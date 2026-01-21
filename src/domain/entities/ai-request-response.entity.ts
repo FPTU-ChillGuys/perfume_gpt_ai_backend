@@ -5,4 +5,5 @@ export class AIRequestResponse extends Common {
   userId!: string;
   requestType!: RequestType;
   prompt!: string;
+  response!: string;
 }

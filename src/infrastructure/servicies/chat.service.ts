@@ -7,21 +7,23 @@ import { AIRequestResponse } from 'src/domain/entities/ai-request-response.entit
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { AddConversationRequest } from 'src/application/dtos/request/add-conversation.request';
+import { MessageResponse } from 'src/application/dtos/response/message.response';
+import { AddMessageRequest } from 'src/application/dtos/request/add-message.request';
 
 @Injectable()
 export class ChatService {
   constructor(
     private unitOfWork: UnitOfWork,
-    @InjectMapper() private mapper: Mapper,
+    @InjectMapper() private mapper: Mapper
   ) {}
 
   async savePrompt(
-    addPromptRequest: AddPromptRequest,
+    addPromptRequest: AddPromptRequest
   ): Promise<BaseResponse<AIRequestResponse>> {
     const aiRequestResponse = await this.mapper.mapAsync(
       addPromptRequest,
       AddPromptRequest,
-      AIRequestResponse,
+      AIRequestResponse
     );
     try {
       this.unitOfWork.AIRequestResponseRepo.create(aiRequestResponse);
@@ -41,7 +43,7 @@ export class ChatService {
       }
 
       this.unitOfWork.AIRequestResponseRepo.assign(aiRequestResponse, {
-        response: response,
+        response: response
       });
       return { success: true };
     } catch {
@@ -53,7 +55,7 @@ export class ChatService {
     try {
       return {
         success: true,
-        data: await this.unitOfWork.AIRequestResponseRepo.findAll(),
+        data: await this.unitOfWork.AIRequestResponseRepo.findAll()
       };
     } catch {
       return { success: false, error: 'Failed to get all request-responses' };
@@ -74,18 +76,44 @@ export class ChatService {
   }
 
   async addConversation(
-    conversationRequest: AddConversationRequest,
+    conversationRequest: AddConversationRequest
   ): Promise<BaseResponse<Conversation>> {
     try {
       const conversation = await this.mapper.mapAsync(
         conversationRequest,
         AddConversationRequest,
-        Conversation,
+        Conversation
       );
       this.unitOfWork.AIConversationRepo.create(conversation);
       return { success: true, data: conversation };
     } catch {
       return { success: false, error: 'Failed to add conversation' };
+    }
+  }
+
+  async updateMessageToConversation(
+    id: string,
+    messages: AddMessageRequest[]
+  ): Promise<BaseResponse> {
+    try {
+      const conversation = await this.unitOfWork.AIConversationRepo.findOne({
+        id
+      });
+      if (!conversation) {
+        return { success: false, error: 'Conversation not found' };
+      }
+
+      this.unitOfWork.AIConversationRepo.assign(conversation, {
+        messages: await this.mapper.mapArrayAsync(
+          messages,
+          AddMessageRequest,
+          MessageResponse
+        )
+      });
+
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Failed to update messages' };
     }
   }
 }

@@ -1,27 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { AIConversationRepository } from './ai-conversation.repository';
-import { AIQuizQuestionAnswerRepository } from './ai-quiz-question-answer.repository';
-import { AIQuizQuestionRepository } from './ai-quiz-question.repository';
+import { ConversationRepository } from './conversation.repository';
+import { QuizQuestionAnswerRepository } from './quiz-question-answer.repository';
+import { QuizQuestionRepository } from './quiz-question.repository';
 import { AIRequestResponseRepository } from './ai-request-response.repository';
-import { AIReviewSummaryRepository } from './ai-review-summary.repository';
+import { AIReviewSummaryRepository } from './review-summary.repository';
 
 @Injectable()
 export class UnitOfWork {
   constructor(
-    private aiConversationRepository: AIConversationRepository,
-    private aiQuizQuestionRepository: AIQuizQuestionRepository,
-    private aiQuizQuestionAnswerRepository: AIQuizQuestionAnswerRepository,
+    private aiConversationRepository: ConversationRepository,
+    private aiQuizQuestionRepository: QuizQuestionRepository,
+    private aiQuizQuestionAnswerRepository: QuizQuestionAnswerRepository,
     private aiRequestResponseRepository: AIRequestResponseRepository,
     private aiReviewSummaryRepository: AIReviewSummaryRepository
   ) {}
 
-  get AIConversationRepo(): AIConversationRepository {
+  get AIConversationRepo(): ConversationRepository {
     return this.aiConversationRepository;
   }
-  get AIQuizQuestionRepo(): AIQuizQuestionRepository {
+  get AIQuizQuestionRepo(): QuizQuestionRepository {
     return this.aiQuizQuestionRepository;
   }
-  get AIQuizQuestionAnswerRepo(): AIQuizQuestionAnswerRepository {
+  get AIQuizQuestionAnswerRepo(): QuizQuestionAnswerRepository {
     return this.aiQuizQuestionAnswerRepository;
   }
   get AIRequestResponseRepo(): AIRequestResponseRepository {

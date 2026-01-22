@@ -1,10 +1,10 @@
 import { Sender } from '../enum/sender.enum';
-import { AIConversation } from './ai-conversation.entity';
+import { Conversation } from './conversation.entity';
 import { Common } from './common/common.entities';
 
-export class AIMessage extends Common {
+export class Message extends Common {
   conversationId!: string;
   sender!: Sender;
   message!: string;
-  conversation!: AIConversation;
+  conversation!: Conversation;
 }

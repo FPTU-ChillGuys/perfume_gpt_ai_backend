@@ -21,6 +21,9 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.13",
+    "@automapper/classes": "^8.8.1",
+    "@automapper/core": "^8.8.1",
+    "@automapper/nestjs": "^8.8.1",
     "@mikro-orm/core": "^6.6.4",
     "@mikro-orm/postgresql": "^6.6.4",
     "@nestjs/common": "^11.0.1",

@@ -1,5 +1,5 @@
 import { Sentiment } from 'src/domain/enum/sentiment.enum';
-import { CommonResponse } from './common.response';
+import { CommonResponse } from './common/common.response';
 
 export class AIReviewSummaryResponse extends CommonResponse {
   productId!: string;

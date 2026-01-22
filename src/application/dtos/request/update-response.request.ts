@@ -1,3 +1,3 @@
-export class UpdateResponseRequest {
+export class UpdateResRequest {
   response!: string;
 }

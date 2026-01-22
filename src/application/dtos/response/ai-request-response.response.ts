@@ -1,5 +1,5 @@
 import { RequestType } from 'src/domain/enum/request-type.enum';
-import { CommonResponse } from './common.response';
+import { CommonResponse } from './common/common.response';
 
 export class AIReqResResponse extends CommonResponse {
   userId!: string;

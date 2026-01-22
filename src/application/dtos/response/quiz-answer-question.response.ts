@@ -1,4 +1,4 @@
-import { CommonResponse } from './common.response';
+import { CommonResponse } from './common/common.response';
 
 export class QuizAnswerQuestionResponse extends CommonResponse {
   userId!: string;

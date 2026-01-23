@@ -26,21 +26,19 @@ export class ChatService {
   async savePrompt(
     addPromptRequest: AddPromptRequest
   ): Promise<BaseResponse<AIRequestResponse>> {
-    const aiRequestResponse = await this.mapper.mapAsync(
-      addPromptRequest,
-      AddPromptRequest,
-      AIRequestResponse
-    );
-    try {
+    return funcHandler(async () => {
+      const aiRequestResponse = await this.mapper.mapAsync(
+        addPromptRequest,
+        AddPromptRequest,
+        AIRequestResponse
+      );
       this.unitOfWork.AIRequestResponseRepo.create(aiRequestResponse);
       return { success: true, data: aiRequestResponse };
-    } catch {
-      return { success: false, error: 'Failed to save prompt' };
-    }
+    }, 'Failed to save prompt');
   }
 
   async updateResponse(id: string, response: string): Promise<BaseResponse> {
-    try {
+    return funcHandler(async () => {
       const aiRequestResponse =
         await this.unitOfWork.AIRequestResponseRepo.findOne({ id });
 
@@ -52,39 +50,33 @@ export class ChatService {
         response: response
       });
       return { success: true };
-    } catch {
-      return { success: false, error: 'Failed to update response' };
-    }
+    }, 'Failed to update response');
   }
 
   async getAllReqRes(): Promise<BaseResponse<AIRequestResponse[]>> {
-    try {
+    return funcHandler(async () => {
       return {
         success: true,
         data: await this.unitOfWork.AIRequestResponseRepo.findAll()
       };
-    } catch {
-      return { success: false, error: 'Failed to get all request-responses' };
-    }
+    }, 'Failed to get all request-responses');
   }
 
   async getReqResById(id: string): Promise<BaseResponse<AIRequestResponse>> {
-    try {
+    return funcHandler(async () => {
       const aiRequestResponse =
         await this.unitOfWork.AIRequestResponseRepo.findOne({ id });
       if (!aiRequestResponse) {
         return { success: false, error: 'Request-Response not found' };
       }
       return { success: true, data: aiRequestResponse };
-    } catch {
-      return { success: false, error: 'Failed to get request-response by id' };
-    }
+    }, 'Failed to get request-response by id');
   }
 
   async addConversation(
     conversationRequest: AddConversationRequest
   ): Promise<BaseResponse<Conversation>> {
-    try {
+    return funcHandler(async () => {
       const conversation = await this.mapper.mapAsync(
         conversationRequest,
         AddConversationRequest,
@@ -92,16 +84,14 @@ export class ChatService {
       );
       this.unitOfWork.AIConversationRepo.create(conversation);
       return { success: true, data: conversation };
-    } catch {
-      return { success: false, error: 'Failed to add conversation' };
-    }
+    }, 'Failed to add conversation');
   }
 
   async updateMessageToConversation(
     id: string,
     messages: AddMessageRequest[]
   ): Promise<BaseResponse> {
-    try {
+    return funcHandler(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne({
         id
       });
@@ -118,13 +108,11 @@ export class ChatService {
       });
 
       return { success: true };
-    } catch {
-      return { success: false, error: 'Failed to update messages' };
-    }
+    }, 'Failed to update messages');
   }
 
   async getConversationById(id: string): Promise<BaseResponse<Conversation>> {
-    try {
+    return funcHandler(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne({
         id
       });
@@ -132,22 +120,18 @@ export class ChatService {
         return { success: false, error: 'Conversation not found' };
       }
       return { success: true, data: conversation };
-    } catch {
-      return { success: false, error: 'Failed to get conversation by id' };
-    }
+    }, 'Failed to get conversation by id');
   }
 
   async getAllConversations(): Promise<BaseResponse<Conversation[]>> {
-    try {
+    return funcHandler(async () => {
       const conversations = await this.unitOfWork.AIConversationRepo.findAll();
       return { success: true, data: conversations };
-    } catch {
-      return { success: false, error: 'Failed to get all conversations' };
-    }
+    }, 'Failed to get all conversations');
   }
 
   async addQuesAnws(question: QuizQuestionRequest): Promise<BaseResponse> {
-    try {
+    return funcHandler(async () => {
       const quizQuestion = await this.mapper.mapAsync(
         question,
         QuizQuestionRequest,
@@ -155,19 +139,14 @@ export class ChatService {
       );
       this.unitOfWork.AIQuizQuestionRepo.create(quizQuestion);
       return { success: true };
-    } catch {
-      return {
-        success: false,
-        error: 'Failed to add quiz question and answers'
-      };
-    }
+    }, 'Failed to add quiz question and answers');
   }
 
   async updateAnswer(
     id: string,
     answers: QuizAnswerRequest[]
   ): Promise<BaseResponse> {
-    try {
+    return funcHandler(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
         id
       });
@@ -184,19 +163,8 @@ export class ChatService {
         answers: mappingedAnswers
       });
       return { success: true };
-    } catch {
-      return { success: false, error: 'Failed to update quiz answer' };
-    }
+    }, 'Failed to update quiz answer');
   }
-
-  // async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
-  //   try {
-  //     const quizQnA = await this.unitOfWork.AIQuizQuestionRepo.findAll();
-  //     return { success: true, data: quizQnA };
-  //   } catch {
-  //     return { success: false, error: 'Failed to get all quiz questions' };
-  //   }
-  // }
 
   getQuizQuesById(id: string): Promise<BaseResponse<QuizQuestion>> {
     return funcHandler(async () => {

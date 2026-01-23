@@ -15,6 +15,7 @@ import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.ent
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { funcHandler } from '../utils/error-handler';
+import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
 
 @Injectable()
 export class ChatService {
@@ -26,7 +27,7 @@ export class ChatService {
   async savePrompt(
     addPromptRequest: AddPromptRequest
   ): Promise<BaseResponse<AIRequestResponse>> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const aiRequestResponse = await this.mapper.mapAsync(
         addPromptRequest,
         AddPromptRequest,
@@ -38,7 +39,7 @@ export class ChatService {
   }
 
   async updateResponse(id: string, response: string): Promise<BaseResponse> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const aiRequestResponse =
         await this.unitOfWork.AIRequestResponseRepo.findOne({ id });
 
@@ -54,7 +55,7 @@ export class ChatService {
   }
 
   async getAllReqRes(): Promise<BaseResponse<AIRequestResponse[]>> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       return {
         success: true,
         data: await this.unitOfWork.AIRequestResponseRepo.findAll()
@@ -63,7 +64,7 @@ export class ChatService {
   }
 
   async getReqResById(id: string): Promise<BaseResponse<AIRequestResponse>> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const aiRequestResponse =
         await this.unitOfWork.AIRequestResponseRepo.findOne({ id });
       if (!aiRequestResponse) {
@@ -76,7 +77,7 @@ export class ChatService {
   async addConversation(
     conversationRequest: AddConversationRequest
   ): Promise<BaseResponse<Conversation>> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const conversation = await this.mapper.mapAsync(
         conversationRequest,
         AddConversationRequest,
@@ -91,7 +92,7 @@ export class ChatService {
     id: string,
     messages: AddMessageRequest[]
   ): Promise<BaseResponse> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne({
         id
       });
@@ -112,7 +113,7 @@ export class ChatService {
   }
 
   async getConversationById(id: string): Promise<BaseResponse<Conversation>> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne({
         id
       });
@@ -124,14 +125,14 @@ export class ChatService {
   }
 
   async getAllConversations(): Promise<BaseResponse<Conversation[]>> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const conversations = await this.unitOfWork.AIConversationRepo.findAll();
       return { success: true, data: conversations };
     }, 'Failed to get all conversations');
   }
 
   async addQuesAnws(question: QuizQuestionRequest): Promise<BaseResponse> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const quizQuestion = await this.mapper.mapAsync(
         question,
         QuizQuestionRequest,
@@ -146,7 +147,7 @@ export class ChatService {
     id: string,
     answers: QuizAnswerRequest[]
   ): Promise<BaseResponse> {
-    return funcHandler(async () => {
+    return await funcHandler(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
         id
       });
@@ -166,8 +167,8 @@ export class ChatService {
     }, 'Failed to update quiz answer');
   }
 
-  getQuizQuesById(id: string): Promise<BaseResponse<QuizQuestion>> {
-    return funcHandler(async () => {
+  async getQuizQuesById(id: string): Promise<BaseResponse<QuizQuestion>> {
+    return await funcHandler(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
         id
       });
@@ -176,5 +177,47 @@ export class ChatService {
       }
       return { success: true, data: quizQuestion };
     }, 'Failed to get quiz question by id');
+  }
+
+  async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
+    return await funcHandler(async () => {
+      const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.findAll();
+      return { success: true, data: quizQuestions };
+    }, 'Failed to get all quiz questions');
+  }
+
+  async addQuizQuesAnws(
+    quizQuesAnws: AddQuesAnwsRequest
+  ): Promise<BaseResponse<QuizQuestionAnswer>> {
+    return await funcHandler(async () => {
+      const quizQuestionAnswer = await this.mapper.mapAsync(
+        quizQuesAnws,
+        AddQuesAnwsRequest,
+        QuizQuestionAnswer
+      );
+      this.unitOfWork.AIQuizQuestionAnswerRepo.create(quizQuestionAnswer);
+      return { success: true, data: quizQuestionAnswer };
+    }, 'Failed to add quiz question answer');
+  }
+
+  async getAllQuizQuesAnws(): Promise<BaseResponse<QuizQuestionAnswer[]>> {
+    return await funcHandler(async () => {
+      const quizQuestionAnswers =
+        await this.unitOfWork.AIQuizQuestionAnswerRepo.findAll();
+      return { success: true, data: quizQuestionAnswers };
+    }, 'Failed to get all quiz question answers');
+  }
+
+  async getQuizQuesAnwsById(
+    id: string
+  ): Promise<BaseResponse<QuizQuestionAnswer>> {
+    return await funcHandler(async () => {
+      const quizQuestionAnswer =
+        await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({ id });
+      if (!quizQuestionAnswer) {
+        return { success: false, error: 'Quiz question answer not found' };
+      }
+      return { success: true, data: quizQuestionAnswer };
+    }, 'Failed to get quiz question answer by id');
   }
 }

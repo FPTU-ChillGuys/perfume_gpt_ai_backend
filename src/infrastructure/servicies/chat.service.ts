@@ -9,6 +9,11 @@ import { Conversation } from 'src/domain/entities/conversation.entity';
 import { AddConversationRequest } from 'src/application/dtos/request/add-conversation.request';
 import { MessageResponse } from 'src/application/dtos/response/message.response';
 import { AddMessageRequest } from 'src/application/dtos/request/add-message.request';
+import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
+import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
+import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
+import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
+import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 
 @Injectable()
 export class ChatService {
@@ -51,7 +56,7 @@ export class ChatService {
     }
   }
 
-  async getAllsReqRes(): Promise<BaseResponse<AIRequestResponse[]>> {
+  async getAllReqRes(): Promise<BaseResponse<AIRequestResponse[]>> {
     try {
       return {
         success: true,
@@ -114,6 +119,81 @@ export class ChatService {
       return { success: true };
     } catch {
       return { success: false, error: 'Failed to update messages' };
+    }
+  }
+
+  async getConversationById(id: string): Promise<BaseResponse<Conversation>> {
+    try {
+      const conversation = await this.unitOfWork.AIConversationRepo.findOne({
+        id
+      });
+      if (!conversation) {
+        return { success: false, error: 'Conversation not found' };
+      }
+      return { success: true, data: conversation };
+    } catch {
+      return { success: false, error: 'Failed to get conversation by id' };
+    }
+  }
+
+  async getAllConversations(): Promise<BaseResponse<Conversation[]>> {
+    try {
+      const conversations = await this.unitOfWork.AIConversationRepo.findAll();
+      return { success: true, data: conversations };
+    } catch {
+      return { success: false, error: 'Failed to get all conversations' };
+    }
+  }
+
+  async addQuesAnws(question: QuizQuestionRequest): Promise<BaseResponse> {
+    try {
+      const quizQuestion = await this.mapper.mapAsync(
+        question,
+        QuizQuestionRequest,
+        QuizQuestion
+      );
+      this.unitOfWork.AIQuizQuestionRepo.create(quizQuestion);
+      return { success: true };
+    } catch {
+      return {
+        success: false,
+        error: 'Failed to add quiz question and answers'
+      };
+    }
+  }
+
+  async updateAnswer(
+    id: string,
+    answers: QuizAnswerRequest[]
+  ): Promise<BaseResponse> {
+    try {
+      const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
+        id
+      });
+      if (!quizQuestion) {
+        return { success: false, error: 'Quiz question not found' };
+      }
+
+      const mappingedAnswers = await this.mapper.mapArrayAsync(
+        answers,
+        QuizAnswerRequest,
+        QuizAnswer
+      );
+      this.unitOfWork.AIQuizQuestionRepo.assign(quizQuestion, {
+        answers: mappingedAnswers
+      });
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Failed to update quiz answer' };
+    }
+  }
+
+  async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
+    try {
+      const quizQnA = await this.unitOfWork.AIQuizQuestionRepo.findAll();
+      return { success: true, data: quizQnA };
+    } catch {
+      return { success: false, error: 'Failed to get all quiz questions' };
     }
   }
 }

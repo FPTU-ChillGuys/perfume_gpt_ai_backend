@@ -8,7 +8,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { funcHandlerAsync } from '../utils/error-handler';
 
 @Injectable()
-export class ChatService {
+export class PromptService {
   constructor(
     private unitOfWork: UnitOfWork,
     @InjectMapper() private mapper: Mapper

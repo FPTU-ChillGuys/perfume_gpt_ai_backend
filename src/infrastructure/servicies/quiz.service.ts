@@ -1,7 +1,7 @@
 import { InjectMapper } from '@automapper/nestjs';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { Mapper } from '@automapper/core';
-import { funcHandler } from '../utils/error-handler';
+import { funcHandlerAsync } from '../utils/error-handler';
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
@@ -17,7 +17,7 @@ export class QuizService {
   ) {}
 
   async addQuesAnws(question: QuizQuestionRequest): Promise<BaseResponse> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const quizQuestion = await this.mapper.mapAsync(
         question,
         QuizQuestionRequest,
@@ -32,7 +32,7 @@ export class QuizService {
     id: string,
     answers: QuizAnswerRequest[]
   ): Promise<BaseResponse> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
         id
       });
@@ -53,7 +53,7 @@ export class QuizService {
   }
 
   async getQuizQuesById(id: string): Promise<BaseResponse<QuizQuestion>> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
         id
       });
@@ -65,7 +65,7 @@ export class QuizService {
   }
 
   async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.findAll();
       return { success: true, data: quizQuestions };
     }, 'Failed to get all quiz questions');
@@ -74,7 +74,7 @@ export class QuizService {
   async addQuizQuesAnws(
     quizQuesAnws: AddQuesAnwsRequest
   ): Promise<BaseResponse<QuizQuestionAnswer>> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const quizQuestionAnswer = await this.mapper.mapAsync(
         quizQuesAnws,
         AddQuesAnwsRequest,
@@ -86,7 +86,7 @@ export class QuizService {
   }
 
   async getAllQuizQuesAnws(): Promise<BaseResponse<QuizQuestionAnswer[]>> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const quizQuestionAnswers =
         await this.unitOfWork.AIQuizQuestionAnswerRepo.findAll();
       return { success: true, data: quizQuestionAnswers };
@@ -96,7 +96,7 @@ export class QuizService {
   async getQuizQuesAnwsById(
     id: string
   ): Promise<BaseResponse<QuizQuestionAnswer>> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const quizQuestionAnswer =
         await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({ id });
       if (!quizQuestionAnswer) {

@@ -1,7 +1,7 @@
 import { Mapper } from '@automapper/core';
 import { InjectMapper } from '@automapper/nestjs';
 import { UnitOfWork } from '../repositories/unit-of-work';
-import { funcHandler } from '../utils/error-handler';
+import { funcHandlerAsync } from '../utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { AddMessageRequest } from 'src/application/dtos/request/add-message.request';
@@ -19,7 +19,7 @@ export class ConversationService {
   async addConversation(
     conversationRequest: AddConversationRequest
   ): Promise<BaseResponse<Conversation>> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const conversation = await this.mapper.mapAsync(
         conversationRequest,
         AddConversationRequest,
@@ -34,7 +34,7 @@ export class ConversationService {
     id: string,
     messages: AddMessageRequest[]
   ): Promise<BaseResponse> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne({
         id
       });
@@ -55,7 +55,7 @@ export class ConversationService {
   }
 
   async getConversationById(id: string): Promise<BaseResponse<Conversation>> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne({
         id
       });
@@ -67,7 +67,7 @@ export class ConversationService {
   }
 
   async getAllConversations(): Promise<BaseResponse<Conversation[]>> {
-    return await funcHandler(async () => {
+    return await funcHandlerAsync(async () => {
       const conversations = await this.unitOfWork.AIConversationRepo.findAll();
       return { success: true, data: conversations };
     }, 'Failed to get all conversations');

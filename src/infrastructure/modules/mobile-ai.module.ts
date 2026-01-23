@@ -11,6 +11,7 @@ const mobileAIProvider: Provider = {
 };
 
 @Module({
-  providers: [mobileAIProvider]
+  providers: [mobileAIProvider],
+  exports: [mobileAIProvider]
 })
-export class AIModule {}
+export class MobileAIModule {}

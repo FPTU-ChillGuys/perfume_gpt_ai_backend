@@ -27,16 +27,19 @@ importers:
         specifier: ^6.6.4
         version: 6.6.4
       '@mikro-orm/entity-generator':
-        specifier: ^6.6.5
-        version: 6.6.5(@mikro-orm/core@6.6.4)(pg@8.16.3)
+        specifier: ^6.6.4
+        version: 6.6.4(@mikro-orm/core@6.6.4)(pg@8.16.3)
       '@mikro-orm/migrations':
-        specifier: ^6.6.5
-        version: 6.6.5(@mikro-orm/core@6.6.4)(@types/node@22.19.7)(pg@8.16.3)
+        specifier: ^6.6.4
+        version: 6.6.4(@mikro-orm/core@6.6.4)(@types/node@22.19.7)(pg@8.16.3)
       '@mikro-orm/nestjs':
         specifier: ^6.1.1
         version: 6.1.1(@mikro-orm/core@6.6.4)(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.12)
       '@mikro-orm/postgresql':
         specifier: ^6.6.4
+        version: 6.6.4(@mikro-orm/core@6.6.4)
+      '@mikro-orm/reflection':
+        specifier: 6.6.4
         version: 6.6.4(@mikro-orm/core@6.6.4)
       '@nestjs/common':
         specifier: ^11.0.1
@@ -706,8 +709,8 @@ packages:
     resolution: {integrity: sha512-5MOP1QXlE73GimQOHJBR/yBiCx65qTIwdbCokE10zw3Dj7M7dZ0Q8aeR2F0cQyIlw/Ne80AlApSB3kh9mjr4ww==}
     engines: {node: '>= 18.12.0'}
 
-  '@mikro-orm/entity-generator@6.6.5':
-    resolution: {integrity: sha512-O+3t5BrGEZ18VsCyKMquMLhkbj6CM0kXzdKpBUXTIS8rEFmGGyae8gadyo8PrLBXH/+v8WPKI4rD+I1rqEAXMQ==}
+  '@mikro-orm/entity-generator@6.6.4':
+    resolution: {integrity: sha512-XRWGBBCwivrXCW8E+J6tbKo8qBgDoROXRcqZXJq4QgB/Mgtv7WAMYNggmy/WO7lU61p9WM65C7Eg3KfaQ3SEvg==}
     engines: {node: '>= 18.12.0'}
     peerDependencies:
       '@mikro-orm/core': ^6.0.0
@@ -728,24 +731,8 @@ packages:
       mariadb:
         optional: true
 
-  '@mikro-orm/knex@6.6.5':
-    resolution: {integrity: sha512-iDfeXivg2kwA+yHfqkZcyDfqbfRHJnZf29JYOQaOOF59tLW1lGjMXL7mmAr36vU/Yjspo+wDIetVBYpfjIQ/ug==}
-    engines: {node: '>= 18.12.0'}
-    peerDependencies:
-      '@mikro-orm/core': ^6.0.0
-      better-sqlite3: '*'
-      libsql: '*'
-      mariadb: '*'
-    peerDependenciesMeta:
-      better-sqlite3:
-        optional: true
-      libsql:
-        optional: true
-      mariadb:
-        optional: true
-
-  '@mikro-orm/migrations@6.6.5':
-    resolution: {integrity: sha512-IxN1lumcuCxyrK2WFURl7quEd5Mu1G9ok8zphlKMZvxicHR4Ks+Dvj7c4UQHbU9w+XFqCFAnm1M7yK46vfXfCQ==}
+  '@mikro-orm/migrations@6.6.4':
+    resolution: {integrity: sha512-e2f8A9GELsozaIdojuoReypLDLDvWuVv6HU25Hfkxyf5VFxnXT0XrK2qjnmvFiRhpHqypRJVPzuCMIdRF2g4xw==}
     engines: {node: '>= 18.12.0'}
     peerDependencies:
       '@mikro-orm/core': ^6.0.0
@@ -760,6 +747,12 @@ packages:
 
   '@mikro-orm/postgresql@6.6.4':
     resolution: {integrity: sha512-s10sZraQrmKwi0F5c+QXuYfgXCbCKrQ+Peanx+eOYvAumsEVQ66u/JaVpvWtS6wWHxfJHBDlUW+kU4CIid5rng==}
+    engines: {node: '>= 18.12.0'}
+    peerDependencies:
+      '@mikro-orm/core': ^6.0.0
+
+  '@mikro-orm/reflection@6.6.4':
+    resolution: {integrity: sha512-aRHDLV+sTecIVqdSaxM2fDEFl7P72Mvgbzxw1+LdZLC+ZrxKAII8GSuWbncJDrO9qdAhRNAW5nmmOuSS44hY+A==}
     engines: {node: '>= 18.12.0'}
     peerDependencies:
       '@mikro-orm/core': ^6.0.0
@@ -1121,6 +1114,9 @@ packages:
 
   '@tokenizer/token@0.3.0':
     resolution: {integrity: sha512-OvjF+z51L3ov0OyAU0duzsYuvO01PH7x4t6DJx+guahgTnBHkhJdG7soQeTSFLWN3efnHyibZ4Z8l2EuWwJN3A==}
+
+  '@ts-morph/common@0.28.1':
+    resolution: {integrity: sha512-W74iWf7ILp1ZKNYXY5qbddNaml7e9Sedv5lvU1V8lftlitkc9Pq1A+jlH23ltDgWYeZFFEqGCD1Ies9hqu3O+g==}
 
   '@tsconfig/node10@1.0.12':
     resolution: {integrity: sha512-UCYBaeFvM11aU2y3YPZ//O5Rhj+xKyzy7mvcIoAjASbigy8mHMryP5cK7dgjlz2hWxh1g5pLw084E0a/wlUSFQ==}
@@ -1702,6 +1698,9 @@ packages:
   co@4.6.0:
     resolution: {integrity: sha512-QVb0dM5HvG+uaxitm8wONl7jltx8dqhfU33DcqtOZcLSVIKSDDLDi7+0LbAKiyI8hD9u42m2YxXSkMGWThaecQ==}
     engines: {iojs: '>= 1.0.0', node: '>= 0.12.0'}
+
+  code-block-writer@13.0.3:
+    resolution: {integrity: sha512-Oofo0pq3IKnsFtuHqSF7TqBfr71aeyZDVJ0HpmqB7FBM2qEigL0iPONSCZSO9pE9dZTAxANe5XHG9Uy0YMv8cg==}
 
   collect-v8-coverage@1.0.3:
     resolution: {integrity: sha512-1L5aqIkwPfiodaMgQunkF1zRhNqifHBmtbbbxcr6yVxxBnliw4TDOW6NxpO8DJLgJ16OT+Y4ztZqP6p/FtXnAw==}
@@ -2958,6 +2957,9 @@ packages:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
 
+  path-browserify@1.0.1:
+    resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
+
   path-exists@4.0.0:
     resolution: {integrity: sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w==}
     engines: {node: '>=8'}
@@ -3537,6 +3539,9 @@ packages:
     peerDependencies:
       typescript: '*'
       webpack: ^5.0.0
+
+  ts-morph@27.0.2:
+    resolution: {integrity: sha512-fhUhgeljcrdZ+9DZND1De1029PrE+cMkIP7ooqkLRTrRLTqcki2AstsyJm0vRNbTbVCNJ0idGlbBrfqc7/nA8w==}
 
   ts-node@10.9.2:
     resolution: {integrity: sha512-f0FFpIdcHgn8zcPSbf1dRevwt047YMnaiJM3u2w2RewrB+fob/zePZcrOyQoLMMO7aBIddLcQIEK5dYjkLnGrQ==}
@@ -4489,10 +4494,10 @@ snapshots:
       mikro-orm: 6.6.4
       reflect-metadata: 0.2.2
 
-  '@mikro-orm/entity-generator@6.6.5(@mikro-orm/core@6.6.4)(pg@8.16.3)':
+  '@mikro-orm/entity-generator@6.6.4(@mikro-orm/core@6.6.4)(pg@8.16.3)':
     dependencies:
       '@mikro-orm/core': 6.6.4
-      '@mikro-orm/knex': 6.6.5(@mikro-orm/core@6.6.4)(pg@8.16.3)
+      '@mikro-orm/knex': 6.6.4(@mikro-orm/core@6.6.4)(pg@8.16.3)
       fs-extra: 11.3.3
     transitivePeerDependencies:
       - better-sqlite3
@@ -4521,25 +4526,10 @@ snapshots:
       - supports-color
       - tedious
 
-  '@mikro-orm/knex@6.6.5(@mikro-orm/core@6.6.4)(pg@8.16.3)':
+  '@mikro-orm/migrations@6.6.4(@mikro-orm/core@6.6.4)(@types/node@22.19.7)(pg@8.16.3)':
     dependencies:
       '@mikro-orm/core': 6.6.4
-      fs-extra: 11.3.3
-      knex: 3.1.0(pg@8.16.3)
-      sqlstring: 2.3.3
-    transitivePeerDependencies:
-      - mysql
-      - mysql2
-      - pg
-      - pg-native
-      - sqlite3
-      - supports-color
-      - tedious
-
-  '@mikro-orm/migrations@6.6.5(@mikro-orm/core@6.6.4)(@types/node@22.19.7)(pg@8.16.3)':
-    dependencies:
-      '@mikro-orm/core': 6.6.4
-      '@mikro-orm/knex': 6.6.5(@mikro-orm/core@6.6.4)(pg@8.16.3)
+      '@mikro-orm/knex': 6.6.4(@mikro-orm/core@6.6.4)(pg@8.16.3)
       fs-extra: 11.3.3
       umzug: 3.8.2(@types/node@22.19.7)
     transitivePeerDependencies:
@@ -4579,6 +4569,12 @@ snapshots:
       - sqlite3
       - supports-color
       - tedious
+
+  '@mikro-orm/reflection@6.6.4(@mikro-orm/core@6.6.4)':
+    dependencies:
+      '@mikro-orm/core': 6.6.4
+      globby: 11.1.0
+      ts-morph: 27.0.2
 
   '@napi-rs/nice-android-arm-eabi@1.1.1':
     optional: true
@@ -4915,6 +4911,12 @@ snapshots:
       - supports-color
 
   '@tokenizer/token@0.3.0': {}
+
+  '@ts-morph/common@0.28.1':
+    dependencies:
+      minimatch: 10.1.1
+      path-browserify: 1.0.1
+      tinyglobby: 0.2.15
 
   '@tsconfig/node10@1.0.12': {}
 
@@ -5641,6 +5643,8 @@ snapshots:
   clone@1.0.4: {}
 
   co@4.6.0: {}
+
+  code-block-writer@13.0.3: {}
 
   collect-v8-coverage@1.0.3: {}
 
@@ -7024,6 +7028,8 @@ snapshots:
 
   parseurl@1.3.3: {}
 
+  path-browserify@1.0.1: {}
+
   path-exists@4.0.0: {}
 
   path-is-absolute@1.0.1: {}
@@ -7570,6 +7576,11 @@ snapshots:
       source-map: 0.7.6
       typescript: 5.9.3
       webpack: 5.104.1(@swc/core@1.15.10)
+
+  ts-morph@27.0.2:
+    dependencies:
+      '@ts-morph/common': 0.28.1
+      code-block-writer: 13.0.3
 
   ts-node@10.9.2(@swc/core@1.15.10)(@types/node@22.19.7)(typescript@5.9.3):
     dependencies:

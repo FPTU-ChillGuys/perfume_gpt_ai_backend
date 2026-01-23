@@ -14,6 +14,7 @@ import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
+import { funcHandler } from '../utils/error-handler';
 
 @Injectable()
 export class ChatService {
@@ -188,12 +189,24 @@ export class ChatService {
     }
   }
 
-  async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
-    try {
-      const quizQnA = await this.unitOfWork.AIQuizQuestionRepo.findAll();
-      return { success: true, data: quizQnA };
-    } catch {
-      return { success: false, error: 'Failed to get all quiz questions' };
-    }
+  // async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
+  //   try {
+  //     const quizQnA = await this.unitOfWork.AIQuizQuestionRepo.findAll();
+  //     return { success: true, data: quizQnA };
+  //   } catch {
+  //     return { success: false, error: 'Failed to get all quiz questions' };
+  //   }
+  // }
+
+  getQuizQuesById(id: string): Promise<BaseResponse<QuizQuestion>> {
+    return funcHandler(async () => {
+      const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
+        id
+      });
+      if (!quizQuestion) {
+        return { success: false, error: 'Quiz question not found' };
+      }
+      return { success: true, data: quizQuestion };
+    }, 'Failed to get quiz question by id');
   }
 }

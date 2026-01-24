@@ -37,6 +37,7 @@
     "@nestjs/swagger": "^11.2.5",
     "@scalar/nestjs-api-reference": "^1.0.18",
     "ai": "^6.0.42",
+    "pg": "^8.17.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "uuid": "^13.0.0",

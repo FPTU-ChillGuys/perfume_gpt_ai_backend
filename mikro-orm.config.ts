@@ -1,15 +1,18 @@
 import { EntityGenerator } from '@mikro-orm/entity-generator';
 import { Migrator } from '@mikro-orm/migrations';
-import { defineConfig } from '@mikro-orm/postgresql';
+import { defineConfig, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
+import { AdminInstruction } from 'src/domain/entities/admin-instruction.entity';
 
 export default defineConfig({
-  entities: ['./src/domain/entities/**/*.ts'],
+  driver: PostgreSqlDriver,
+  entities: [AdminInstruction],
   extensions: [EntityGenerator, Migrator],
   metadataProvider: TsMorphMetadataProvider,
   dbName: 'perfume_gpt_ai',
   user: 'vqn',
   password: '1234567890',
   host: 'localhost',
-  port: 5432
+  port: 5432,
+  dynamicImportProvider: (id) => import(id)
 });

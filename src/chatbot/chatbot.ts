@@ -25,7 +25,8 @@ export async function TextGenerationFromMessagesToResultWithErrorHandler(
       tools: tools ? tools : undefined
     });
     return result.text;
-  } catch {
+  } catch (error) {
+    console.error('Error in TextGenerationFromMessages:', error);
     return errorMessage
       ? errorMessage
       : 'Hệ thống gặp sự cố khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.';

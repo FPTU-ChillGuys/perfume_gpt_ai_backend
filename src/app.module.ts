@@ -6,6 +6,7 @@ import { classes } from '@automapper/classes';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import defineConfig from '../mikro-orm.config';
 import { ProviderModule } from './infrastructure/modules/provider.module';
+import { ConfigModule } from '@nestjs/config';
 @Module({
   imports: [
     AutomapperModule.forRoot({
@@ -15,6 +16,7 @@ import { ProviderModule } from './infrastructure/modules/provider.module';
       ...defineConfig,
       autoLoadEntities: true
     }),
+    ConfigModule.forRoot(),
     ProviderModule
   ],
   controllers: [AppController],

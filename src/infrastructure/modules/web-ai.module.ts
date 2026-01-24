@@ -1,10 +1,10 @@
 import { AIService } from '../servicies/ai.service';
 import { Module, Provider } from '@nestjs/common';
 
-const WEB_CHAT_CONTROLLER = 'WEB_CHAT_CONTROLLER';
+export const WEB_CHAT_SERVICE = 'WEB_CHAT_SERVICE';
 
 const webAIProvider: Provider = {
-  provide: WEB_CHAT_CONTROLLER,
+  provide: WEB_CHAT_SERVICE,
   useFactory: () => {
     return new AIService();
   }

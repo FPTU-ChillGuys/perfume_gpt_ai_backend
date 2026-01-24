@@ -1,7 +1,15 @@
 import { QuizQuestion } from './quiz-question.entity';
 import { Common } from './common/common.entities';
-import { ManyToOne, Property } from '@mikro-orm/core';
+import {
+  Collection,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  Property
+} from '@mikro-orm/core';
+import { QuizQuestionAnswer } from './quiz-question-answer.entity';
 
+@Entity()
 export class QuizAnswer extends Common {
   @Property()
   questionId!: string;
@@ -13,4 +21,7 @@ export class QuizAnswer extends Common {
     updateRule: 'cascade'
   })
   question!: QuizQuestion;
+
+  @OneToMany(() => QuizQuestionAnswer, (qqa) => qqa.answer)
+  quizQuestionAnswers = new Collection<QuizQuestionAnswer>(this);
 }

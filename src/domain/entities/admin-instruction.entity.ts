@@ -1,6 +1,7 @@
-import { Property } from '@mikro-orm/core';
+import { Entity, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
 
+@Entity()
 export class AdminInstruction extends Common {
   @Property()
   instruction!: string;

@@ -1,4 +1,4 @@
-import { Entity, Property } from '@mikro-orm/core';
+import { Entity, Enum, Property } from '@mikro-orm/core';
 import { RequestType } from '../enum/request-type.enum';
 import { Common } from './common/common.entities';
 import { AIRequestResponseRepository } from 'src/infrastructure/repositories/ai-request-response.repository';
@@ -7,7 +7,7 @@ import { AIRequestResponseRepository } from 'src/infrastructure/repositories/ai-
 export class AIRequestResponse extends Common {
   @Property()
   userId!: string;
-  @Property()
+  @Enum(() => RequestType)
   requestType!: RequestType;
   @Property()
   prompt!: string;

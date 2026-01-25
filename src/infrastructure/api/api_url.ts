@@ -1,3 +1,9 @@
-export const BASE_URL = process.env.BASE_URL || '';
+export default function ApiUrl() {
+  const BASE_URL = process.env.BASE_URL || '';
 
-export const PRODUCT_URL = (url: string) => `${BASE_URL}/products/${url}`;
+  const PRODUCT_URL = (url: string) => `${BASE_URL}/products/${url}`;
+
+  return {
+    PRODUCT_URL
+  };
+}

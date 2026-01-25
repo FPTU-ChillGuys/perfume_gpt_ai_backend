@@ -5,6 +5,8 @@ import { QuizModule } from './quiz.module';
 import { MobileAIModule } from './mobile-ai.module';
 import { WebAIModule } from './web-ai.module';
 import { MobileAIController } from 'src/api/controllers/ai/mobile-ai.controller';
+import { ProductModule } from './product.module';
+import { ProductController } from 'src/api/controllers/product.controller';
 
 @Module({
   imports: [
@@ -12,15 +14,17 @@ import { MobileAIController } from 'src/api/controllers/ai/mobile-ai.controller'
     PromptModule,
     QuizModule,
     MobileAIModule,
-    WebAIModule
+    WebAIModule,
+    ProductModule
   ],
-  controllers: [MobileAIController],
+  controllers: [MobileAIController, ProductController],
   exports: [
     ConversationModule,
     PromptModule,
     QuizModule,
     MobileAIModule,
-    WebAIModule
+    WebAIModule,
+    ProductModule
   ]
 })
 export class ProviderModule {}

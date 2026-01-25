@@ -1,7 +1,7 @@
 export class PagedAndSortedRequest {
-  PageNumber!: number;
-  PageSize!: number;
-  SortBy!: string;
-  SortOrder!: 'asc' | 'desc';
-  IsDescending!: boolean;
+  PageNumber: number = 1;
+  PageSize: number = 10;
+  SortBy: string = '';
+  SortOrder: 'asc' | 'desc' = 'asc';
+  IsDescending: boolean = false;
 }

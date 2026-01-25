@@ -6,25 +6,37 @@ import { classes } from '@automapper/classes';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import defineConfig from '../mikro-orm.config';
 import { ProviderModule } from './infrastructure/modules/provider.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthGuard } from './application/common/auth/AuthGuard';
 import { APP_GUARD } from '@nestjs/core';
+
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     AutomapperModule.forRoot({
       strategyInitializer: classes()
     }),
-    MikroOrmModule.forRoot({
-      ...defineConfig,
-      autoLoadEntities: true
-    }),
-    ConfigModule.forRoot(),
     ProviderModule,
-    JwtModule.register({
-      global: true,
-      secret: process.env.PUBLIC_KEY,
-      signOptions: { algorithm: 'RS256' }
+    MikroOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        return {
+          ...defineConfig,
+          user: configService.get('POSTGRES_USER'),
+          password: configService.get('POSTGRES_PASSWORD')
+        };
+      }
+    }),
+
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('PUBLIC_KEY'),
+        signOptions: { algorithm: 'RS256' }
+      })
     })
   ],
   controllers: [AppController],

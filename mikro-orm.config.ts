@@ -10,8 +10,8 @@ export default defineConfig({
   extensions: [EntityGenerator, Migrator],
   metadataProvider: TsMorphMetadataProvider,
   dbName: 'perfume_gpt_ai',
-  user: process.env.POSTGRES_USER || '',
-  password: process.env.POSTGRES_PASSWORD || '',
+  // user: process.env.POSTGRES_USER || '',
+  // password: process.env.POSTGRES_PASSWORD || '',
   host: 'localhost',
   port: 5432,
   dynamicImportProvider: (id) => import(id)

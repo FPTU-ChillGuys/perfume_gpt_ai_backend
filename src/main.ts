@@ -7,7 +7,18 @@ import { HttpExceptionFilter } from './application/filters/http-error-handler.fi
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
 
-  const config = new DocumentBuilder().build();
+  const config = new DocumentBuilder()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        in: 'header',
+        name: 'Authorization'
+      },
+      'jwt' // tên security
+    )
+    .build();
   const document = SwaggerModule.createDocument(app, config);
 
   app.use(

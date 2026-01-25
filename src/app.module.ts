@@ -10,6 +10,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthGuard } from './application/common/auth/AuthGuard';
 import { APP_GUARD } from '@nestjs/core';
+import * as fs from 'fs';
 
 @Module({
   imports: [
@@ -34,8 +35,12 @@ import { APP_GUARD } from '@nestjs/core';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('PUBLIC_KEY'),
-        signOptions: { algorithm: 'RS256' }
+        publicKey: fs.readFileSync('public_key.pem', 'utf8'),
+        verifyOptions: {
+          algorithms: ['RS256'],
+          issuer: config.get<string>('JWT_ISSUER'),
+          audience: config.get<string>('JWT_AUDIENCE')
+        }
       })
     })
   ],

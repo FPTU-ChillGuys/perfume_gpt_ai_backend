@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../Metadata';
 import { Reflector } from '@nestjs/core';
+import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 
 interface JwtPayload {
   sub: string;
@@ -38,7 +39,7 @@ export class AuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractTokenFromHeader(request);
+    const token = extractTokenFromHeader(request);
     if (!token) {
       throw new UnauthorizedException();
     }
@@ -54,10 +55,5 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
     return true;
-  }
-
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
   }
 }

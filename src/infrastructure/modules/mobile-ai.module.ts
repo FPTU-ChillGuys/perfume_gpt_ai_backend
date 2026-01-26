@@ -10,7 +10,7 @@ export const MOBILE_CHAT_SERVICE = 'MOBILE_CHAT_SERVICE';
 const mobileAIProvider: Provider = {
   provide: MOBILE_CHAT_SERVICE,
   useFactory: (tools: Tools) => {
-    return new AIService(SYSTEM_PROMPT, tools.getTools, 15);
+    return new AIService(SYSTEM_PROMPT, tools.getTools, 10);
   },
   inject: [Tools]
 };

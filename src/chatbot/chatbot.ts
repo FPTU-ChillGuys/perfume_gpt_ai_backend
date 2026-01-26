@@ -14,7 +14,8 @@ export async function TextGenerationFromMessagesToResultWithErrorHandler(
   messages: UIMessage[],
   systemPrompt?: string,
   tools?: ToolSet,
-  errorMessage?: string
+  errorMessage?: string,
+  stopWhen?: number
 ) {
   try {
     const modelMessages = await convertToModelMessages(messages);
@@ -23,6 +24,7 @@ export async function TextGenerationFromMessagesToResultWithErrorHandler(
       messages: modelMessages,
       system: systemPrompt ? systemPrompt : undefined,
       tools: tools ? tools : undefined,
+      stopWhen: stepCountIs(stopWhen ? stopWhen : 5)
     });
     return result.text;
   } catch (error) {

@@ -22,7 +22,7 @@ export async function TextGenerationFromMessagesToResultWithErrorHandler(
       model: model,
       messages: modelMessages,
       system: systemPrompt ? systemPrompt : undefined,
-      tools: tools ? tools : undefined
+      tools: tools ? tools : undefined,
     });
     return result.text;
   } catch (error) {

@@ -4,10 +4,10 @@ import { ProductTool } from './tools/products.tool';
 
 @Injectable()
 export class Tools {
-  tools: ToolSet;
+  getTools: ToolSet;
 
   constructor(private readonly productTool: ProductTool) {
-    this.tools = {
+    this.getTools = {
       getAllProducts: this.productTool.getAllProducts
     };
   }

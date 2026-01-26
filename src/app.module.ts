@@ -25,8 +25,10 @@ import * as fs from 'fs';
       useFactory: (configService: ConfigService) => {
         return {
           ...defineConfig,
-          user: configService.get('POSTGRES_USER'),
-          password: configService.get('POSTGRES_PASSWORD')
+          user: configService.get<string>('POSTGRES_USER'),
+          password: configService.get<string>('POSTGRES_PASSWORD'),
+          host: configService.get<string>('POSTGRES_HOST'),
+          port: configService.get<number>('POSTGRES_PORT')
         };
       }
     }),

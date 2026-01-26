@@ -3,7 +3,9 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
 import {
   StreamTextGenerationFromMessagesToResultWithErrorHandler,
-  TextGenerationFromMessagesToResultWithErrorHandler
+  StreamTextGenerationFromPromptToResultWithErrorHandler,
+  TextGenerationFromMessagesToResultWithErrorHandler,
+  TextGenerationFromPromptToResultWithErrorHandler
 } from 'src/chatbot/chatbot';
 import { gpt5nano } from 'src/chatbot/models/openai';
 import { Injectable } from '@nestjs/common';
@@ -15,6 +17,18 @@ export class AIService {
     private tools?: ToolSet,
     private stopWhen?: number
   ) {}
+
+  async TextGenerateFromPrompt(prompt: string): Promise<BaseResponse<string>> {
+    return await funcHandlerAsync(async () => {
+      const text = await TextGenerationFromPromptToResultWithErrorHandler(
+        gpt5nano,
+        prompt,
+        this.systemPrompt,
+        this.tools
+      );
+      return { success: true, data: text };
+    }, 'Failed to generate text from messages');
+  }
 
   async TextGenerateFromMessages(
     messages: UIMessage[]
@@ -28,6 +42,21 @@ export class AIService {
       );
       return { success: true, data: text };
     }, 'Failed to generate text from messages');
+  }
+
+  TextGenerateStreamFromPrompt(
+    prompt: string
+  ): BaseResponse<ReadableStream<any>> {
+    return funcHandler(() => {
+      const stream = StreamTextGenerationFromPromptToResultWithErrorHandler(
+        gpt5nano,
+        prompt,
+        this.systemPrompt,
+        this.tools,
+        this.stopWhen
+      );
+      return { success: true, data: stream };
+    }, 'Failed to generate text stream from messages');
   }
 
   TextGenerateStreamFromMessages(

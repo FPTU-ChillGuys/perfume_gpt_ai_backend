@@ -8,7 +8,8 @@ export class Tools {
 
   constructor(private readonly productTool: ProductTool) {
     this.getTools = {
-      getAllProducts: this.productTool.getAllProducts
+      getAllProducts: this.productTool.getAllProducts,
+      searchProduct: this.productTool.searchProduct
     };
   }
 }

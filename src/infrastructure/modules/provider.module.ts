@@ -9,6 +9,7 @@ import { ProductModule } from './product.module';
 import { ProductController } from 'src/api/controllers/product.controller';
 import { ToolModule } from './tool.module';
 import { QuizController } from 'src/api/controllers/quiz.controller';
+import { MappingModule } from './mapping.module';
 
 const modules = [
   ConversationModule,
@@ -17,7 +18,8 @@ const modules = [
   MobileAIModule,
   WebAIModule,
   ProductModule,
-  ToolModule
+  ToolModule,
+  MappingModule
 ];
 
 @Module({

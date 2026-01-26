@@ -9,23 +9,29 @@ import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
+import { QuizQuestionRepository } from '../repositories/quiz-question.repository';
 
 export class QuizService {
   constructor(
     private unitOfWork: UnitOfWork,
+    private quizQuestionRepository: QuizQuestionRepository,
     @InjectMapper() private mapper: Mapper
   ) {}
 
   async addQuesAnws(question: QuizQuestionRequest): Promise<BaseResponse> {
-    return await funcHandlerAsync(async () => {
-      const quizQuestion = await this.mapper.mapAsync(
-        question,
-        QuizQuestionRequest,
-        QuizQuestion
-      );
-      this.unitOfWork.AIQuizQuestionRepo.create(quizQuestion);
-      return { success: true };
-    }, 'Failed to add quiz question and answers');
+    return await funcHandlerAsync(
+      async () => {
+        const quizQuestion = await this.mapper.mapAsync(
+          question,
+          QuizQuestionRequest,
+          QuizQuestion
+        );
+        this.unitOfWork.AIQuizQuestionRepo.create(quizQuestion);
+        return { success: true };
+      },
+      'Failed to add quiz question and answers',
+      true
+    );
   }
 
   async updateAnswer(
@@ -65,10 +71,15 @@ export class QuizService {
   }
 
   async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
-    return await funcHandlerAsync(async () => {
-      const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.findAll();
-      return { success: true, data: quizQuestions };
-    }, 'Failed to get all quiz questions');
+    return await funcHandlerAsync(
+      async () => {
+        const quizQuestions = await this.quizQuestionRepository.findAll();
+        // await this.unitOfWork.AIQuizQuestionRepo.findAll();
+        return { success: true, data: quizQuestions };
+      },
+      'Failed to get all quiz questions',
+      true
+    );
   }
 
   async addQuizQuesAnws(

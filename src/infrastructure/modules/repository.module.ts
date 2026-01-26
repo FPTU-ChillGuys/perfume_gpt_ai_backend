@@ -1,24 +1,9 @@
-import { ConversationRepository } from '../repositories/conversation.repository';
-import { QuizQuestionRepository } from '../repositories/quiz-question.repository';
-import { QuizQuestionAnswerRepository } from '../repositories/quiz-question-answer.repository';
-import { AIRequestResponseRepository } from '../repositories/ai-request-response.repository';
-import { AIReviewSummaryRepository } from '../repositories/review-summary.repository';
 import { Module } from '@nestjs/common';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { entities } from '../utils/entities';
 
 @Module({
-  providers: [
-    ConversationRepository,
-    QuizQuestionRepository,
-    QuizQuestionAnswerRepository,
-    AIRequestResponseRepository,
-    AIReviewSummaryRepository
-  ],
-  exports: [
-    ConversationRepository,
-    QuizQuestionRepository,
-    QuizQuestionAnswerRepository,
-    AIRequestResponseRepository,
-    AIReviewSummaryRepository
-  ]
+  imports: [MikroOrmModule.forFeature([...entities])],
+  exports: [MikroOrmModule]
 })
 export class RepositoryModule {}

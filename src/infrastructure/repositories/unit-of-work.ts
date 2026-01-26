@@ -8,11 +8,11 @@ import { AIReviewSummaryRepository } from './review-summary.repository';
 @Injectable()
 export class UnitOfWork {
   constructor(
-    private aiConversationRepository: ConversationRepository,
-    private aiQuizQuestionRepository: QuizQuestionRepository,
-    private aiQuizQuestionAnswerRepository: QuizQuestionAnswerRepository,
-    private aiRequestResponseRepository: AIRequestResponseRepository,
-    private aiReviewSummaryRepository: AIReviewSummaryRepository
+    private readonly aiConversationRepository: ConversationRepository,
+    private readonly aiQuizQuestionRepository: QuizQuestionRepository,
+    private readonly aiQuizQuestionAnswerRepository: QuizQuestionAnswerRepository,
+    private readonly aiRequestResponseRepository: AIRequestResponseRepository,
+    private readonly aiReviewSummaryRepository: AIReviewSummaryRepository
   ) {}
 
   get AIConversationRepo(): ConversationRepository {

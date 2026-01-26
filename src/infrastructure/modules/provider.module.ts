@@ -8,6 +8,7 @@ import { MobileAIController } from 'src/api/controllers/ai/mobile-ai.controller'
 import { ProductModule } from './product.module';
 import { ProductController } from 'src/api/controllers/product.controller';
 import { ToolModule } from './tool.module';
+import { QuizController } from 'src/api/controllers/quiz.controller';
 
 const modules = [
   ConversationModule,
@@ -21,7 +22,7 @@ const modules = [
 
 @Module({
   imports: modules,
-  controllers: [MobileAIController, ProductController],
+  controllers: [MobileAIController, ProductController, QuizController],
   exports: modules
 })
 export class ProviderModule {}

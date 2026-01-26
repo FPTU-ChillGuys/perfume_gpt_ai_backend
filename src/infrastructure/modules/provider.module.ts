@@ -7,24 +7,21 @@ import { WebAIModule } from './web-ai.module';
 import { MobileAIController } from 'src/api/controllers/ai/mobile-ai.controller';
 import { ProductModule } from './product.module';
 import { ProductController } from 'src/api/controllers/product.controller';
+import { ToolModule } from './tool.module';
+
+const modules = [
+  ConversationModule,
+  PromptModule,
+  QuizModule,
+  MobileAIModule,
+  WebAIModule,
+  ProductModule,
+  ToolModule
+];
 
 @Module({
-  imports: [
-    ConversationModule,
-    PromptModule,
-    QuizModule,
-    MobileAIModule,
-    WebAIModule,
-    ProductModule
-  ],
+  imports: modules,
   controllers: [MobileAIController, ProductController],
-  exports: [
-    ConversationModule,
-    PromptModule,
-    QuizModule,
-    MobileAIModule,
-    WebAIModule,
-    ProductModule
-  ]
+  exports: modules
 })
 export class ProviderModule {}

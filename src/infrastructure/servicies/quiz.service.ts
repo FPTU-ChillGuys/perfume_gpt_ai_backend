@@ -9,12 +9,12 @@ import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
-import { QuizQuestionRepository } from '../repositories/quiz-question.repository';
+import { Injectable } from '@nestjs/common';
 
+@Injectable()
 export class QuizService {
   constructor(
     private unitOfWork: UnitOfWork,
-    private quizQuestionRepository: QuizQuestionRepository,
     @InjectMapper() private mapper: Mapper
   ) {}
 
@@ -73,8 +73,8 @@ export class QuizService {
   async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
     return await funcHandlerAsync(
       async () => {
-        const quizQuestions = await this.quizQuestionRepository.findAll();
-        // await this.unitOfWork.AIQuizQuestionRepo.findAll();
+        const quizQuestions =
+          await this.unitOfWork.AIQuizQuestionRepo.findAll();
         return { success: true, data: quizQuestions };
       },
       'Failed to get all quiz questions',

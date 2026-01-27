@@ -15,4 +15,9 @@ export class Message extends Common {
     updateRule: 'cascade'
   })
   conversation!: Conversation;
+
+  constructor(init?: Partial<Message>) {
+    super();
+    Object.assign(this, init);
+  }
 }

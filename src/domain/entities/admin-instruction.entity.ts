@@ -7,4 +7,9 @@ export class AdminInstruction extends Common {
   instruction!: string;
   @Property()
   instructionType!: string;
+
+  constructor(init?: Partial<AdminInstruction>) {
+    super();
+    Object.assign(this, init);
+  }
 }

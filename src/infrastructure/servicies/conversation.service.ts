@@ -5,7 +5,6 @@ import { funcHandlerAsync } from '../utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { AddMessageRequest } from 'src/application/dtos/request/add-message.request';
-import { MessageResponse } from 'src/application/dtos/response/message.response';
 import { AddConversationRequest } from 'src/application/dtos/request/add-conversation.request';
 import { Injectable } from '@nestjs/common';
 
@@ -20,12 +19,10 @@ export class ConversationService {
     conversationRequest: AddConversationRequest
   ): Promise<BaseResponse<Conversation>> {
     return await funcHandlerAsync(async () => {
-      const conversation = await this.mapper.mapAsync(
-        conversationRequest,
-        AddConversationRequest,
-        Conversation
-      );
-      this.unitOfWork.AIConversationRepo.create(conversation);
+      const conversation = new Conversation({
+        userId: conversationRequest.userId
+      });
+      await this.unitOfWork.AIConversationRepo.insert(conversation);
       return { success: true, data: conversation };
     }, 'Failed to add conversation');
   }
@@ -35,21 +32,10 @@ export class ConversationService {
     messages: AddMessageRequest[]
   ): Promise<BaseResponse> {
     return await funcHandlerAsync(async () => {
-      const conversation = await this.unitOfWork.AIConversationRepo.findOne({
-        id
-      });
-      if (!conversation) {
-        return { success: false, error: 'Conversation not found' };
-      }
-
-      this.unitOfWork.AIConversationRepo.assign(conversation, {
-        messages: await this.mapper.mapArrayAsync(
-          messages,
-          AddMessageRequest,
-          MessageResponse
-        )
-      });
-
+      await this.unitOfWork.AIConversationRepo.addMessagesToConversation(
+        id,
+        messages
+      );
       return { success: true };
     }, 'Failed to update messages');
   }

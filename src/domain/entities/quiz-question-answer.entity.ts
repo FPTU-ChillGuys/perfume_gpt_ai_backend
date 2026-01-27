@@ -20,4 +20,9 @@ export class QuizQuestionAnswer extends Common {
     updateRule: 'cascade'
   })
   answer!: QuizAnswer;
+
+  constructor(init?: Partial<QuizAnswer>) {
+    super();
+    Object.assign(this, init);
+  }
 }

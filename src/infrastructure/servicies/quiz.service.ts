@@ -7,7 +7,6 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
-import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
 import { Injectable } from '@nestjs/common';
 
@@ -23,7 +22,6 @@ export class QuizService {
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(
       async () => {
-        // 1. Tạo QuizQuestion
         const quizQuestion =
           await this.unitOfWork.AIQuizQuestionRepo.createWithAnswers(question);
         return { success: true, data: quizQuestion.id };
@@ -45,14 +43,11 @@ export class QuizService {
         return { success: false, error: 'Quiz question not found' };
       }
 
-      const mappingedAnswers = await this.mapper.mapArrayAsync(
-        answers,
-        QuizAnswerRequest,
-        QuizAnswer
+      await this.unitOfWork.AIQuizQuestionRepo.updateWithAnswers(
+        id,
+        quizQuestion.question,
+        answers
       );
-      this.unitOfWork.AIQuizQuestionRepo.assign(quizQuestion, {
-        answers: mappingedAnswers
-      });
       return { success: true };
     }, 'Failed to update quiz answer');
   }

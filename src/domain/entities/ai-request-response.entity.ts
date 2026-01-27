@@ -13,4 +13,9 @@ export class AIRequestResponse extends Common {
   prompt!: string;
   @Property()
   response!: string;
+
+  constructor(init?: Partial<AIRequestResponse>) {
+    super();
+    Object.assign(this, init);
+  }
 }

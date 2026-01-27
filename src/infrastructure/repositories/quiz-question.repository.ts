@@ -12,14 +12,15 @@ export class QuizQuestionRepository extends SqlEntityRepository<QuizQuestion> {
       question: request.question
     });
 
-    request.answers.forEach((ansReq) => {
-      quizQuestion.answers.add(
-        new QuizAnswer({
-          answer: ansReq.answer,
-          question: quizQuestion // owning side
-        })
-      );
-    });
+    quizQuestion.answers.set(
+      request.answers.map(
+        (ansReq) =>
+          new QuizAnswer({
+            answer: ansReq.answer,
+            question: quizQuestion // owning side
+          })
+      )
+    );
 
     const em = this.getEntityManager();
     em.persist(quizQuestion);
@@ -41,17 +42,16 @@ export class QuizQuestionRepository extends SqlEntityRepository<QuizQuestion> {
 
     quizQuestion.question = question;
 
-    // Clear existing answers
-    quizQuestion.answers.removeAll();
-    // Add new answers
-    answers.forEach((ansReq) => {
-      quizQuestion.answers.add(
-        new QuizAnswer({
-          answer: ansReq.answer,
-          question: quizQuestion // owning side
-        })
-      );
-    });
+    quizQuestion.answers.set(
+      answers.map(
+        (ansReq) =>
+          new QuizAnswer({
+            answer: ansReq.answer,
+            question: quizQuestion // owning side
+          })
+      )
+    );
+
     const em = this.getEntityManager();
     em.persist(quizQuestion);
     await em.flush();

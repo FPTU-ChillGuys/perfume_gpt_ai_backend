@@ -9,4 +9,9 @@ export class Conversation extends Common {
   userId!: string;
   @OneToMany(() => Message, (message) => message.conversation)
   messages = new Collection<Message>(this);
+
+  constructor(init?: Partial<Conversation>) {
+    super();
+    Object.assign(this, init);
+  }
 }

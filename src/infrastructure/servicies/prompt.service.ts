@@ -18,12 +18,12 @@ export class PromptService {
     addPromptRequest: AddPromptRequest
   ): Promise<BaseResponse<AIRequestResponse>> {
     return await funcHandlerAsync(async () => {
-      const aiRequestResponse = await this.mapper.mapAsync(
-        addPromptRequest,
-        AddPromptRequest,
-        AIRequestResponse
-      );
-      this.unitOfWork.AIRequestResponseRepo.create(aiRequestResponse);
+      const aiRequestResponse = new AIRequestResponse({
+        prompt: addPromptRequest.prompt,
+        requestType: addPromptRequest.requestType,
+        response: ''
+      });
+      await this.unitOfWork.AIRequestResponseRepo.insert(aiRequestResponse);
       return { success: true, data: aiRequestResponse };
     }, 'Failed to save prompt');
   }

@@ -13,4 +13,8 @@ export class AIReviewSummary extends Common {
   sentiment!: Sentiment;
   @Property()
   reviewCount!: number;
+  constructor(init?: Partial<AIReviewSummary>) {
+    super();
+    Object.assign(this, init);
+  }
 }

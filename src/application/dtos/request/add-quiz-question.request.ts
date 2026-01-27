@@ -1,4 +1,4 @@
-import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { QuizAnswerRequest } from './add-quiz-answer.request';
 
 export class QuizQuestionRequest {

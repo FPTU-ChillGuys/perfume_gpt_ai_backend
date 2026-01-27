@@ -12,4 +12,9 @@ export class QuizQuestion extends Common {
   answers = new Collection<QuizAnswer>(this);
   @OneToMany(() => QuizQuestionAnswer, (qqa) => qqa.question)
   quizQuestionAnswers = new Collection<QuizQuestionAnswer>(this);
+
+  constructor(init?: Partial<QuizQuestion>) {
+    super();
+    Object.assign(this, init);
+  }
 }

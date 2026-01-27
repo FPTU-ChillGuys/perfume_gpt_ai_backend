@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { AppController } from './api/controllers/app.controller';
 import { AppService } from './app.service';
 import { AutomapperModule } from '@automapper/nestjs';
-import { classes } from '@automapper/classes';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import defineConfig from '../mikro-orm.config';
 import { ProviderModule } from './infrastructure/modules/provider.module';
@@ -11,12 +10,15 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthGuard } from './application/common/auth/AuthGuard';
 import { APP_GUARD } from '@nestjs/core';
 import * as fs from 'fs';
+import { mikro } from '@automapper/mikro';
+import { CamelCaseNamingConvention } from '@automapper/core';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     AutomapperModule.forRoot({
-      strategyInitializer: classes()
+      strategyInitializer: mikro(),
+      namingConventions: new CamelCaseNamingConvention()
     }),
     ProviderModule,
     MikroOrmModule.forRootAsync({

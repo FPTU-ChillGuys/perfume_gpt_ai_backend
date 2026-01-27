@@ -1,7 +1,7 @@
 import { InjectMapper } from '@automapper/nestjs';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { Mapper } from '@automapper/core';
-import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
+import { funcHandlerAsync } from '../utils/error-handler';
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
@@ -23,13 +23,27 @@ export class QuizService {
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(
       async () => {
-        //Map thu cong tam thoi
-        const quizQuestion: QuizQuestion = new QuizQuestion();
-        quizQuestion.question = question.question;
-        console.log('Mapped Answers:', quizQuestion);
-        const createdQuizQuestionId =
-          await this.unitOfWork.AIQuizQuestionRepo.insert(quizQuestion);
-        return { success: true, data: createdQuizQuestionId };
+        // 1. Tạo QuizQuestion
+        const quizQuestion = new QuizQuestion({
+          question: question.question
+        });
+
+        // 2. Map answers
+        question.answers.forEach((ansReq) => {
+          const answer = new QuizAnswer({
+            answer: ansReq.answer,
+            question: quizQuestion // owning side
+          });
+
+          quizQuestion.answers.add(answer);
+        });
+
+        // 3. Persist + flush (QUAN TRỌNG)
+        const em = this.unitOfWork.entityManager;
+
+        em.persist(quizQuestion);
+        await em.flush();
+        return { success: true, data: quizQuestion.id };
       },
       'Failed to add quiz question and answers',
       true

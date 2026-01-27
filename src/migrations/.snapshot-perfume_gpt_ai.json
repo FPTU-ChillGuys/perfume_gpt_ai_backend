@@ -337,16 +337,6 @@
           "length": 6,
           "mappedType": "datetime"
         },
-        "conversation_id": {
-          "name": "conversation_id",
-          "type": "varchar(255)",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": 255,
-          "mappedType": "string"
-        },
         "sender": {
           "name": "sender",
           "type": "text",
@@ -370,8 +360,8 @@
           "length": 255,
           "mappedType": "string"
         },
-        "conversationId": {
-          "name": "conversationId",
+        "conversation_id": {
+          "name": "conversation_id",
           "type": "uuid",
           "unsigned": false,
           "autoincrement": false,
@@ -396,10 +386,10 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "message_conversationId_foreign": {
-          "constraintName": "message_conversationId_foreign",
+        "message_conversation_id_foreign": {
+          "constraintName": "message_conversation_id_foreign",
           "columnNames": [
-            "conversationId"
+            "conversation_id"
           ],
           "localTableName": "public.message",
           "referencedColumnNames": [
@@ -505,16 +495,6 @@
           "length": 6,
           "mappedType": "datetime"
         },
-        "question_id": {
-          "name": "question_id",
-          "type": "varchar(255)",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": 255,
-          "mappedType": "string"
-        },
         "answer": {
           "name": "answer",
           "type": "varchar(255)",
@@ -525,8 +505,8 @@
           "length": 255,
           "mappedType": "string"
         },
-        "questionId": {
-          "name": "questionId",
+        "question_id": {
+          "name": "question_id",
           "type": "uuid",
           "unsigned": false,
           "autoincrement": false,
@@ -551,10 +531,10 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "quiz_answer_questionId_foreign": {
-          "constraintName": "quiz_answer_questionId_foreign",
+        "quiz_answer_question_id_foreign": {
+          "constraintName": "quiz_answer_question_id_foreign",
           "columnNames": [
-            "questionId"
+            "question_id"
           ],
           "localTableName": "public.quiz_answer",
           "referencedColumnNames": [

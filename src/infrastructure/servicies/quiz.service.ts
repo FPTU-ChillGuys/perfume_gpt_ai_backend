@@ -24,25 +24,8 @@ export class QuizService {
     return await funcHandlerAsync(
       async () => {
         // 1. Tạo QuizQuestion
-        const quizQuestion = new QuizQuestion({
-          question: question.question
-        });
-
-        // 2. Map answers
-        question.answers.forEach((ansReq) => {
-          const answer = new QuizAnswer({
-            answer: ansReq.answer,
-            question: quizQuestion // owning side
-          });
-
-          quizQuestion.answers.add(answer);
-        });
-
-        // 3. Persist + flush (QUAN TRỌNG)
-        const em = this.unitOfWork.entityManager;
-
-        em.persist(quizQuestion);
-        await em.flush();
+        const quizQuestion =
+          await this.unitOfWork.AIQuizQuestionRepo.createWithAnswers(question);
         return { success: true, data: quizQuestion.id };
       },
       'Failed to add quiz question and answers',

@@ -6,14 +6,11 @@ import { MessageResponse } from 'src/application/dtos/response/message.response'
 
 @Entity({ repository: () => MessageResponse })
 export class Message extends Common {
-  @Property()
-  conversationId!: string;
   @Enum(() => Sender)
   sender!: Sender;
   @Property()
   message!: string;
   @ManyToOne(() => Conversation, {
-    fieldName: 'conversationId',
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })

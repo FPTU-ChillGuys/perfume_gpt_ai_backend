@@ -12,11 +12,9 @@ import { QuizQuestionAnswer } from './quiz-question-answer.entity';
 @Entity()
 export class QuizAnswer extends Common {
   @Property()
-  questionId!: string;
-  @Property()
   answer!: string;
+
   @ManyToOne(() => QuizQuestion, {
-    fieldName: 'questionId',
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })

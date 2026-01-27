@@ -1,7 +1,7 @@
 import { InjectMapper } from '@automapper/nestjs';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { Mapper } from '@automapper/core';
-import { funcHandlerAsync } from '../utils/error-handler';
+import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
@@ -18,16 +18,18 @@ export class QuizService {
     @InjectMapper() private mapper: Mapper
   ) {}
 
-  async addQuesAnws(question: QuizQuestionRequest): Promise<BaseResponse> {
+  async addQuesAnws(
+    question: QuizQuestionRequest
+  ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(
       async () => {
-        const quizQuestion = await this.mapper.mapAsync(
-          question,
-          QuizQuestionRequest,
-          QuizQuestion
-        );
-        this.unitOfWork.AIQuizQuestionRepo.create(quizQuestion);
-        return { success: true };
+        //Map thu cong tam thoi
+        const quizQuestion: QuizQuestion = new QuizQuestion();
+        quizQuestion.question = question.question;
+        console.log('Mapped Answers:', quizQuestion);
+        const createdQuizQuestion =
+          await this.unitOfWork.AIQuizQuestionRepo.insert(quizQuestion);
+        return { success: true, data: createdQuizQuestion };
       },
       'Failed to add quiz question and answers',
       true

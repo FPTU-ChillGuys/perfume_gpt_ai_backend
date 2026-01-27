@@ -10,6 +10,7 @@ import { ProductController } from 'src/api/controllers/product.controller';
 import { ToolModule } from './tool.module';
 import { QuizController } from 'src/api/controllers/quiz.controller';
 import { MappingModule } from './mapping.module';
+import { ConversationController } from 'src/api/controllers/conversation.controller';
 
 const modules = [
   ConversationModule,
@@ -24,7 +25,12 @@ const modules = [
 
 @Module({
   imports: modules,
-  controllers: [MobileAIController, ProductController, QuizController],
+  controllers: [
+    MobileAIController,
+    ProductController,
+    QuizController,
+    ConversationController
+  ],
   exports: modules
 })
 export class ProviderModule {}

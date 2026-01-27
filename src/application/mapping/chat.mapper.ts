@@ -1,5 +1,5 @@
 import { AutomapperProfile, InjectMapper } from '@automapper/nestjs';
-import { createMap, type Mapper } from '@automapper/core';
+import { createMap, forMember, ignore, type Mapper } from '@automapper/core';
 import { AddPromptRequest } from '../dtos/request/add-prompt.request';
 import { AIRequestResponse } from 'src/domain/entities/ai-request-response.entity';
 import { UpdateResRequest } from '../dtos/request/update-response.request';
@@ -21,7 +21,15 @@ export class ChatProfile extends AutomapperProfile {
       createMap(mapper, UpdateResRequest, AIRequestResponse);
       createMap(mapper, AddMessageRequest, Message);
       createMap(mapper, QuizAnswerRequest, QuizAnswer);
-      createMap(mapper, QuizQuestionRequest, QuizQuestion);
+      createMap(
+        mapper,
+        QuizQuestionRequest,
+        QuizQuestion,
+        forMember(
+          (dest) => dest.answers,
+          ignore() // 🔥 cực kỳ quan trọng
+        )
+      );
     };
   }
 }

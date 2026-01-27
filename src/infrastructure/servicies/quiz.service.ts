@@ -27,9 +27,9 @@ export class QuizService {
         const quizQuestion: QuizQuestion = new QuizQuestion();
         quizQuestion.question = question.question;
         console.log('Mapped Answers:', quizQuestion);
-        const createdQuizQuestion =
+        const createdQuizQuestionId =
           await this.unitOfWork.AIQuizQuestionRepo.insert(quizQuestion);
-        return { success: true, data: createdQuizQuestion };
+        return { success: true, data: createdQuizQuestionId };
       },
       'Failed to add quiz question and answers',
       true

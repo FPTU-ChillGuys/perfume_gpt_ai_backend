@@ -17,6 +17,9 @@ importers:
       '@automapper/core':
         specifier: ^8.8.1
         version: 8.8.1
+      '@automapper/mikro':
+        specifier: ^8.8.1
+        version: 8.8.1(@automapper/classes@8.8.1(@automapper/core@8.8.1)(reflect-metadata@0.2.2))(@mikro-orm/core@6.6.4)(reflect-metadata@0.2.2)
       '@automapper/nestjs':
         specifier: ^8.8.1
         version: 8.8.1(@automapper/core@8.8.1)(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.12)
@@ -228,6 +231,14 @@ packages:
   '@automapper/core@8.8.1':
     resolution: {integrity: sha512-VIRULNAImqaTojp8zqhVGVimjxjriawqZWlemooWh5B5tX2XlgA6icPrQBQh+M9wY8IVQipBTOcr338N9lf8RA==}
     engines: {node: '>=16.0.0'}
+
+  '@automapper/mikro@8.8.1':
+    resolution: {integrity: sha512-x6fhRSj+kBH6cNsJZdNXgRFtUcxRT/SCto7gueXsTFrsz/qZ9kQI7bLznYy8GM2rmAKL455bnObmYMSBdDllyQ==}
+    engines: {node: '>=16.0.0'}
+    peerDependencies:
+      '@automapper/classes': 8.8.1
+      '@mikro-orm/core': ^5.0.0
+      reflect-metadata: ~0.1.13
 
   '@automapper/nestjs@8.8.1':
     resolution: {integrity: sha512-EeC0UBoBIchnWwNdfVUb0bbOKaHhuDLBOFXeZbwUxFcOn2CR+zOs96Dv6gd9x0WGZGcdZ39h4hkDaos6QPCG+Q==}
@@ -4004,6 +4015,12 @@ snapshots:
       reflect-metadata: 0.2.2
 
   '@automapper/core@8.8.1': {}
+
+  '@automapper/mikro@8.8.1(@automapper/classes@8.8.1(@automapper/core@8.8.1)(reflect-metadata@0.2.2))(@mikro-orm/core@6.6.4)(reflect-metadata@0.2.2)':
+    dependencies:
+      '@automapper/classes': 8.8.1(@automapper/core@8.8.1)(reflect-metadata@0.2.2)
+      '@mikro-orm/core': 6.6.4
+      reflect-metadata: 0.2.2
 
   '@automapper/nestjs@8.8.1(@automapper/core@8.8.1)(@nestjs/common@11.1.12(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.12)':
     dependencies:

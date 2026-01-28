@@ -54,9 +54,12 @@ export class QuizService {
 
   async getQuizQuesById(id: string): Promise<BaseResponse<QuizQuestion>> {
     return await funcHandlerAsync(async () => {
-      const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
-        id
-      });
+      const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne(
+        {
+          id
+        },
+        { populate: ['answers'] }
+      );
       if (!quizQuestion) {
         return { success: false, error: 'Quiz question not found' };
       }
@@ -67,8 +70,9 @@ export class QuizService {
   async getAllQuizQues(): Promise<BaseResponse<QuizQuestion[]>> {
     return await funcHandlerAsync(
       async () => {
-        const quizQuestions =
-          await this.unitOfWork.AIQuizQuestionRepo.findAll();
+        const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.findAll({
+          populate: ['answers']
+        });
         return { success: true, data: quizQuestions };
       },
       'Failed to get all quiz questions',
@@ -80,12 +84,13 @@ export class QuizService {
     quizQuesAnws: AddQuesAnwsRequest
   ): Promise<BaseResponse<QuizQuestionAnswer>> {
     return await funcHandlerAsync(async () => {
-      const quizQuestionAnswer = await this.mapper.mapAsync(
-        quizQuesAnws,
-        AddQuesAnwsRequest,
-        QuizQuestionAnswer
-      );
-      this.unitOfWork.AIQuizQuestionAnswerRepo.create(quizQuestionAnswer);
+      const quizQuestionAnswer =
+        await this.unitOfWork.AIQuizQuestionAnswerRepo.createQuesAns(
+          quizQuesAnws.userId,
+          '',
+          quizQuesAnws.questionId,
+          quizQuesAnws.answerId
+        );
       return { success: true, data: quizQuestionAnswer };
     }, 'Failed to add quiz question answer');
   }

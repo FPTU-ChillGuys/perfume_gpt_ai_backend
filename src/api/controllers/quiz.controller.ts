@@ -1,5 +1,8 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { ApiBody } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
+import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
+import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
 import { QuizService } from 'src/infrastructure/servicies/quiz.service';
 
@@ -17,5 +20,30 @@ export class QuizController {
   @Post()
   async createQuizQues(@Body() quizQuestionRequest: QuizQuestionRequest) {
     return this.quizService.addQuesAnws(quizQuestionRequest);
+  }
+
+  @Public()
+  @Post('list')
+  @ApiBody({ type: [QuizQuestionRequest] })
+  async createQuizQueses(@Body() quizQuestionRequest: QuizQuestionRequest[]) {
+    for (const quizQuestion of quizQuestionRequest) {
+      await this.quizService.addQuesAnws(quizQuestion);
+    }
+    return { success: true };
+  }
+
+  @Public()
+  @Put(':id')
+  async updateQuizAnswer(
+    @Param('id') id: string,
+    @Body() quizAnswerRequest: QuizAnswerRequest[]
+  ) {
+    return this.quizService.updateAnswer(id, quizAnswerRequest);
+  }
+
+  @Public()
+  @Post('user/quiz')
+  async addUserAnswer(@Body() quizQuesAnws: AddQuesAnwsRequest) {
+    return this.quizService.addQuizQuesAnws(quizQuesAnws);
   }
 }

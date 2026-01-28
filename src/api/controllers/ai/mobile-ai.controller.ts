@@ -1,5 +1,5 @@
 import { Body, Controller, Inject, Post, Query } from '@nestjs/common';
-import { ApiBody } from '@nestjs/swagger';
+import { ApiBody, ApiResponse } from '@nestjs/swagger';
 import { UIMessage } from 'ai';
 import { Public } from 'src/application/common/Metadata';
 import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
@@ -26,7 +26,11 @@ export class MobileAIController {
   ) {}
 
   @Public()
-  @Post('chat/test')
+  @Post('chat')
+  @ApiResponse({
+    status: 201,
+    type: ConversationDto,
+  })
   async chat(
     @Body() conversation: ConversationDto
   ): Promise<BaseResponse<ConversationDto>> {
@@ -52,7 +56,11 @@ export class MobileAIController {
   }
 
   @Public()
-  @Post('search/test')
+  @Post('search')
+  @ApiResponse({
+    status: 201,
+    type: String
+  })
   async searchProductWithAI(
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
@@ -60,9 +68,13 @@ export class MobileAIController {
   }
 
   @Public()
-  @Post('user/quiz/test')
+  @Post('user/quiz')
+  @ApiResponse({
+    status: 201,
+    type: String
+  })
   @ApiBody({ type: [AddQuesAnwsRequest] })
-  async chatQuiz(@Body() addQuesAnwsRequests: AddQuesAnwsRequest[]) {
+  async chatQuiz(@Body() addQuesAnwsRequests: AddQuesAnwsRequest[]) : Promise<BaseResponse<string>> {
     const quesAnses: Array<{ question: string; answer: string }> = [];
     await Promise.all(
       addQuesAnwsRequests.map(async (quesAns) => {

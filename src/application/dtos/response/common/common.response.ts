@@ -1,5 +1,10 @@
+import { ApiProperty } from '@nestjs/swagger';
+
 export class CommonResponse {
-  id!: string;
-  createdAt!: Date;
-  updatedAt!: Date;
+  @ApiProperty()
+  id?: string = '';
+  @ApiProperty()
+  createdAt?: Date = new Date();
+  @ApiProperty()
+  updatedAt?: Date = new Date();
 }

@@ -6,4 +6,9 @@ export class AIReviewSummaryResponse extends CommonResponse {
   summary!: string;
   sentiment!: Sentiment;
   reviewCount!: number;
+
+  constructor(init?: Partial<AIReviewSummaryResponse>) {
+    super();
+    Object.assign(this, init);
+  }
 }

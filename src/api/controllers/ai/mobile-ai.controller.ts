@@ -2,19 +2,27 @@ import { Body, Controller, Inject, Post, Query } from '@nestjs/common';
 import { ApiBody } from '@nestjs/swagger';
 import { UIMessage } from 'ai';
 import { Public } from 'src/application/common/Metadata';
+import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
 import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { MOBILE_CHAT_SERVICE } from 'src/infrastructure/modules/mobile-ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
+import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
 import { QuizService } from 'src/infrastructure/servicies/quiz.service';
 import { quizPrompt } from 'src/infrastructure/utils/convert-to-prompt';
+import {
+  addMessageToMessages,
+  convertToMessages,
+  overrideMessagesToConversation
+} from 'src/infrastructure/utils/message-helper';
 import { UIMessageSchemaObject } from 'src/infrastructure/utils/schema-object';
 
 @Controller('ai/mobile')
 export class MobileAIController {
   constructor(
     @Inject(MOBILE_CHAT_SERVICE) private aiService: AIService,
-    private quizService: QuizService
+    private quizService: QuizService,
+    private conversattionService: ConversationService
   ) {}
 
   @Public()
@@ -22,8 +30,28 @@ export class MobileAIController {
   @ApiBody({
     schema: UIMessageSchemaObject
   })
-  async chat(@Body() messages: UIMessage[]) {
-    return this.aiService.TextGenerateFromMessages(messages);
+  async chat(
+    @Body() conversation: ConversationDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    const convertedMessages: UIMessage[] = convertToMessages(
+      conversation.messages || []
+    );
+    const message =
+      await this.aiService.TextGenerateFromMessages(convertedMessages);
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    const responseConversation = overrideMessagesToConversation(
+      conversation.id,
+      addMessageToMessages(message.data || '', conversation.messages || [])
+    );
+
+    return {
+      success: true,
+      data: responseConversation
+    };
   }
 
   @Public()

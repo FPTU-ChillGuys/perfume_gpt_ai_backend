@@ -5,4 +5,9 @@ export class QuizAnswerQuestionResponse extends CommonResponse {
   questionId!: string;
   answerId!: string;
   ai_result!: string;
+
+  constructor(init?: Partial<QuizAnswerQuestionResponse>) {
+    super();
+    Object.assign(this, init);
+  }
 }

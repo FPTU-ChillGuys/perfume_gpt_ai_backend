@@ -6,4 +6,9 @@ export class AIReqResResponse extends CommonResponse {
   requestType!: RequestType;
   prompt!: string;
   response!: string;
+
+  constructor(init?: Partial<AIReqResResponse>) {
+    super();
+    Object.assign(this, init);
+  }
 }

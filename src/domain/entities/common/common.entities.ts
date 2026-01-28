@@ -10,5 +10,4 @@ export class Common {
 
   @Property({ onUpdate: () => new Date() })
   updatedAt: Date = new Date();
-  
 }

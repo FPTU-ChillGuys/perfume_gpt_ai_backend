@@ -4,6 +4,8 @@ import { defineConfig, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { entities } from 'src/infrastructure/utils/entities';
 
+export const 
+
 export default defineConfig({
   driver: PostgreSqlDriver,
   entities: [...entities],

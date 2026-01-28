@@ -11,6 +11,7 @@ import { ToolModule } from './tool.module';
 import { QuizController } from 'src/api/controllers/quiz.controller';
 import { MappingModule } from './mapping.module';
 import { ConversationController } from 'src/api/controllers/conversation.controller';
+import { AIModule } from './ai.module';
 
 const modules = [
   ConversationModule,
@@ -20,7 +21,8 @@ const modules = [
   WebAIModule,
   ProductModule,
   ToolModule,
-  MappingModule
+  MappingModule,
+  AIModule
 ];
 
 @Module({

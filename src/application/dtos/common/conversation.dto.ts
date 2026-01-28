@@ -6,6 +6,6 @@ export class ConversationDto {
   id!: string;
   @ApiProperty()
   userId?: string;
-  @ApiProperty()
+  @ApiProperty({ type: () => [MessageDto] })
   messages?: MessageDto[];
 }

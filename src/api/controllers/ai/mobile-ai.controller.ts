@@ -27,9 +27,6 @@ export class MobileAIController {
 
   @Public()
   @Post('chat/test')
-  @ApiBody({
-    schema: UIMessageSchemaObject
-  })
   async chat(
     @Body() conversation: ConversationDto
   ): Promise<BaseResponse<ConversationDto>> {

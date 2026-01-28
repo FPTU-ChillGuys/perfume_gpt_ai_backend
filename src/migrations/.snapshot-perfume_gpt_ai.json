@@ -588,16 +588,57 @@
           "nullable": false,
           "length": 255,
           "mappedType": "string"
-        },
-        "ai_result": {
-          "name": "ai_result",
-          "type": "varchar(255)",
+        }
+      },
+      "name": "quiz_question_answer",
+      "schema": "public",
+      "indexes": [
+        {
+          "keyName": "quiz_question_answer_pkey",
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {},
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "length": 255,
-          "mappedType": "string"
+          "default": "gen_random_uuid()",
+          "mappedType": "uuid"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 6,
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 6,
+          "mappedType": "datetime"
         },
         "question_id": {
           "name": "question_id",
@@ -616,13 +657,22 @@
           "primary": false,
           "nullable": false,
           "mappedType": "uuid"
+        },
+        "ques_ans_id": {
+          "name": "ques_ans_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "mappedType": "uuid"
         }
       },
-      "name": "quiz_question_answer",
+      "name": "quiz_question_answer_detail",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "quiz_question_answer_pkey",
+          "keyName": "quiz_question_answer_detail_pkey",
           "columnNames": [
             "id"
           ],
@@ -634,12 +684,12 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "quiz_question_answer_question_id_foreign": {
-          "constraintName": "quiz_question_answer_question_id_foreign",
+        "quiz_question_answer_detail_question_id_foreign": {
+          "constraintName": "quiz_question_answer_detail_question_id_foreign",
           "columnNames": [
             "question_id"
           ],
-          "localTableName": "public.quiz_question_answer",
+          "localTableName": "public.quiz_question_answer_detail",
           "referencedColumnNames": [
             "id"
           ],
@@ -647,16 +697,29 @@
           "deleteRule": "cascade",
           "updateRule": "cascade"
         },
-        "quiz_question_answer_answer_id_foreign": {
-          "constraintName": "quiz_question_answer_answer_id_foreign",
+        "quiz_question_answer_detail_answer_id_foreign": {
+          "constraintName": "quiz_question_answer_detail_answer_id_foreign",
           "columnNames": [
             "answer_id"
           ],
-          "localTableName": "public.quiz_question_answer",
+          "localTableName": "public.quiz_question_answer_detail",
           "referencedColumnNames": [
             "id"
           ],
           "referencedTableName": "public.quiz_answer",
+          "deleteRule": "cascade",
+          "updateRule": "cascade"
+        },
+        "quiz_question_answer_detail_ques_ans_id_foreign": {
+          "constraintName": "quiz_question_answer_detail_ques_ans_id_foreign",
+          "columnNames": [
+            "ques_ans_id"
+          ],
+          "localTableName": "public.quiz_question_answer_detail",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.quiz_question_answer",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         }

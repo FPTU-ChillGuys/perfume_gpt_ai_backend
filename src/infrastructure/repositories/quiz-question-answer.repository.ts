@@ -15,8 +15,8 @@ export class QuizQuestionAnswerRepository extends SqlEntityRepository<QuizQuesti
     const orm = this.getEntityManager();
     // Using getReference to avoid fetching the entire entity
     quizQuesAns.userId = userId;
-    quizQuesAns.question = orm.getReference(QuizQuestion, questionId);
-    quizQuesAns.answer = orm.getReference(QuizAnswer, answerId);
+    // quizQuesAns.question = orm.getReference(QuizQuestion, questionId);
+    // quizQuesAns.answer = orm.getReference(QuizAnswer, answerId);
     // Persist and flush the new entity
     orm.persist(quizQuesAns);
     await orm.flush();

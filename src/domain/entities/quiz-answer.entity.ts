@@ -7,7 +7,7 @@ import {
   OneToMany,
   Property
 } from '@mikro-orm/core';
-import { QuizQuestionAnswer } from './quiz-question-answer.entity';
+import { QuizQuestionAnswerDetail } from './quiz-question-answer-detail.entity';
 
 @Entity()
 export class QuizAnswer extends Common {
@@ -20,8 +20,8 @@ export class QuizAnswer extends Common {
   })
   question!: QuizQuestion;
 
-  @OneToMany(() => QuizQuestionAnswer, (qqa) => qqa.answer)
-  quizQuestionAnswers = new Collection<QuizQuestionAnswer>(this);
+  @OneToMany(() => QuizQuestionAnswerDetail, (qqa) => qqa.answer)
+  quizQuestionAnswers = new Collection<QuizQuestionAnswerDetail>(this);
 
   constructor(init?: Partial<QuizAnswer>) {
     super();

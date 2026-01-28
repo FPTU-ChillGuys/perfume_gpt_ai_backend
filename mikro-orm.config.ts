@@ -11,7 +11,6 @@ export default defineConfig({
   metadataProvider: TsMorphMetadataProvider,
   dbName: 'perfume_gpt_ai',
   // user: process.env.POSTGRES_USER || '',
-  // password: process.env.POSTGRES_PASSWORD || ''
- 
+  // password: process.env.POSTGRES_PASSWORD || '',
   dynamicImportProvider: (id) => import(id)
 });

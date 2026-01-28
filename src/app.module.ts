@@ -24,13 +24,10 @@ import { CamelCaseNamingConvention } from '@automapper/core';
     MikroOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: () => {
+      useFactory: async () => {
+        const config = await defineConfig();
         return {
-          ...defineConfig
-          // user: configService.get<string>('POSTGRES_USER'),
-          // password: configService.get<string>('POSTGRES_PASSWORD'),
-          // host: configService.get<string>('POSTGRES_HOST'),
-          // port: configService.get<number>('POSTGRES_PORT')
+          ...config
         };
       }
     }),

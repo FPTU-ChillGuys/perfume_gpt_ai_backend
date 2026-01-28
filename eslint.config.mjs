@@ -22,7 +22,8 @@ export default defineConfig(
       sourceType: 'commonjs',
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: __dirname
+        // import.meta.dirname,
       },
     },
   },

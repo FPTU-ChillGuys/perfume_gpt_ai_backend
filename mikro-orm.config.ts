@@ -7,7 +7,7 @@ import { entities } from 'src/infrastructure/utils/entities';
 
 const hostConfig = async () => {
   try {
-    const host_config = await import('./host-config');
+    const host_config = await import('./host-config.js');
     return host_config.host_config;
   } catch (error) {
     console.error('Error importing host-config:', error);

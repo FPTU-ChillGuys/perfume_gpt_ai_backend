@@ -8,7 +8,6 @@ import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 export class QuizQuestionAnswerRepository extends SqlEntityRepository<QuizQuestionAnswer> {
   async createQuesAns(
     userId: string,
-    ai_result: string,
     questionId: string,
     answerId: string
   ): Promise<QuizQuestionAnswer> {
@@ -16,7 +15,6 @@ export class QuizQuestionAnswerRepository extends SqlEntityRepository<QuizQuesti
     const orm = this.getEntityManager();
     // Using getReference to avoid fetching the entire entity
     quizQuesAns.userId = userId;
-    quizQuesAns.ai_result = ai_result;
     quizQuesAns.question = orm.getReference(QuizQuestion, questionId);
     quizQuesAns.answer = orm.getReference(QuizAnswer, answerId);
     // Persist and flush the new entity

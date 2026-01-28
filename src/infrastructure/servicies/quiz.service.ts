@@ -87,7 +87,6 @@ export class QuizService {
       const quizQuestionAnswer =
         await this.unitOfWork.AIQuizQuestionAnswerRepo.createQuesAns(
           quizQuesAnws.userId,
-          '',
           quizQuesAnws.questionId,
           quizQuesAnws.answerId
         );

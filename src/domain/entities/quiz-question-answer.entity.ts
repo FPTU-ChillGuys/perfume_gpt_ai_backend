@@ -8,8 +8,6 @@ import { QuizQuestionAnswerRepository } from 'src/infrastructure/repositories/qu
 export class QuizQuestionAnswer extends Common {
   @Property()
   userId!: string;
-  @Property()
-  ai_result!: string;
   @ManyToOne(() => QuizQuestion, {
     deleteRule: 'cascade',
     updateRule: 'cascade'

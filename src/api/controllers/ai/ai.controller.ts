@@ -9,6 +9,7 @@ import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
 import { QuizService } from 'src/infrastructure/servicies/quiz.service';
+import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { quizPrompt } from 'src/infrastructure/utils/convert-to-prompt';
 import {
   addMessageToMessages,
@@ -26,10 +27,7 @@ export class AIController {
 
   @Public()
   @Post('chat')
-  @ApiResponse({
-    status: 201,
-    type: ConversationDto
-  })
+  @ApiBaseResponse(ConversationDto)
   async chat(
     @Body() conversation: ConversationDto
   ): Promise<BaseResponse<ConversationDto>> {
@@ -56,10 +54,7 @@ export class AIController {
 
   @Public()
   @Post('search')
-  @ApiResponse({
-    status: 201,
-    type: String
-  })
+  @ApiBaseResponse(String)
   async searchProductWithAI(
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
@@ -68,10 +63,7 @@ export class AIController {
 
   @Public()
   @Post('user/quiz')
-  @ApiResponse({
-    status: 201,
-    type: String
-  })
+  @ApiBaseResponse(String)
   @ApiBody({ type: [AddQuesAnwsRequest] })
   async chatQuiz(
     @Body() addQuesAnwsRequests: AddQuesAnwsRequest[]

@@ -7,6 +7,8 @@ import { Conversation } from 'src/domain/entities/conversation.entity';
 import { AddMessageRequest } from 'src/application/dtos/request/add-message.request';
 import { AddConversationRequest } from 'src/application/dtos/request/add-conversation.request';
 import { Injectable } from '@nestjs/common';
+import { ConversationResponse } from 'src/application/dtos/response/conversation.response';
+import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
 
 @Injectable()
 export class ConversationService {
@@ -52,10 +54,21 @@ export class ConversationService {
     }, 'Failed to get conversation by id');
   }
 
-  async getAllConversations(): Promise<BaseResponse<Conversation[]>> {
+  async getAllConversations(): Promise<BaseResponse<ConversationDto[]>> {
     return await funcHandlerAsync(async () => {
-      const conversations = await this.unitOfWork.AIConversationRepo.findAll();
-      return { success: true, data: conversations };
-    }, 'Failed to get all conversations');
+      const conversations = await this.unitOfWork.AIConversationRepo.findAll({populate : ['messages']});
+      const response = conversations.map(
+        (conv): ConversationDto => ({
+          id: conv.id,
+          userId: conv.userId,
+          messages: conv.messages.map((msg) => ({
+            id: msg.id,
+            message: msg.message,
+            sender: msg.sender
+          }))
+        })
+      );
+      return { success: true, data: response };
+    }, 'Failed to get all conversations', true);
   }
 }

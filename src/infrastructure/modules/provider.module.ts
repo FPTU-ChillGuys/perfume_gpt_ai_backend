@@ -12,6 +12,7 @@ import { QuizController } from 'src/api/controllers/quiz.controller';
 import { MappingModule } from './mapping.module';
 import { ConversationController } from 'src/api/controllers/conversation.controller';
 import { AIModule } from './ai.module';
+import { AIController } from 'src/api/controllers/ai/ai.controller';
 
 const modules = [
   ConversationModule,
@@ -31,7 +32,8 @@ const modules = [
     MobileAIController,
     ProductController,
     QuizController,
-    ConversationController
+    ConversationController,
+    AIController
   ],
   exports: modules
 })

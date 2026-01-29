@@ -58,7 +58,11 @@ export class AIController {
   async searchProductWithAI(
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
-    return await this.aiService.TextGenerateFromPrompt(prompt);
+    const aiResponse = await this.aiService.TextGenerateFromPrompt(prompt);
+    if (!aiResponse.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+    return { success: true, data: aiResponse.data };
   }
 
   @Public()

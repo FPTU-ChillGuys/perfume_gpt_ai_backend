@@ -5,6 +5,7 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 
 export const ApiBaseResponse = <GenericType extends Function>(
   data: GenericType,
+  properties: Record<string, any> = {}
 ) =>
   applyDecorators(
     ApiExtraModels(BaseResponse, data),
@@ -14,20 +15,22 @@ export const ApiBaseResponse = <GenericType extends Function>(
         allOf: [
           { $ref: getSchemaPath(BaseResponse) },
           {
-            properties: {
-              data: {
-                $ref: getSchemaPath(data)
-              }
-            }
+            properties: properties
+              ? properties
+              : {
+                  data: {
+                    $ref: getSchemaPath(data)
+                  }
+                }
           }
         ]
       }
     })
   );
 
-
-  export const ExtendApiBaseResponse = <GenericType extends Function>(
+export const ExtendApiBaseResponse = <GenericType extends Function>(
   data: GenericType,
+  properties: Record<string, any> = {}
 ) =>
   applyDecorators(
     ApiExtraModels(BaseResponseAPI, data),
@@ -37,11 +40,13 @@ export const ApiBaseResponse = <GenericType extends Function>(
         allOf: [
           { $ref: getSchemaPath(BaseResponseAPI) },
           {
-            properties: {
-              payload: {
-                $ref: getSchemaPath(data)
-              }
-            }
+            properties: properties
+              ? properties
+              : {
+                  data: {
+                    $ref: getSchemaPath(data)
+                  }
+                }
           }
         ]
       }

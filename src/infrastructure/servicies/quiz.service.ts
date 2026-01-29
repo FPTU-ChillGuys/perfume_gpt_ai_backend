@@ -9,6 +9,8 @@ import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
 import { Injectable } from '@nestjs/common';
+import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
+import { QuizAnswerResponse } from 'src/application/dtos/response/quiz-answer.response';
 
 @Injectable()
 export class QuizService {
@@ -52,7 +54,9 @@ export class QuizService {
     }, 'Failed to update quiz answer');
   }
 
-  async getQuizQuesById(id: string): Promise<BaseResponse<QuizQuestion>> {
+  async getQuizQuesById(
+    id: string
+  ): Promise<BaseResponse<QuizQuestionResponse>> {
     return await funcHandlerAsync(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne(
         {
@@ -63,7 +67,23 @@ export class QuizService {
       if (!quizQuestion) {
         return { success: false, error: 'Quiz question not found' };
       }
-      return { success: true, data: quizQuestion };
+
+      const quizQuestionResponse = new QuizQuestionResponse({
+        id: quizQuestion.id,
+        createdAt: quizQuestion.createdAt,
+        updatedAt: quizQuestion.updatedAt,
+        question: quizQuestion.question,
+        answers: quizQuestion.answers.map(
+          (ans): QuizAnswerResponse => ({
+            id: ans.id,
+            updatedAt: ans.updatedAt,
+            createdAt: ans.createdAt,
+            answer: ans.answer
+          })
+        )
+      });
+
+      return { success: true, data: quizQuestionResponse };
     }, 'Failed to get quiz question by id');
   }
 

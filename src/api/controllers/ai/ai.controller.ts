@@ -79,9 +79,9 @@ export class AIController {
           quesAns.questionId
         );
         if (quest.success && quest.data) {
-          const ans = quest.data.answers.find((a) => a.id === quesAns.answerId);
+          const ans = quest.data.answers?.find((a) => a.id === quesAns.answerId);
           quesAnses.push({
-            question: quest.data.question,
+            question: quest.data.question || '',
             answer: ans?.answer || ''
           });
         } else {
@@ -90,10 +90,13 @@ export class AIController {
       })
     );
 
+    // Generate prompt
     const prompt = quizPrompt(quesAnses);
-
+    
+    // Get AI response
     const aiResponse = await this.aiService.TextGenerateFromPrompt(prompt);
 
+    // Return response
     if (!aiResponse.success) {
       return { success: false, error: 'Failed to get AI response' };
     }

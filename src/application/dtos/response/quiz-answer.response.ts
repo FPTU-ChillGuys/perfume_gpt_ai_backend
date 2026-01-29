@@ -3,9 +3,9 @@ import { CommonResponse } from './common/common.response';
 
 export class QuizAnswerResponse extends CommonResponse {
   @ApiProperty()
-  questionId!: string;
+  questionId?: string;
   @ApiProperty()
-  answer!: string;
+  answer?: string;
 
   constructor(init?: Partial<QuizAnswerResponse>) {
     super();

@@ -40,7 +40,8 @@ export async function TextGenerationFromMessagesToResultWithErrorHandler(
   systemPrompt?: string,
   tools?: ToolSet,
   errorMessage?: string,
-  stopWhen?: number
+  stopWhen?: number,
+  output?: any
 ) {
   try {
     const modelMessages = await convertToModelMessages(messages);
@@ -49,7 +50,8 @@ export async function TextGenerationFromMessagesToResultWithErrorHandler(
       messages: modelMessages,
       system: systemPrompt ? systemPrompt : undefined,
       tools: tools ? tools : undefined,
-      stopWhen: stepCountIs(stopWhen ? stopWhen : 5)
+      stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
+      output: output ? output : undefined
     });
     return result.text;
   } catch (error) {

@@ -9,6 +9,7 @@ import {
 } from 'src/chatbot/chatbot';
 import { gpt5nano } from 'src/chatbot/models/openai';
 import { Injectable } from '@nestjs/common';
+import { error } from 'console';
 
 @Injectable()
 export class AIService {
@@ -31,21 +32,28 @@ export class AIService {
   }
 
   async TextGenerateFromMessages(
-    messages: UIMessage[]
+    messages: UIMessage[],
+    output?: any,
+    errorMessage?: string
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
       const text = await TextGenerationFromMessagesToResultWithErrorHandler(
         gpt5nano,
         messages,
         this.systemPrompt,
-        this.tools
+        this.tools,
+        errorMessage,
+        this.stopWhen,
+        output
       );
       return { success: true, data: text };
     }, 'Failed to generate text from messages');
   }
 
   TextGenerateStreamFromPrompt(
-    prompt: string
+    prompt: string,
+    output?: any,
+    errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
       const stream = StreamTextGenerationFromPromptToResultWithErrorHandler(
@@ -53,14 +61,18 @@ export class AIService {
         prompt,
         this.systemPrompt,
         this.tools,
-        this.stopWhen
+        this.stopWhen,
+        output,
+        errorMessage
       );
       return { success: true, data: stream };
     }, 'Failed to generate text stream from messages');
   }
 
   TextGenerateStreamFromMessages(
-    messages: UIMessage[]
+    messages: UIMessage[],
+    output?: any,
+    errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
       const stream = StreamTextGenerationFromMessagesToResultWithErrorHandler(
@@ -68,7 +80,9 @@ export class AIService {
         messages,
         this.systemPrompt,
         this.tools,
-        this.stopWhen
+        this.stopWhen,
+        errorMessage,
+        output
       );
       return { success: true, data: stream };
     }, 'Failed to generate text stream from messages');

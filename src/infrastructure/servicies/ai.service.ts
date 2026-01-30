@@ -19,12 +19,12 @@ export class AIService {
     private stopWhen?: number
   ) {}
 
-  async TextGenerateFromPrompt(prompt: string): Promise<BaseResponse<string>> {
+  async TextGenerateFromPrompt(prompt: string, additionalSystemPrompt?: string): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
       const text = await TextGenerationFromPromptToResultWithErrorHandler(
         gpt5nano,
         prompt,
-        this.systemPrompt,
+        this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools
       );
       return { success: true, data: text };

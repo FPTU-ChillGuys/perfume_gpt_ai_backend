@@ -42,24 +42,26 @@ export class ProductTool {
 
   searchProduct: Tool = tool({
     description: 'Get a list of all products available in the store.',
-    inputSchema: z.array(
-      z.object({
-        searchText: z.string(),
-        pageNumber: z.number().min(1).optional().default(1),
-        pageSize: z.number().min(1).max(100).optional().default(10),
-        sortBy: z.string().optional(),
-        sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
-        isDescending: z.boolean().optional().default(false),
-        searchTerms: z.array(z.string()).optional().default([])
-      })
-    ),
+    inputSchema: z.object({
+      searches: z.array(
+        z.object({
+          searchText: z.string(),
+          pageNumber: z.number().min(1).optional().default(1),
+          pageSize: z.number().min(1).max(100).optional().default(10),
+          sortBy: z.string().optional(),
+          sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
+          isDescending: z.boolean().optional().default(false),
+          searchTerms: z.array(z.string()).optional().default([])
+        })
+      )
+    }),
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
             // Tạo array search để search nhiều từ khóa đê tổng hợp 
           let results : ProductResponse[] = [];
 
-          for (const item of input) {
+          for (const item of input.searches) {
             const response = await this.productService.getProductsUsingSemanticSearch(
               item.searchText,
               {

@@ -1,9 +1,10 @@
 import { Sender } from '../enum/sender.enum';
 import { Conversation } from './conversation.entity';
 import { Common } from './common/common.entities';
-import { Entity, Enum, ManyToOne, Property } from '@mikro-orm/core';
+import { Entity, Enum, ManyToOne, OneToOne, Property } from '@mikro-orm/core';
 import { MessageResponse } from 'src/application/dtos/response/message.response';
 import { ApiProperty } from '@nestjs/swagger';
+import { AIUserLogDetail } from './ai-user-log-detail.entity';
 
 @Entity({ repository: () => MessageResponse })
 export class Message extends Common {
@@ -21,6 +22,10 @@ export class Message extends Common {
     updateRule: 'cascade'
   })
   conversation!: Conversation;
+
+  @ApiProperty({ type: () => AIUserLogDetail })
+  @OneToOne(() => AIUserLogDetail)
+  aiUserLogDetail!: AIUserLogDetail;
 
   constructor(init?: Partial<Message>) {
     super();

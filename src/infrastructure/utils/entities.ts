@@ -1,4 +1,3 @@
-import { AIRequestResponse } from 'src/domain/entities/ai-request-response.entity';
 import { AIReviewSummary } from 'src/domain/entities/ai-review-summary.entity';
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
@@ -8,6 +7,6 @@ export const entities = [
   Conversation,
   QuizQuestion,
   QuizQuestionAnswer,
-  AIRequestResponse,
+  // AIRequestResponse,
   AIReviewSummary
 ];

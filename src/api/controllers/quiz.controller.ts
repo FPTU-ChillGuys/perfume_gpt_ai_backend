@@ -39,6 +39,7 @@ export class QuizController {
 
   @Public()
   @Put(':id')
+  @ApiBody({ type: [QuizAnswerRequest] })
   async updateQuizAnswer(
     @Param('id') id: string,
     @Body() quizAnswerRequest: QuizAnswerRequest[]

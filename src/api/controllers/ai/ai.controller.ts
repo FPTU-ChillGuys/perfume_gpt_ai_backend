@@ -1,10 +1,11 @@
 import { Body, Controller, Inject, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiResponse } from '@nestjs/swagger';
-import { UIMessage } from 'ai';
+import { Output, UIMessage } from 'ai';
 import { Public } from 'src/application/common/Metadata';
 import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
 import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
@@ -34,8 +35,10 @@ export class AIController {
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
-    const message =
-      await this.aiService.TextGenerateFromMessages(convertedMessages);
+    const message = await this.aiService.TextGenerateFromMessages(
+      convertedMessages,
+      Output.object(searchOutput)
+    );
 
     if (!message.success) {
       return { success: false, error: 'Failed to get AI response' };
@@ -79,7 +82,9 @@ export class AIController {
           quesAns.questionId
         );
         if (quest.success && quest.data) {
-          const ans = quest.data.answers?.find((a) => a.id === quesAns.answerId);
+          const ans = quest.data.answers?.find(
+            (a) => a.id === quesAns.answerId
+          );
           quesAnses.push({
             question: quest.data.question || '',
             answer: ans?.answer || ''
@@ -92,7 +97,7 @@ export class AIController {
 
     // Generate prompt
     const prompt = quizPrompt(quesAnses);
-    
+
     // Get AI response
     const aiResponse = await this.aiService.TextGenerateFromPrompt(prompt);
 

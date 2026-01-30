@@ -14,12 +14,15 @@ export class AIReviewSummary extends Common {
   @ApiProperty()
   @Property()
   summary!: string;
+
+  @ApiProperty({ enum: Sentiment })
   @Enum(() => Sentiment)
   sentiment!: Sentiment;
 
   @ApiProperty()
   @Property()
   reviewCount!: number;
+  
   constructor(init?: Partial<AIReviewSummary>) {
     super();
     Object.assign(this, init);

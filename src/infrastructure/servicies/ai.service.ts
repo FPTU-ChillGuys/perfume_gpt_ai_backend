@@ -34,13 +34,14 @@ export class AIService {
   async TextGenerateFromMessages(
     messages: UIMessage[],
     output?: any,
+    additionalSystemPrompt?: string,
     errorMessage?: string
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
       const text = await TextGenerationFromMessagesToResultWithErrorHandler(
         gpt5nano,
         messages,
-        this.systemPrompt,
+        this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
         errorMessage,
         this.stopWhen,
@@ -53,13 +54,14 @@ export class AIService {
   TextGenerateStreamFromPrompt(
     prompt: string,
     output?: any,
+    additionalSystemPrompt?: string,
     errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
       const stream = StreamTextGenerationFromPromptToResultWithErrorHandler(
         gpt5nano,
         prompt,
-        this.systemPrompt,
+        this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
         this.stopWhen,
         output,
@@ -72,13 +74,14 @@ export class AIService {
   TextGenerateStreamFromMessages(
     messages: UIMessage[],
     output?: any,
+    additionalSystemPrompt?: string,
     errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
       const stream = StreamTextGenerationFromMessagesToResultWithErrorHandler(
         gpt5nano,
         messages,
-        this.systemPrompt,
+        this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
         this.stopWhen,
         errorMessage,

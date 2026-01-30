@@ -5,7 +5,7 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 
 export const ApiBaseResponse = <GenericType extends Function>(
   data: GenericType,
-  properties: Record<string, any> = {}
+  properties?: Record<string, any>
 ) =>
   applyDecorators(
     ApiExtraModels(BaseResponse, data),
@@ -30,7 +30,7 @@ export const ApiBaseResponse = <GenericType extends Function>(
 
 export const ExtendApiBaseResponse = <GenericType extends Function>(
   data: GenericType,
-  properties: Record<string, any> = {}
+  properties?: Record<string, any>
 ) =>
   applyDecorators(
     ApiExtraModels(BaseResponseAPI, data),

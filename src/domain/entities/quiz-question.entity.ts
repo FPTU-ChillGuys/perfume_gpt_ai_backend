@@ -10,10 +10,12 @@ export class QuizQuestion extends Common {
   @ApiProperty()
   @Property()
   question!: string;
-  @ApiProperty()
+
+  @ApiProperty({ type: () => QuizAnswer, isArray: true })
   @OneToMany(() => QuizAnswer, (quizAns) => quizAns.question)
   answers = new Collection<QuizAnswer>(this);
-  @ApiProperty()
+
+  @ApiProperty({ type: () => QuizQuestionAnswerDetail, isArray: true })
   @OneToMany(() => QuizQuestionAnswerDetail, (qqa) => qqa.question)
   quizQuestionAnswers = new Collection<QuizQuestionAnswerDetail>(this);
 

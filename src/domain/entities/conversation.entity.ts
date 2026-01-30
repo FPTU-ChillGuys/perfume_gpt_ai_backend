@@ -10,7 +10,7 @@ export class Conversation extends Common {
   @Property()
   userId!: string;
 
-  @ApiProperty()
+  @ApiProperty({ type: () => Message, isArray: true })
   @OneToMany(() => Message, (message) => message.conversation)
   messages = new Collection<Message>(this);
 

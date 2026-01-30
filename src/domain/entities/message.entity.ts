@@ -7,15 +7,15 @@ import { ApiProperty } from '@nestjs/swagger';
 
 @Entity({ repository: () => MessageResponse })
 export class Message extends Common {
-  @ApiProperty()
+  @ApiProperty({ enum: Sender })
   @Enum(() => Sender)
   sender!: Sender;
 
   @ApiProperty()
   @Property()
   message!: string;
-  
-  @ApiProperty()
+
+  @ApiProperty({ type: () => Conversation })
   @ManyToOne(() => Conversation, {
     deleteRule: 'cascade',
     updateRule: 'cascade'

@@ -16,14 +16,14 @@ export class QuizAnswer extends Common {
   @Property()
   answer!: string;
 
-  @ApiProperty()
+  @ApiProperty({type: () => QuizQuestion})
   @ManyToOne(() => QuizQuestion, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })
   question!: QuizQuestion;
 
-  @ApiProperty()
+  @ApiProperty({ type: () => QuizQuestionAnswerDetail, isArray: true })
   @OneToMany(() => QuizQuestionAnswerDetail, (qqa) => qqa.answer)
   quizQuestionAnswers = new Collection<QuizQuestionAnswerDetail>(this);
 

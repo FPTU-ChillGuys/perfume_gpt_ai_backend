@@ -7,20 +7,20 @@ import { ApiProperty } from '@nestjs/swagger';
 
 @Entity()
 export class QuizQuestionAnswerDetail extends Common {
-  @ApiProperty()
+  @ApiProperty({type: () => QuizQuestion})
   @ManyToOne(() => QuizQuestion, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })
   question!: QuizQuestion;
-  @ApiProperty()
+  @ApiProperty({type: () => QuizAnswer})
   @ManyToOne(() => QuizAnswer, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })
   answer!: QuizAnswer;
 
-  @ApiProperty()
+  @ApiProperty({type: () => QuizQuestionAnswer})
   @ManyToOne(() => QuizQuestionAnswer, {
     deleteRule: 'cascade',
     updateRule: 'cascade'

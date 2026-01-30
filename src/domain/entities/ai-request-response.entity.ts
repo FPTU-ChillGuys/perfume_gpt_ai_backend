@@ -11,7 +11,7 @@ export class AIRequestResponse extends Common {
   @Property()
   userId!: string;
 
-  @ApiProperty()
+  @ApiProperty({ enum: RequestType })
   @Enum(() => RequestType)
   requestType!: RequestType;
 

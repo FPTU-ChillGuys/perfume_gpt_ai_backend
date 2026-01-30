@@ -4,8 +4,10 @@ import { Public } from 'src/application/common/Metadata';
 import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
 import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
+import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizService } from 'src/infrastructure/servicies/quiz.service';
+import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 
 @Controller('quizzes')
 export class QuizController {
@@ -13,10 +15,7 @@ export class QuizController {
 
   @Public()
   @Get()
-  @ApiResponse({
-    status: 200,
-    type: [QuizQuestion]
-  })
+  @ApiBaseResponse(QuizQuestion)
   async getAllQuizzes() {
     return this.quizService.getAllQuizQues();
   }

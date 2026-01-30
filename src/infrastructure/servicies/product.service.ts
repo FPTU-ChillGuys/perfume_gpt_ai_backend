@@ -37,4 +37,33 @@ export class ProductService {
       true
     );
   }
+
+  async getProductsUsingSemanticSearch(
+    searchText: string,
+    request: PagedAndSortedRequest
+  ): Promise<BaseResponseAPI<ProductListResponse>> {
+    return await funcHandlerAsync(
+      async () => {
+        console.log(ApiUrl().PRODUCT_URL('search/semantic'));
+        const { data } = await firstValueFrom(
+          this.httpService.get<BaseResponseAPI<ProductListResponse>>(
+            ApiUrl().PRODUCT_URL('search/semantic'),
+            {
+              params: {
+                searchText: searchText,
+                pageNumber: request.PageNumber ?? 1,
+                pageSize: request.PageSize ?? 10,
+                sortBy: request.SortBy ?? '',
+                sortOrder: request.SortOrder ?? 'asc',
+                isDescending: request.IsDescending ?? false
+              }
+            }
+          )
+        );
+        return data;
+      },
+      'Failed to fetch products',
+      true
+    );
+  }
 }

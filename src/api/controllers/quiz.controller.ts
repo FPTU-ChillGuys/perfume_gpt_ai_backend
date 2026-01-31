@@ -62,11 +62,11 @@ export class QuizController {
     return this.quizService.updateAnswer(id, quizAnswerRequest);
   }
 
-  @Public()
-  @Post('user/test')
-  async addUserAnswer(@Body() quizQuesAnws: QuesAnwsRequest) {
-    return this.quizService.addQuizQuesAnws(quizQuesAnws);
-  }
+  // @Public()
+  // @Post('user/test')
+  // async addUserAnswer(@Body() quizQuesAnws: QuesAnwsRequest) {
+  //   return this.quizService.addQuizQuesAnws(quizQuesAnws);
+  // }
 
   //5-question interactive quiz
   @Public()

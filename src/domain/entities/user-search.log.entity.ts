@@ -1,15 +1,19 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Common } from "./common/common.entities";
-import { Property } from "@mikro-orm/core";
+import { ApiProperty } from '@nestjs/swagger';
+import { Common } from './common/common.entities';
+import { ManyToOne, Property } from '@mikro-orm/core';
+import { UserLog } from './user-log.entity';
 
 export class UserSearchLog extends Common {
+  @ApiProperty()
+  @Property()
+  content?: string;
 
-    @ApiProperty()
-    @Property()
-    content?: string; 
+  @ApiProperty({ type: () => UserLog })
+  @ManyToOne(() => UserLog)
+  userLog: UserLog;
 
-    constructor(init?: Partial<UserSearchLog>) {
-        super();
-        Object.assign(this, init);
-    }
+  constructor(init?: Partial<UserSearchLog>) {
+    super();
+    Object.assign(this, init);
+  }
 }

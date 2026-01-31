@@ -9,9 +9,9 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiResponse } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
-import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
-import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
-import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
+import { AddQuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
+import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
+import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
 import { QUIZ_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';

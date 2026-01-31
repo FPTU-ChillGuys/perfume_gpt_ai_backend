@@ -10,4 +10,8 @@ export class ReviewSumaryRequest {
   sentiment!: Sentiment;
   @ApiProperty()
   reviewCount!: number;
+
+  constructor(init?: Partial<ReviewSumaryRequest>) {
+    Object.assign(this, init);
+  }
 }

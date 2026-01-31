@@ -7,8 +7,8 @@ import {
   type Mapper
 } from '@automapper/core';
 import { Message } from 'src/domain/entities/message.entity';
-import { QuizQuestionRequest } from '../dtos/request/add-quiz-question.request';
-import { QuizAnswerRequest } from '../dtos/request/add-quiz-answer.request';
+import { QuizQuestionRequest } from '../dtos/request/quiz-question.request';
+import { QuizAnswerRequest } from '../dtos/request/quiz-answer.request';
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 

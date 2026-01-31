@@ -3,7 +3,7 @@ import { ApiBody, ApiResponse } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Public } from 'src/application/common/Metadata';
 import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
-import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
+import { AddQuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { QUIZ_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
@@ -39,5 +39,5 @@ export class AIController {
     }
     return { success: true, data: aiResponse.data };
   }
-  
+
 }

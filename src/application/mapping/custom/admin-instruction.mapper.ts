@@ -14,4 +14,15 @@ export class AdminInstructionMapper {
   static toResponseList(entities: AdminInstruction[]): any[] {
     return entities.map((entity) => this.toResponse(entity));
   }
+
+  //  static toEntity(request: AddPromptRequest): AdminInstruction {
+  //   return new AdminInstruction({
+  //     instruction: request.prompt,
+  //     instructionType: request.requestType
+  //   });
+  // }
+
+  // static toEntityList(requests: AddPromptRequest[]): AdminInstruction[] {
+  //   return requests.map((request) => this.toEntity(request));
+  // }
 }

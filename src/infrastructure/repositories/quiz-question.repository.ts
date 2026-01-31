@@ -1,7 +1,7 @@
 import { SqlEntityRepository } from '@mikro-orm/postgresql';
 import { Injectable } from '@nestjs/common';
-import { QuizAnswerRequest } from 'src/application/dtos/request/add-quiz-answer.request';
-import { QuizQuestionRequest } from 'src/application/dtos/request/add-quiz-question.request';
+import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
+import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 

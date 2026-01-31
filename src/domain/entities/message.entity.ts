@@ -2,11 +2,10 @@ import { Sender } from '../enum/sender.enum';
 import { Conversation } from './conversation.entity';
 import { Common } from './common/common.entities';
 import { Entity, Enum, ManyToOne, OneToOne, Property } from '@mikro-orm/core';
-import { MessageResponse } from 'src/application/dtos/response/message.response';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserMessageLog } from './user-message-log.entity';
 
-@Entity({ repository: () => MessageResponse })
+@Entity()
 export class Message extends Common {
   @ApiProperty({ enum: Sender })
   @Enum(() => Sender)

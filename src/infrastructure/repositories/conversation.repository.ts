@@ -1,11 +1,7 @@
 import { SqlEntityRepository } from '@mikro-orm/postgresql';
 import { Injectable } from '@nestjs/common';
-import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
-import { MessageDto } from 'src/application/dtos/common/message.dto';
-import { AddMessageRequest } from 'src/application/dtos/request/add-message.request';
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { Message } from 'src/domain/entities/message.entity';
-import { Sender } from 'src/domain/enum/sender.enum';
 
 @Injectable()
 export class ConversationRepository extends SqlEntityRepository<Conversation> {

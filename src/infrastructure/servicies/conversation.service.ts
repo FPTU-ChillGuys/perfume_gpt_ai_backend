@@ -4,14 +4,12 @@ import { UnitOfWork } from '../repositories/unit-of-work';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Conversation } from 'src/domain/entities/conversation.entity';
-import { AddMessageRequest } from 'src/application/dtos/request/add-message.request';
-import { AddConversationRequest } from 'src/application/dtos/request/add-conversation.request';
 import { Injectable } from '@nestjs/common';
-import { ConversationResponse } from 'src/application/dtos/response/conversation.response';
 import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { Message } from 'src/domain/entities/message.entity';
 import { MessageDto } from 'src/application/dtos/common/message.dto';
+import { ConversationMapper } from 'src/application/mapping/custom';
 
 @Injectable()
 export class ConversationService {
@@ -91,17 +89,7 @@ export class ConversationService {
         return { success: false, error: 'Conversation not found' };
       }
 
-      const conversationDto = new ConversationDto({
-        id: conversation.id,
-        userId: conversation.userId,
-        messages: conversation.messages.getItems().map(
-          (msg) =>
-            new MessageDto({
-              message: msg.message,
-              sender: msg.sender
-            })
-        )
-      });
+      const conversationDto = ConversationMapper.toResponse(conversation, true);
 
       return { success: true, data: conversationDto };
     }, 'Failed to get conversation by id');

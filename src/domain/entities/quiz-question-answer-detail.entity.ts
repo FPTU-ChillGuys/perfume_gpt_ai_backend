@@ -4,7 +4,7 @@ import { QuizAnswer } from './quiz-answer.entity';
 import { QuizQuestionAnswer } from './quiz-question-answer.entity';
 import { Common } from './common/common.entities';
 import { ApiProperty } from '@nestjs/swagger';
-import { UserLogDetail } from './ai-user-log-detail.entity';
+import { UserQuizLog } from './user-quiz-log.entity';
 
 @Entity()
 export class QuizQuestionAnswerDetail extends Common {
@@ -28,9 +28,9 @@ export class QuizQuestionAnswerDetail extends Common {
   })
   quesAns!: QuizQuestionAnswer;
 
-  @ApiProperty({ type: () => UserLogDetail })
-  @OneToOne(() => UserLogDetail)
-  UserLogDetail!: UserLogDetail;
+  @ApiProperty({ type: () => UserQuizLog })
+  @OneToOne(() => UserQuizLog)
+  userQuizLog!: UserQuizLog;
 
   constructor(init?: Partial<QuizQuestionAnswerDetail>) {
     super();

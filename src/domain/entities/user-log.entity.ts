@@ -4,17 +4,13 @@ import { Common } from './common/common.entities';
 import { ApiProperty } from '@nestjs/swagger';
 
 @Entity()
-export class AIUserLog extends Common {
+export class UserLog extends Common {
 
   @ApiProperty()
   @Property()
   userId!: string;
 
-  @ApiProperty({ enum: RequestType })
-  @Enum(() => RequestType)
-  requestType!: RequestType;
-
-  constructor(init?: Partial<AIUserLog>) {
+  constructor(init?: Partial<UserLog>) {
     super();
     Object.assign(this, init);
   }

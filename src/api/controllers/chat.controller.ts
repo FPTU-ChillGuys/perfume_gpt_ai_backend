@@ -38,6 +38,8 @@ export class ChatController {
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
+
+    // Call AI service to get response
     const message = await this.aiService.TextGenerateFromMessages(
       convertedMessages,
       Output.object(searchOutput)
@@ -47,14 +49,16 @@ export class ChatController {
       return { success: false, error: 'Failed to get AI response' };
     }
 
+    // Prepare response conversation
     const responseConversation = overrideMessagesToConversation(
-      conversation.id,
+      conversation.id || '',
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 
+    // Save or update conversation in database
     if (
       !(await this.conversationService.isExistConversation(
-        responseConversation.id
+        responseConversation.id || ''
       ))
     ) {
       await this.conversationService.addConversation(responseConversation);

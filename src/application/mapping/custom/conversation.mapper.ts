@@ -31,4 +31,44 @@ export class ConversationMapper {
   ): ConversationDto[] {
     return entities.map((entity) => this.toResponse(entity, includeMessages));
   }
+
+    static toEntity(dto: ConversationDto): Conversation {
+    const conversation = new Conversation({
+      userId: dto.userId || ''
+    });
+
+    // Set id if provided
+    if (dto.id) {
+      conversation.id = dto.id;
+    }
+
+    // Map messages if provided
+    if (dto.messages && dto.messages.length > 0) {
+      const messages = dto.messages.map(messageDto => 
+        MessageMapper.toEntity(messageDto, conversation)
+      );
+      conversation.messages.set(messages);
+    }
+
+    return conversation;
+  }
+
+  static toEntityList(dtos: ConversationDto[]): Conversation[] {
+    return dtos.map((dto) => this.toEntity(dto));
+  }
+
+  static updateEntity(entity: Conversation, dto: ConversationDto): Conversation {
+    if (dto.userId) {
+      entity.userId = dto.userId;
+    }
+
+    if (dto.messages) {
+      const messages = dto.messages.map(messageDto => 
+        MessageMapper.toEntity(messageDto, entity)
+      );
+      entity.messages.set(messages);
+    }
+
+    return entity;
+  }
 }

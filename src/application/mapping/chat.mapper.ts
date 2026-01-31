@@ -6,9 +6,6 @@ import {
   mapFrom,
   type Mapper
 } from '@automapper/core';
-import { AddPromptRequest } from '../dtos/request/add-prompt.request';
-import { UpdateResRequest } from '../dtos/request/update-response.request';
-import { AddMessageRequest } from '../dtos/request/add-message.request';
 import { Message } from 'src/domain/entities/message.entity';
 import { QuizQuestionRequest } from '../dtos/request/add-quiz-question.request';
 import { QuizAnswerRequest } from '../dtos/request/add-quiz-answer.request';
@@ -22,7 +19,6 @@ export class ChatProfile extends AutomapperProfile {
 
   get profile() {
     return (mapper: Mapper) => {
-      createMap(mapper, AddMessageRequest, Message);
       createMap(
         mapper,
         QuizAnswerRequest,

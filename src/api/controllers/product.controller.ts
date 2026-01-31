@@ -16,4 +16,5 @@ export class ProductController {
   async chat(@Query() request: PagedAndSortedRequest) {
     return this.productService.getAllProducts(request);
   }
+  
 }

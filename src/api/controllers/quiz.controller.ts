@@ -51,4 +51,6 @@ export class QuizController {
   async addUserAnswer(@Body() quizQuesAnws: AddQuesAnwsRequest) {
     return this.quizService.addQuizQuesAnws(quizQuesAnws);
   }
+
+  //5-question interactive quiz
 }

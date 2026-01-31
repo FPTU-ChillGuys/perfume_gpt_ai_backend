@@ -12,8 +12,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { UserMessageLog } from './user-message-log.entity';
 import { UserQuizLog } from './user-quiz-log.entity';
 import { UserSearchLog } from './user-search.log.entity';
+import { UserLogRepository } from 'src/infrastructure/repositories/user-log.repository';
 
-@Entity()
+@Entity({repository: () => UserLogRepository})
 export class UserLog extends Common {
   @ApiProperty()
   @Property()

@@ -8,4 +8,8 @@ export class ConversationDto {
   userId?: string;
   @ApiProperty({ type: () => [MessageDto] })
   messages?: MessageDto[];
+
+  constructor(init?: Partial<ConversationDto>) {
+    Object.assign(this, init);
+  }
 }

@@ -5,4 +5,8 @@ export class MessageDto {
   sender!: string;
   @ApiProperty()
   message!: string;
+
+  constructor(init?: Partial<MessageDto>) {
+    Object.assign(this, init);
+  }
 }

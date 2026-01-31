@@ -38,6 +38,15 @@ export class ConversationService {
         ) || []
       );
       await this.unitOfWork.AIConversationRepo.addConversation(conversation);
+
+      //Luu message vao log
+      for (const msg of conversation.messages.getItems()) {
+        await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
+          conversation.userId,
+          msg
+        );
+      }
+
       return { success: true, data: conversation };
     }, 'Failed to add conversation');
   }
@@ -47,20 +56,33 @@ export class ConversationService {
     messageDtos: MessageDto[]
   ): Promise<BaseResponse> {
     return await funcHandlerAsync(async () => {
-      const messages: Message[] = messageDtos.map((msg) => new Message({
-        sender: msg.sender as Sender,
-        message: msg.message
-      }));
-
-      await this.unitOfWork.AIConversationRepo.addMessagesToConversation(
-        id,
-        messages
+      const messages: Message[] = messageDtos.map(
+        (msg) =>
+          new Message({
+            sender: msg.sender as Sender,
+            message: msg.message
+          })
       );
+
+      const conversation =
+        await this.unitOfWork.AIConversationRepo.addMessagesToConversation(
+          id,
+          messages
+        );
+
+      //Lay message luu vao log
+      await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
+        conversation.userId,
+        messages[messages.length - 1]
+      );
+
       return { success: true };
     }, 'Failed to update messages');
   }
 
-  async getConversationById(id: string): Promise<BaseResponse<Conversation>> {
+  async getConversationById(
+    id: string
+  ): Promise<BaseResponse<ConversationDto>> {
     return await funcHandlerAsync(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne({
         id
@@ -68,7 +90,20 @@ export class ConversationService {
       if (!conversation) {
         return { success: false, error: 'Conversation not found' };
       }
-      return { success: true, data: conversation };
+
+      const conversationDto = new ConversationDto({
+        id: conversation.id,
+        userId: conversation.userId,
+        messages: conversation.messages.getItems().map(
+          (msg) =>
+            new MessageDto({
+              message: msg.message,
+              sender: msg.sender
+            })
+        )
+      });
+
+      return { success: true, data: conversationDto };
     }, 'Failed to get conversation by id');
   }
 
@@ -85,6 +120,7 @@ export class ConversationService {
         const conversations = await this.unitOfWork.AIConversationRepo.findAll({
           populate: ['messages']
         });
+
         const response = conversations.map(
           (conv): ConversationDto => ({
             id: conv.id,
@@ -96,6 +132,7 @@ export class ConversationService {
             }))
           })
         );
+
         return { success: true, data: response };
       },
       'Failed to get all conversations',

@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Post } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post } from '@nestjs/common';
 import { Output, UIMessage } from 'ai';
 import { Public } from 'src/application/common/Metadata';
 import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
@@ -20,6 +20,13 @@ export class ChatController {
     @Inject(AI_SERVICE) private aiService: AIService,
     private conversationService: ConversationService
   ) {}
+
+  @Public()
+  @Get()
+  @ApiBaseResponse(ConversationDto)
+  async getAllConversations(): Promise<BaseResponse<ConversationDto[]>> {
+    return await this.conversationService.getAllConversations();
+  }
 
   //Natural language chat
   @Public()
@@ -50,8 +57,7 @@ export class ChatController {
         responseConversation.id
       ))
     ) {
-      const conversation = await this.conversationService.addConversation(responseConversation);
-      
+      await this.conversationService.addConversation(responseConversation);
     } else {
       await this.conversationService.updateMessageToConversation(
         responseConversation.id!,

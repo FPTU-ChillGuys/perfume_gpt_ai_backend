@@ -19,15 +19,15 @@ export class UserLog extends Common {
   @Property()
   userId!: string;
 
-  @ApiProperty()
+  @ApiProperty({type: () => UserMessageLog, isArray: true})
   @OneToMany(() => UserMessageLog, (userMessageLog) => userMessageLog.userLog)
   userMessageLogs = new Collection<UserMessageLog>(this);
 
-  @ApiProperty()
+  @ApiProperty({type: () => UserQuizLog, isArray: true})
   @OneToMany(() => UserQuizLog, (userQuizLog) => userQuizLog.userLog)
   userQuizLogs = new Collection<UserQuizLog>(this);
 
-  @ApiProperty()
+  @ApiProperty({type: () => UserSearchLog, isArray: true})
   @OneToMany(() => UserSearchLog, (userSearchLog) => userSearchLog.userLog)
   userSearchLogs = new Collection<UserSearchLog>(this);
 

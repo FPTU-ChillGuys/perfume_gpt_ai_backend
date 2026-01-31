@@ -4,7 +4,7 @@ import { Common } from './common/common.entities';
 import { Entity, Enum, ManyToOne, OneToOne, Property } from '@mikro-orm/core';
 import { MessageResponse } from 'src/application/dtos/response/message.response';
 import { ApiProperty } from '@nestjs/swagger';
-import { AIUserLogDetail } from './ai-user-log-detail.entity';
+import { UserLogDetail } from './ai-user-log-detail.entity';
 
 @Entity({ repository: () => MessageResponse })
 export class Message extends Common {
@@ -23,9 +23,9 @@ export class Message extends Common {
   })
   conversation!: Conversation;
 
-  @ApiProperty({ type: () => AIUserLogDetail })
-  @OneToOne(() => AIUserLogDetail)
-  aiUserLogDetail!: AIUserLogDetail;
+  @ApiProperty({ type: () => UserLogDetail })
+  @OneToOne(() => UserLogDetail)
+  UserLogDetail!: UserLogDetail;
 
   constructor(init?: Partial<Message>) {
     super();

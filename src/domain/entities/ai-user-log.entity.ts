@@ -14,14 +14,6 @@ export class AIUserLog extends Common {
   @Enum(() => RequestType)
   requestType!: RequestType;
 
-  // @ApiProperty()
-  // @Property()
-  // prompt!: string;
-
-  // @ApiProperty()
-  // @Property()
-  // response!: string;
-
   constructor(init?: Partial<AIUserLog>) {
     super();
     Object.assign(this, init);

@@ -6,6 +6,7 @@ import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
 import { AddQuesAnwsRequest } from 'src/application/dtos/request/add-ques-ans.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { QUIZ_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
@@ -99,7 +100,7 @@ export class AIController {
     const prompt = quizPrompt(quesAnses);
 
     // Get AI response
-    const aiResponse = await this.aiService.TextGenerateFromPrompt(prompt);
+    const aiResponse = await this.aiService.TextGenerateFromPrompt(prompt, QUIZ_SYSTEM_PROMPT);
 
     // Return response
     if (!aiResponse.success) {

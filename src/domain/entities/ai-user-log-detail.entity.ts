@@ -5,7 +5,7 @@ import { Message } from "./message.entity";
 import { QuizQuestionAnswerDetail } from "./quiz-question-answer-detail.entity";
 
 @Entity()
-export class AIUserLogDetail extends Common {
+export class UserLogDetail extends Common {
 
     //Log prompt content
     @ApiProperty()
@@ -25,7 +25,7 @@ export class AIUserLogDetail extends Common {
     @OneToOne(() => QuizQuestionAnswerDetail)
     quizQuesAnsDetail? : QuizQuestionAnswerDetail;
 
-    constructor(init?: Partial<AIUserLogDetail>) {
+    constructor(init?: Partial<UserLogDetail>) {
         super();
         Object.assign(this, init);
     }

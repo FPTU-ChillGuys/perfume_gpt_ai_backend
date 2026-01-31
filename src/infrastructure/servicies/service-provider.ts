@@ -1,12 +1,12 @@
 import { AIService } from './ai.service';
 import { ConversationService } from './conversation.service';
-import { PromptService } from './prompt.service';
+import { UserLogService } from './user-log.service';
 import { QuizService } from './quiz.service';
 
 export class ServiceProvider {
   constructor(
     private conversationService: ConversationService,
-    private promptService: PromptService,
+    private userLogService: UserLogService,
     private quizService: QuizService
   ) {}
 
@@ -22,8 +22,8 @@ export class ServiceProvider {
     return new AIService('web');
   }
 
-  getPromptService(): PromptService {
-    return this.promptService;
+  getUserLogService(): UserLogService {
+    return this.userLogService;
   }
 
   getQuizService(): QuizService {

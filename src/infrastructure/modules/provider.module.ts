@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConversationModule } from './conversation.module';
-import { PromptModule } from './prompt.module';
+import { UserLogModule } from './user-log.module';
 import { QuizModule } from './quiz.module';
 import { MobileAIModule } from './mobile-ai.module';
 import { WebAIModule } from './web-ai.module';
@@ -16,7 +16,7 @@ import { AIController } from 'src/api/controllers/ai/ai.controller';
 
 const modules = [
   ConversationModule,
-  PromptModule,
+  UserLogModule,
   QuizModule,
   MobileAIModule,
   WebAIModule,

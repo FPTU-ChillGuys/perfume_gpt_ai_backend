@@ -16,7 +16,10 @@ import {
 
 @Controller('chat')
 export class ChatController {
-  constructor(@Inject(AI_SERVICE) private aiService: AIService, private conversationService: ConversationService) {}
+  constructor(
+    @Inject(AI_SERVICE) private aiService: AIService,
+    private conversationService: ConversationService
+  ) {}
 
   //Natural language chat
   @Public()
@@ -42,7 +45,19 @@ export class ChatController {
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 
-    await this.conversationService.addConversation(responseConversation);
+    if (
+      !(await this.conversationService.isExistConversation(
+        responseConversation.id
+      ))
+    ) {
+      const conversation = await this.conversationService.addConversation(responseConversation);
+      
+    } else {
+      await this.conversationService.updateMessageToConversation(
+        responseConversation.id!,
+        responseConversation.messages || []
+      );
+    }
 
     return {
       success: true,

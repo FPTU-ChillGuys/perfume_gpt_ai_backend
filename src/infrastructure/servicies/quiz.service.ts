@@ -4,7 +4,7 @@ import { Mapper } from '@automapper/core';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { AddQuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
+import { QuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
@@ -100,19 +100,19 @@ export class QuizService {
     );
   }
 
-  async addQuizQuesAnws(
-    quizQuesAnws: AddQuesAnwsRequest
-  ): Promise<BaseResponse<QuizQuestionAnswer>> {
-    return await funcHandlerAsync(async () => {
-      const quizQuestionAnswer =
-        await this.unitOfWork.AIQuizQuestionAnswerRepo.createQuesAns(
-          quizQuesAnws.userId,
-          quizQuesAnws.questionId,
-          quizQuesAnws.answerId
-        );
-      return { success: true, data: quizQuestionAnswer };
-    }, 'Failed to add quiz question answer');
-  }
+  // async addQuizQuesAnws(
+  //   quizQuesAnws: QuesAnwsRequest
+  // ): Promise<BaseResponse<QuizQuestionAnswer>> {
+  //   return await funcHandlerAsync(async () => {
+  //     const quizQuestionAnswer =
+  //       await this.unitOfWork.AIQuizQuestionAnswerRepo.createQuesAns(
+  //         quizQuesAnws.userId,
+  //         quizQuesAnws.questionId,
+  //         quizQuesAnws.answerId
+  //       );
+  //     return { success: true, data: quizQuestionAnswer };
+  //   }, 'Failed to add quiz question answer');
+  // }
 
   async getAllQuizQuesAnws(): Promise<BaseResponse<QuizQuestionAnswer[]>> {
     return await funcHandlerAsync(async () => {

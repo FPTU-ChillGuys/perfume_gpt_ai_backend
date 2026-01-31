@@ -1,6 +1,6 @@
 import { QuizQuestionAnswerDetail } from 'src/domain/entities/quiz-question-answer-detail.entity';
 import { QuizQuestionAnswerDetailResponse } from '../../dtos/response/quiz-question-answer-detail.response';
-import { AddQuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
+import { QuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
@@ -22,7 +22,7 @@ export class QuizQuestionAnswerDetailMapper {
   }
 
    static toEntity(
-    request: AddQuesAnwsRequest,
+    request: QuesAnwsRequest,
     question?: QuizQuestion,
     answer?: QuizAnswer,
     quesAns?: QuizQuestionAnswer

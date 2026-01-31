@@ -1,4 +1,3 @@
-import { AddPromptRequest } from 'src/application/dtos/request/prompt.request';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { Injectable } from '@nestjs/common';
 import { InjectMapper } from '@automapper/nestjs';

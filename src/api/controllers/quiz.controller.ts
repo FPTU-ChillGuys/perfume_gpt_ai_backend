@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiResponse } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
-import { AddQuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
+import { QuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -64,7 +64,7 @@ export class QuizController {
 
   @Public()
   @Post('user/test')
-  async addUserAnswer(@Body() quizQuesAnws: AddQuesAnwsRequest) {
+  async addUserAnswer(@Body() quizQuesAnws: QuesAnwsRequest) {
     return this.quizService.addQuizQuesAnws(quizQuesAnws);
   }
 
@@ -72,29 +72,11 @@ export class QuizController {
   @Public()
   @Post('user')
   @ApiBaseResponse(String)
-  @ApiBody({ type: [AddQuesAnwsRequest] })
+  @ApiBody({ type: [QuesAnwsRequest] })
   async chatQuiz(
-    @Body() addQuesAnwsRequests: AddQuesAnwsRequest[]
+    @Body() addQuesAnwsRequests: QuesAnwsRequest[]
   ): Promise<BaseResponse<string>> {
     const quesAnses: Array<{ question: string; answer: string }> = [];
-    await Promise.all(
-      addQuesAnwsRequests.map(async (quesAns) => {
-        const quest = await this.quizService.getQuizQuesById(
-          quesAns.questionId
-        );
-        if (quest.success && quest.data) {
-          const ans = quest.data.answers?.find(
-            (a) => a.id === quesAns.answerId
-          );
-          quesAnses.push({
-            question: quest.data.question || '',
-            answer: ans?.answer || ''
-          });
-        } else {
-          return { success: false, error: 'Quiz question not found' };
-        }
-      })
-    );
 
     // Generate prompt
     const prompt = quizPrompt(quesAnses);

@@ -28,35 +28,6 @@ export class AIController {
   ) {}
 
   @Public()
-  @Post('chat')
-  @ApiBaseResponse(ConversationDto)
-  async chat(
-    @Body() conversation: ConversationDto
-  ): Promise<BaseResponse<ConversationDto>> {
-    const convertedMessages: UIMessage[] = convertToMessages(
-      conversation.messages || []
-    );
-    const message = await this.aiService.TextGenerateFromMessages(
-      convertedMessages,
-      Output.object(searchOutput)
-    );
-
-    if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
-    }
-
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id,
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    return {
-      success: true,
-      data: responseConversation
-    };
-  }
-
-  @Public()
   @Post('search')
   @ApiBaseResponse(String)
   async searchProductWithAI(
@@ -68,49 +39,5 @@ export class AIController {
     }
     return { success: true, data: aiResponse.data };
   }
-
-  @Public()
-  @Post('user/quiz')
-  @ApiBaseResponse(String)
-  @ApiBody({ type: [AddQuesAnwsRequest] })
-  async chatQuiz(
-    @Body() addQuesAnwsRequests: AddQuesAnwsRequest[]
-  ): Promise<BaseResponse<string>> {
-    const quesAnses: Array<{ question: string; answer: string }> = [];
-    await Promise.all(
-      addQuesAnwsRequests.map(async (quesAns) => {
-        const quest = await this.quizService.getQuizQuesById(
-          quesAns.questionId
-        );
-        if (quest.success && quest.data) {
-          const ans = quest.data.answers?.find(
-            (a) => a.id === quesAns.answerId
-          );
-          quesAnses.push({
-            question: quest.data.question || '',
-            answer: ans?.answer || ''
-          });
-        } else {
-          return { success: false, error: 'Quiz question not found' };
-        }
-      })
-    );
-
-    // Generate prompt
-    const prompt = quizPrompt(quesAnses);
-
-    // Get AI response
-    const aiResponse = await this.aiService.TextGenerateFromPrompt(prompt, QUIZ_SYSTEM_PROMPT);
-
-    // Return response
-    if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
-    }
-
-    return { success: true, data: aiResponse.data };
-  }
-
-  
-
   
 }

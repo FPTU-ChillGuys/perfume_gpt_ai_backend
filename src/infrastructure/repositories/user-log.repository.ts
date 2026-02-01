@@ -25,11 +25,11 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
 
   async addMessageLogToUserLog(userId: string, message: Message) {
     const userLog = await this.findOneOrFail({ userId });
-    const messageLog = userLog.userMessageLogs.add(
+    userLog.userMessageLogs.add(
       new UserMessageLog({ message, userLog })
     );
     await this.em.flush();
-    return messageLog;
+    return userLog.userMessageLogs.getItems();
   }
 
   async getUserLogsWithMessages(userId: string): Promise<UserLog | null> {
@@ -44,11 +44,11 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     quizQuesAnsDetail: QuizQuestionAnswerDetail
   ) {
     const userLog = await this.findOneOrFail({ userId });
-    const quizLog = userLog.userQuizLogs.add(
+    userLog.userQuizLogs.add(
       new UserQuizLog({ quizQuesAnsDetail, userLog })
     );
     await this.em.flush();
-    return quizLog;
+    return userLog.userQuizLogs.getItems();
   }
 
   async getUserLogsWithQuizDetails(userId: string): Promise<UserLog | null> {
@@ -64,7 +64,7 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
       new UserSearchLog({ content: searchLog, userLog })
     );
     await this.em.flush();
-    return searchLog;
+    return userLog.userSearchLogs.getItems();
   }
 
   async saveUserLog(userLog: UserLog): Promise<void> {

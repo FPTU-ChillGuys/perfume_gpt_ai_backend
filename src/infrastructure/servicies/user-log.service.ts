@@ -5,6 +5,9 @@ import { Mapper } from '@automapper/core';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { UserLog } from 'src/domain/entities/user-log.entity';
+import { UserSearchLogMapper } from 'src/application/mapping';
+import { UserSearchLog } from 'src/domain/entities/user-search.log.entity';
+import { UserSearchLogResponse } from 'src/application/dtos/response/user-search-log.response';
 
 @Injectable()
 export class UserLogService {
@@ -28,13 +31,14 @@ export class UserLogService {
   async addUserSearch(
     searchText: string,
     userId: string
-  ): Promise<BaseResponse> {
+  ): Promise<BaseResponse<UserSearchLogResponse[]>> {
     return await funcHandlerAsync(async () => {
-      await this.unitOfWork.UserLogRepo.addSearchLogToUserLog(
+      const searchLog = await this.unitOfWork.UserLogRepo.addSearchLogToUserLog(
         userId,
         searchText
       );
-      return { success: true };
+      const searchLogResponse = UserSearchLogMapper.toResponseList(searchLog);
+      return { success: true, data: searchLogResponse };
     }, 'Failed to add user search log');
   }
 }

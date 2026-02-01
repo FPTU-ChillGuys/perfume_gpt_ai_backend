@@ -20,7 +20,7 @@ export class ConversationService {
 
   async addConversation(
     conversationRequest: ConversationDto
-  ): Promise<BaseResponse<Conversation>> {
+  ): Promise<BaseResponse<ConversationDto>> {
     return await funcHandlerAsync(async () => {
       const conversation = new Conversation({
         userId: conversationRequest.userId
@@ -31,6 +31,8 @@ export class ConversationService {
           conversation
         )
       );
+
+      //Luu conversation
       await this.unitOfWork.AIConversationRepo.addConversation(conversation);
 
       //Luu message vao log
@@ -41,14 +43,16 @@ export class ConversationService {
         );
       }
 
-      return { success: true, data: conversation };
+      const conversationDto = ConversationMapper.toResponse(conversation, true);
+
+      return { success: true, data: conversationDto };
     }, 'Failed to add conversation');
   }
 
   async updateMessageToConversation(
     id: string,
     messageDtos: MessageDto[]
-  ): Promise<BaseResponse> {
+  ): Promise<BaseResponse<MessageDto[]>> {
     return await funcHandlerAsync(async () => {
       const messages: Message[] = messageDtos.map(
         (msg) =>
@@ -70,7 +74,7 @@ export class ConversationService {
         messages[messages.length - 1]
       );
 
-      return { success: true };
+      return { success: true, data: MessageMapper.toResponseList(conversation.messages.getItems()) };
     }, 'Failed to update messages');
   }
 
@@ -106,7 +110,7 @@ export class ConversationService {
         });
 
         const response = ConversationMapper.toResponseList(conversations, false);
-        
+
         return { success: true, data: response };
       },
       'Failed to get all conversations',

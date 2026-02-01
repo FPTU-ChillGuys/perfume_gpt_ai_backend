@@ -13,7 +13,6 @@ import {
   QuizQuestionMapper
 } from 'src/application/mapping';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
-import { QuizQuestionAnswerRepository } from '../repositories/quiz-question-answer.repository';
 import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
 
 @Injectable()
@@ -118,24 +117,33 @@ export class QuizService {
     }, 'Failed to add quiz question answer');
   }
 
-  async getAllQuizQuesAnws(): Promise<BaseResponse<QuizQuestionAnswer[]>> {
+  async getAllQuizQuesAnws(): Promise<
+    BaseResponse<QuizQuestionAnswerResponse[]>
+  > {
     return await funcHandlerAsync(async () => {
       const quizQuestionAnswers =
         await this.unitOfWork.AIQuizQuestionAnswerRepo.findAll();
-      return { success: true, data: quizQuestionAnswers };
+
+      const quizQuestionAnswersResponses =
+        QuizQuestionAnswerMapper.toResponseList(quizQuestionAnswers, true);
+
+      return { success: true, data: quizQuestionAnswersResponses };
     }, 'Failed to get all quiz question answers');
   }
 
   async getQuizQuesAnwsById(
     id: string
-  ): Promise<BaseResponse<QuizQuestionAnswer>> {
+  ): Promise<BaseResponse<QuizQuestionAnswerResponse>> {
     return await funcHandlerAsync(async () => {
       const quizQuestionAnswer =
         await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({ id });
       if (!quizQuestionAnswer) {
         return { success: false, error: 'Quiz question answer not found' };
       }
-      return { success: true, data: quizQuestionAnswer };
+      return {
+        success: true,
+        data: QuizQuestionAnswerMapper.toResponse(quizQuestionAnswer, true)
+      };
     }, 'Failed to get quiz question answer by id');
   }
 

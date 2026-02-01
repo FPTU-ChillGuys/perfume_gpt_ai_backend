@@ -2,8 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConversationModule } from './conversation.module';
 import { UserLogModule } from './user-log.module';
 import { QuizModule } from './quiz.module';
-import { MobileAIModule } from './mobile-ai.module';
-import { WebAIModule } from './web-ai.module';
 import { ProductModule } from './product.module';
 import { ProductController } from 'src/api/controllers/product.controller';
 import { ToolModule } from './tool.module';
@@ -16,12 +14,11 @@ const modules = [
   ConversationModule,
   UserLogModule,
   QuizModule,
-  MobileAIModule,
-  WebAIModule,
   ProductModule,
   ToolModule,
   MappingModule,
-  AIModule
+  AIModule,
+  UserLogModule
 ];
 
 @Module({

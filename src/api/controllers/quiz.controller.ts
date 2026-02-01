@@ -9,8 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiResponse } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
-import { QuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
+import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
@@ -79,9 +79,9 @@ export class QuizController {
   @Public()
   @Post('user')
   @ApiBaseResponse(String)
-  @ApiBody({ type: [QuesAnwsRequest] })
+  @ApiBody({ type: [QuizQuesAnwsRequest] })
   async chatQuiz(
-    @Body() addQuesAnwsRequests: QuesAnwsRequest[]
+    @Body() addQuesAnwsRequests: QuizQuesAnwsRequest[]
   ): Promise<BaseResponse<string>> {
     const quesAnses: Array<{ question: string; answer: string }> = [];
 

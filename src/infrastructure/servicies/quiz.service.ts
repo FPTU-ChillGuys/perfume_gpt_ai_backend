@@ -13,6 +13,8 @@ import {
   QuizQuestionMapper
 } from 'src/application/mapping';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
+import { QuizQuestionAnswerRepository } from '../repositories/quiz-question-answer.repository';
+import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
 
 @Injectable()
 export class QuizService {
@@ -100,13 +102,19 @@ export class QuizService {
 
   async addQuizQuesAnws(
     quizQuesAnws: QuizQuesAnwsRequest
-  ): Promise<BaseResponse<QuizQuestionAnswer>> {
+  ): Promise<BaseResponse<QuizQuestionAnswerResponse>> {
     return await funcHandlerAsync(async () => {
       const quesAns = await this.mappingFromRequestToEntity(quizQuesAnws);
 
       const quizQuestionAnswer =
         await this.unitOfWork.AIQuizQuestionAnswerRepo.createQuesAns(quesAns);
-      return { success: true, data: quizQuestionAnswer };
+
+      const savedQuesAns = QuizQuestionAnswerMapper.toResponse(
+        quizQuestionAnswer,
+        true
+      );
+
+      return { success: true, data: savedQuesAns };
     }, 'Failed to add quiz question answer');
   }
 

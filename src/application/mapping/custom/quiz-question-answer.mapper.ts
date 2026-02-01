@@ -1,16 +1,15 @@
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
-import { QuizQuestiomAnswerResponse } from '../../dtos/response/quiz-question-answer.response';
 import { QuizQuestionAnswerDetailMapper } from './quiz-question-answer-detail.mapper';
-import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
+import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
 
 export class QuizQuestionAnswerMapper {
   static toResponse(
     entity: QuizQuestionAnswer,
     includeDetails: boolean = false
-  ): QuizQuestiomAnswerResponse {
-    const response = new QuizQuestiomAnswerResponse({
+  ): QuizQuestionAnswerResponse {
+    const response = new QuizQuestionAnswerResponse({
       id: entity.id,
       userId: entity.userId,
       createdAt: entity.createdAt,
@@ -31,7 +30,7 @@ export class QuizQuestionAnswerMapper {
   static toResponseList(
     entities: QuizQuestionAnswer[],
     includeDetails: boolean = false
-  ): QuizQuestiomAnswerResponse[] {
+  ): QuizQuestionAnswerResponse[] {
     return entities.map((entity) => this.toResponse(entity, includeDetails));
   }
 

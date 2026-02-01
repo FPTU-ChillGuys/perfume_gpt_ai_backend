@@ -108,6 +108,12 @@ export class QuizService {
       const quizQuestionAnswer =
         await this.unitOfWork.AIQuizQuestionAnswerRepo.createQuesAns(quesAns);
 
+      //Log last quiz question answer
+      this.unitOfWork.UserLogRepo.addQuizQuesAnsDetailLogToUserLog(
+        quizQuesAnws.userId,
+        quizQuestionAnswer.details[quizQuesAnws.details.length - 1]
+      );
+
       const savedQuesAns = QuizQuestionAnswerMapper.toResponse(
         quizQuestionAnswer,
         true

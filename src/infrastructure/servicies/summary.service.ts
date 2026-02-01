@@ -1,6 +1,6 @@
 import { UnitOfWork } from "../repositories/unit-of-work";
 
-export class ReviewService {
+export class SummaryService {
     constructor(private unitOfWork: UnitOfWork) {}
 
 

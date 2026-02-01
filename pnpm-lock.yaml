@@ -74,6 +74,9 @@ importers:
       axios:
         specifier: ^1.13.2
         version: 1.13.2
+      date-fns:
+        specifier: ^4.1.0
+        version: 4.1.0
       pg:
         specifier: ^8.17.2
         version: 8.17.2
@@ -1914,6 +1917,9 @@ packages:
 
   dataloader@2.2.3:
     resolution: {integrity: sha512-y2krtASINtPFS1rSDjacrFgn1dcUuoREVabwlOGOe4SdxenREqwjwjElAdwvbGM7kgZz9a3KVicWR7vcz8rnzA==}
+
+  date-fns@4.1.0:
+    resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
   debug@4.3.4:
     resolution: {integrity: sha512-PRWFHuSU3eDtQJPvnNY7Jcket1j0t5OuOsFzPPzsekD52Zl8qUfFIPEiswXqIvHWGVHOgX+7G/vCNNhehwxfkQ==}
@@ -5994,6 +6000,8 @@ snapshots:
       which: 2.0.2
 
   dataloader@2.2.3: {}
+
+  date-fns@4.1.0: {}
 
   debug@4.3.4:
     dependencies:

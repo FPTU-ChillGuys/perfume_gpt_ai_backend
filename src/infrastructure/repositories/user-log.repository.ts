@@ -35,7 +35,7 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
   async getUserLogsWithMessages(userId: string): Promise<UserLog | null> {
     return this.findOne(
       { userId },
-      { populate: ['userMessageLogs', 'userMessageLogs.message'] }
+      { populate: ['userMessageLogs', 'userMessageLogs.message', 'userQuizLogs', 'userQuizLogs.quizQuesAnsDetail', 'userSearchLogs'] }
     );
   }
 

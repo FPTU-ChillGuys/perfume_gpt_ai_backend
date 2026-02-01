@@ -2,8 +2,9 @@ import { Entity, Enum, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
 import { ApiProperty } from '@nestjs/swagger';
 import { PeriodEnum } from '../enum/period.enum';
+import { UserLogSummaryRepository } from 'src/infrastructure/repositories/user-log-summary.repository';
 
-@Entity()
+@Entity({repository: () => UserLogSummaryRepository})
 export class UserLogSummary extends Common {
   
   @ApiProperty()

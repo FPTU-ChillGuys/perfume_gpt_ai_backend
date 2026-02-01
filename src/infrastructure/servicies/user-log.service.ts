@@ -9,12 +9,12 @@ import { UserSearchLogMapper } from 'src/application/mapping';
 import { UserSearchLog } from 'src/domain/entities/user-search.log.entity';
 import { UserSearchLogResponse } from 'src/application/dtos/response/user-search-log.response';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
+import { UserLogRequest } from 'src/application/dtos/request/user-log.request';
 
 @Injectable()
 export class UserLogService {
   constructor(
     private unitOfWork: UnitOfWork,
-    @InjectMapper() private mapper: Mapper
   ) {}
 
   async getUserLogByUserId(userId: string): Promise<UserLog | null> {
@@ -58,19 +58,16 @@ export class UserLogService {
 
   // Tong hop cac log cua user trong mot khoang thoi gian
   async summarizeUserLogs(
-    userId: string,
-    period: PeriodEnum,
-    endDate: Date,
-    startDate?: Date
+    userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
-      if (!startDate) {
-        startDate = this.getFirstDateOfPeriod(period, endDate);
+      if (!userLogRequest.startDate) {
+        userLogRequest.startDate = this.getFirstDateOfPeriod(userLogRequest.period, userLogRequest.endDate);
       }
 
       // Lay log cua user trong khoang thoi gian
       const userLog = await this.unitOfWork.UserLogRepo.getUserLogsWithMessages(
-        userId
+        userLogRequest.userId
       );
 
       if (!userLog) {
@@ -79,7 +76,7 @@ export class UserLogService {
 
       // Lay log tim kiem cua user trong khoang thoi gian
       const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
-        return log.createdAt >= startDate! && log.createdAt <= endDate;
+        return log.createdAt >= userLogRequest.startDate! && log.createdAt <= userLogRequest.endDate;
       });
 
       //Lay noi dung tim kiem
@@ -87,7 +84,7 @@ export class UserLogService {
 
       //Lay log tin nhan cua user trong khoang thoi gian
       const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
-        return log.createdAt >= startDate! && log.createdAt <= endDate;
+        return log.createdAt >= userLogRequest.startDate! && log.createdAt <= userLogRequest.endDate;
       });
 
       // Lay noi dung tin nhan
@@ -97,7 +94,7 @@ export class UserLogService {
 
       // Lay log quiz cua user trong khoang thoi gian
       const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
-        return log.createdAt >= startDate! && log.createdAt <= endDate;
+        return log.createdAt >= userLogRequest.startDate! && log.createdAt <= userLogRequest.endDate;
       });
 
       // Lay noi dung quiz
@@ -110,8 +107,8 @@ export class UserLogService {
         searchContents,
         messageContents,
         quizContents,
-        startDate!,
-        endDate
+        userLogRequest.startDate!,
+        userLogRequest.endDate
       );
 
       return { success: true, data: prompt };

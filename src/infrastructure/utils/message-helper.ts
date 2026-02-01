@@ -1,7 +1,6 @@
 import { UIMessage } from 'ai';
 import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
 import { MessageDto } from 'src/application/dtos/common/message.dto';
-import { MessageResponse } from 'src/application/dtos/response/message.response';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -55,3 +54,4 @@ export const overrideMessagesToConversation = (
     messages: messages
   };
 };
+

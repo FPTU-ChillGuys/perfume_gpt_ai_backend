@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { UserLogService } from '../servicies/user-log.service';
 import { UnitOfWorkModule } from './unit-of-work.module';
+import { RepositoryModule } from './repository.module';
 
 @Module({
   imports: [UnitOfWorkModule],

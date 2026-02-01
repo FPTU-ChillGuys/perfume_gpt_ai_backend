@@ -1,18 +1,34 @@
+import { Entity, Enum, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
+import { ApiProperty } from '@nestjs/swagger';
+import { PeriodEnum } from '../enum/period.enum';
 
+@Entity()
 export class UserLogSummary extends Common {
-  userId: string;
+  
+  @ApiProperty()
+  @Property()
+  userId!: string;
 
-  // Log theo tuan hoac thang hoac nam
-  period: 'weekly' | 'monthly' | 'yearly';
+  @ApiProperty()
+  @Enum(() => PeriodEnum)
+  period!: PeriodEnum;
 
-  startDate: Date;
+  @ApiProperty()
+  @Property()
+  startDate!: Date;
 
-  endDate: Date;
+  @ApiProperty()
+  @Property()
+  endDate!: Date;
 
-  totalLogs: number;
+  @ApiProperty()
+  @Property()
+  totalLogs!: number;
 
-  logSummary: string;
+  @ApiProperty()
+  @Property()
+  logSummary!: string;
 
   constructor(init?: Partial<UserLogSummary>) {
     super();

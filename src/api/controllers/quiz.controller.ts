@@ -9,11 +9,12 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiResponse } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
-import { QuesAnwsRequest } from 'src/application/dtos/request/ques-ans.request';
+import { QuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
+import { QuizQuestionAnswerMapper, QuizQuestionMapper } from 'src/application/mapping';
 import { QUIZ_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
@@ -30,35 +31,41 @@ export class QuizController {
   ) {}
 
   @Public()
-  @Get()
+  @Get("questions")
   @ApiBaseResponse(QuizQuestion)
-  async getAllQuizzes() {
-    return this.quizService.getAllQuizQues();
+  async getAllQuizzes() : Promise<BaseResponse<QuizQuestionResponse[]>> {
+    const quizQues = await this.quizService.getAllQuizQues();
+    
+    if (!quizQues.success) {
+      return { success: false, error: 'Failed to get quiz questions' };
+    }
+
+    return { success: true, data: quizQues.data };
   }
 
   @Public()
-  @Post()
+  @Post("questions")
   async createQuizQues(@Body() quizQuestionRequest: QuizQuestionRequest) {
-    return this.quizService.addQuesAnws(quizQuestionRequest);
+    return this.quizService.addQuizQues(quizQuestionRequest);
   }
 
   @Public()
-  @Post('list')
+  @Post('questions/list')
   @ApiBody({ type: [QuizQuestionRequest] })
   async createQuizQueses(@Body() quizQuestionRequest: QuizQuestionRequest[]) {
     for (const quizQuestion of quizQuestionRequest) {
-      await this.quizService.addQuesAnws(quizQuestion);
+      await this.quizService.addQuizQues(quizQuestion);
     }
     return { success: true };
   }
 
   @Public()
-  @Put(':id')
+  @Put('questions/:id')
   @ApiBody({ type: [QuizAnswerRequest] })
   async updateQuizAnswer(
     @Param('id') id: string,
     @Body() quizAnswerRequest: QuizAnswerRequest[]
-  ) {
+  ) : Promise<BaseResponse<QuizQuestionResponse>> {
     return this.quizService.updateAnswer(id, quizAnswerRequest);
   }
 

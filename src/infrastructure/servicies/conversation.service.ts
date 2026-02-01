@@ -9,7 +9,7 @@ import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { Message } from 'src/domain/entities/message.entity';
 import { MessageDto } from 'src/application/dtos/common/message.dto';
-import { ConversationMapper } from 'src/application/mapping/custom';
+import { ConversationMapper, MessageMapper } from 'src/application/mapping/custom';
 
 @Injectable()
 export class ConversationService {
@@ -26,14 +26,10 @@ export class ConversationService {
         userId: conversationRequest.userId
       });
       conversation.messages.set(
-        conversationRequest.messages?.map(
-          (msg) =>
-            new Message({
-              conversation: conversation,
-              sender: msg.sender as Sender,
-              message: msg.message
-            })
-        ) || []
+        MessageMapper.toEntityList(
+          conversationRequest.messages || [],
+          conversation
+        )
       );
       await this.unitOfWork.AIConversationRepo.addConversation(conversation);
 
@@ -109,18 +105,8 @@ export class ConversationService {
           populate: ['messages']
         });
 
-        const response = conversations.map(
-          (conv): ConversationDto => ({
-            id: conv.id,
-            userId: conv.userId,
-            messages: conv.messages.map((msg) => ({
-              id: msg.id,
-              message: msg.message,
-              sender: msg.sender
-            }))
-          })
-        );
-
+        const response = ConversationMapper.toResponseList(conversations, false);
+        
         return { success: true, data: response };
       },
       'Failed to get all conversations',

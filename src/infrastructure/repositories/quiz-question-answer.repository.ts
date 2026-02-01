@@ -7,19 +7,11 @@ import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 @Injectable()
 export class QuizQuestionAnswerRepository extends SqlEntityRepository<QuizQuestionAnswer> {
   async createQuesAns(
-    userId: string,
-    questionId: string,
-    answerId: string
+    quizQuestionAnswer: QuizQuestionAnswer,
   ): Promise<QuizQuestionAnswer> {
-    const quizQuesAns = new QuizQuestionAnswer();
     const orm = this.getEntityManager();
-    // Using getReference to avoid fetching the entire entity
-    quizQuesAns.userId = userId;
-    // quizQuesAns.question = orm.getReference(QuizQuestion, questionId);
-    // quizQuesAns.answer = orm.getReference(QuizAnswer, answerId);
-    // Persist and flush the new entity
-    orm.persist(quizQuesAns);
+    orm.persist(quizQuestionAnswer);
     await orm.flush();
-    return quizQuesAns;
+    return quizQuestionAnswer;
   }
 }

@@ -1,12 +1,12 @@
 import { ApiProperty } from "@nestjs/swagger";
 
-export class QuestAnsDetailRequest {
+export class QuizQuesAnsDetailRequest {
   @ApiProperty()
   questionId: string;
   @ApiProperty()
   answerId: string;
 
-  constructor(init?: Partial<QuestAnsDetailRequest>) {
+  constructor(init?: Partial<QuizQuesAnsDetailRequest>) {
     Object.assign(this, init);
   }
 }

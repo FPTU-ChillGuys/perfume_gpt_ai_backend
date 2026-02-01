@@ -30,7 +30,7 @@ export class QuizQuestionAnswerDetail extends Common {
 
   @ApiProperty({ type: () => UserQuizLog })
   @OneToOne(() => UserQuizLog)
-  userQuizLog!: UserQuizLog;
+  userQuizLog?: UserQuizLog;
 
   constructor(init?: Partial<QuizQuestionAnswerDetail>) {
     super();

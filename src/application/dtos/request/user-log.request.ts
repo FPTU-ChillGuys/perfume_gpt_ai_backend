@@ -11,3 +11,12 @@ export class UserLogRequest {
   @ApiProperty()
   startDate?: Date;
 }
+
+export class AllUserLogRequest {
+  @ApiProperty({ enum: PeriodEnum })
+  period: PeriodEnum;
+  @ApiProperty()
+  endDate: Date;
+  @ApiProperty()
+  startDate?: Date;
+}

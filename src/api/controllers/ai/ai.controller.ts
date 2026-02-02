@@ -11,8 +11,6 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 export class AIController {
   constructor(
     @Inject(AI_SERVICE) private aiService: AIService,
-    private quizService: QuizService,
-    private conversattionService: ConversationService
   ) {}
 
   @Public()

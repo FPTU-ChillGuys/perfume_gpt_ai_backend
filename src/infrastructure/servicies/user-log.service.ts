@@ -9,13 +9,14 @@ import { UserSearchLogMapper } from 'src/application/mapping';
 import { UserSearchLog } from 'src/domain/entities/user-search.log.entity';
 import { UserSearchLogResponse } from 'src/application/dtos/response/user-search-log.response';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
-import { UserLogRequest } from 'src/application/dtos/request/user-log.request';
+import {
+  AllUserLogRequest,
+  UserLogRequest
+} from 'src/application/dtos/request/user-log.request';
 
 @Injectable()
 export class UserLogService {
-  constructor(
-    private unitOfWork: UnitOfWork,
-  ) {}
+  constructor(private unitOfWork: UnitOfWork) {}
 
   async getUserLogByUserId(userId: string): Promise<UserLog | null> {
     return this.unitOfWork.UserLogRepo.findOne({ userId });
@@ -57,12 +58,15 @@ export class UserLogService {
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
-  async summarizeUserLogs(
+  async collectAndSummarizeUserLogs(
     userLogRequest: UserLogRequest
-  ): Promise<BaseResponse<string>> {
+  ): Promise<BaseResponse<{ prompt: string; response: string }>> {
     return await funcHandlerAsync(async () => {
       if (!userLogRequest.startDate) {
-        userLogRequest.startDate = this.getFirstDateOfPeriod(userLogRequest.period, userLogRequest.endDate);
+        userLogRequest.startDate = this.getFirstDateOfPeriod(
+          userLogRequest.period,
+          userLogRequest.endDate
+        );
       }
 
       // Lay log cua user trong khoang thoi gian
@@ -76,7 +80,10 @@ export class UserLogService {
 
       // Lay log tim kiem cua user trong khoang thoi gian
       const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
-        return log.createdAt >= userLogRequest.startDate! && log.createdAt <= userLogRequest.endDate;
+        return (
+          log.createdAt >= userLogRequest.startDate! &&
+          log.createdAt <= userLogRequest.endDate
+        );
       });
 
       //Lay noi dung tim kiem
@@ -84,7 +91,10 @@ export class UserLogService {
 
       //Lay log tin nhan cua user trong khoang thoi gian
       const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
-        return log.createdAt >= userLogRequest.startDate! && log.createdAt <= userLogRequest.endDate;
+        return (
+          log.createdAt >= userLogRequest.startDate! &&
+          log.createdAt <= userLogRequest.endDate
+        );
       });
 
       // Lay noi dung tin nhan
@@ -94,7 +104,10 @@ export class UserLogService {
 
       // Lay log quiz cua user trong khoang thoi gian
       const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
-        return log.createdAt >= userLogRequest.startDate! && log.createdAt <= userLogRequest.endDate;
+        return (
+          log.createdAt >= userLogRequest.startDate! &&
+          log.createdAt <= userLogRequest.endDate
+        );
       });
 
       // Lay noi dung quiz
@@ -111,7 +124,93 @@ export class UserLogService {
         userLogRequest.endDate
       );
 
-      return { success: true, data: prompt };
+      const response = this.convertUserLogToString(
+        searchContents,
+        messageContents,
+        quizContents,
+        userLogRequest.startDate!,
+        userLogRequest.endDate
+      );
+
+      return { success: true, data: { prompt, response } };
+    }, 'Failed to summarize user logs');
+  }
+
+  // Tong hop cac log cua user trong mot khoang thoi gian
+  async collectAndSummarizeAllUsersLogs(
+    allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<{ prompt: string; response: string }>> {
+    return await funcHandlerAsync(async () => {
+      if (!allUserLogRequest.startDate) {
+        allUserLogRequest.startDate = this.getFirstDateOfPeriod(
+          allUserLogRequest.period,
+          allUserLogRequest.endDate
+        );
+      }
+
+      // Lay log cua user trong khoang thoi gian
+      const userLogs = await this.unitOfWork.UserLogRepo.getAllUserLogs();
+
+      let prompt = '';
+      let response = '';
+
+      for (const userLog of userLogs) {
+        // Lay log tim kiem cua user trong khoang thoi gian
+        const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
+          return (
+            log.createdAt >= allUserLogRequest.startDate! &&
+            log.createdAt <= allUserLogRequest.endDate
+          );
+        });
+
+        //Lay noi dung tim kiem
+        const searchContents = searchLogs.map((log) => log.content).join('; ');
+
+        //Lay log tin nhan cua user trong khoang thoi gian
+        const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
+          return (
+            log.createdAt >= allUserLogRequest.startDate! &&
+            log.createdAt <= allUserLogRequest.endDate
+          );
+        });
+
+        // Lay noi dung tin nhan
+        const messageContents = messageLogs
+          .map((log) => log.message.message)
+          .join('; ');
+
+        // Lay log quiz cua user trong khoang thoi gian
+        const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
+          return (
+            log.createdAt >= allUserLogRequest.startDate! &&
+            log.createdAt <= allUserLogRequest.endDate
+          );
+        });
+
+        // Lay noi dung quiz
+        const quizContents = quizLogs
+          .map((log) => log.quizQuesAnsDetail.answer)
+          .join('; ');
+
+        // Tao prompt de tong hop log
+        prompt += this.generateSummaryPrompt(
+          searchContents,
+          messageContents,
+          quizContents,
+          allUserLogRequest.startDate!,
+          allUserLogRequest.endDate
+        ) + '\n';
+
+        response = this.convertUserLogToString(
+          searchContents,
+          messageContents,
+          quizContents,
+          allUserLogRequest.startDate!,
+          allUserLogRequest.endDate
+        ) + '\n';
+      }
+
+      return { success: true, data: { prompt, response } };
     }, 'Failed to summarize user logs');
   }
 
@@ -140,7 +239,7 @@ export class UserLogService {
     startDate: Date,
     endDate: Date
   ): string {
-    let prompt = `Summarize the user's activities from ${startDate.toDateString()} to ${endDate.toDateString()}.\n`;  
+    let prompt = `Summarize the user's activities from ${startDate.toDateString()} to ${endDate.toDateString()}.\n`;
     if (searchContents) {
       prompt += `Search activities: ${searchContents}\n`;
     }
@@ -152,5 +251,19 @@ export class UserLogService {
     }
     prompt += `Provide a concise summary of the user's activities during this period.`;
     return prompt;
+  }
+
+  convertUserLogToString(
+    searchContents: string,
+    messageContents: string,
+    quizContents: string,
+    startDate: Date,
+    endDate: Date
+  ): string {
+    const response = `User activity summary from ${startDate.toDateString()} to ${endDate.toDateString()}:\n
+    Search Activities: ${searchContents}\n
+    Messages: ${messageContents}\n
+    Quiz Answers: ${quizContents}\n`;
+    return response;
   }
 }

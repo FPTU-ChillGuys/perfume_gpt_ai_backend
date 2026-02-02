@@ -3,6 +3,7 @@ import { ApiBody } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
@@ -45,7 +46,8 @@ export class TrendController {
     ${summaryResponse.data}`;
     
     const trendResponse = await this.aiService.TextGenerateFromPrompt(
-      trendPrompt
+      trendPrompt,
+      ADVANCED_MATCHING_SYSTEM_PROMPT
     );
 
     if (!trendResponse.success) {

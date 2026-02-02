@@ -13,8 +13,15 @@ export class ProductController {
   @Public()
   @Get()
   @ExtendApiBaseResponse(ProductListResponse)
-  async chat(@Query() request: PagedAndSortedRequest) {
+  async getAllProducts(@Query() request: PagedAndSortedRequest) {
     return this.productService.getAllProducts(request);
+  }
+
+  @Public()
+  @Get()
+  @ExtendApiBaseResponse(ProductListResponse)
+  async getProductsBySemanticSearch(@Query('searchText') searchText: string, @Query() request: PagedAndSortedRequest) {
+    return this.productService.getProductsUsingSemanticSearch(searchText,request);
   }
   
 }

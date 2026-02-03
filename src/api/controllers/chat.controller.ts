@@ -28,6 +28,15 @@ export class ChatController {
     return await this.conversationService.getAllConversations();
   }
 
+  @Public()
+  @Get(':id')
+  @ApiBaseResponse(String)
+  async getConversationById(
+    @Body('id') id: string
+  ): Promise<BaseResponse<ConversationDto>> {
+    return await this.conversationService.getConversationById(id);
+  }
+
   //Natural language chat
   @Public()
   @Post()

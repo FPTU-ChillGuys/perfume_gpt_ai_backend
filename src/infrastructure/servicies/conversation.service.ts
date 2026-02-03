@@ -93,7 +93,7 @@ export class ConversationService {
     return await funcHandlerAsync(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne({
         id
-      });
+      }, { populate: ['messages'] });
       if (!conversation) {
         return { success: false, error: 'Conversation not found' };
       }

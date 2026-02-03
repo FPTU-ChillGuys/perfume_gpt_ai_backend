@@ -32,7 +32,7 @@ export class TrendController {
     }
 
     // Summarize with AI
-    const summaryResponse = await this.aiService.TextGenerateFromPrompt(
+    const summaryResponse = await this.aiService.textGenerateFromPrompt(
        `${response.data!.prompt}`
     );
     
@@ -45,7 +45,7 @@ export class TrendController {
     `Based on the following summarized user logs, identify emerging trends and patterns that could inform future product development and marketing strategies. Provide insights into user behavior, preferences, and potential market opportunities:\n
     ${summaryResponse.data}`;
     
-    const trendResponse = await this.aiService.TextGenerateFromPrompt(
+    const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,
       ADVANCED_MATCHING_SYSTEM_PROMPT
     );

@@ -9,7 +9,7 @@ import {
   UIMessage
 } from 'ai';
 
-export async function TextGenerationFromPromptToResultWithErrorHandler(
+export async function textGenerationFromPromptToResultWithErrorHandler(
   model: LanguageModel,
   prompt: string,
   systemPrompt?: string,
@@ -34,7 +34,7 @@ export async function TextGenerationFromPromptToResultWithErrorHandler(
   }
 }
 
-export async function TextGenerationFromMessagesToResultWithErrorHandler(
+export async function textGenerationFromMessagesToResultWithErrorHandler(
   model: LanguageModel,
   messages: UIMessage[],
   systemPrompt?: string,
@@ -62,7 +62,7 @@ export async function TextGenerationFromMessagesToResultWithErrorHandler(
   }
 }
 
-export function StreamTextGenerationFromPromptToResultWithErrorHandler(
+export function streamTextGenerationFromPromptToResultWithErrorHandler(
   model: LanguageModel,
   prompt: string,
   systemPrompt?: string,
@@ -100,7 +100,7 @@ export function StreamTextGenerationFromPromptToResultWithErrorHandler(
   return stream;
 }
 
-export function StreamTextGenerationFromMessagesToResultWithErrorHandler(
+export function streamTextGenerationFromMessagesToResultWithErrorHandler(
   model: LanguageModel,
   messages: UIMessage[],
   systemPrompt?: string,

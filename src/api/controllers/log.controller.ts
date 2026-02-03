@@ -44,7 +44,7 @@ export class LogController {
     }
 
     // Summarize with AI
-    const aiResponse = await this.aiService.TextGenerateFromPrompt(
+    const aiResponse = await this.aiService.textGenerateFromPrompt(
       response.data!.prompt
     );
 

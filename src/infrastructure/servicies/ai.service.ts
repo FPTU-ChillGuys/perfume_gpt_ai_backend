@@ -1,12 +1,7 @@
 import { ToolSet, UIMessage } from 'ai';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
-import {
-  StreamTextGenerationFromMessagesToResultWithErrorHandler,
-  StreamTextGenerationFromPromptToResultWithErrorHandler,
-  TextGenerationFromMessagesToResultWithErrorHandler,
-  TextGenerationFromPromptToResultWithErrorHandler
-} from 'src/chatbot/chatbot';
+import { streamTextGenerationFromMessagesToResultWithErrorHandler, streamTextGenerationFromPromptToResultWithErrorHandler, textGenerationFromMessagesToResultWithErrorHandler, textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
 import { gpt5nano } from 'src/chatbot/models/openai';
 import { Injectable } from '@nestjs/common';
 import { error } from 'console';
@@ -19,9 +14,9 @@ export class AIService {
     private stopWhen?: number
   ) {}
 
-  async TextGenerateFromPrompt(prompt: string, additionalSystemPrompt?: string): Promise<BaseResponse<string>> {
+  async textGenerateFromPrompt(prompt: string, additionalSystemPrompt?: string): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
-      const text = await TextGenerationFromPromptToResultWithErrorHandler(
+      const text = await textGenerationFromPromptToResultWithErrorHandler(
         gpt5nano,
         prompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
@@ -31,14 +26,14 @@ export class AIService {
     }, 'Failed to generate text from messages');
   }
 
-  async TextGenerateFromMessages(
+  async textGenerateFromMessages(
     messages: UIMessage[],
     output?: any,
     additionalSystemPrompt?: string,
     errorMessage?: string
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
-      const text = await TextGenerationFromMessagesToResultWithErrorHandler(
+      const text = await textGenerationFromMessagesToResultWithErrorHandler(
         gpt5nano,
         messages,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
@@ -51,14 +46,14 @@ export class AIService {
     }, 'Failed to generate text from messages');
   }
 
-  TextGenerateStreamFromPrompt(
+  textGenerateStreamFromPrompt(
     prompt: string,
     output?: any,
     additionalSystemPrompt?: string,
     errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
-      const stream = StreamTextGenerationFromPromptToResultWithErrorHandler(
+      const stream = streamTextGenerationFromPromptToResultWithErrorHandler(
         gpt5nano,
         prompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
@@ -78,7 +73,7 @@ export class AIService {
     errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
-      const stream = StreamTextGenerationFromMessagesToResultWithErrorHandler(
+      const stream = streamTextGenerationFromMessagesToResultWithErrorHandler(
         gpt5nano,
         messages,
         this.systemPrompt + (additionalSystemPrompt ?? ''),

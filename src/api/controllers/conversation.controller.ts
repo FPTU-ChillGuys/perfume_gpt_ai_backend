@@ -50,7 +50,7 @@ export class ConversationController {
     );
 
     // Call AI service to get response
-    const message = await this.aiService.TextGenerateFromMessages(
+    const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
       Output.object(searchOutput)
     );

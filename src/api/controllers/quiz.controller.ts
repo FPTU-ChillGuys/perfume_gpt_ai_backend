@@ -83,7 +83,7 @@ export class QuizController {
     const prompt = quizPrompt(quesAnses);
 
     // Get AI response
-    const aiResponse = await this.aiService.TextGenerateFromPrompt(
+    const aiResponse = await this.aiService.textGenerateFromPrompt(
       prompt,
       QUIZ_SYSTEM_PROMPT
     );

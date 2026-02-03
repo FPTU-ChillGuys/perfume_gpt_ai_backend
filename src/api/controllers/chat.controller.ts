@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Inject, Post } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
+import { ApiQuery } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Public } from 'src/application/common/Metadata';
 import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/common/conversation.dto';
@@ -30,9 +31,9 @@ export class ChatController {
 
   @Public()
   @Get(':id')
-  @ApiBaseResponse(String)
+  @ApiQuery({ name: 'id', type: String })
   async getConversationById(
-    @Body('id') id: string
+    @Query('id') id: string
   ): Promise<BaseResponse<ConversationDto>> {
     return await this.conversationService.getConversationById(id);
   }

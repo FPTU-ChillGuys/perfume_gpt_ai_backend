@@ -44,7 +44,7 @@ export class ChatController {
   @ApiBaseResponse(ConversationRequestDto)
   async chat(
     @Body() conversation: ConversationRequestDto
-  ): Promise<BaseResponse<ConversationDto>> {
+  ) {
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );

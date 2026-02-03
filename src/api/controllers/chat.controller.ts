@@ -41,7 +41,7 @@ export class ChatController {
   //Natural language chat
   @Public()
   @Post()
-  @ApiBaseResponse(ConversationDto)
+  @ApiBaseResponse(ConversationRequestDto)
   async chat(
     @Body() conversation: ConversationRequestDto
   ): Promise<BaseResponse<ConversationDto>> {

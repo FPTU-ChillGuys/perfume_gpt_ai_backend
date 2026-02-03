@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Post } from '@nestjs/common';
 import { Output, UIMessage } from 'ai';
 import { Public } from 'src/application/common/Metadata';
-import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
+import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/common/conversation.dto';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
@@ -33,7 +33,7 @@ export class ChatController {
   @Post()
   @ApiBaseResponse(ConversationDto)
   async chat(
-    @Body() conversation: ConversationDto
+    @Body() conversation: ConversationRequestDto
   ): Promise<BaseResponse<ConversationDto>> {
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []

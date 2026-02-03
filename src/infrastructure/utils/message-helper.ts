@@ -1,10 +1,10 @@
 import { UIMessage } from 'ai';
 import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
-import { MessageDto } from 'src/application/dtos/common/message.dto';
+import { MessageDto, MessageRequestDto } from 'src/application/dtos/common/message.dto';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { v4 as uuidv4 } from 'uuid';
 
-export function convertToMessages(message: MessageDto[]): UIMessage[] {
+export function convertToMessages(message: MessageRequestDto[]): UIMessage[] {
   return message.map((msgReq) => ({
     id: uuidv4(),
     role:

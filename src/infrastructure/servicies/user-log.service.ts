@@ -138,15 +138,17 @@ export class UserLogService {
           startOfDay(convertToUTC(userLogRequest.startDate!)),
           endOfDay(convertToUTC(userLogRequest.endDate))
         );
-        
-        await this.unitOfWork.UserLogRepo.insert(new UserLogSummary({
-          userId: userLogRequest.userId,
-          startDate: startOfDay(convertToUTC(userLogRequest.startDate!)),
-          endDate: endOfDay(convertToUTC(userLogRequest.endDate)),
-          logSummary: response
-        }))
 
-        return { success: true, data: { prompt, response }};
+        await this.unitOfWork.UserLogRepo.insert(
+          new UserLogSummary({
+            userId: userLogRequest.userId,
+            startDate: startOfDay(convertToUTC(userLogRequest.startDate!)),
+            endDate: endOfDay(convertToUTC(userLogRequest.endDate)),
+            logSummary: response
+          })
+        );
+
+        return { success: true, data: { prompt, response } };
       },
       'Failed to summarize user logs',
       true
@@ -175,8 +177,9 @@ export class UserLogService {
         // Lay log tim kiem cua user trong khoang thoi gian
         const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
           return (
-            log.createdAt >= allUserLogRequest.startDate! &&
-            log.createdAt <= allUserLogRequest.endDate
+            log.createdAt >=
+              startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
+            log.createdAt <= endOfDay(convertToUTC(allUserLogRequest.endDate))
           );
         });
 
@@ -186,8 +189,9 @@ export class UserLogService {
         //Lay log tin nhan cua user trong khoang thoi gian
         const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
           return (
-            log.createdAt >= allUserLogRequest.startDate! &&
-            log.createdAt <= allUserLogRequest.endDate
+            log.createdAt >=
+              startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
+            log.createdAt <= endOfDay(convertToUTC(allUserLogRequest.endDate))
           );
         });
 
@@ -199,8 +203,9 @@ export class UserLogService {
         // Lay log quiz cua user trong khoang thoi gian
         const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
           return (
-            log.createdAt >= allUserLogRequest.startDate! &&
-            log.createdAt <= allUserLogRequest.endDate
+            log.createdAt >=
+              startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
+            log.createdAt <= endOfDay(convertToUTC(allUserLogRequest.endDate))
           );
         });
 
@@ -215,8 +220,8 @@ export class UserLogService {
             searchContents,
             messageContents,
             quizContents,
-            allUserLogRequest.startDate!,
-            allUserLogRequest.endDate
+            startOfDay(convertToUTC(allUserLogRequest.startDate!)),
+            endOfDay(convertToUTC(allUserLogRequest.endDate))
           ) + '\n';
 
         response =
@@ -224,8 +229,8 @@ export class UserLogService {
             searchContents,
             messageContents,
             quizContents,
-            allUserLogRequest.startDate!,
-            allUserLogRequest.endDate
+            startOfDay(convertToUTC(allUserLogRequest.startDate!)),
+            endOfDay(convertToUTC(allUserLogRequest.endDate))
           ) + '\n';
       }
 

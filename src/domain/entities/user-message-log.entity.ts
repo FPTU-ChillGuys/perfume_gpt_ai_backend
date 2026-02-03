@@ -6,9 +6,9 @@ import { UserLog } from './user-log.entity';
 
 @Entity()
 export class UserMessageLog extends Common {
-  @ApiProperty({ type: () => Message })
-  @OneToOne(() => Message)
-  message: Message;
+  @ApiProperty({ type: () => Message, nullable: true })
+  @OneToOne(() => Message, { nullable: true })
+  message?: Message;
 
   @ApiProperty({ type: () => UserLog })
   @ManyToOne(() => UserLog)

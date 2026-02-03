@@ -5,8 +5,8 @@ import { UserLog } from './user-log.entity';
 
 @Entity()
 export class UserSearchLog extends Common {
-  @ApiProperty()
-  @Property()
+  @ApiProperty({ type: 'string', nullable: true })
+  @Property({ type: 'text', nullable: true })
   content?: string;
 
   @ApiProperty({ type: () => UserLog })

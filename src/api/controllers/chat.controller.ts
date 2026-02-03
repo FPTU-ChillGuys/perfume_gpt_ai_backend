@@ -52,6 +52,7 @@ export class ChatController {
     // Prepare response conversation
     const responseConversation = overrideMessagesToConversation(
       conversation.id || '',
+      conversation.userId || '',
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 

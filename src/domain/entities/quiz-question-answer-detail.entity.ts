@@ -28,8 +28,8 @@ export class QuizQuestionAnswerDetail extends Common {
   })
   quesAns!: QuizQuestionAnswer;
 
-  @ApiProperty({ type: () => UserQuizLog })
-  @OneToOne(() => UserQuizLog)
+  @ApiProperty({ type: () => UserQuizLog, nullable: true  })
+  @OneToOne(() => UserQuizLog, { nullable: true })
   userQuizLog?: UserQuizLog;
 
   constructor(init?: Partial<QuizQuestionAnswerDetail>) {

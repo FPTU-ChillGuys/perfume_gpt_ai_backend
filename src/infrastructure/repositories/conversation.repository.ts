@@ -21,7 +21,7 @@ export class ConversationRepository extends SqlEntityRepository<Conversation> {
   }
 
   async addConversation(conversation: Conversation): Promise<Conversation> {
-    const orm = this.getEntityManager();
+    const orm = this.getEntityManager().getContext();
     orm.persist(conversation);
     await orm.flush();
     return conversation;

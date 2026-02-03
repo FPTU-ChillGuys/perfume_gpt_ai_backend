@@ -11,8 +11,8 @@ export class Message extends Common {
   @Enum(() => Sender)
   sender!: Sender;
 
-  @ApiProperty()
-  @Property()
+  @ApiProperty({ type: 'string' })
+  @Property({ type: 'text' })
   message!: string;
 
   @ApiProperty({ type: () => Conversation })
@@ -22,9 +22,9 @@ export class Message extends Common {
   })
   conversation!: Conversation;
 
-  @ApiProperty({ type: () => UserMessageLog })
-  @OneToOne(() => UserMessageLog)
-  userMessageLog!: UserMessageLog;
+  @ApiProperty({ type: () => UserMessageLog, nullable: true })
+  @OneToOne(() => UserMessageLog, { nullable: true })
+  userMessageLog?: UserMessageLog;
 
   constructor(init?: Partial<Message>) {
     super();

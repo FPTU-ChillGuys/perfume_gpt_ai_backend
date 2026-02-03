@@ -15,20 +15,20 @@ import { UserLogRepository } from 'src/infrastructure/repositories/user-log.repo
 
 @Entity({repository: () => UserLogRepository})
 export class UserLog extends Common {
-  @ApiProperty()
-  @Property()
-  userId!: string;
+  @ApiProperty({ type: 'string', nullable: true })
+  @Property({ type: 'text', nullable: true })
+  userId?: string;
 
-  @ApiProperty({type: () => UserMessageLog, isArray: true})
-  @OneToMany(() => UserMessageLog, (userMessageLog) => userMessageLog.userLog)
+  @ApiProperty({type: () => UserMessageLog, isArray: true, nullable: true })
+  @OneToMany(() => UserMessageLog, (userMessageLog) => userMessageLog.userLog, { nullable: true })
   userMessageLogs = new Collection<UserMessageLog>(this);
 
-  @ApiProperty({type: () => UserQuizLog, isArray: true})
-  @OneToMany(() => UserQuizLog, (userQuizLog) => userQuizLog.userLog)
+  @ApiProperty({type: () => UserQuizLog, isArray: true, nullable: true })
+  @OneToMany(() => UserQuizLog, (userQuizLog) => userQuizLog.userLog, { nullable: true })
   userQuizLogs = new Collection<UserQuizLog>(this);
 
-  @ApiProperty({type: () => UserSearchLog, isArray: true})
-  @OneToMany(() => UserSearchLog, (userSearchLog) => userSearchLog.userLog)
+  @ApiProperty({type: () => UserSearchLog, isArray: true, nullable: true })
+  @OneToMany(() => UserSearchLog, (userSearchLog) => userSearchLog.userLog, { nullable: true })
   userSearchLogs = new Collection<UserSearchLog>(this);
 
   constructor(init?: Partial<UserLog>) {

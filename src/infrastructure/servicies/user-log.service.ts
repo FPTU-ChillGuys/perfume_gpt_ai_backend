@@ -99,7 +99,7 @@ export class UserLogService {
 
       // Lay noi dung tin nhan
       const messageContents = messageLogs
-        .map((log) => log.message.message)
+        .map((log) => log.message?.message)
         .join('; ');
 
       // Lay log quiz cua user trong khoang thoi gian
@@ -112,7 +112,7 @@ export class UserLogService {
 
       // Lay noi dung quiz
       const quizContents = quizLogs
-        .map((log) => log.quizQuesAnsDetail.answer)
+        .map((log) => log.quizQuesAnsDetail?.answer)
         .join('; ');
 
       // Tao prompt de tong hop log
@@ -176,7 +176,7 @@ export class UserLogService {
 
         // Lay noi dung tin nhan
         const messageContents = messageLogs
-          .map((log) => log.message.message)
+          .map((log) => log.message?.message)
           .join('; ');
 
         // Lay log quiz cua user trong khoang thoi gian
@@ -189,7 +189,7 @@ export class UserLogService {
 
         // Lay noi dung quiz
         const quizContents = quizLogs
-          .map((log) => log.quizQuesAnsDetail.answer)
+          .map((log) => log.quizQuesAnsDetail?.answer)
           .join('; ');
 
         // Tao prompt de tong hop log

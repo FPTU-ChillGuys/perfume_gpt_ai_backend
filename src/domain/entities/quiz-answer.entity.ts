@@ -12,8 +12,8 @@ import { ApiProperty } from '@nestjs/swagger';
 
 @Entity()
 export class QuizAnswer extends Common {
-  @ApiProperty()
-  @Property()
+  @ApiProperty({type: 'string' })
+  @Property({ type: 'text' })
   answer!: string;
 
   @ApiProperty({type: () => QuizQuestion})

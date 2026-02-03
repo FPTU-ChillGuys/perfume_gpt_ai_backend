@@ -46,7 +46,7 @@ export class ConversationService {
       const conversationDto = ConversationMapper.toResponse(conversation, true);
 
       return { success: true, data: conversationDto };
-    }, 'Failed to add conversation');
+    }, 'Failed to add conversation', true);
   }
 
   async updateMessageToConversation(

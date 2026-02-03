@@ -8,7 +8,7 @@ export class UserLogMapper {
   static toResponse(entity: UserLog, includeRelations: boolean = false): UserLogResponse {
     const response = new UserLogResponse();
     response.id = entity.id;
-    response.userId = entity.userId;
+    response.userId = entity?.userId!;
     response.createdAt = entity.createdAt;
     response.updatedAt = entity.updatedAt;
 

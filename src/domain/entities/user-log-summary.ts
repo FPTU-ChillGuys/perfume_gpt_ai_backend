@@ -27,8 +27,8 @@ export class UserLogSummary extends Common {
   @Property()
   totalLogs!: number;
 
-  @ApiProperty()
-  @Property()
+  @ApiProperty({type: 'string' })
+  @Property({ type: 'text' })
   logSummary!: string;
 
   constructor(init?: Partial<UserLogSummary>) {

@@ -47,10 +47,12 @@ export const addMessageToMessages = (
 
 export const overrideMessagesToConversation = (
   conversationId: string,
+  userId: string,
   messages: MessageDto[]
 ): ConversationDto => {
   return {
     id: conversationId,
+    userId: userId,
     messages: messages
   };
 };

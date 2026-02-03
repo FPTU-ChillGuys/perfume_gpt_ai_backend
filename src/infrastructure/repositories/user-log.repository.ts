@@ -19,12 +19,23 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     return userLog;
   }
 
+  async createUserLogIfNotExists(userId: string): Promise<UserLog> {
+     const existingLog = await  this.findOne({ userId });
+     if (existingLog) {
+       return existingLog;
+     }
+     return this.createUserLog(userId);
+  }
+
   getUserLogByUserId(userId: string): Promise<UserLog | null> {
     return this.findOne({ userId });
   }
 
   async addMessageLogToUserLog(userId: string, message: Message) {
-    const userLog = await this.findOneOrFail({ userId });
+    let userLog = await this.findOne({ userId });
+    if (!userLog) {
+      userLog = this.createUserLog(userId);
+    }
     userLog.userMessageLogs.add(
       new UserMessageLog({ message, userLog })
     );
@@ -49,7 +60,10 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     userId: string,
     quizQuesAnsDetail: QuizQuestionAnswerDetail
   ) {
-    const userLog = await this.findOneOrFail({ userId });
+    let userLog = await this.findOne({ userId });
+    if (!userLog) {
+      userLog = this.createUserLog(userId);
+    }
     userLog.userQuizLogs.add(
       new UserQuizLog({ quizQuesAnsDetail, userLog })
     );
@@ -65,7 +79,10 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
   }
 
   async addSearchLogToUserLog(userId: string, searchLog: string) {
-    const userLog = await this.findOneOrFail({ userId });
+    let userLog = await this.findOne({ userId });
+    if (!userLog) {
+      userLog = this.createUserLog(userId);
+    }
     userLog.userSearchLogs.add(
       new UserSearchLog({ content: searchLog, userLog })
     );

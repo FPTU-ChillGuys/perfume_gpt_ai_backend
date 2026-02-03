@@ -66,11 +66,9 @@ export class UserLogService {
     return await funcHandlerAsync(
       async () => {
         if (!userLogRequest.startDate) {
-          userLogRequest.startDate = startOfDay(
-            this.getFirstDateOfPeriod(
-              userLogRequest.period,
-              convertToUTC(userLogRequest.endDate)
-            )
+          userLogRequest.startDate = this.getFirstDateOfPeriod(
+            userLogRequest.period,
+            convertToUTC(userLogRequest.endDate)
           );
         }
 
@@ -86,7 +84,8 @@ export class UserLogService {
         // Lay log tim kiem cua user trong khoang thoi gian
         const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
           return (
-            log.createdAt >= userLogRequest.startDate! &&
+            log.createdAt >=
+              startOfDay(convertToUTC(userLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
@@ -97,7 +96,8 @@ export class UserLogService {
         //Lay log tin nhan cua user trong khoang thoi gian
         const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
           return (
-            log.createdAt >= userLogRequest.startDate! &&
+            log.createdAt >=
+              startOfDay(convertToUTC(userLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
@@ -110,7 +110,8 @@ export class UserLogService {
         // Lay log quiz cua user trong khoang thoi gian
         const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
           return (
-            log.createdAt >= userLogRequest.startDate! &&
+            log.createdAt >=
+              startOfDay(convertToUTC(userLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
@@ -125,19 +126,19 @@ export class UserLogService {
           searchContents,
           messageContents,
           quizContents,
-          userLogRequest.startDate!,
-          userLogRequest.endDate
+          startOfDay(convertToUTC(userLogRequest.startDate!)),
+          endOfDay(convertToUTC(userLogRequest.endDate))
         );
 
         const response = this.convertUserLogToString(
           searchContents,
           messageContents,
           quizContents,
-          userLogRequest.startDate!,
-          userLogRequest.endDate
+          startOfDay(convertToUTC(userLogRequest.startDate!)),
+          endOfDay(convertToUTC(userLogRequest.endDate))
         );
 
-        return { success: true, data: { prompt, response } };
+        return { success: true, data: { prompt, response }};
       },
       'Failed to summarize user logs',
       true

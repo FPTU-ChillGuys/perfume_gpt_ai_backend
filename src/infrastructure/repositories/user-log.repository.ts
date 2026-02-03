@@ -20,15 +20,26 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
   }
 
   async createUserLogIfNotExists(userId: string): Promise<UserLog> {
-     const existingLog = await  this.findOne({ userId });
-     if (existingLog) {
-       return existingLog;
-     }
-     return this.createUserLog(userId);
+    const existingLog = await this.findOne({ userId });
+    if (existingLog) {
+      return existingLog;
+    }
+    return this.createUserLog(userId);
   }
 
   getUserLogByUserId(userId: string): Promise<UserLog | null> {
-    return this.findOne({ userId });
+    return this.findOne(
+      { userId },
+      {
+        populate: [
+          'userMessageLogs',
+          'userMessageLogs.message',
+          'userQuizLogs',
+          'userQuizLogs.quizQuesAnsDetail',
+          'userSearchLogs'
+        ]
+      }
+    );
   }
 
   async addMessageLogToUserLog(userId: string, message: Message) {
@@ -36,11 +47,12 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     if (!userLog) {
       userLog = this.createUserLog(userId);
     }
-    userLog.userMessageLogs.add(
-      new UserMessageLog({ message, userLog })
-    );
+    userLog.userMessageLogs.add(new UserMessageLog({ message, userLog }));
     await this.em.flush();
-    const messageLogs = (await this.getUserLogsWithMessages(userId))?.userMessageLogs.getItems() || [];
+    const messageLogs =
+      (
+        await this.getUserLogsWithMessages(userId)
+      )?.userMessageLogs.getItems() || [];
     return messageLogs;
   }
 
@@ -53,7 +65,13 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
 
   async getAllUserLogs(): Promise<UserLog[]> {
     return this.findAll({
-      populate: ['userMessageLogs', 'userMessageLogs.message', 'userQuizLogs', 'userQuizLogs.quizQuesAnsDetail', 'userSearchLogs']
+      populate: [
+        'userMessageLogs',
+        'userMessageLogs.message',
+        'userQuizLogs',
+        'userQuizLogs.quizQuesAnsDetail',
+        'userSearchLogs'
+      ]
     });
   }
 
@@ -65,9 +83,7 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     if (!userLog) {
       userLog = this.createUserLog(userId);
     }
-    userLog.userQuizLogs.add(
-      new UserQuizLog({ quizQuesAnsDetail, userLog })
-    );
+    userLog.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog }));
     await this.em.flush();
     return userLog.userQuizLogs.getItems();
   }
@@ -92,10 +108,7 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
   }
 
   async getUserLogsWithSearchLogs(userId: string): Promise<UserLog | null> {
-    return this.findOne(
-      { userId },
-      { populate: ['userSearchLogs'] }
-    );
+    return this.findOne({ userId }, { populate: ['userSearchLogs'] });
   }
 
   async saveUserLog(userLog: UserLog): Promise<void> {

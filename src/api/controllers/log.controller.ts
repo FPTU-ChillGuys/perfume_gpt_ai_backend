@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Inject, Post } from '@nestjs/common';
-import { ApiBody } from '@nestjs/swagger';
+import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
+import { ApiBody, ApiQuery } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -17,11 +17,10 @@ export class LogController {
 
   //Summarize user logs
   @Public()
-  @Post('collect')
+  @Get('collect')
   @ApiBaseResponse(String)
-  @ApiBody({ type: UserLogRequest })
   async collectLogs(
-    @Body() userLogRequest: UserLogRequest
+    @Query() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
     const response =
       await this.userLogService.collectAndSummarizeUserLogs(userLogRequest);
@@ -32,11 +31,10 @@ export class LogController {
   }
 
   @Public()
-  @Post('summary')
+  @Get('summary')
   @ApiBaseResponse(String)
-  @ApiBody({ type: UserLogRequest })
   async summarizeLogs(
-    @Body() userLogRequest: UserLogRequest
+    @Query() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
     const response =
       await this.userLogService.collectAndSummarizeUserLogs(userLogRequest);
@@ -53,6 +51,6 @@ export class LogController {
       return { success: false, error: 'Failed to get AI response' };
     }
 
-    return { success: true, data: aiResponse.data };
+    return { success: true, data: aiResponse.data, error: aiResponse.error };
   }
 }

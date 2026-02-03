@@ -31,7 +31,7 @@ export class RecommendationController {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
-    const summaryResponse = await this.aiService.TextGenerateFromPrompt(
+    const summaryResponse = await this.aiService.textGenerateFromPrompt(
       `${response.data!.prompt}`
     );
 
@@ -44,7 +44,7 @@ export class RecommendationController {
     `Based on the following summarized user logs, provide personalized repurchase recommendations for products the users have shown interest in. Consider their preferences, past interactions, and any emerging trends that could influence their purchasing decisions:\n
     ${summaryResponse.data}`;
 
-    const recommendationResponse = await this.aiService.TextGenerateFromPrompt(
+    const recommendationResponse = await this.aiService.textGenerateFromPrompt(
       recommendationPrompt
     );
 
@@ -70,7 +70,7 @@ export class RecommendationController {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
-    const summaryResponse = await this.aiService.TextGenerateFromPrompt(
+    const summaryResponse = await this.aiService.textGenerateFromPrompt(
       `${response.data!.prompt}`,
 
     );
@@ -84,7 +84,7 @@ export class RecommendationController {
     `Based on the following summarized user logs, provide personalized AI-driven recommendations for products or services that align with the users' interests and preferences. Consider their past interactions, preferences, and any emerging trends that could enhance their experience:\n
     ${summaryResponse.data}`;
 
-    const recommendationResponse = await this.aiService.TextGenerateFromPrompt(
+    const recommendationResponse = await this.aiService.textGenerateFromPrompt(
       recommendationPrompt,
       ADVANCED_MATCHING_SYSTEM_PROMPT
     );

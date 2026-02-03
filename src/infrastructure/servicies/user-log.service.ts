@@ -14,6 +14,7 @@ import {
   UserLogRequest
 } from 'src/application/dtos/request/user-log.request';
 import { endOfDay, startOfDay } from 'date-fns';
+import { convertToUTC } from '../utils/time-zone';
 
 @Injectable()
 export class UserLogService {
@@ -68,7 +69,7 @@ export class UserLogService {
           userLogRequest.startDate = startOfDay(
             this.getFirstDateOfPeriod(
               userLogRequest.period,
-              userLogRequest.endDate
+              convertToUTC(userLogRequest.endDate)
             )
           );
         }
@@ -86,7 +87,7 @@ export class UserLogService {
         const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
           return (
             log.createdAt >= userLogRequest.startDate! &&
-            log.createdAt <= endOfDay(new Date(userLogRequest.endDate))
+            log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
 
@@ -97,7 +98,7 @@ export class UserLogService {
         const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
           return (
             log.createdAt >= userLogRequest.startDate! &&
-            log.createdAt <= endOfDay(new Date(userLogRequest.endDate))
+            log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
 
@@ -110,7 +111,7 @@ export class UserLogService {
         const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
           return (
             log.createdAt >= userLogRequest.startDate! &&
-            log.createdAt <= endOfDay(new Date(userLogRequest.endDate))
+            log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
 

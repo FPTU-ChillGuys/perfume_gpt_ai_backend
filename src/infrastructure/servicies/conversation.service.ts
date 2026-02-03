@@ -70,32 +70,36 @@ export class ConversationService {
     id: string,
     messageDtos: MessageDto[]
   ): Promise<BaseResponse<MessageDto[]>> {
-    return await funcHandlerAsync(async () => {
-      const messages: Message[] = messageDtos.map(
-        (msg) =>
-          new Message({
-            sender: msg.sender as Sender,
-            message: msg.message
-          })
-      );
-
-      const conversation =
-        await this.unitOfWork.AIConversationRepo.addMessagesToConversation(
-          id,
-          messages
+    return await funcHandlerAsync(
+      async () => {
+        const messages: Message[] = messageDtos.map(
+          (msg) =>
+            new Message({
+              sender: msg.sender as Sender,
+              message: msg.message
+            })
         );
 
-      //Lay message luu vao log
-      await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
-        conversation.userId,
-        messages[messages.length - 1]
-      );
+        const conversation =
+          await this.unitOfWork.AIConversationRepo.addMessagesToConversation(
+            id,
+            messages
+          );
 
-      return {
-        success: true,
-        data: MessageMapper.toResponseList(conversation.messages.getItems())
-      };
-    }, 'Failed to update messages');
+        //Lay message luu vao log
+        await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
+          conversation.userId,
+          messages[messages.length - 1]
+        );
+
+        return {
+          success: true,
+          data: MessageMapper.toResponseList(conversation.messages.getItems())
+        };
+      },
+      'Failed to update messages',
+      true
+    );
   }
 
   async getConversationById(

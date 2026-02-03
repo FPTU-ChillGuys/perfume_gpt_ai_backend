@@ -40,13 +40,14 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
       new UserMessageLog({ message, userLog })
     );
     await this.em.flush();
-    return userLog.userMessageLogs.getItems();
+    const messageLogs = (await this.getUserLogsWithMessages(userId))?.userMessageLogs.getItems() || [];
+    return messageLogs;
   }
 
   async getUserLogsWithMessages(userId: string): Promise<UserLog | null> {
     return this.findOne(
       { userId },
-      { populate: ['userMessageLogs', 'userMessageLogs.message', 'userQuizLogs', 'userQuizLogs.quizQuesAnsDetail', 'userSearchLogs'] }
+      { populate: ['userMessageLogs', 'userMessageLogs.message'] }
     );
   }
 
@@ -88,6 +89,13 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     );
     await this.em.flush();
     return userLog.userSearchLogs.getItems();
+  }
+
+  async getUserLogsWithSearchLogs(userId: string): Promise<UserLog | null> {
+    return this.findOne(
+      { userId },
+      { populate: ['userSearchLogs'] }
+    );
   }
 
   async saveUserLog(userLog: UserLog): Promise<void> {

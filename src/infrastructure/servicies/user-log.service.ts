@@ -15,6 +15,7 @@ import {
 } from 'src/application/dtos/request/user-log.request';
 import { endOfDay, startOfDay } from 'date-fns';
 import { convertToUTC } from '../utils/time-zone';
+import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 
 @Injectable()
 export class UserLogService {
@@ -137,6 +138,13 @@ export class UserLogService {
           startOfDay(convertToUTC(userLogRequest.startDate!)),
           endOfDay(convertToUTC(userLogRequest.endDate))
         );
+        
+        await this.unitOfWork.UserLogRepo.insert(new UserLogSummary({
+          userId: userLogRequest.userId,
+          startDate: startOfDay(convertToUTC(userLogRequest.startDate!)),
+          endDate: endOfDay(convertToUTC(userLogRequest.endDate)),
+          logSummary: response
+        }))
 
         return { success: true, data: { prompt, response }};
       },

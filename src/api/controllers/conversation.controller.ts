@@ -15,8 +15,8 @@ import {
   overrideMessagesToConversation
 } from 'src/infrastructure/utils/message-helper';
 
-@Controller('chat')
-export class ChatController {
+@Controller('conversation')
+export class ConversationController {
   constructor(
     @Inject(AI_SERVICE) private aiService: AIService,
     private conversationService: ConversationService

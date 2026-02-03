@@ -43,6 +43,7 @@ export class LogController {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
+    // Summarize with AI
     const aiResponse = await this.aiService.TextGenerateFromPrompt(
       response.data!.prompt
     );

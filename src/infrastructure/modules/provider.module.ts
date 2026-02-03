@@ -10,7 +10,7 @@ import { MappingModule } from './mapping.module';
 import { AIModule } from './ai.module';
 import { AIController } from 'src/api/controllers/ai/ai.controller';
 import { LogController } from 'src/api/controllers/log.controller';
-import { ChatController } from 'src/api/controllers/chat.controller';
+import { ConversationController } from 'src/api/controllers/conversation.controller';
 import { TrendController } from 'src/api/controllers/trend.controller';
 import { ReviewController } from 'src/api/controllers/review.controller';
 import { RecommendationController } from 'src/api/controllers/recommendation.controller';
@@ -33,7 +33,7 @@ const modules = [
     QuizController,
     AIController,
     LogController,
-    ChatController,
+    ConversationController,
     TrendController,
     ReviewController,
     RecommendationController

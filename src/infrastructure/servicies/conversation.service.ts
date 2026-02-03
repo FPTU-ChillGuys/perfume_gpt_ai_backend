@@ -9,7 +9,10 @@ import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { Message } from 'src/domain/entities/message.entity';
 import { MessageDto } from 'src/application/dtos/common/message.dto';
-import { ConversationMapper, MessageMapper } from 'src/application/mapping/custom';
+import {
+  ConversationMapper,
+  MessageMapper
+} from 'src/application/mapping/custom';
 
 @Injectable()
 export class ConversationService {
@@ -21,41 +24,46 @@ export class ConversationService {
   async addConversation(
     conversationRequest: ConversationDto
   ): Promise<BaseResponse<ConversationDto>> {
-    return await funcHandlerAsync(async () => {
-      const existedConversation = await this.isExistConversation(
-        conversationRequest.id || ''
-      );
+    return await funcHandlerAsync(
+      async () => {
+        const existedConversation = await this.isExistConversation(
+          conversationRequest.id || ''
+        );
 
-      if (existedConversation) {
-        return { success: false, error: 'Conversation already exists' };
-      }
+        if (existedConversation) {
+          return { success: false, error: 'Conversation already exists' };
+        }
 
-      const conversation = new Conversation({
-        id: conversationRequest.id || '',
-        userId: conversationRequest.userId
-      });
-      conversation.messages.set(
-        MessageMapper.toEntityList(
-          conversationRequest.messages || [],
-          conversation
-        )
-      );
+        const conversation = new Conversation({
+          id: conversationRequest.id || '',
+          userId: conversationRequest.userId
+        });
+        conversation.messages.set(
+          MessageMapper.toEntityList(
+            conversationRequest.messages || [],
+            conversation
+          )
+        );
 
-      //Luu conversation
-      await this.unitOfWork.AIConversationRepo.addConversation(conversation);
+        //Luu conversation
+        await this.unitOfWork.AIConversationRepo.addConversation(conversation);
 
-      //Luu message vao log
-      for (const msg of conversation.messages.getItems()) {
+        //Luu message vao log
         await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
           conversation.userId,
-          msg
+          conversation.messages.getItems()[0]
         );
-      }
 
-      const conversationDto = ConversationMapper.toResponse(conversation, true);
+        const conversationDto = ConversationMapper.toResponse(
+          conversation,
+          true
+        );
 
-      return { success: true, data: conversationDto };
-    }, 'Failed to add conversation', true);
+        return { success: true, data: conversationDto };
+      },
+      'Failed to add conversation',
+      true
+    );
   }
 
   async updateMessageToConversation(
@@ -83,7 +91,10 @@ export class ConversationService {
         messages[messages.length - 1]
       );
 
-      return { success: true, data: MessageMapper.toResponseList(conversation.messages.getItems()) };
+      return {
+        success: true,
+        data: MessageMapper.toResponseList(conversation.messages.getItems())
+      };
     }, 'Failed to update messages');
   }
 
@@ -91,9 +102,12 @@ export class ConversationService {
     id: string
   ): Promise<BaseResponse<ConversationDto>> {
     return await funcHandlerAsync(async () => {
-      const conversation = await this.unitOfWork.AIConversationRepo.findOne({
-        id
-      }, { populate: ['messages'] });
+      const conversation = await this.unitOfWork.AIConversationRepo.findOne(
+        {
+          id
+        },
+        { populate: ['messages'] }
+      );
       if (!conversation) {
         return { success: false, error: 'Conversation not found' };
       }
@@ -118,7 +132,10 @@ export class ConversationService {
           populate: ['messages']
         });
 
-        const response = ConversationMapper.toResponseList(conversations, false);
+        const response = ConversationMapper.toResponseList(
+          conversations,
+          false
+        );
 
         return { success: true, data: response };
       },

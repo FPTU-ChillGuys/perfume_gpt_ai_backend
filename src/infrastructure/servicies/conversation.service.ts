@@ -22,7 +22,16 @@ export class ConversationService {
     conversationRequest: ConversationDto
   ): Promise<BaseResponse<ConversationDto>> {
     return await funcHandlerAsync(async () => {
+      const existedConversation = await this.isExistConversation(
+        conversationRequest.id || ''
+      );
+
+      if (existedConversation) {
+        return { success: false, error: 'Conversation already exists' };
+      }
+
       const conversation = new Conversation({
+        id: conversationRequest.id || '',
         userId: conversationRequest.userId
       });
       conversation.messages.set(

@@ -7,11 +7,13 @@ import ApiUrl from '../api/api_url';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
+import { Injectable } from '@nestjs/common';
 
+@Injectable()
 export class ReviewService {
   constructor(
     private unitOfWork: UnitOfWork,
-    private readonly httpService: HttpService
+    private httpService: HttpService
   ) {}
 
   async getAllReviews(
@@ -19,7 +21,7 @@ export class ReviewService {
   ): Promise<BaseResponseAPI<ReviewListItemResponse>> {
     return await funcHandlerAsync(
       async () => {
-        console.log(ApiUrl().PRODUCT_URL(''));
+        console.log(ApiUrl().REVIEW_URL(''));
         const { data } = await firstValueFrom(
           this.httpService.get<BaseResponseAPI<ReviewListItemResponse>>(
             ApiUrl().REVIEW_URL(''),

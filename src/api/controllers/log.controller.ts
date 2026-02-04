@@ -83,7 +83,7 @@ export class LogController {
     return response;
   }
 
-   // Xem chi tiet log nguoi dung
+   // Xem log report nguoi dung
   @Public()
   @Get("report")
   @ApiBaseResponse(String)

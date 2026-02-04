@@ -1,7 +1,6 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 import { QuizQuesAnsDetailRequest } from './quiz-ques-ans-detail.request';
 
-@ApiSchema()
 export class QuizQuesAnwsRequest {
   @ApiProperty()
   userId!: string;

@@ -82,6 +82,20 @@ export class QuizService {
     }, 'Failed to get quiz question by id');
   }
 
+  async getQuizQuesByIdList(
+    ids: string[]
+  ): Promise<BaseResponse<QuizQuestionResponse[]>> {
+    return await funcHandlerAsync(async () => {
+      const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.find(
+        { id: { $in: ids } },
+        { populate: ['answers'] }
+      );
+      const quizQuestionsResponses =
+        QuizQuestionMapper.toResponseList(quizQuestions);
+      return { success: true, data: quizQuestionsResponses };
+    }, 'Failed to get quiz questions by id list');
+  }
+
   async getAllQuizQues(): Promise<BaseResponse<QuizQuestionResponse[]>> {
     return await funcHandlerAsync(
       async () => {

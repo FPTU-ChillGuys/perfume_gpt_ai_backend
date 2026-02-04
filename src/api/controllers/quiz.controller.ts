@@ -30,6 +30,7 @@ export class QuizController {
     private quizService: QuizService
   ) {}
 
+  // Lay tat ca cau hoi quiz
   @Public()
   @Get("questions")
   @ApiBaseResponse(QuizQuestion)
@@ -43,12 +44,14 @@ export class QuizController {
     return { success: true, data: quizQues.data };
   }
 
+  // Tao cau hoi quiz
   @Public()
   @Post("questions")
   async createQuizQues(@Body() quizQuestionRequest: QuizQuestionRequest) {
     return this.quizService.addQuizQues(quizQuestionRequest);
   }
 
+  // Tao nhieu cau hoi quiz
   @Public()
   @Post('questions/list')
   @ApiBody({ type: [QuizQuestionRequest] })
@@ -59,6 +62,7 @@ export class QuizController {
     return { success: true };
   }
 
+  // Cap nhat cau tra loi quiz
   @Public()
   @Put('questions/:id')
   @ApiBody({ type: [QuizAnswerRequest] })
@@ -73,11 +77,31 @@ export class QuizController {
   @Public()
   @Post('user')
   @ApiBaseResponse(String)
-  @ApiBody({ type: [QuizQuesAnwsRequest] })
+  @ApiBody({ schema: { example: [{ questionId: 'string', answerId: 'string' }] } })
   async chatQuiz(
-    @Body() addQuesAnwsRequests: QuizQuesAnwsRequest[]
+    @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
+
+    // Lay cau hoi quiz va cau tra loi tuong ung
+    const questionIds = quizAnswers.map(qa => qa.questionId);
+    const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
+    if (!quizQueses.success) {
+      return { success: false, error: 'Failed to get quiz question' };
+    }
+
+    // Tim cau tra loi trong cau hoi
     const quesAnses: Array<{ question: string; answer: string }> = [];
+    if (quizQueses.data) {
+      for (let i = 0; i < quizQueses.data.length; i++) {
+        const quizQues = quizQueses.data[i];
+        if (quizQues.answers && quizQues.question) {
+          const answer = quizQues.answers.find(ans => ans.id === quizAnswers[i].answerId);
+          if (answer && answer.answer) {
+            quesAnses.push({ question: quizQues.question, answer: answer.answer });
+          }
+        }
+      }
+    }
 
     // Generate prompt
     const prompt = quizPrompt(quesAnses);

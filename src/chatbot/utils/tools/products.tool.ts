@@ -73,7 +73,7 @@ export class ProductTool {
               }
             );
             if (response.success && response.payload?.items) {
-              results = results.concat(response.payload.items);
+              results = results.concat(response.payload.items ?? []);
             }
           }
 

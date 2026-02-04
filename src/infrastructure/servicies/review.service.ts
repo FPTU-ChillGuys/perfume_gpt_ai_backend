@@ -1,6 +1,10 @@
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { UnitOfWork } from '../repositories/unit-of-work';
-import { ReviewListItemResponse } from 'src/application/dtos/response/review.response';
+import {
+  ReviewListItemResponse,
+  ReviewResponse,
+  ReviewStatisticsResponse
+} from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { funcHandlerAsync } from '../utils/error-handler';
 import ApiUrl from '../api/api_url';
@@ -8,6 +12,7 @@ import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { Injectable } from '@nestjs/common';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 
 @Injectable()
 export class ReviewService {
@@ -16,14 +21,13 @@ export class ReviewService {
     private httpService: HttpService
   ) {}
 
-  async getAllReviews(
+  async   getAllReviews(
     request: GetPagedReviewRequest
-  ): Promise<BaseResponseAPI<ReviewListItemResponse>> {
+  ): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        console.log(ApiUrl().REVIEW_URL(''));
         const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<ReviewListItemResponse>>(
+          this.httpService.get<BaseResponseAPI<PagedResult<ReviewResponse>>>(
             ApiUrl().REVIEW_URL(''),
             {
               params: {
@@ -38,6 +42,46 @@ export class ReviewService {
                 sortBy: request.SortBy ?? '',
                 sortOrder: request.SortOrder ?? 'asc',
                 isDescending: request.IsDescending ?? false
+              }
+            }
+          )
+        );
+        return data;
+      },
+      'Failed to fetch reviews',
+      true
+    );
+  }
+
+  async getReviewsByVariantId(variantId: string): Promise<BaseResponseAPI<ReviewResponse[]>> {
+    return await funcHandlerAsync(
+      async () => {
+        const { data } = await firstValueFrom(
+          this.httpService.get<BaseResponseAPI<ReviewResponse[]>>(
+            ApiUrl().REVIEW_URL(`variant/${variantId}`),
+            {
+              params: {
+                variantId: variantId
+              }
+            }
+          )
+        );
+        return data;
+      },
+      'Failed to fetch reviews',
+      true
+    );
+  }
+
+  async getReviewStatisticByVariantId(variantId: string): Promise<BaseResponseAPI<ReviewStatisticsResponse>> {
+    return await funcHandlerAsync(
+      async () => {
+        const { data } = await firstValueFrom(
+          this.httpService.get<BaseResponseAPI<ReviewStatisticsResponse>>(
+            ApiUrl().REVIEW_URL(`variant/${variantId}/statistics`),
+            {
+              params: {
+                variantId: variantId
               }
             }
           )

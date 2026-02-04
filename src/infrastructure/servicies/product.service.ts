@@ -1,11 +1,12 @@
 import { HttpService } from '@nestjs/axios';
 import ApiUrl from '../api/api_url';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
-import { ProductListResponse } from 'src/application/dtos/response/product.response';
+import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { firstValueFrom } from 'rxjs';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { Injectable } from '@nestjs/common';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 
 @Injectable()
 export class ProductService {
@@ -13,12 +14,12 @@ export class ProductService {
 
   async getAllProducts(
     request: PagedAndSortedRequest
-  ): Promise<BaseResponseAPI<ProductListResponse>> {
+  ): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
     return await funcHandlerAsync(
       async () => {
         console.log(ApiUrl().PRODUCT_URL(''));
         const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<ProductListResponse>>(
+          this.httpService.get<BaseResponseAPI<PagedResult<ProductResponse>>>(
             ApiUrl().PRODUCT_URL(''),
             {
               params: {
@@ -41,12 +42,12 @@ export class ProductService {
   async getProductsUsingSemanticSearch(
     searchText: string,
     request: PagedAndSortedRequest
-  ): Promise<BaseResponseAPI<ProductListResponse>> {
+  ): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
     return await funcHandlerAsync(
       async () => {
         console.log(ApiUrl().PRODUCT_URL('search/semantic'));
         const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<ProductListResponse>>(
+          this.httpService.get<BaseResponseAPI<PagedResult<ProductResponse>>>(
             ApiUrl().PRODUCT_URL('search/semantic'),
             {
               params: {

@@ -30,7 +30,3 @@ export class ProductResponse {
   baseNotes!: string;
 }
 
-export class ProductListResponse {
-  @ApiProperty({ type: [ProductResponse] })
-  items!: ProductResponse[];
-}

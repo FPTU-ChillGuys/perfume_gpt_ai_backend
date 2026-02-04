@@ -69,12 +69,30 @@ export class LogController {
   // Xem chi tiet log nguoi dung
   @Public()
   @Get()
-  async getUserLogsSummaryById(
+  @ApiBaseResponse(UserLogSummaryResponse, true)
+  async getUserLogsSummariesById(
     @Query('userId') userId: string,
     @Query('endDate') endDate: Date,
     @Query('startDate') startDate: Date
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
-    const response = await this.userLogService.getUserLogSummaryByUserId(
+    const response = await this.userLogService.getUserLogSummariesByUserId(
+      userId,
+      startDate,
+      endDate
+    );
+    return response;
+  }
+
+   // Xem chi tiet log nguoi dung
+  @Public()
+  @Get("report")
+  @ApiBaseResponse(String)
+  async getUserLogsSummaryReportById(
+    @Query('userId') userId: string,
+    @Query('endDate') endDate: Date,
+    @Query('startDate') startDate: Date
+  ): Promise<BaseResponse<string>> {
+    const response = await this.userLogService.getUserLogSummaryReportByUserId(
       userId,
       startDate,
       endDate

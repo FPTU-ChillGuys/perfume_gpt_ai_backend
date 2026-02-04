@@ -2,9 +2,13 @@ import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
 import { ApiQuery } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Public } from 'src/application/common/Metadata';
-import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/common/conversation.dto';
+import {
+  ConversationDto,
+  ConversationRequestDto
+} from 'src/application/dtos/common/conversation.dto';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
@@ -45,24 +49,24 @@ export class ConversationController {
   @Public()
   @Post()
   @ApiBaseResponse(ConversationRequestDto)
-  async chat(
-    @Body() conversation: ConversationRequestDto
-  ) {
+  async conversation(@Body() conversation: ConversationRequestDto) {
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
 
-    // Lay log nguoi dung tu db trong khoan 1 thang 
-    const userLog = await this.logService.getUserLogSummaryByUserId({
-      userId: conversation.userId,
-    })
-    
+    // Lay log nguoi dung tu db trong khoan 1 thang
+    const userLog = await this.logService.getUserLogSummaryReportByUserId(
+      conversation.userId
+    );
+
+    // Tao prompt cho AI tu log nguoi dung
+    const userLogPrompt = `Here are some of your recent activity logs that might be relevant to our conversation:\n${userLog.data}\nUse this information to provide more accurate and personalized responses. If the logs are not relevant, you can ignore them.`;
 
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
       Output.object(searchOutput),
-      userLog.data?.prompt
+      `${ADVANCED_MATCHING_SYSTEM_PROMPT} \n ${userLogPrompt}`
     );
 
     if (!message.success) {
@@ -93,6 +97,35 @@ export class ConversationController {
     return {
       success: true,
       data: responseConversation
+    };
+  }
+
+   //Test response conversation with user log
+  @Public()
+  @Post('test')
+  @ApiBaseResponse(ConversationRequestDto)
+  async convserationTest(@Query('userId') userId: string, @Query('prompt') prompt: string) {
+    // Lay log nguoi dung tu db trong khoan 1 thang
+    const userLog = await this.logService.getUserLogSummaryReportByUserId(
+      userId
+    );
+
+    // Tao prompt cho AI tu log nguoi dung
+    const userLogPrompt = `Here are some of your recent activity logs that might be relevant to our conversation:\n${userLog.data}\nUse this information to provide more accurate and personalized responses. If the logs are not relevant, you can ignore them.`;
+
+    // Call AI service to get response
+    const message = await this.aiService.textGenerateFromPrompt(
+      prompt,
+      `${ADVANCED_MATCHING_SYSTEM_PROMPT} \n ${userLogPrompt}`
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    return {
+      success: true,
+      data: message.data
     };
   }
 }

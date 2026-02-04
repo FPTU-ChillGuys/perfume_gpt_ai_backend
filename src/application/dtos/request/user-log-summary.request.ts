@@ -8,5 +8,5 @@ export class UserLogSummaryRequest {
     @ApiProperty()
     endDate: Date;
     @ApiProperty()
-    logSummary?: string;
+    logSummary: string = '';
 }

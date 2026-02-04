@@ -86,24 +86,57 @@ export class UserLogService {
     );
   }
 
-  async getUserLogSummaryByUserId(
-    userId : string,
+  async getUserLogSummariesByUserId(
+    userId: string,
     startDate?: Date,
     endDate?: Date
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
     return await funcHandlerAsync(
       async () => {
-        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({ 
-          userId: userId,  
-          startDate: startDate ? startOfDay(convertToUTC(startDate)) : new Date(0),
-          endDate: endDate ? endOfDay(convertToUTC(endDate)) : endOfDay(new Date())
+        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({
+          userId: userId,
+          startDate: startDate
+            ? startOfDay(convertToUTC(startDate))
+            : new Date(0),
+          endDate: endDate
+            ? endOfDay(convertToUTC(endDate))
+            : endOfDay(new Date())
         });
         if (!userLogSummary) {
           return { success: false, error: 'User log summary not found' };
         }
-        return { success: true, data: UserLogSummaryMapper.toResponseList(userLogSummary) };
+        return {
+          success: true,
+          data: UserLogSummaryMapper.toResponseList(userLogSummary)
+        };
       },
       'Failed to get user log summary',
+      true
+    );
+  }
+
+  // Tao report tu cac user log summary
+  async getUserLogSummaryReportByUserId(
+    userId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<BaseResponse<string>> {
+    return await funcHandlerAsync(
+      async () => {
+        const userLogSummaries = await this.getUserLogSummariesByUserId(
+          userId,
+          startDate,
+          endDate
+        );
+        if (!userLogSummaries.success || !userLogSummaries.data) {
+          return { success: false, error: 'User log summaries not found' };
+        }
+        const report = userLogSummaries.data
+          .map((summary) => summary.logSummary)
+          .join('\n');
+        return { success: true, data: report };
+      },
+      'Failed to get user log summary report',
       true
     );
   }
@@ -179,7 +212,7 @@ export class UserLogService {
           endOfDay(convertToUTC(userLogRequest.endDate))
         );
 
-        const response = this.convertUserLogToString(
+        const response = this.convertUserLogsToString(
           searchContents,
           messageContents,
           quizContents,
@@ -264,7 +297,7 @@ export class UserLogService {
           ) + '\n';
 
         response =
-          this.convertUserLogToString(
+          this.convertUserLogsToString(
             searchContents,
             messageContents,
             quizContents,
@@ -317,7 +350,7 @@ export class UserLogService {
     return prompt;
   }
 
-  convertUserLogToString(
+  convertUserLogsToString(
     searchContents: string,
     messageContents: string,
     quizContents: string,

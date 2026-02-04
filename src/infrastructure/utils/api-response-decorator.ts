@@ -1,9 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import {
-  ApiExtraModels,
-  ApiOkResponse,
-  getSchemaPath,
-} from '@nestjs/swagger';
+import { ApiExtraModels, ApiOkResponse, getSchemaPath } from '@nestjs/swagger';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 
@@ -11,7 +7,7 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 const primitiveMap: Record<string, any> = {
   String: { type: 'string' },
   Number: { type: 'number' },
-  Boolean: { type: 'boolean' },
+  Boolean: { type: 'boolean' }
 };
 
 // Kiểm tra primitive
@@ -25,7 +21,8 @@ const isPrimitive = (data: any) =>
  */
 export const ApiBaseResponse = <T extends Function>(
   data: T,
-  properties?: Record<string, any>,
+  isArray: boolean = false,
+  properties?: Record<string, any>
 ) => {
   const schemaData = isPrimitive(data)
     ? primitiveMap[data.name] // Primitive schema
@@ -39,15 +36,13 @@ export const ApiBaseResponse = <T extends Function>(
         allOf: [
           { $ref: getSchemaPath(BaseResponse) },
           {
-            properties:
-              properties ??
-              {
-                data: schemaData,
-              },
-          },
-        ],
-      },
-    }),
+            properties: properties ?? {
+              data: isArray ? { type: 'array', items: schemaData } : schemaData
+            }
+          }
+        ]
+      }
+    })
   );
 };
 
@@ -58,7 +53,8 @@ export const ApiBaseResponse = <T extends Function>(
  */
 export const ExtendApiBaseResponse = <T extends Function>(
   data: T,
-  properties?: Record<string, any>,
+  isArray: boolean = false,
+  properties?: Record<string, any>
 ) => {
   const schemaData = isPrimitive(data)
     ? primitiveMap[data.name]
@@ -72,14 +68,12 @@ export const ExtendApiBaseResponse = <T extends Function>(
         allOf: [
           { $ref: getSchemaPath(BaseResponseAPI) },
           {
-            properties:
-              properties ??
-              {
-                data: schemaData,
-              },
-          },
-        ],
-      },
-    }),
+            properties: properties ?? {
+              data: isArray ? { type: 'array', items: schemaData } : schemaData
+            }
+          }
+        ]
+      }
+    })
   );
 };

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Gender } from 'src/domain/enum/gender.enum';
 
 export class ProductResponse {
   @ApiProperty()
@@ -17,6 +18,8 @@ export class ProductResponse {
   familyId!: number | null;
   @ApiProperty()
   familyName!: string | null;
+  @ApiProperty()
+  gender: Gender;
   @ApiProperty()
   description!: string;
   @ApiProperty()

@@ -16,12 +16,14 @@ import {
 import { endOfDay, startOfDay } from 'date-fns';
 import { convertToUTC } from '../utils/time-zone';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
+import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
+import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
 
 @Injectable()
 export class UserLogService {
   constructor(private unitOfWork: UnitOfWork) {}
 
-  async getUserLogByUserId(userId: string): Promise<UserLog | null> {
+  async getUserLogsByUserId(userId: string): Promise<UserLog | null> {
     return this.unitOfWork.UserLogRepo.findOne({ userId });
   }
 
@@ -57,6 +59,45 @@ export class UserLogService {
     return this.unitOfWork.UserLogRepo.addSearchLogToUserLog(
       user.id,
       searchText
+    );
+  }
+
+  async saveUserLogSummary(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    summary: string
+  ): Promise<BaseResponse<string>> {
+    return await funcHandlerAsync(
+      async () => {
+        const userLogSummary = new UserLogSummary({
+          userId,
+          startDate,
+          endDate,
+          logSummary: summary
+        });
+
+        await this.unitOfWork.UserLogSummaryRepo.insert(userLogSummary);
+        return { success: true, data: userLogSummary.logSummary };
+      },
+      'Failed to save user log summary',
+      true
+    );
+  }
+
+  async getUserLogSummaryByUserId(
+    userId: string
+  ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
+    return await funcHandlerAsync(
+      async () => {
+        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({ userId});
+        if (!userLogSummary) {
+          return { success: false, error: 'User log summary not found' };
+        }
+        return { success: true, data: UserLogSummaryMapper.toResponseList(userLogSummary) };
+      },
+      'Failed to get user log summary',
+      true
     );
   }
 
@@ -137,15 +178,6 @@ export class UserLogService {
           quizContents,
           startOfDay(convertToUTC(userLogRequest.startDate!)),
           endOfDay(convertToUTC(userLogRequest.endDate))
-        );
-
-        await this.unitOfWork.UserLogRepo.insert(
-          new UserLogSummary({
-            userId: userLogRequest.userId,
-            startDate: startOfDay(convertToUTC(userLogRequest.startDate!)),
-            endDate: endOfDay(convertToUTC(userLogRequest.endDate)),
-            logSummary: response
-          })
         );
 
         return { success: true, data: { prompt, response } };

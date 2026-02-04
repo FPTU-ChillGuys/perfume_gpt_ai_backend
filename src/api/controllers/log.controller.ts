@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiQuery } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
+import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import { UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
@@ -48,10 +50,48 @@ export class LogController {
       response.data!.prompt
     );
 
+    // Save summary to database
+
+    await this.userLogService.saveUserLogSummary(
+      userLogRequest.userId,
+      userLogRequest.startDate!,
+      userLogRequest.endDate!,
+      aiResponse.data || ''
+    );
+
     if (!aiResponse.success) {
       return { success: false, error: 'Failed to get AI response' };
     }
 
     return { success: true, data: aiResponse.data, error: aiResponse.error };
+  }
+
+  // Xem chi tiet log nguoi dung
+  @Public()
+  @Get()
+  async getUserLogsSummaryById(userId: string): Promise<BaseResponse<UserLogSummaryResponse[]>> {
+    const response = await this.userLogService.getUserLogSummaryByUserId(userId);
+    return response;
+  }
+
+  // Tao tom tat log nguoi dung
+  @Public()
+  @Post()
+  @ApiBody({ type: UserLogSummaryRequest })
+  @ApiBaseResponse(String)
+  async createUserLogSummary(
+    @Body() userLogRequest: UserLogSummaryRequest
+  ): Promise<BaseResponse<string>> {
+    const response = await this.userLogService.saveUserLogSummary(
+      userLogRequest.userId,
+      userLogRequest.startDate,
+      userLogRequest.endDate,
+      userLogRequest.logSummary
+    );
+
+    if (!response.success) {
+      return { success: false, error: 'Failed to save user log summary' };
+    }
+    return { success: true, data: 'User log summary saved successfully' };
   }
 }

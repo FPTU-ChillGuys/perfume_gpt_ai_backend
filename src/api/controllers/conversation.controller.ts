@@ -5,9 +5,11 @@ import { Public } from 'src/application/common/Metadata';
 import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/common/conversation.dto';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
+import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import {
   addMessageToMessages,
@@ -19,7 +21,8 @@ import {
 export class ConversationController {
   constructor(
     @Inject(AI_SERVICE) private aiService: AIService,
-    private conversationService: ConversationService
+    private conversationService: ConversationService,
+    private logService: UserLogService
   ) {}
 
   @Public()
@@ -49,10 +52,19 @@ export class ConversationController {
       conversation.messages || []
     );
 
+    // Lay log nguoi dung tu db trong khoan 1 thang 
+    const userLog = await this.logService.collectAndSummarizeUserLogs({
+      userId: conversation.userId || '',
+      period: PeriodEnum.MONTHLY,
+      endDate: new Date(),
+    })
+    
+
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      Output.object(searchOutput)
+      Output.object(searchOutput),
+      userLog.data?.prompt
     );
 
     if (!message.success) {

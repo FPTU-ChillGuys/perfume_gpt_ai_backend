@@ -53,10 +53,8 @@ export class ConversationController {
     );
 
     // Lay log nguoi dung tu db trong khoan 1 thang 
-    const userLog = await this.logService.collectAndSummarizeUserLogs({
-      userId: conversation.userId || '',
-      period: PeriodEnum.MONTHLY,
-      endDate: new Date(),
+    const userLog = await this.logService.getUserLogSummaryByUserId({
+      userId: conversation.userId,
     })
     
 

@@ -18,6 +18,7 @@ import { convertToUTC } from '../utils/time-zone';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
+import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 
 @Injectable()
 export class UserLogService {
@@ -86,11 +87,17 @@ export class UserLogService {
   }
 
   async getUserLogSummaryByUserId(
-    userId: string
+    userId : string,
+    startDate?: Date,
+    endDate?: Date
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
     return await funcHandlerAsync(
       async () => {
-        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({ userId});
+        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({ 
+          userId: userId,  
+          startDate: startDate ? startOfDay(convertToUTC(startDate)) : new Date(0),
+          endDate: endDate ? endOfDay(convertToUTC(endDate)) : endOfDay(new Date())
+        });
         if (!userLogSummary) {
           return { success: false, error: 'User log summary not found' };
         }

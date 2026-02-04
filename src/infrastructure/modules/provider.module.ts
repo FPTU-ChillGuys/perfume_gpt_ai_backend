@@ -14,6 +14,7 @@ import { ConversationController } from 'src/api/controllers/conversation.control
 import { TrendController } from 'src/api/controllers/trend.controller';
 import { ReviewController } from 'src/api/controllers/review.controller';
 import { RecommendationController } from 'src/api/controllers/recommendation.controller';
+import { ReviewModule } from './review.module';
 
 const modules = [
   ConversationModule,
@@ -23,7 +24,8 @@ const modules = [
   ToolModule,
   MappingModule,
   AIModule,
-  UserLogModule
+  UserLogModule,
+  ReviewModule
 ];
 
 @Module({

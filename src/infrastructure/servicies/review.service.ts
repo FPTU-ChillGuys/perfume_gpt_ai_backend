@@ -6,6 +6,7 @@ import { funcHandlerAsync } from '../utils/error-handler';
 import ApiUrl from '../api/api_url';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
+import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 
 export class ReviewService {
   constructor(
@@ -14,7 +15,7 @@ export class ReviewService {
   ) {}
 
   async getAllReviews(
-    request: PagedAndSortedRequest
+    request: GetPagedReviewRequest
   ): Promise<BaseResponseAPI<ReviewListItemResponse>> {
     return await funcHandlerAsync(
       async () => {
@@ -24,6 +25,12 @@ export class ReviewService {
             ApiUrl().REVIEW_URL(''),
             {
               params: {
+                variantId: request.VariantId,
+                userId: request.UserId,
+                status: request.Status,
+                minRating: request.MinRating,
+                maxRating: request.MaxRating,
+                hasImages: request.HasImages,
                 pageNumber: request.PageNumber ?? 1,
                 pageSize: request.PageSize ?? 10,
                 sortBy: request.SortBy ?? '',

@@ -15,6 +15,8 @@ import { TrendController } from 'src/api/controllers/trend.controller';
 import { ReviewController } from 'src/api/controllers/review.controller';
 import { RecommendationController } from 'src/api/controllers/recommendation.controller';
 import { ReviewModule } from './review.module';
+import { InventoryModule } from './inventory.module';
+import { InventoryController } from 'src/api/controllers/inventory.controller';
 
 const modules = [
   ConversationModule,
@@ -25,7 +27,8 @@ const modules = [
   MappingModule,
   AIModule,
   UserLogModule,
-  ReviewModule
+  ReviewModule,
+  InventoryModule
 ];
 
 @Module({
@@ -38,7 +41,8 @@ const modules = [
     ConversationController,
     TrendController,
     ReviewController,
-    RecommendationController
+    RecommendationController,
+    InventoryController
   ],
   exports: modules
 })

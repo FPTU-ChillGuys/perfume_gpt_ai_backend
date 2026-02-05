@@ -23,5 +23,7 @@ export class ProductController {
   async getProductsBySemanticSearch(@Query('searchText') searchText: string, @Query() request: PagedAndSortedRequest) {
     return this.productService.getProductsUsingSemanticSearch(searchText,request);
   }
+
+  
   
 }

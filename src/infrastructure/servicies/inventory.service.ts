@@ -6,17 +6,21 @@ import { InventoryStockResponse } from 'src/application/dtos/response/inventory-
 import { funcHandlerAsync } from '../utils/error-handler';
 import ApiUrl from '../api/api_url';
 import { firstValueFrom } from 'rxjs';
+import { extractTokenFromHeader } from '../utils/extract-token';
+import { authorizationHeader } from '../utils/header';
+import { Injectable } from '@nestjs/common';
 
+@Injectable()
 export class InventoryService {
   constructor(private readonly httpService: HttpService) {}
 
   //Get inventory methods here
   async getInventoryStock(
-    request: InventoryStockRequest
+    request: InventoryStockRequest,
+    authHeader: string
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        console.log(ApiUrl().PRODUCT_URL(''));
         const { data } = await firstValueFrom(
           this.httpService.get<BaseResponseAPI<PagedResult<InventoryStockResponse>>>(
             ApiUrl().INVENTORY_URL('stock'),
@@ -30,6 +34,9 @@ export class InventoryService {
                 sortBy: request.SortBy ?? '',
                 sortOrder: request.SortOrder ?? 'asc',
                 isDescending: request.IsDescending ?? false
+              },
+              headers: {
+                Authorization: authorizationHeader(authHeader)
               }
             }
           )

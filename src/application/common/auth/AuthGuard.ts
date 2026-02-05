@@ -50,6 +50,10 @@ export class AuthGuard implements CanActivate {
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
       request['user'] = payload;
+      const requiredRole = this.reflector.get<string>('role', context.getHandler());
+      if (requiredRole && payload.role !== requiredRole) {
+        throw new UnauthorizedException('Insufficient role');
+      }
     } catch (error) {
       console.error('JWT verification failed:', error);
       throw new UnauthorizedException();

@@ -12,20 +12,12 @@ export class UserLogSummary extends Common {
   userId!: string;
 
   @ApiProperty()
-  @Enum(() => PeriodEnum)
-  period!: PeriodEnum;
-
-  @ApiProperty()
   @Property()
   startDate!: Date;
 
   @ApiProperty()
   @Property()
   endDate!: Date;
-
-  @ApiProperty()
-  @Property()
-  totalLogs!: number;
 
   @ApiProperty({type: 'string' })
   @Property({ type: 'text' })

@@ -50,11 +50,13 @@ export class LogController {
       response.data!.prompt
     );
 
-    // Save summary to database
+    // Determine start date
+    const startDate = userLogRequest.startDate || this.userLogService.getFirstDateOfPeriod(userLogRequest.period!, userLogRequest.endDate!);
 
+    // Save summary to database
     await this.userLogService.saveUserLogSummary(
       userLogRequest.userId,
-      userLogRequest.startDate!,
+      startDate,
       userLogRequest.endDate!,
       aiResponse.data || ''
     );

@@ -520,13 +520,12 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "varchar(255)",
+          "type": "text",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
-          "nullable": false,
-          "length": 255,
-          "mappedType": "string"
+          "nullable": true,
+          "mappedType": "text"
         }
       },
       "name": "user_log",
@@ -589,20 +588,6 @@
           "length": 255,
           "mappedType": "string"
         },
-        "period": {
-          "name": "period",
-          "type": "text",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "enumItems": [
-            "weekly",
-            "monthly",
-            "yearly"
-          ],
-          "mappedType": "enum"
-        },
         "start_date": {
           "name": "start_date",
           "type": "timestamptz",
@@ -622,15 +607,6 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
-        },
-        "total_logs": {
-          "name": "total_logs",
-          "type": "int",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "mappedType": "integer"
         },
         "log_summary": {
           "name": "log_summary",

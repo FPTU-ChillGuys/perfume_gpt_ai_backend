@@ -24,8 +24,18 @@ import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-sum
 export class UserLogService {
   constructor(private unitOfWork: UnitOfWork) {}
 
-  async getUserLogsByUserId(userId: string): Promise<UserLog | null> {
-    return this.unitOfWork.UserLogRepo.findOne({ userId });
+  async getUserLogsByUserId(userId: string): Promise<BaseResponse<UserLog | null>> {
+    return await funcHandlerAsync(
+      async () => {
+        const userLog = await this.unitOfWork.UserLogRepo.findOne({ userId });
+        if (!userLog) {
+          return { success: false, error: 'User log not found', data: null };
+        }
+        return { success: true, data: userLog };
+      },
+      'Failed to get user log',
+      true
+    );
   }
 
   async createUserLogIfNotExist(userId: string): Promise<UserLog> {

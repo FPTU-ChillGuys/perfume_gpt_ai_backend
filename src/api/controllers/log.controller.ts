@@ -33,7 +33,7 @@ export class LogController {
   }
 
   @Public()
-  @Get('summary')
+  @Get('summarize')
   @ApiBaseResponse(String)
   async summarizeLogs(
     @Query() userLogRequest: UserLogRequest
@@ -70,7 +70,10 @@ export class LogController {
 
   // Xem chi tiet log nguoi dung
   @Public()
-  @Get()
+  @Get('summaries')
+  @ApiQuery({ name: 'userId', type: String })
+  @ApiQuery({ name: 'startDate', type: Date})
+  @ApiQuery({ name: 'endDate', type: Date, example: new Date()  })
   @ApiBaseResponse(UserLogSummaryResponse, true)
   async getUserLogsSummariesById(
     @Query('userId') userId: string,

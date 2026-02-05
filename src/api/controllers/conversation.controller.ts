@@ -20,6 +20,7 @@ import {
   convertToMessages,
   overrideMessagesToConversation
 } from 'src/infrastructure/utils/message-helper';
+import { convertToUTC } from 'src/infrastructure/utils/time-zone';
 
 @Controller('conversation')
 export class ConversationController {
@@ -107,8 +108,12 @@ export class ConversationController {
   async convserationTest(@Query('userId') userId: string, @Query('prompt') prompt: string) {
     // Lay log nguoi dung tu db trong khoan 1 thang
     const userLog = await this.logService.getUserLogSummaryReportByUserId(
-      userId
+      userId,
+      new Date(0),
+      convertToUTC(new Date())
     );
+
+    console.log('User log data:', userLog.data);
 
     // Tao prompt cho AI tu log nguoi dung
     const userLogPrompt = `Here are some of your recent activity logs that might be relevant to our conversation:\n${userLog.data}\nUse this information to provide more accurate and personalized responses. If the logs are not relevant, you can ignore them.`;

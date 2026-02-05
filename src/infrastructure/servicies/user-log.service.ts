@@ -24,7 +24,9 @@ import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-sum
 export class UserLogService {
   constructor(private unitOfWork: UnitOfWork) {}
 
-  async getUserLogsByUserId(userId: string): Promise<BaseResponse<UserLog | null>> {
+  async getUserLogsByUserId(
+    userId: string
+  ): Promise<BaseResponse<UserLog | null>> {
     return await funcHandlerAsync(
       async () => {
         const userLog = await this.unitOfWork.UserLogRepo.findOne({ userId });
@@ -103,14 +105,24 @@ export class UserLogService {
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
     return await funcHandlerAsync(
       async () => {
+        console.log(
+          `Start Date: ${
+            startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
+          }, End Date: ${
+            endDate ? endOfDay(convertToUTC(endDate)) : endOfDay(new Date())
+          }`
+        );
+
         const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({
           userId: userId,
-          startDate: startDate
-            ? startOfDay(convertToUTC(startDate))
-            : new Date(0),
-          endDate: endDate
-            ? endOfDay(convertToUTC(endDate))
-            : endOfDay(new Date())
+          startDate: {
+            $gte: startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
+          },
+          endDate: {
+            $lte: endDate
+              ? endOfDay(convertToUTC(endDate))
+              : endOfDay(convertToUTC(new Date()))
+          }
         });
         if (!userLogSummary) {
           return { success: false, error: 'User log summary not found' };

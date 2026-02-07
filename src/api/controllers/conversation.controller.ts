@@ -124,14 +124,12 @@ export class ConversationController {
     const userLogPrompt = `Here are some of your recent activity logs that might be relevant to our conversation:\n${userLog.data}\nUse this information to provide more accurate and personalized responses. If the logs are not relevant, you can ignore them.`;
 
     // Tam thoi lay order cua nguoi dung theo userID
-    const orders = await this.orderService.getOrdersByUserId(userId, new OrderRequest(), extractTokenFromHeader(request) ?? '');
-
-    const orderInfo = orders.payload ? orders.payload.items.map(order => `Order ID: ${order.id}, Items: ${order.itemCount}, Total: ${order.totalAmount}, Status: ${order.status}, Date: ${order.createdAt}`).join('\n') : 'No orders found.';
+    const orderReport = await this.orderService.createOrderReportFromGetOrderDetailsWithOrdersByUserId(userId, extractTokenFromHeader(request) ?? '');
 
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromPrompt(
       prompt,
-      `${ADVANCED_MATCHING_SYSTEM_PROMPT} \n ${userLogPrompt}`
+      `${ADVANCED_MATCHING_SYSTEM_PROMPT} \n ${userLogPrompt} \n Additionally, here is a summary of your recent orders that might be relevant to our conversation:\n${orderReport.payload}\n Use this information to provide more accurate and personalized responses. If the order information is not relevant, you can ignore it.`
     );
 
     if (!message.success) {

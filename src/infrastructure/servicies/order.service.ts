@@ -5,6 +5,7 @@ import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import {
+  OrderDetailResponse,
   OrderListItemResponse,
   OrderResponse
 } from 'src/application/dtos/response/order.response';
@@ -96,9 +97,8 @@ export class OrderService {
 
   async getOrderDetailsWithOrdersByUserId(
     userId: string,
-    orderIds: string[],
     authHeader: string
-  ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
+  ): Promise<BaseResponseAPI<OrderResponse[]>> {
     return await funcHandlerAsync(
       async () => {
         const orders = await this.getOrdersByUserId(
@@ -117,9 +117,34 @@ export class OrderService {
             orderDetailsList.push(orderDetails.payload);
           }
         }
-        return { success: true, data: orderDetailsList };
+        return { success: true, payload: orderDetailsList };
       },
       'Failed to fetch order details with orders by user id',
+      true
+    );
+  }
+
+  async createOrderReportFromGetOrderDetailsWithOrdersByUserId(
+    userId: string,
+    authHeader: string
+  ): Promise<BaseResponseAPI<string>> {
+    return await funcHandlerAsync(
+      async () => {
+        const orders = await this.getOrderDetailsWithOrdersByUserId(
+          userId,
+          authHeader
+        );
+        if (!orders.payload || orders.payload.length === 0) {
+          return { success: false, error: 'No orders found for the user' };
+        }
+        const report = orders.payload
+          .map((order: OrderResponse) => {
+            return `Order ID: ${order.id}\nItems:\n${order.orderDetails.map((item: OrderDetailResponse) => `- ${item.variantName} (Quantity: ${item.quantity}, Price: ${item.unitPrice})`).join('\n')}\nTotal Amount: ${order.totalAmount}\nStatus: ${order.orderStatus}\nCreated At: ${order.createdAt}\n`;
+          })
+          .join('\n----------------\n');
+        return { success: true, payload: report };
+      },
+      'Failed to create order report',
       true
     );
   }

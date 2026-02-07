@@ -17,6 +17,7 @@ import { RecommendationController } from 'src/api/controllers/recommendation.con
 import { ReviewModule } from './review.module';
 import { InventoryModule } from './inventory.module';
 import { InventoryController } from 'src/api/controllers/inventory.controller';
+import { OrderModule } from './order.module';
 
 const modules = [
   ConversationModule,
@@ -28,7 +29,8 @@ const modules = [
   AIModule,
   UserLogModule,
   ReviewModule,
-  InventoryModule
+  InventoryModule,
+  OrderModule
 ];
 
 @Module({

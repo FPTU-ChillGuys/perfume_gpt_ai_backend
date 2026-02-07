@@ -32,7 +32,7 @@ export class OrderController {
     @Param('userId') userId: string,
     @Query('orderRequest') orderRequest: OrderRequest
   ) {
-    return await this.orderService.getOrderByUserId(
+    return await this.orderService.getOrdersByUserId(
       userId,
       orderRequest,
       extractTokenFromHeader(request!) ?? ''

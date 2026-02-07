@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query, Req } from '@nestjs/common';
 import { ApiQuery } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
+import { Request } from 'express';
 import { Public } from 'src/application/common/Metadata';
 import {
   ConversationDto,
   ConversationRequestDto
 } from 'src/application/dtos/common/conversation.dto';
+import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
@@ -13,8 +15,10 @@ import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
+import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import {
   addMessageToMessages,
   convertToMessages,
@@ -27,7 +31,8 @@ export class ConversationController {
   constructor(
     @Inject(AI_SERVICE) private aiService: AIService,
     private conversationService: ConversationService,
-    private logService: UserLogService
+    private logService: UserLogService,
+    private orderService: OrderService
   ) {}
 
   @Public()
@@ -105,7 +110,7 @@ export class ConversationController {
   @Public()
   @Post('test')
   @ApiBaseResponse(ConversationRequestDto)
-  async convserationTest(@Query('userId') userId: string, @Query('prompt') prompt: string) {
+  async convserationTest(@Req() request: Request, @Query('userId') userId: string, @Query('prompt') prompt: string) {
     // Lay log nguoi dung tu db trong khoan 1 thang
     const userLog = await this.logService.getUserLogSummaryReportByUserId(
       userId,
@@ -117,6 +122,11 @@ export class ConversationController {
 
     // Tao prompt cho AI tu log nguoi dung
     const userLogPrompt = `Here are some of your recent activity logs that might be relevant to our conversation:\n${userLog.data}\nUse this information to provide more accurate and personalized responses. If the logs are not relevant, you can ignore them.`;
+
+    // Tam thoi lay order cua nguoi dung theo userID
+    const orders = await this.orderService.getOrdersByUserId(userId, new OrderRequest(), extractTokenFromHeader(request) ?? '');
+
+    const orderInfo = orders.payload ? orders.payload.items.map(order => `Order ID: ${order.id}, Items: ${order.itemCount}, Total: ${order.totalAmount}, Status: ${order.status}, Date: ${order.createdAt}`).join('\n') : 'No orders found.';
 
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromPrompt(

@@ -19,4 +19,9 @@ export class InventoryController {
         return this.inventoryService.getInventoryStock(inventoryStockRequest, extractTokenFromHeader(request!) ?? '');
     }
 
+    //Get batch 
+
+
+
+
 }

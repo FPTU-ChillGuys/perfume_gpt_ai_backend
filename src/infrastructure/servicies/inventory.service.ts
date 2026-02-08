@@ -9,6 +9,8 @@ import { firstValueFrom } from 'rxjs';
 import { extractTokenFromHeader } from '../utils/extract-token';
 import { authorizationHeader } from '../utils/header';
 import { Injectable } from '@nestjs/common';
+import { BatchResponse } from 'src/application/dtos/response/batch.response';
+import { BatchRequest } from 'src/application/dtos/request/batch.request';
 
 @Injectable()
 export class InventoryService {
@@ -22,18 +24,44 @@ export class InventoryService {
     return await funcHandlerAsync(
       async () => {
         const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<PagedResult<InventoryStockResponse>>>(
+          this.httpService.get<
+            BaseResponseAPI<PagedResult<InventoryStockResponse>>
+          >(ApiUrl().INVENTORY_URL('stock'), {
+            params: {
+              variantId: request.VariantId,
+              searchTerm: request.SearchTerm,
+              isLowStock: request.IsLowStock,
+              pageNumber: request.PageNumber ?? 1,
+              pageSize: request.PageSize ?? 10,
+              sortBy: request.SortBy ?? '',
+              sortOrder: request.SortOrder ?? 'asc',
+              isDescending: request.IsDescending ?? false
+            },
+            headers: {
+              Authorization: authorizationHeader(authHeader)
+            }
+          })
+        );
+        return data;
+      },
+      'Failed to fetch inventory stock',
+      true
+    );
+  }
+
+  //Get batch methods here
+  async getBatch(
+    request: BatchRequest,
+    authHeader: string
+  ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
+    return await funcHandlerAsync(
+      async () => {
+        const { data } = await firstValueFrom(
+          this.httpService.get<BaseResponseAPI<PagedResult<BatchResponse>>>(
             ApiUrl().INVENTORY_URL('stock'),
             {
               params: {
-                variantId: request.VariantId,
-                searchTerm: request.SearchTerm,
-                isLowStock: request.IsLowStock,
-                pageNumber: request.PageNumber ?? 1,
-                pageSize: request.PageSize ?? 10,
-                sortBy: request.SortBy ?? '',
-                sortOrder: request.SortOrder ?? 'asc',
-                isDescending: request.IsDescending ?? false
+                ...request
               },
               headers: {
                 Authorization: authorizationHeader(authHeader)

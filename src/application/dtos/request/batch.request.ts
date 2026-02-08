@@ -43,4 +43,9 @@ export class BatchRequest extends PagedAndSortedRequest {
 
     @ApiProperty({ required: false, description: 'Created at timestamp', example: '2024-01-01T00:00:00Z' })
     createdAt?: string;
+
+    constructor(init?: Partial<BatchRequest>) {
+        super();
+        Object.assign(this, init);
+    }
 }

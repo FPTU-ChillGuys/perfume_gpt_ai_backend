@@ -6,7 +6,6 @@ import { InventoryStockResponse } from 'src/application/dtos/response/inventory-
 import { funcHandlerAsync } from '../utils/error-handler';
 import ApiUrl from '../api/api_url';
 import { firstValueFrom } from 'rxjs';
-import { extractTokenFromHeader } from '../utils/extract-token';
 import { authorizationHeader } from '../utils/header';
 import { Injectable } from '@nestjs/common';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
@@ -58,7 +57,7 @@ export class InventoryService {
       async () => {
         const { data } = await firstValueFrom(
           this.httpService.get<BaseResponseAPI<PagedResult<BatchResponse>>>(
-            ApiUrl().INVENTORY_URL('stock'),
+            ApiUrl().INVENTORY_URL('batches'),
             {
               params: {
                 ...request
@@ -74,5 +73,55 @@ export class InventoryService {
       'Failed to fetch inventory stock',
       true
     );
+  }
+
+  async createReportFromBatchAndStock(authHeader: string): Promise<String> {
+    // Implementation for creating report from batch and stock
+    const stockResponse = await this.getInventoryStock(
+      new InventoryStockRequest({ PageNumber: 1, PageSize: 1000 }),
+      authHeader
+    );
+
+    const batchResponse = await this.getBatch(
+      new BatchRequest({ PageNumber: 1, PageSize: 1000 }),
+      authHeader
+    );
+
+    const report = this.createBatchAndStockReport(
+      stockResponse.payload?.items ?? [],
+      batchResponse.payload?.items ?? []
+    );
+
+    return report;
+  }
+
+  createBatchReport(batchResponse: BatchResponse[]): String {
+    // Implementation for creating batch report
+    const batchReport = batchResponse.map((batch) => {
+      return `Batch ID: ${batch.id}, Batch Code: ${batch.batchCode}, Import Quantity: ${batch.importQuantity}, Remaining Quantity: ${batch.remainingQuantity}, Manufacture Date: ${batch.manufactureDate}, Expiry Date: ${batch.expiryDate}, Created At: ${batch.createdAt}`;
+    });
+    return batchReport.join('\n');
+  }
+
+  createStockReport(stockResponse: InventoryStockResponse[]): String {
+    // Implementation for creating stock report
+    const stockReport = stockResponse.map((stock) => {
+      return `Variant ID: ${stock.variantId}, Variant SKU: ${stock.variantSku}, Product Name: ${stock.productName}, Concentration: ${stock.concentrationName}, Volume: ${stock.volumeMl}ml, Stock Quantity: ${stock.totalQuantity}, Low Stock Threshold: ${stock.lowStockThreshold}, Is Low Stock: ${stock.isLowStock}`;
+    });
+    return stockReport.join('\n');
+  }
+
+  createBatchAndStockReport(
+    stockResponse: InventoryStockResponse[],
+    batchResponse: BatchResponse[]
+  ) {
+    // Implementation for creating inventory report
+    const batchAndStockReport = [
+      '--- Inventory Stock Report ---',
+      this.createStockReport(stockResponse),
+      '--- Batch Report ---',
+      this.createBatchReport(batchResponse)
+    ].join('\n\n');
+    return batchAndStockReport;
   }
 }

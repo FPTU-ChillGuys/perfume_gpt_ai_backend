@@ -167,6 +167,29 @@ export class QuizService {
     }, 'Failed to get quiz question answer by id');
   }
 
+  async getQuizQuesAnwsByUserId(
+    userId: string
+  ): Promise<BaseResponse<QuizQuestionAnswerResponse>> {
+    return await funcHandlerAsync(async () => {
+      const quizQuestionAnswer =
+        await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({ userId });
+      if (!quizQuestionAnswer) {
+        return { success: false, error: 'Quiz question answer not found' };
+      }
+      return {
+        success: true,
+        data: QuizQuestionAnswerMapper.toResponse(quizQuestionAnswer, true)
+      };
+    }
+    , 'Failed to get quiz question answer by user id');
+  }
+
+  async checkExistQuizQuesAnwsByUserId(userId: string): Promise<boolean> {
+    const quizQuestionAnswer =
+      await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({ userId });
+    return quizQuestionAnswer !== null;
+  }
+
   async mappingFromRequestToEntity(
     request: QuizQuesAnwsRequest
   ): Promise<QuizQuestionAnswer> {

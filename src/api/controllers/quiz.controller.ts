@@ -23,6 +23,7 @@ import { QuizService } from 'src/infrastructure/servicies/quiz.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { quizPrompt } from 'src/infrastructure/utils/convert-to-prompt';
 
+@Public()
 @Controller('quizzes')
 export class QuizController {
   constructor(
@@ -32,11 +33,11 @@ export class QuizController {
 
   // Lay tat ca cau hoi quiz
   @Public()
-  @Get("questions")
+  @Get('questions')
   @ApiBaseResponse(QuizQuestion)
-  async getAllQuizzes() : Promise<BaseResponse<QuizQuestionResponse[]>> {
+  async getAllQuizzes(): Promise<BaseResponse<QuizQuestionResponse[]>> {
     const quizQues = await this.quizService.getAllQuizQues();
-    
+
     if (!quizQues.success) {
       return { success: false, error: 'Failed to get quiz questions' };
     }
@@ -46,9 +47,18 @@ export class QuizController {
 
   // Tao cau hoi quiz
   @Public()
-  @Post("questions")
+  @Post('questions')
   async createQuizQues(@Body() quizQuestionRequest: QuizQuestionRequest) {
     return this.quizService.addQuizQues(quizQuestionRequest);
+  }
+
+  // Check xem co phai nguoi dung tra loi quiz lan dau khong
+  @Public()
+  @Get('user/:userId/check-first-time')
+  async checkFirstTime(@Param('userId') userId: string) {
+    const isFirstTime =
+      await this.quizService.checkExistQuizQuesAnwsByUserId(userId);
+    return { success: true, data: isFirstTime };
   }
 
   // Tao nhieu cau hoi quiz
@@ -69,7 +79,7 @@ export class QuizController {
   async updateQuizAnswer(
     @Param('id') id: string,
     @Body() quizAnswerRequest: QuizAnswerRequest[]
-  ) : Promise<BaseResponse<QuizQuestionResponse>> {
+  ): Promise<BaseResponse<QuizQuestionResponse>> {
     return this.quizService.updateAnswer(id, quizAnswerRequest);
   }
 
@@ -77,13 +87,14 @@ export class QuizController {
   @Public()
   @Post('user')
   @ApiBaseResponse(String)
-  @ApiBody({ schema: { example: [{ questionId: 'string', answerId: 'string' }] } })
+  @ApiBody({
+    schema: { example: [{ questionId: 'string', answerId: 'string' }] }
+  })
   async chatQuiz(
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-
     // Lay cau hoi quiz va cau tra loi tuong ung
-    const questionIds = quizAnswers.map(qa => qa.questionId);
+    const questionIds = quizAnswers.map((qa) => qa.questionId);
     const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
     if (!quizQueses.success) {
       return { success: false, error: 'Failed to get quiz question' };
@@ -95,9 +106,14 @@ export class QuizController {
       for (let i = 0; i < quizQueses.data.length; i++) {
         const quizQues = quizQueses.data[i];
         if (quizQues.answers && quizQues.question) {
-          const answer = quizQues.answers.find(ans => ans.id === quizAnswers[i].answerId);
+          const answer = quizQues.answers.find(
+            (ans) => ans.id === quizAnswers[i].answerId
+          );
           if (answer && answer.answer) {
-            quesAnses.push({ question: quizQues.question, answer: answer.answer });
+            quesAnses.push({
+              question: quizQues.question,
+              answer: answer.answer
+            });
           }
         }
       }

@@ -10,7 +10,7 @@ import { UserSearchLog } from 'src/domain/entities/user-search.log.entity';
 
 @Injectable()
 export class UserLogRepository extends SqlEntityRepository<UserLog> {
-  em = this.getEntityManager();
+  em = this.getEntityManager().fork();
 
   createUserLog(userId: string): UserLog {
     const userLog = new UserLog();

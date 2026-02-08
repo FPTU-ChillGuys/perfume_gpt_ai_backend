@@ -18,6 +18,7 @@ import { ReviewModule } from './review.module';
 import { InventoryModule } from './inventory.module';
 import { InventoryController } from 'src/api/controllers/inventory.controller';
 import { OrderModule } from './order.module';
+import { AIAcceptanceModule } from './ai-acceptance.module';
 
 const modules = [
   ConversationModule,
@@ -30,7 +31,8 @@ const modules = [
   UserLogModule,
   ReviewModule,
   InventoryModule,
-  OrderModule
+  OrderModule,
+  AIAcceptanceModule
 ];
 
 @Module({
@@ -44,7 +46,7 @@ const modules = [
     TrendController,
     ReviewController,
     RecommendationController,
-    InventoryController
+    InventoryController,
   ],
   exports: modules
 })

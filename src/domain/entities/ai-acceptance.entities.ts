@@ -1,8 +1,10 @@
-import { Property } from '@mikro-orm/core';
+import { BaseEntity, Entity, Property } from '@mikro-orm/core';
 import { ApiProperty } from '@nestjs/swagger';
-import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { AIAcceptanceRepository } from 'src/infrastructure/repositories/ai-acceptance.repository';
+import { Common } from './common/common.entities';
 
-export class AIAcceptance extends BaseResponse {
+@Entity({ repository: () => AIAcceptanceRepository })
+export class AIAcceptance extends Common {
   @ApiProperty()
   @Property()
   userId: string;

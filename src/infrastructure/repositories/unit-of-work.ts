@@ -5,6 +5,7 @@ import { QuizQuestionRepository } from './quiz-question.repository';
 import { AIReviewSummaryRepository } from './review-summary.repository';
 import { UserLogRepository } from './user-log.repository';
 import { UserLogSummaryRepository } from './user-log-summary.repository';
+import { AIAcceptanceRepository } from './ai-acceptance.repository';
 
 @Injectable()
 export class UnitOfWork {
@@ -14,7 +15,8 @@ export class UnitOfWork {
     private readonly aiQuizQuestionAnswerRepository: QuizQuestionAnswerRepository,
     private readonly userLogRepository: UserLogRepository,
     private readonly aiReviewSummaryRepository: AIReviewSummaryRepository,
-    private readonly userLogSummaryRepository: UserLogSummaryRepository
+    private readonly userLogSummaryRepository: UserLogSummaryRepository,
+    private readonly aiAcceptanceRepository: AIAcceptanceRepository
   ) {}
 
   get AIConversationRepo(): ConversationRepository {
@@ -34,5 +36,9 @@ export class UnitOfWork {
   }
   get UserLogSummaryRepo(): UserLogSummaryRepository {
     return this.userLogSummaryRepository;
+  }
+
+  get AIAcceptanceRepo(): AIAcceptanceRepository {
+    return this.aiAcceptanceRepository;
   }
 }

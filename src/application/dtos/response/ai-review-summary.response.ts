@@ -1,8 +1,9 @@
 import { Sentiment } from 'src/domain/enum/sentiment.enum';
 import { CommonResponse } from './common/common.response';
 import { ApiProperty } from '@nestjs/swagger';
+import { BaseEntity } from '@mikro-orm/core';
 
-export class AIReviewSummaryResponse extends CommonResponse {
+export class AIReviewSummaryResponse extends BaseEntity {
   @ApiProperty()
   productId!: string;
   @ApiProperty()

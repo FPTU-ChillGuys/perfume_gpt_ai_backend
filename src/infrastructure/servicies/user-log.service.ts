@@ -332,6 +332,15 @@ export class UserLogService {
     }, 'Failed to summarize user logs');
   }
 
+  // Tam thoi lay tat ca userId tu log
+  async getAllUserIdsFromLogs(): Promise<string[]> {
+    const userLogs = await this.unitOfWork.UserLogRepo.getAllUserLogs();
+    const userIds = userLogs
+      .map((log) => log.userId)
+      .filter((userId): userId is string => typeof userId === 'string');
+    return Array.from(new Set(userIds));
+  }
+
   getFirstDateOfPeriod(period: PeriodEnum, endDate: Date): Date {
     const endDateObj = new Date(endDate);
     let startDate = new Date(endDateObj);

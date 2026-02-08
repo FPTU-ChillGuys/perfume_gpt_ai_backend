@@ -11,6 +11,10 @@ export class UserLogRequest {
   endDate: Date = endOfDay(new Date());
   @ApiProperty()
   startDate?: Date;
+
+  constructor(init ?: Partial<UserLogRequest>) {
+    Object.assign(this, init);
+  }
 }
 
 export class AllUserLogRequest {
@@ -20,4 +24,8 @@ export class AllUserLogRequest {
   endDate: Date;
   @ApiProperty()
   startDate?: Date;
+
+  constructor(init ?: Partial<AllUserLogRequest>) {
+    Object.assign(this, init);
+  }
 }

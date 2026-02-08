@@ -12,6 +12,7 @@ import { APP_GUARD } from '@nestjs/core';
 import * as fs from 'fs';
 import { mikro } from '@automapper/mikro';
 import { CamelCaseNamingConvention } from '@automapper/core';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -43,7 +44,8 @@ import { CamelCaseNamingConvention } from '@automapper/core';
           audience: config.get<string>('JWT_AUDIENCE')
         }
       })
-    })
+    }),
+    ScheduleModule.forRoot()
   ],
   controllers: [AppController],
   providers: [

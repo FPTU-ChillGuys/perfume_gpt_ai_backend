@@ -19,6 +19,7 @@ import { InventoryModule } from './inventory.module';
 import { InventoryController } from 'src/api/controllers/inventory.controller';
 import { OrderModule } from './order.module';
 import { AIAcceptanceModule } from './ai-acceptance.module';
+import { AIAcceptanceController } from 'src/api/controllers/ai-acceptance.controller';
 
 const modules = [
   ConversationModule,
@@ -47,6 +48,7 @@ const modules = [
     ReviewController,
     RecommendationController,
     InventoryController,
+    AIAcceptanceController
   ],
   exports: modules
 })

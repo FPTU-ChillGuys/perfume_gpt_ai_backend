@@ -35,6 +35,7 @@ export class ConversationController {
     private orderService: OrderService
   ) {}
 
+  // Get all conversations
   @Public()
   @Get()
   @ApiBaseResponse(ConversationDto)
@@ -42,6 +43,7 @@ export class ConversationController {
     return await this.conversationService.getAllConversations();
   }
 
+  // Get conversation by ID
   @Public()
   @Get(':id')
   @ApiQuery({ name: 'id', type: String })

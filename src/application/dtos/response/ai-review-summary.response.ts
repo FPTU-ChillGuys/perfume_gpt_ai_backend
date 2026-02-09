@@ -3,7 +3,7 @@ import { CommonResponse } from './common/common.response';
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from '@mikro-orm/core';
 
-export class AIReviewSummaryResponse extends BaseEntity {
+export class AIReviewSummaryResponse extends CommonResponse {
   @ApiProperty()
   productId!: string;
   @ApiProperty()

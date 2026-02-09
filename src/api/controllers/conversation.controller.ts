@@ -68,6 +68,13 @@ export class ConversationController {
   }
 
   //Natural language chat v1
+  /**
+   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
+   * 
+   * @param request 
+   * @param conversation 
+   * @returns 
+   */
   @Public()
   @Post('chat/v1')
   @ApiBaseResponse(ConversationRequestDto)
@@ -81,6 +88,9 @@ export class ConversationController {
 
     //---------------------V1-------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
+    /* 
+      Cách này lấy log tóm tắt từ user log service (Nhanh hơn nhưng tùy thuộc nội dung tóm tắt của service)
+    */
     const userLog = await this.logService.getUserLogSummaryReportByUserId(
       conversation.userId
     );
@@ -139,6 +149,13 @@ export class ConversationController {
     };
   }
 
+  /**
+   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
+   * 
+   * @param request 
+   * @param conversation 
+   * @returns 
+   */
   @Public()
   @Post('chat/v2')
   @ApiBaseResponse(ConversationRequestDto)
@@ -152,6 +169,9 @@ export class ConversationController {
 
     //---------------------V2-------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
+    /* 
+      Cách này lấy log trực tiếp từ user log service (Chậm hơn nhưng luôn đầy đủ nội dung)
+    */
     const userLogResponse = await this.logService.collectAndSummarizeUserLogs({
       userId: conversation.userId,
       period: PeriodEnum.MONTHLY,
@@ -211,6 +231,13 @@ export class ConversationController {
   }
 
   //Test response conversation with user log
+  /**
+   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
+   * 
+   * @param request 
+   * @param conversation 
+   * @returns 
+   */
   @Public()
   @Post('test/v1')
   @ApiBaseResponse(ConversationRequestDto)
@@ -264,6 +291,13 @@ export class ConversationController {
   @Public()
   @Post('test/v2')
   @ApiBaseResponse(ConversationRequestDto)
+  /**
+   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
+   * 
+   * @param request 
+   * @param conversation 
+   * @returns 
+   */
   async convserationV2Test(
     @Req() request: Request,
     @Query('userId') userId: string,

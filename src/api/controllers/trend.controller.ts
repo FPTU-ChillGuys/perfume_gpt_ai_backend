@@ -25,7 +25,7 @@ export class TrendController {
     @Body() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<string>> {
     const response =
-      await this.userLogService.collectAndSummarizeAllUsersLogs(allUserLogRequest);
+      await this.userLogService.getReportAndPromptAllUsersLogs(allUserLogRequest);
 
     if (!response.success) {
       return { success: false, error: 'Failed to summarize user logs' };

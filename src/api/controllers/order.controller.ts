@@ -11,6 +11,7 @@ import { Request } from 'express';
 import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { OrderResponse } from 'src/application/dtos/response/order.response';
+import { orderSummaryPrompt } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
@@ -24,7 +25,7 @@ export class OrderController {
     @Inject(AI_SERVICE) private aiService: AIService
   ) {}
 
-  @Get('')
+  @Get()
   @ApiBaseResponse(PagedResult<OrderResponse>)
   //Get orders
   async getAllOrders(
@@ -59,8 +60,10 @@ export class OrderController {
     @Req() request: Request,
     @Query('userId') userId: string
   ) {
+
+    // Lay tat ca don hang cua user
     const ordersResponse =
-      await this.orderService.createOrderReportFromGetOrderDetailsWithOrdersByUserId(
+      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
         userId,
         extractTokenFromHeader(request!) ?? ''
       );
@@ -72,9 +75,10 @@ export class OrderController {
       };
     }
 
-    const aiPrompt = `Generate a comprehensive summary of the following order details, highlighting key insights such as purchasing patterns, frequently ordered items, and any notable trends that could inform future business strategies:\n\n${ordersResponse.payload}`;
-
-    const aiResponse = await this.aiService.textGenerateFromPrompt(aiPrompt);
+    // Goi AI service de tao summary
+    const aiResponse = await this.aiService.textGenerateFromPrompt(
+      orderSummaryPrompt(ordersResponse.payload ?? '')
+    );
 
     if (!aiResponse.success) {
       return {

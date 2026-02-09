@@ -20,6 +20,10 @@ export class InventoryController {
     @Inject(AI_SERVICE) private readonly aiService: AIService
   ) {}
 
+  /** 
+   * Lay stock hang ton kho
+   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
+   */
   @Get('stock')
   @ApiBaseResponse(PagedResult<InventoryStockResponse>)
   async getInventoryStock(
@@ -32,7 +36,10 @@ export class InventoryController {
     );
   }
 
-  //Get batch
+  /** 
+   * Lay batch
+   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
+   */
   @Get('batches')
   @ApiBaseResponse(PagedResult<BatchResponse>)
   async getBatch(@Req() request: Request, @Query() batchRequest: BatchRequest) {
@@ -42,13 +49,34 @@ export class InventoryController {
     );
   }
 
+  /** 
+   * Lay stock hang ton kho
+   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
+   */
+  @Get('report')
+  @ApiBaseResponse(String)
+  //Get AI generated inventory report
+  async getInventoryReport(
+    @Req() request: Request,
+  ) {
+    const authHeader = extractTokenFromHeader(request!) ?? '';
+
+    // Fetch stock and batch data
+    const report =
+      await this.inventoryService.createReportFromBatchAndStock(authHeader);
+
+    return { success: true, data: report };
+  }
+
+  /** 
+   * Lay stock hang ton kho
+   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
+   */
   @Get('report/ai')
   @ApiBaseResponse(String)
   //Get AI generated inventory report
   async getAIInventoryReport(
     @Req() request: Request,
-    @Query() inventoryStockRequest: InventoryStockRequest,
-    @Query() batchRequest: BatchRequest
   ) {
     const authHeader = extractTokenFromHeader(request!) ?? '';
 

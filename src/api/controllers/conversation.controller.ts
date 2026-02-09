@@ -172,7 +172,7 @@ export class ConversationController {
     /* 
       Cách này lấy log trực tiếp từ user log service (Chậm hơn nhưng luôn đầy đủ nội dung)
     */
-    const userLogResponse = await this.logService.collectAndSummarizeUserLogs({
+    const userLogResponse = await this.logService.getReportAndPromptUserLogs({
       userId: conversation.userId,
       period: PeriodEnum.MONTHLY,
       endDate: convertToUTC(new Date()),
@@ -305,7 +305,7 @@ export class ConversationController {
   ) {
     // -----------------------------Test V1 -------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
-    const userLogResponse = await this.logService.collectAndSummarizeUserLogs({
+    const userLogResponse = await this.logService.getReportAndPromptUserLogs({
       userId: userId,
       period: PeriodEnum.MONTHLY,
       endDate: convertToUTC(new Date()),

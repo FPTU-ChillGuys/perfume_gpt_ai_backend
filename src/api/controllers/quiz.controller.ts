@@ -22,13 +22,15 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { QuizService } from 'src/infrastructure/servicies/quiz.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { quizPrompt } from 'src/application/constant/prompts';
+import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 
 @Public()
 @Controller('quizzes')
 export class QuizController {
   constructor(
     @Inject(AI_SERVICE) private aiService: AIService,
-    private quizService: QuizService
+    private quizService: QuizService,
+    private logService: UserLogService
   ) {}
 
   // Lay tat ca cau hoi quiz
@@ -91,6 +93,7 @@ export class QuizController {
     schema: { example: [{ questionId: 'string', answerId: 'string' }] }
   })
   async chatQuiz(
+    @Param('userId') userId: string, 
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
     // Lay cau hoi quiz va cau tra loi tuong ung
@@ -121,6 +124,26 @@ export class QuizController {
 
     // Generate prompt
     const prompt = quizPrompt(quesAnses);
+
+    // Them quiz question answer detail vao user log
+    const quizQuesAnsDetail = new QuizQuesAnwsRequest({
+      userId: userId,
+      details: quizAnswers
+    });
+
+    const savedQuizQuesAnsResponse = await this.quizService.addQuizQuesAnws(
+      quizQuesAnsDetail
+    );
+
+    if (!savedQuizQuesAnsResponse.success) {
+      return { success: false, error: 'Failed to save quiz question answers' };
+    }
+
+    // Save user quiz log
+    await this.logService.addQuizQuesAnsDetailToUserLog(
+      userId,
+      savedQuizQuesAnsResponse.data?.id || ''
+    );
 
     // Get AI response
     const aiResponse = await this.aiService.textGenerateFromPrompt(

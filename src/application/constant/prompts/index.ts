@@ -20,7 +20,8 @@ export {
   trendForecastingPrompt,
   reviewSummaryPrompt,
   repurchaseRecommendationPrompt,
-  aiRecommendationPrompt
+  aiRecommendationPrompt,
+  orderSummaryPrompt
 } from './controller.prompt';
 
 // Service prompts

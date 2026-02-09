@@ -60,6 +60,12 @@ export const repurchaseRecommendationPrompt = (summaryData: string): string =>
   `Based on the following summarized user logs, provide personalized repurchase recommendations for products the users have shown interest in. Consider their preferences, past interactions, and any emerging trends that could influence their purchasing decisions:\n${summaryData}`;
 
 /**
+ * Prompt tạo tóm tắt đơn hàng bằng AI
+ */
+export const orderSummaryPrompt = (orderDetails: string): string =>
+  `Generate a comprehensive summary of the following order details, highlighting key insights such as purchasing patterns, frequently ordered items, and any notable trends that could inform future business strategies:\n\n${orderDetails}`;
+
+/**
  * Prompt gợi ý AI dựa trên log người dùng
  */
 export const aiRecommendationPrompt = (summaryData: string): string =>

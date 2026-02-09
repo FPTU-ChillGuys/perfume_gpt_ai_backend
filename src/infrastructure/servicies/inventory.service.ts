@@ -75,6 +75,11 @@ export class InventoryService {
     );
   }
 
+  /**
+   * Tao report tu batch va stock (Lay du lieu tu 2 API tren)
+   * @param authHeader 
+   * @returns 
+   */
   async createReportFromBatchAndStock(authHeader: string): Promise<String> {
     // Implementation for creating report from batch and stock
     const stockResponse = await this.getInventoryStock(

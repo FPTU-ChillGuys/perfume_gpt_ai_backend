@@ -24,6 +24,4 @@ export class ProductController {
     return this.productService.getProductsUsingSemanticSearch(searchText,request);
   }
 
-  
-  
 }

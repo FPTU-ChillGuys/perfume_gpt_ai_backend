@@ -29,7 +29,7 @@ export class RecommendationController {
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
     const response =
-      await this.userLogService.collectAndSummarizeUserLogs(userLogRequest);
+      await this.userLogService.getReportAndPromptUserLogs(userLogRequest);
 
     if (!response.success) {
       return { success: false, error: 'Failed to summarize user logs' };
@@ -64,7 +64,7 @@ export class RecommendationController {
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
     const response =
-      await this.userLogService.collectAndSummarizeUserLogs(userLogRequest);
+      await this.userLogService.getReportAndPromptUserLogs(userLogRequest);
 
     if (!response.success) {
       return { success: false, error: 'Failed to summarize user logs' };

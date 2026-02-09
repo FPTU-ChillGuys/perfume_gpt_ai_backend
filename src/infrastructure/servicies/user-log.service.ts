@@ -20,6 +20,9 @@ import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-s
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import { generateSummaryPrompt } from 'src/application/constant/prompts';
+import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
+import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
+import { QuizQuestionAnswerDetail } from 'src/domain/entities/quiz-question-answer-detail.entity';
 
 @Injectable()
 export class UserLogService {
@@ -73,6 +76,23 @@ export class UserLogService {
     return this.unitOfWork.UserLogRepo.addSearchLogToUserLog(
       user.id,
       searchText
+    );
+  }
+
+  async addQuizQuesAnsDetailToUserLog(
+    userId: string,
+    quizQuesAnsId: string
+  ): Promise<UserQuizLog[]> {
+    // Response existing user log or create new one
+    const user = await this.createUserLogIfNotExist(userId);
+
+    const quizQuesAnsDetail = await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne(
+      { id: quizQuesAnsId }
+    );
+
+    return this.unitOfWork.UserLogRepo.addQuizQuesAnsDetailsLogToUserLog(
+      user.id,
+      quizQuesAnsDetail?.details.getItems() || []
     );
   }
 
@@ -172,11 +192,13 @@ export class UserLogService {
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
-  async collectAndSummarizeUserLogs(
+  async getReportAndPromptUserLogs(
     userLogRequest: UserLogRequest
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
     return await funcHandlerAsync(
       async () => {
+
+        // Xu ly neu khong co startDate thi lay theo period
         if (!userLogRequest.startDate) {
           userLogRequest.startDate = this.getFirstDateOfPeriod(
             userLogRequest.period,
@@ -242,7 +264,8 @@ export class UserLogService {
           endOfDay(convertToUTC(userLogRequest.endDate))
         );
 
-        const response = this.convertUserLogsToString(
+        // Tao response tu cac log
+        const response = this.convertUserLogsToReport(
           searchContents,
           messageContents,
           quizContents,
@@ -258,7 +281,7 @@ export class UserLogService {
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
-  async collectAndSummarizeAllUsersLogs(
+  async getReportAndPromptAllUsersLogs(
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
     return await funcHandlerAsync(async () => {
@@ -327,7 +350,7 @@ export class UserLogService {
           ) + '\n';
 
         response =
-          this.convertUserLogsToString(
+          this.convertUserLogsToReport(
             searchContents,
             messageContents,
             quizContents,
@@ -367,7 +390,8 @@ export class UserLogService {
     return startDate;
   }
 
-  convertUserLogsToString(
+  // Chuyen doi cac log nguoi dung thanh chuoi de tao report
+  convertUserLogsToReport(
     searchContents: string,
     messageContents: string,
     quizContents: string,

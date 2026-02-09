@@ -107,7 +107,7 @@ export class ConversationController {
 
     // Ket hop prompt tu log nguoi dung va report don hang
     const combinedPrompt = `${userLogPromptText}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.payload ?? '')}`;
+    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}`;
 
     //-------------------------------------------------------------
 
@@ -172,7 +172,7 @@ export class ConversationController {
     /* 
       Cách này lấy log trực tiếp từ user log service (Chậm hơn nhưng luôn đầy đủ nội dung)
     */
-    const userLogResponse = await this.logService.getReportAndPromptUserLogs({
+    const userLogResponse = await this.logService.getReportAndPromptSummaryUserLogs({
       userId: conversation.userId,
       period: PeriodEnum.MONTHLY,
       endDate: convertToUTC(new Date()),
@@ -188,7 +188,7 @@ export class ConversationController {
     // Ket hop prompt tu log nguoi dung va report don hang
     // Lay response tu user log service
     const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.payload ?? '')}`;
+    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}`;
 
     //-------------------------------------------------------------
 
@@ -267,7 +267,7 @@ export class ConversationController {
       );
 
     const combinedPrompt = `${userLogPromptText}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.payload ?? '')}`;
+    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}`;
 
     //-------------------------------------------------------------
 
@@ -305,7 +305,7 @@ export class ConversationController {
   ) {
     // -----------------------------Test V1 -------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
-    const userLogResponse = await this.logService.getReportAndPromptUserLogs({
+    const userLogResponse = await this.logService.getReportAndPromptSummaryUserLogs({
       userId: userId,
       period: PeriodEnum.MONTHLY,
       endDate: convertToUTC(new Date()),
@@ -320,7 +320,7 @@ export class ConversationController {
       );
 
     const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.payload ?? '')}`;
+    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}`;
 
     //-------------------------------------------------------------
 

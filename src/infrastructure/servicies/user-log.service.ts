@@ -192,7 +192,7 @@ export class UserLogService {
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
-  async getReportAndPromptUserLogs(
+  async getReportAndPromptSummaryUserLogs(
     userLogRequest: UserLogRequest
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
     return await funcHandlerAsync(
@@ -281,7 +281,7 @@ export class UserLogService {
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
-  async getReportAndPromptAllUsersLogs(
+  async getReportAndPromptSummaryAllUsersLogs(
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
     return await funcHandlerAsync(async () => {

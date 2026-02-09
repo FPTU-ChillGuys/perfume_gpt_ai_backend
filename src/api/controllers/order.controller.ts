@@ -77,7 +77,7 @@ export class OrderController {
 
     // Goi AI service de tao summary
     const aiResponse = await this.aiService.textGenerateFromPrompt(
-      orderSummaryPrompt(ordersResponse.payload ?? '')
+      orderSummaryPrompt(ordersResponse.data ?? '')
     );
 
     if (!aiResponse.success) {

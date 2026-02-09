@@ -30,7 +30,7 @@ export class LogController {
 
     // Lay va tom tat log nguoi dung
     const response =
-      await this.userLogService.getReportAndPromptUserLogs(userLogRequest);
+      await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
 
     return {
       success: response.success,
@@ -46,7 +46,7 @@ export class LogController {
     @Query() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
     const response =
-      await this.userLogService.getReportAndPromptUserLogs(userLogRequest);
+      await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
 
     if (!response.success) {
       return { success: false, error: 'Failed to summarize user logs' };
@@ -88,7 +88,7 @@ export class LogController {
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<string>> {
     const response =
-      await this.userLogService.getReportAndPromptAllUsersLogs(allUserLogRequest);
+      await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
 
     if (!response.success) {
       return { success: false, error: 'Failed to summarize user logs' };
@@ -124,7 +124,7 @@ export class LogController {
       });
 
       const response =
-        await this.userLogService.getReportAndPromptUserLogs(userLogRequest);
+        await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
 
       if (!response.success) {
         console.log(`Failed to summarize logs for userId: ${userId}`);
@@ -183,7 +183,7 @@ export class LogController {
       });
 
       const response =
-        await this.userLogService.getReportAndPromptUserLogs(userLogRequest);
+        await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
 
       if (!response.success) {
         console.log(`Failed to summarize logs for userId: ${userId}`);

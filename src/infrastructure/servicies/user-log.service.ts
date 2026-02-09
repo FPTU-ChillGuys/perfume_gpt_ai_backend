@@ -19,6 +19,7 @@ import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
+import { generateSummaryPrompt } from 'src/application/constant/prompts';
 
 @Injectable()
 export class UserLogService {
@@ -226,7 +227,7 @@ export class UserLogService {
           .join('; ');
 
         // Tao prompt de tong hop log
-        const prompt = this.generateSummaryPrompt(
+        const prompt = generateSummaryPrompt(
           searchContents,
           messageContents,
           quizContents,
@@ -310,7 +311,7 @@ export class UserLogService {
 
         // Tao prompt de tong hop log
         prompt +=
-          this.generateSummaryPrompt(
+          generateSummaryPrompt(
             searchContents,
             messageContents,
             quizContents,
@@ -357,28 +358,6 @@ export class UserLogService {
       throw new Error('Invalid period enum');
     }
     return startDate;
-  }
-
-  //Tao prompt de tong hop log
-  generateSummaryPrompt(
-    searchContents: string,
-    messageContents: string,
-    quizContents: string,
-    startDate: Date,
-    endDate: Date
-  ): string {
-    let prompt = `Summarize the user's activities from ${startDate.toDateString()} to ${new Date(endDate).toDateString()}.\n`;
-    if (searchContents) {
-      prompt += `Search activities: ${searchContents}\n`;
-    }
-    if (messageContents) {
-      prompt += `Messages: ${messageContents}\n`;
-    }
-    if (quizContents) {
-      prompt += `Quiz answers: ${quizContents}\n`;
-    }
-    prompt += `Provide a concise summary of the user's activities during this period.`;
-    return prompt;
   }
 
   convertUserLogsToString(

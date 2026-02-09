@@ -2,6 +2,7 @@ import { Controller, Get, Inject, Query } from '@nestjs/common';
 import { Public } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
+import { reviewSummaryPrompt } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
@@ -34,12 +35,8 @@ export class ReviewController {
         const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
         const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
 
-        const summaryPrompt = 
-        `Summarize the following product reviews, highlighting key points such as common praises, frequent complaints, and overall sentiment. Provide insights that could help improve the product or inform potential buyers:\n
-        ${reviewsText}`;
-
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            summaryPrompt
+            reviewSummaryPrompt(reviewsText)
         );
 
         if (!summaryResponse.success) {
@@ -62,12 +59,8 @@ export class ReviewController {
         const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
         const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
 
-        const summaryPrompt = 
-        `Summarize the following product reviews, highlighting key points such as common praises, frequent complaints, and overall sentiment. Provide insights that could help improve the product or inform potential buyers:\n
-        ${reviewsText}`;
-
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            summaryPrompt
+            reviewSummaryPrompt(reviewsText)
         );
 
         if (!summaryResponse.success) {

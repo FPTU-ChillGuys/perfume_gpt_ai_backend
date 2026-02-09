@@ -15,13 +15,13 @@ import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
 import { QuizQuestionAnswerMapper, QuizQuestionMapper } from 'src/application/mapping';
-import { QUIZ_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
+import { QUIZ_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { QuizService } from 'src/infrastructure/servicies/quiz.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { quizPrompt } from 'src/infrastructure/utils/convert-to-prompt';
+import { quizPrompt } from 'src/application/constant/prompts';
 
 @Public()
 @Controller('quizzes')

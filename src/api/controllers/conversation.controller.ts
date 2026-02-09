@@ -10,7 +10,13 @@ import {
 import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
-import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
+import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/application/constant/prompts';
+import {
+  userLogPrompt,
+  orderReportPrompt,
+  conversationSystemPrompt,
+  conversationTestSystemPrompt
+} from 'src/application/constant/prompts';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
@@ -68,13 +74,13 @@ export class ConversationController {
     );
 
     // Tao prompt cho AI tu log nguoi dung
-    const userLogPrompt = `Here are some of your recent activity logs that might be relevant to our conversation:\n${userLog.data}\nUse this information to provide more accurate and personalized responses. If the logs are not relevant, you can ignore them.`;
+    const userLogPromptText = userLogPrompt(userLog.data ?? '');
 
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
       Output.object(searchOutput),
-      `${ADVANCED_MATCHING_SYSTEM_PROMPT} \n ${userLogPrompt}`
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, userLogPromptText)
     );
 
     if (!message.success) {
@@ -123,7 +129,7 @@ export class ConversationController {
     console.log('User log data:', userLog.data);
 
     // Tao prompt cho AI tu log nguoi dung
-    const userLogPrompt = `Here are some of your recent activity logs that might be relevant to our conversation:\n${userLog.data}\nUse this information to provide more accurate and personalized responses. If the logs are not relevant, you can ignore them.`;
+    const userLogPromptText = userLogPrompt(userLog.data ?? '');
 
     // Tam thoi lay order cua nguoi dung theo userID
     const orderReport = await this.orderService.createOrderReportFromGetOrderDetailsWithOrdersByUserId(userId, extractTokenFromHeader(request) ?? '');
@@ -131,7 +137,11 @@ export class ConversationController {
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromPrompt(
       prompt,
-      `${ADVANCED_MATCHING_SYSTEM_PROMPT} \n ${userLogPrompt} \n Additionally, here is a summary of your recent orders that might be relevant to our conversation:\n${orderReport.payload}\n Use this information to provide more accurate and personalized responses. If the order information is not relevant, you can ignore it.`
+      conversationTestSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        userLogPromptText,
+        orderReportPrompt(orderReport.payload ?? '')
+      )
     );
 
     if (!message.success) {

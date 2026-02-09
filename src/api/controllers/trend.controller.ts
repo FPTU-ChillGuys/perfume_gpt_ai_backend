@@ -3,7 +3,7 @@ import { ApiBody } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
+import { ADVANCED_MATCHING_SYSTEM_PROMPT, trendForecastingPrompt } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
@@ -41,9 +41,7 @@ export class TrendController {
     }
 
     //Trend forecasting prompt base on summary response
-    const trendPrompt = 
-    `Based on the following summarized user logs, identify emerging trends and patterns that could inform future product development and marketing strategies. Provide insights into user behavior, preferences, and potential market opportunities:\n
-    ${summaryResponse.data}`;
+    const trendPrompt = trendForecastingPrompt(summaryResponse.data ?? '');
     
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,

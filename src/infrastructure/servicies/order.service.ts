@@ -124,7 +124,7 @@ export class OrderService {
     );
   }
 
-  async createOrderReportFromGetOrderDetailsWithOrdersByUserId(
+  async getOrderReportFromGetOrderDetailsWithOrdersByUserId(
     userId: string,
     authHeader: string
   ): Promise<BaseResponseAPI<string>> {

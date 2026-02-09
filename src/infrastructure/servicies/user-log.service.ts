@@ -154,9 +154,16 @@ export class UserLogService {
         if (!userLogSummaries.success || !userLogSummaries.data) {
           return { success: false, error: 'User log summaries not found' };
         }
-        const report = userLogSummaries.data
+        // Tao data tu cac log summary
+        const data = userLogSummaries.data
           .map((summary) => summary.logSummary)
           .join('\n');
+
+        // Tao report
+        const report = `User Log Summary Report from ${startDate?.toISOString() ?? 'the beginning'} to ${
+          endDate?.toISOString() ?? new Date().toISOString()
+        }:\n${data}`;
+
         return { success: true, data: report };
       },
       'Failed to get user log summary report',

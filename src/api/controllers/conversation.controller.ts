@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Inject, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Post,
+  Query,
+  Req
+} from '@nestjs/common';
 import { ApiQuery } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Request } from 'express';
@@ -59,15 +67,19 @@ export class ConversationController {
     return await this.conversationService.getConversationById(id);
   }
 
-  //Natural language chat
+  //Natural language chat v1
   @Public()
-  @Post()
+  @Post('chat/v1')
   @ApiBaseResponse(ConversationRequestDto)
-  async conversation(@Body() conversation: ConversationRequestDto) {
+  async conversationV1(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDto
+  ) {
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
 
+    //---------------------V1-------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
     const userLog = await this.logService.getUserLogSummaryReportByUserId(
       conversation.userId
@@ -76,11 +88,24 @@ export class ConversationController {
     // Tao prompt cho AI tu log nguoi dung
     const userLogPromptText = userLogPrompt(userLog.data ?? '');
 
+    // Tam thoi lay order cua nguoi dung theo userID
+    const orderReport =
+      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+        conversation.userId,
+        extractTokenFromHeader(request) ?? ''
+      );
+
+    // Ket hop prompt tu log nguoi dung va report don hang
+    const combinedPrompt = `${userLogPromptText}\n\n
+    Order Report:\n${orderReportPrompt(orderReport.payload ?? '')}`;
+
+    //-------------------------------------------------------------
+
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
       Output.object(searchOutput),
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, userLogPromptText)
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt)
     );
 
     if (!message.success) {
@@ -114,11 +139,87 @@ export class ConversationController {
     };
   }
 
-   //Test response conversation with user log
   @Public()
-  @Post('test')
+  @Post('chat/v2')
   @ApiBaseResponse(ConversationRequestDto)
-  async convserationTest(@Req() request: Request, @Query('userId') userId: string, @Query('prompt') prompt: string) {
+  async conversationV2(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDto
+  ) {
+    const convertedMessages: UIMessage[] = convertToMessages(
+      conversation.messages || []
+    );
+
+    //---------------------V2-------------------------------------
+    // Lay log nguoi dung tu db trong khoan 1 thang
+    const userLogResponse = await this.logService.collectAndSummarizeUserLogs({
+      userId: conversation.userId,
+      period: PeriodEnum.MONTHLY,
+      endDate: convertToUTC(new Date()),
+      startDate: undefined
+    });
+
+    const orderReport =
+      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+        conversation.userId,
+        extractTokenFromHeader(request) ?? ''
+      );
+
+    // Ket hop prompt tu log nguoi dung va report don hang
+    // Lay response tu user log service
+    const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
+    Order Report:\n${orderReportPrompt(orderReport.payload ?? '')}`;
+
+    //-------------------------------------------------------------
+
+    // Call AI service to get response
+    const message = await this.aiService.textGenerateFromMessages(
+      convertedMessages,
+      Output.object(searchOutput),
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt)
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    // Prepare response conversation
+    const responseConversation = overrideMessagesToConversation(
+      conversation.id || '',
+      conversation.userId || '',
+      addMessageToMessages(message.data || '', conversation.messages || [])
+    );
+
+    // Luu hoac cap nhat conversation vao db
+    if (
+      !(await this.conversationService.isExistConversation(
+        responseConversation.id || ''
+      ))
+    ) {
+      await this.conversationService.addConversation(responseConversation);
+    } else {
+      await this.conversationService.updateMessageToConversation(
+        responseConversation.id!,
+        responseConversation.messages || []
+      );
+    }
+
+    return {
+      success: true,
+      data: responseConversation
+    };
+  }
+
+  //Test response conversation with user log
+  @Public()
+  @Post('test/v1')
+  @ApiBaseResponse(ConversationRequestDto)
+  async convserationV1Test(
+    @Req() request: Request,
+    @Query('userId') userId: string,
+    @Query('prompt') prompt: string
+  ) {
+    // -----------------------------Test V1 -------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
     const userLog = await this.logService.getUserLogSummaryReportByUserId(
       userId,
@@ -132,16 +233,67 @@ export class ConversationController {
     const userLogPromptText = userLogPrompt(userLog.data ?? '');
 
     // Tam thoi lay order cua nguoi dung theo userID
-    const orderReport = await this.orderService.createOrderReportFromGetOrderDetailsWithOrdersByUserId(userId, extractTokenFromHeader(request) ?? '');
+    const orderReport =
+      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+        userId,
+        extractTokenFromHeader(request) ?? ''
+      );
+
+    const combinedPrompt = `${userLogPromptText}\n\n
+    Order Report:\n${orderReportPrompt(orderReport.payload ?? '')}`;
+
+    //-------------------------------------------------------------
 
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromPrompt(
       prompt,
-      conversationTestSystemPrompt(
-        ADVANCED_MATCHING_SYSTEM_PROMPT,
-        userLogPromptText,
-        orderReportPrompt(orderReport.payload ?? '')
-      )
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt)
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    return {
+      success: true,
+      data: message.data
+    };
+  }
+
+  //Test response conversation with user log
+  @Public()
+  @Post('test/v2')
+  @ApiBaseResponse(ConversationRequestDto)
+  async convserationV2Test(
+    @Req() request: Request,
+    @Query('userId') userId: string,
+    @Query('prompt') prompt: string
+  ) {
+    // -----------------------------Test V1 -------------------------------------
+    // Lay log nguoi dung tu db trong khoan 1 thang
+    const userLogResponse = await this.logService.collectAndSummarizeUserLogs({
+      userId: userId,
+      period: PeriodEnum.MONTHLY,
+      endDate: convertToUTC(new Date()),
+      startDate: undefined
+    });
+
+    // Tam thoi lay order cua nguoi dung theo userID
+    const orderReport =
+      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+        userId,
+        extractTokenFromHeader(request) ?? ''
+      );
+
+    const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
+    Order Report:\n${orderReportPrompt(orderReport.payload ?? '')}`;
+
+    //-------------------------------------------------------------
+
+    // Call AI service to get response
+    const message = await this.aiService.textGenerateFromPrompt(
+      prompt,
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt)
     );
 
     if (!message.success) {

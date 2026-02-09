@@ -18,12 +18,12 @@ export const orderReportPrompt = (orderReport: string): string =>
   `Additionally, here is a summary of your recent orders that might be relevant to our conversation:\n${orderReport}\n Use this information to provide more accurate and personalized responses. If the order information is not relevant, you can ignore it.`;
 
 /**
- * Prompt kết hợp system prompt với user log prompt
+ * Prompt kết hợp system prompt với cac prompt khac
  */
 export const conversationSystemPrompt = (
   systemPrompt: string,
-  userLogPromptText: string
-): string => `${systemPrompt} \n ${userLogPromptText}`;
+  otherPrompts: string
+): string => `${systemPrompt} \n ${otherPrompts}`;
 
 /**
  * Prompt kết hợp system prompt, user log và order report

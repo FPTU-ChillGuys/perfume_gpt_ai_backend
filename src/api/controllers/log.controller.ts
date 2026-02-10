@@ -23,7 +23,7 @@ export class LogController {
 
   /** Lấy báo cáo log hoạt động người dùng */
   @Public()
-  @Get('report')
+  @Get('report/activity')
   @ApiOperation({ summary: 'Lấy báo cáo log hoạt động người dùng' })
   @ApiBaseResponse(String)
   async collectLogs(
@@ -251,8 +251,11 @@ export class LogController {
 
   /** Xem báo cáo tóm tắt log người dùng theo ID */
   @Public()
-  @Get('report')
+  @Get('report/summary')
   @ApiOperation({ summary: 'Xem báo cáo tóm tắt log người dùng theo ID' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({ name: 'startDate', type: Date, description: 'Ngày bắt đầu' })
+  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
   @ApiBaseResponse(String)
   async getUserLogsSummaryReportById(
     @Query('userId') userId: string,

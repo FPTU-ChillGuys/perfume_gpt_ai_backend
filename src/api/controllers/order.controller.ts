@@ -33,6 +33,7 @@ export class OrderController {
   /** Lấy danh sách tất cả đơn hàng */
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả đơn hàng' })
+  @ApiQuery({ name: 'orderRequest', type: String, required: false, description: 'Tham số lọc đơn hàng' })
   @ApiBaseResponse(PagedResult<OrderResponse>)
   async getAllOrders(
     @Req() request: Request,
@@ -48,6 +49,7 @@ export class OrderController {
   @Get('user/:userId')
   @ApiOperation({ summary: 'Lấy đơn hàng theo user ID' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
+  @ApiQuery({ name: 'orderRequest', type: String, required: false, description: 'Tham số lọc đơn hàng' })
   @ApiBaseResponse(PagedResult<OrderResponse>)
   async getOrdersByUserId(
     @Req() request: Request,

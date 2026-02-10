@@ -5,9 +5,10 @@ import {
   Inject,
   Param,
   Post,
-  Put
+  Put,
+  Query
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
@@ -100,12 +101,13 @@ export class QuizController {
   @Public()
   @Post('user')
   @ApiOperation({ summary: 'Trả lời quiz và nhận gợi ý AI' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiBaseResponse(String)
   @ApiBody({
     schema: { example: [{ questionId: 'string', answerId: 'string' }] }
   })
   async chatQuiz(
-    @Param('userId') userId: string, 
+    @Query('userId') userId: string, 
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
     // Lay cau hoi quiz va cau tra loi tuong ung

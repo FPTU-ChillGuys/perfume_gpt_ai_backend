@@ -263,6 +263,8 @@ export class ConversationController {
   @Public()
   @Post('test/v1')
   @ApiOperation({ summary: 'Test V1 - Test hội thoại với log tóm tắt' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({ name: 'prompt', type: String, description: 'Nội dung tin nhắn test' })
   @ApiBaseResponse(ConversationRequestDto)
   async convserationV1Test(
     @Req() request: Request,
@@ -322,6 +324,8 @@ export class ConversationController {
   @Public()
   @Post('test/v2')
   @ApiOperation({ summary: 'Test V2 - Test hội thoại với log chi tiết' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({ name: 'prompt', type: String, description: 'Nội dung tin nhắn test' })
   @ApiBaseResponse(ConversationRequestDto)
   async convserationV2Test(
     @Req() request: Request,

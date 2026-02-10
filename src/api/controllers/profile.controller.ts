@@ -1,6 +1,49 @@
-import { Controller } from "@nestjs/common";
+import { Controller, Get, Req } from "@nestjs/common";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Request } from 'express';
+import { Public } from 'src/application/common/Metadata';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { ProfileResponse } from 'src/application/dtos/response/profile.response';
+import { ProfileService } from 'src/infrastructure/servicies/profile.service';
+import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
+import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 
+@ApiTags('Profile')
 @Controller('profile')
 export class ProfileController {
-  // Implement profile-related endpoints here
+  constructor(private readonly profileService: ProfileService) {}
+
+  /** Lấy thông tin profile của người dùng hiện tại */
+  @Public()
+  @Get('me')
+  @ApiOperation({ summary: 'Lấy thông tin profile của người dùng hiện tại' })
+  @ApiBaseResponse(ProfileResponse)
+  async getOwnProfile(
+    @Req() request: Request
+  ): Promise<BaseResponseAPI<ProfileResponse>> {
+    return await this.profileService.getOwnProfile(
+      extractTokenFromHeader(request) ?? ''
+    );
+  }
+
+  /** Tạo báo cáo profile dưới dạng text */
+  @Public()
+  @Get('report')
+  @ApiOperation({ summary: 'Tạo báo cáo profile dưới dạng text' })
+  @ApiBaseResponse(String)
+  async getProfileReport(
+    @Req() request: Request
+  ): Promise<BaseResponse<string>> {
+    const profile = await this.profileService.getOwnProfile(
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!profile.success) {
+      return { success: false, error: 'Failed to fetch profile' };
+    }
+
+    const report = await this.profileService.createProfileReport(profile.payload!);
+    return { success: true, data: report };
+  }
 }

@@ -1,5 +1,5 @@
-import { Controller, Get, Inject, Query } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
@@ -37,7 +37,7 @@ export class ReviewController {
     @ApiBaseResponse(String)
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI theo variant ID' })
     @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
-    async getReviewSummaryByVariantId(@Query('variantId') variantId: string): Promise<BaseResponse<string>> {
+    async getReviewSummaryByVariantId(@Param('variantId') variantId: string): Promise<BaseResponse<string>> {
         const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
 
         if (!reviewsResponse.success) {
@@ -92,7 +92,7 @@ export class ReviewController {
     @ApiOperation({ summary: 'Tóm tắt đánh giá có cấu trúc theo variant ID' })
     @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
     async getStructuredReviewSummaryByVariantId(
-        @Query('variantId') variantId: string
+        @Param('variantId') variantId: string
     ): Promise<BaseResponse<AIReviewSummaryStructuredResponse>> {
         const startTime = Date.now();
 

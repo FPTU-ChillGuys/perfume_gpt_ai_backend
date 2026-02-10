@@ -1,5 +1,5 @@
 import { Body, Controller, Inject, Post } from '@nestjs/common';
-import { ApiBody } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -9,6 +9,7 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 
+@ApiTags('Trends')
 @Controller('trends')
 export class TrendController {
   constructor(
@@ -16,9 +17,10 @@ export class TrendController {
     @Inject(AI_SERVICE) private aiService: AIService
   ) {}
 
-  // Trend forcasting
+  /** Dự đoán xu hướng từ tổng hợp log người dùng */
   @Public()
   @Post('summary')
+  @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
   @ApiBaseResponse(String)
   @ApiBody({ type: AllUserLogRequest })
   async summarizeLogs(

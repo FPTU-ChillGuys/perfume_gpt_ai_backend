@@ -1,42 +1,50 @@
 import { Controller, Get, Param, Post, Query } from "@nestjs/common";
-import { ApiQuery } from "@nestjs/swagger";
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { AIAcceptanceService } from "src/infrastructure/servicies/ai-acceptance.service";
 
+@ApiTags('AI Acceptance')
 @Controller('ai-acceptance')
 export class AIAcceptanceController {
-  // Implement AI acceptance-related endpoints here
   constructor(private readonly aiAcceptanceService: AIAcceptanceService) {}
 
-  // Update AI acceptance status by ID
+  /** Cập nhật trạng thái chấp nhận AI theo ID */
   @Post(':id')
+  @ApiOperation({ summary: 'Cập nhật trạng thái chấp nhận AI theo ID' })
+  @ApiParam({ name: 'id', description: 'ID bản ghi AI acceptance' })
+  @ApiQuery({ name: 'status', description: 'Trạng thái (true/false)' })
   async updateAIAcceptanceData(@Param('id') id: string, @Query('status') status: string) {
     return this.aiAcceptanceService.updateAIAcceptanceStatusById(id, status === 'true');
   }
 
-  // Get AI acceptance status by user ID
+  /** Lấy trạng thái chấp nhận AI theo user ID */
   @Get('status/:userId')
-  @ApiQuery({ name: 'userId', required: true, description: 'User ID to fetch AI acceptance status for' })
+  @ApiOperation({ summary: 'Lấy trạng thái chấp nhận AI theo user ID' })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   async getAIAcceptanceStatus(@Param('userId') userId: string) {
     return this.aiAcceptanceService.getAIAcceptanceByUserId(userId);
   }
 
-  // Get AI acceptance rate by acceptance status
+  /** Lấy tỷ lệ chấp nhận AI theo trạng thái */
   @Get('rate')
-  @ApiQuery({ name: 'isAccepted', required: true, description: 'Acceptance status to calculate rate for (true or false)' })
+  @ApiOperation({ summary: 'Lấy tỷ lệ chấp nhận AI theo trạng thái' })
+  @ApiQuery({ name: 'isAccepted', required: true, description: 'Trạng thái chấp nhận (true/false)' })
   async getAIAcceptanceRate(@Query('isAccepted') isAccepted: string) {
     return this.aiAcceptanceService.getAIAcceptanceRateByAcceptanceStatus(isAccepted === 'true');
   }
 
-  // Get AI acceptance rate by user ID
+  /** Lấy tỷ lệ chấp nhận AI theo user ID */
   @Get('rate/:userId')
-  @ApiQuery({ name: 'userId', required: true, description: 'User ID to fetch AI acceptance rate for' })
+  @ApiOperation({ summary: 'Lấy tỷ lệ chấp nhận AI theo user ID' })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   async getAIAcceptanceRateByUserId(@Param('userId') userId: string) {
     return this.aiAcceptanceService.getAIAcceptanceRateByAcceptanceStatusWithUserId(userId);
   }
 
-  // Create a new AI acceptance record for a user
+  /** Tạo bản ghi chấp nhận AI mới cho người dùng */
   @Post('record/:userId')
-  @ApiQuery({ name: 'isAccepted', required: true, description: 'Acceptance status for the new AI acceptance record (true or false)' })
+  @ApiOperation({ summary: 'Tạo bản ghi chấp nhận AI mới' })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
+  @ApiQuery({ name: 'isAccepted', required: true, description: 'Trạng thái chấp nhận (true/false)' })
   async createAIAcceptanceRecord(@Param('userId') userId: string, @Query('isAccepted') isAccepted: string) {
     return this.aiAcceptanceService.createAIAcceptanceRecord(userId, isAccepted === 'false');
   }

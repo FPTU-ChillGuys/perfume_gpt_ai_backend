@@ -1,4 +1,5 @@
 import { Controller, Get, Inject, Query, Req } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public } from 'src/application/common/Metadata';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
@@ -13,6 +14,7 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 
 @Public()
+@ApiTags('Inventory')
 @Controller('inventory')
 export class InventoryController {
   constructor(
@@ -20,11 +22,9 @@ export class InventoryController {
     @Inject(AI_SERVICE) private readonly aiService: AIService
   ) {}
 
-  /** 
-   * Lay stock hang ton kho
-   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
-   */
+  /** Lấy thông tin tồn kho */
   @Get('stock')
+  @ApiOperation({ summary: 'Lấy thông tin tồn kho' })
   @ApiBaseResponse(PagedResult<InventoryStockResponse>)
   async getInventoryStock(
     @Req() request: Request,
@@ -36,11 +36,9 @@ export class InventoryController {
     );
   }
 
-  /** 
-   * Lay batch
-   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
-   */
+  /** Lấy danh sách batch */
   @Get('batches')
+  @ApiOperation({ summary: 'Lấy danh sách batch' })
   @ApiBaseResponse(PagedResult<BatchResponse>)
   async getBatch(@Req() request: Request, @Query() batchRequest: BatchRequest) {
     return this.inventoryService.getBatch(
@@ -49,13 +47,10 @@ export class InventoryController {
     );
   }
 
-  /** 
-   * Lay stock hang ton kho
-   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
-   */
+  /** Lấy báo cáo tồn kho */
   @Get('report')
+  @ApiOperation({ summary: 'Lấy báo cáo tồn kho' })
   @ApiBaseResponse(String)
-  //Get AI generated inventory report
   async getInventoryReport(
     @Req() request: Request,
   ) {
@@ -68,13 +63,10 @@ export class InventoryController {
     return { success: true, data: report };
   }
 
-  /** 
-   * Lay stock hang ton kho
-   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
-   */
+  /** Tạo báo cáo tồn kho bằng AI */
   @Get('report/ai')
+  @ApiOperation({ summary: 'Tạo báo cáo tồn kho bằng AI' })
   @ApiBaseResponse(String)
-  //Get AI generated inventory report
   async getAIInventoryReport(
     @Req() request: Request,
   ) {

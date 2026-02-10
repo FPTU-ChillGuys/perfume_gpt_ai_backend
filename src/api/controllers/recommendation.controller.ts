@@ -1,5 +1,5 @@
 import { Body, Controller, Inject, Post, Req } from '@nestjs/common';
-import { ApiBody } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -16,6 +16,7 @@ import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { Request } from 'express';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 
+@ApiTags('Recommendation')
 @Controller('recommendation')
 export class RecommendationController {
   constructor(
@@ -24,9 +25,10 @@ export class RecommendationController {
     @Inject(AI_SERVICE) private aiService: AIService
   ) {}
 
-  //Repurchase recommendation V1
+  /** Gợi ý mua lại V2 - Dùng log chi tiết từ user log service */
   @Public()
   @Post('repurchase/v2')
+  @ApiOperation({ summary: 'Gợi ý mua lại V2 - Dùng log chi tiết' })
   @ApiBaseResponse(String)
   @ApiBody({ type: UserLogRequest })
   async repurchaseRecommendationV2(
@@ -79,9 +81,10 @@ export class RecommendationController {
     return { success: true, data: recommendationResponse.data };
   }
 
-  //Repurchase recommendation V1
+  /** Gợi ý mua lại V1 - Dùng log tóm tắt */
   @Public()
   @Post('repurchase/v1')
+  @ApiOperation({ summary: 'Gợi ý mua lại V1 - Dùng log tóm tắt' })
   @ApiBaseResponse(String)
   @ApiBody({ type: UserLogRequest })
   async repurchaseRecommendationV1(
@@ -135,9 +138,10 @@ export class RecommendationController {
     return { success: true, data: recommendationResponse.data };
   }
 
-  //AI recommendation V1
+  /** Gợi ý sản phẩm bằng AI V1 - Dùng log chi tiết */
   @Public()
   @Post('recommend/ai/v1')
+  @ApiOperation({ summary: 'Gợi ý AI V1 - Dùng log chi tiết' })
   @ApiBaseResponse(String)
   @ApiBody({ type: UserLogRequest })
   async aiRecommendationV1(
@@ -176,9 +180,10 @@ export class RecommendationController {
     return { success: true, data: recommendationResponse.data };
   }
 
-  //AI recommendation V2
+  /** Gợi ý sản phẩm bằng AI V2 - Dùng log tóm tắt */
   @Public()
   @Post('recommend/ai/v1')
+  @ApiOperation({ summary: 'Gợi ý AI V2 - Dùng log tóm tắt' })
   @ApiBaseResponse(String)
   @ApiBody({ type: UserLogRequest })
   async aiRecommendationV2(

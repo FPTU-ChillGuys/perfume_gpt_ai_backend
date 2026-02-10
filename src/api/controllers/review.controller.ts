@@ -1,4 +1,5 @@
 import { Controller, Get, Inject, Query } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
@@ -6,8 +7,11 @@ import { reviewSummaryPrompt } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 
 @Public()
+@ApiTags('Reviews')
 @Controller('reviews')
 export class ReviewController {
 
@@ -16,16 +20,19 @@ export class ReviewController {
         @Inject(AI_SERVICE) private aiService: AIService
     ) {}
 
-    //Get reviews
+    /** Lấy danh sách đánh giá */
     @Get()
+    @ApiOperation({ summary: 'Lấy danh sách đánh giá (phân trang)' })
     async getReviews(@Query() request: GetPagedReviewRequest): Promise<any> {
         return await this.reviewService.getAllReviews(request);
     }
 
-    // Review summary
-    // Review theo tung variant
+    /** Tóm tắt đánh giá bằng AI theo variant ID */
     @Get('summary/:variantId')
-    async getReviewSummaryByVariantId(@Query('variantId') variantId: string): Promise<any> {
+    @ApiBaseResponse(String)
+    @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI theo variant ID' })
+    @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
+    async getReviewSummaryByVariantId(@Query('variantId') variantId: string): Promise<BaseResponse<string>> {
         const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
 
         if (!reviewsResponse.success) {
@@ -46,10 +53,11 @@ export class ReviewController {
         return { success: true, data: summaryResponse.data };
     }
 
-    // Review summary
-    // Review theo tung variant
+    /** Tóm tắt đánh giá bằng AI cho tất cả variant */
     @Get('summary/all')
-    async getReviewSummaryFromAllVariant(request: GetPagedReviewRequest): Promise<any> {
+    @ApiBaseResponse(String)
+    @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
+    async getReviewSummaryFromAllVariant(request: GetPagedReviewRequest): Promise<BaseResponse<string>> {
         const reviewsResponse = await this.reviewService.getAllReviews(request);
 
         if (!reviewsResponse.success) {

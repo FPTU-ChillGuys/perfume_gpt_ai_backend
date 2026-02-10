@@ -7,7 +7,7 @@ import {
   Post,
   Put
 } from '@nestjs/common';
-import { ApiBody, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
@@ -25,6 +25,7 @@ import { quizPrompt } from 'src/application/constant/prompts';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 
 @Public()
+@ApiTags('Quizzes')
 @Controller('quizzes')
 export class QuizController {
   constructor(
@@ -33,9 +34,10 @@ export class QuizController {
     private logService: UserLogService
   ) {}
 
-  // Lay tat ca cau hoi quiz
+  /** Lấy tất cả câu hỏi quiz */
   @Public()
   @Get('questions')
+  @ApiOperation({ summary: 'Lấy danh sách câu hỏi quiz' })
   @ApiBaseResponse(QuizQuestion)
   async getAllQuizzes(): Promise<BaseResponse<QuizQuestionResponse[]>> {
     const quizQues = await this.quizService.getAllQuizQues();
@@ -47,25 +49,29 @@ export class QuizController {
     return { success: true, data: quizQues.data };
   }
 
-  // Tao cau hoi quiz
+  /** Tạo câu hỏi quiz mới */
   @Public()
   @Post('questions')
+  @ApiOperation({ summary: 'Tạo câu hỏi quiz mới' })
   async createQuizQues(@Body() quizQuestionRequest: QuizQuestionRequest) {
     return this.quizService.addQuizQues(quizQuestionRequest);
   }
 
-  // Check xem co phai nguoi dung tra loi quiz lan dau khong
+  /** Kiểm tra người dùng đã làm quiz lần đầu chưa */
   @Public()
   @Get('user/:userId/check-first-time')
+  @ApiOperation({ summary: 'Kiểm tra người dùng đã làm quiz lần đầu chưa' })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   async checkFirstTime(@Param('userId') userId: string) {
     const isFirstTime =
       await this.quizService.checkExistQuizQuesAnwsByUserId(userId);
     return { success: true, data: isFirstTime };
   }
 
-  // Tao nhieu cau hoi quiz
+  /** Tạo nhiều câu hỏi quiz cùng lúc */
   @Public()
   @Post('questions/list')
+  @ApiOperation({ summary: 'Tạo nhiều câu hỏi quiz cùng lúc' })
   @ApiBody({ type: [QuizQuestionRequest] })
   async createQuizQueses(@Body() quizQuestionRequest: QuizQuestionRequest[]) {
     for (const quizQuestion of quizQuestionRequest) {
@@ -74,9 +80,11 @@ export class QuizController {
     return { success: true };
   }
 
-  // Cap nhat cau tra loi quiz
+  /** Cập nhật câu trả lời quiz */
   @Public()
   @Put('questions/:id')
+  @ApiOperation({ summary: 'Cập nhật câu trả lời quiz' })
+  @ApiParam({ name: 'id', description: 'ID câu hỏi' })
   @ApiBody({ type: [QuizAnswerRequest] })
   async updateQuizAnswer(
     @Param('id') id: string,
@@ -85,9 +93,10 @@ export class QuizController {
     return this.quizService.updateAnswer(id, quizAnswerRequest);
   }
 
-  //5-question interactive quiz
+  /** Trả lời quiz và nhận gợi ý nước hoa từ AI */
   @Public()
   @Post('user')
+  @ApiOperation({ summary: 'Trả lời quiz và nhận gợi ý AI' })
   @ApiBaseResponse(String)
   @ApiBody({
     schema: { example: [{ questionId: 'string', answerId: 'string' }] }

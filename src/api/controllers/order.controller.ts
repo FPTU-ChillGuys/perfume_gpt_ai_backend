@@ -7,6 +7,7 @@ import {
   Query,
   Req
 } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -18,6 +19,7 @@ import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 
+@ApiTags('Orders')
 @Controller('orders')
 export class OrderController {
   constructor(
@@ -25,9 +27,10 @@ export class OrderController {
     @Inject(AI_SERVICE) private aiService: AIService
   ) {}
 
+  /** Lấy danh sách tất cả đơn hàng */
   @Get()
+  @ApiOperation({ summary: 'Lấy danh sách tất cả đơn hàng' })
   @ApiBaseResponse(PagedResult<OrderResponse>)
-  //Get orders
   async getAllOrders(
     @Req() request: Request,
     @Query('orderRequest') orderRequest: OrderRequest
@@ -38,9 +41,11 @@ export class OrderController {
     );
   }
 
+  /** Lấy danh sách đơn hàng theo userId */
   @Get('user/:userId')
+  @ApiOperation({ summary: 'Lấy đơn hàng theo user ID' })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   @ApiBaseResponse(PagedResult<OrderResponse>)
-  //Get orders by user id
   async getOrdersByUserId(
     @Req() request: Request,
     @Param('userId') userId: string,
@@ -53,9 +58,11 @@ export class OrderController {
     );
   }
 
+  /** Tạo báo cáo tóm tắt đơn hàng bằng AI */
   @Get('summary/ai')
+  @ApiOperation({ summary: 'Tạo báo cáo tóm tắt đơn hàng bằng AI' })
+  @ApiQuery({ name: 'userId', description: 'ID của người dùng' })
   @ApiBaseResponse(String)
-  //Get AI generated order summary
   async getAIOrderSummary(
     @Req() request: Request,
     @Query('userId') userId: string

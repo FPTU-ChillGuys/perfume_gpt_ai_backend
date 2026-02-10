@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { ApiBody, ApiQuery } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
@@ -13,6 +13,7 @@ import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
 
+@ApiTags('Logs')
 @Controller('logs')
 export class LogController {
   constructor(
@@ -20,9 +21,10 @@ export class LogController {
     @Inject(AI_SERVICE) private aiService: AIService
   ) {}
 
-  //Summarize user logs
+  /** Lấy báo cáo log hoạt động người dùng */
   @Public()
   @Get('report')
+  @ApiOperation({ summary: 'Lấy báo cáo log hoạt động người dùng' })
   @ApiBaseResponse(String)
   async collectLogs(
     @Query() userLogRequest: UserLogRequest
@@ -38,9 +40,10 @@ export class LogController {
     };
   }
 
-  // Summarize user logs with AI
+  /** Tóm tắt log người dùng bằng AI */
   @Public()
   @Get('summarize')
+  @ApiOperation({ summary: 'Tóm tắt log người dùng bằng AI' })
   @ApiBaseResponse(String)
   async summarizeLogs(
     @Query() userLogRequest: UserLogRequest
@@ -80,9 +83,10 @@ export class LogController {
     return { success: true, data: aiResponse.data, error: aiResponse.error };
   }
 
-  // Summarize all user logs with AI (attention: this may take long time and not save to db)
+  /** Tóm tắt log của tất cả người dùng bằng AI (chú ý: có thể mất thời gian và không lưu vào DB) */
   @Public()
   @Get('summarize/all')
+  @ApiOperation({ summary: 'Tóm tắt log tất cả người dùng bằng AI' })
   @ApiBaseResponse(String)
   async summarizeAllLogs(
     @Query() allUserLogRequest: AllUserLogRequest
@@ -224,9 +228,10 @@ export class LogController {
     return { success: true, data: 'Scheduled task completed.' };
   }
 
-  // Xem chi tiet log nguoi dung
+  /** Xem chi tiết các bản tóm tắt log người dùng */
   @Public()
   @Get('summaries')
+  @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng' })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'startDate', type: Date })
   @ApiQuery({ name: 'endDate', type: Date, example: new Date() })
@@ -244,9 +249,10 @@ export class LogController {
     return response;
   }
 
-  // Xem log report nguoi dung
+  /** Xem báo cáo tóm tắt log người dùng theo ID */
   @Public()
   @Get('report')
+  @ApiOperation({ summary: 'Xem báo cáo tóm tắt log người dùng theo ID' })
   @ApiBaseResponse(String)
   async getUserLogsSummaryReportById(
     @Query('userId') userId: string,
@@ -261,9 +267,10 @@ export class LogController {
     return response;
   }
 
-  // Tao tom tat log nguoi dung
+  /** Tạo bản tóm tắt log người dùng thủ công */
   @Public()
   @Post()
+  @ApiOperation({ summary: 'Tạo bản tóm tắt log người dùng thủ công' })
   @ApiBody({ type: UserLogSummaryRequest })
   @ApiBaseResponse(String)
   async createUserLogSummary(

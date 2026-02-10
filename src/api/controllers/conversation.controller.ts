@@ -7,7 +7,7 @@ import {
   Query,
   Req
 } from '@nestjs/common';
-import { ApiQuery } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Request } from 'express';
 import { Public } from 'src/application/common/Metadata';
@@ -40,6 +40,7 @@ import {
 } from 'src/infrastructure/utils/message-helper';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
 
+@ApiTags('Conversation')
 @Controller('conversation')
 export class ConversationController {
   constructor(
@@ -49,17 +50,19 @@ export class ConversationController {
     private orderService: OrderService
   ) {}
 
-  // Get all conversations
+  /** Lấy tất cả cuộc hội thoại */
   @Public()
   @Get()
+  @ApiOperation({ summary: 'Lấy tất cả cuộc hội thoại' })
   @ApiBaseResponse(ConversationDto)
   async getAllConversations(): Promise<BaseResponse<ConversationDto[]>> {
     return await this.conversationService.getAllConversations();
   }
 
-  // Get conversation by ID
+  /** Lấy cuộc hội thoại theo ID */
   @Public()
   @Get(':id')
+  @ApiOperation({ summary: 'Lấy cuộc hội thoại theo ID' })
   @ApiQuery({ name: 'id', type: String })
   async getConversationById(
     @Query('id') id: string
@@ -67,16 +70,13 @@ export class ConversationController {
     return await this.conversationService.getConversationById(id);
   }
 
-  //Natural language chat v1
   /**
-   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
-   * 
-   * @param request 
-   * @param conversation 
-   * @returns 
+   * Chat V1 - Sử dụng log tóm tắt từ user log service (nhanh hơn nhưng phụ thuộc nội dung tóm tắt của service)
+   * @note request dùng để lấy token xác thực, có thể chuyển sang axios interceptor
    */
   @Public()
   @Post('chat/v1')
+  @ApiOperation({ summary: 'Chat V1 - Dùng log tóm tắt từ user log summary' })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV1(
     @Req() request: Request,
@@ -150,14 +150,12 @@ export class ConversationController {
   }
 
   /**
-   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
-   * 
-   * @param request 
-   * @param conversation 
-   * @returns 
+   * Chat V2 - Lấy log trực tiếp từ user log service (chậm hơn nhưng luôn đầy đủ nội dung)
+   * @note request dùng để lấy token xác thực, có thể chuyển sang axios interceptor
    */
   @Public()
   @Post('chat/v2')
+  @ApiOperation({ summary: 'Chat V2 - Dùng log chi tiết từ user log service' })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV2(
     @Req() request: Request,
@@ -230,16 +228,13 @@ export class ConversationController {
     };
   }
 
-  //Test response conversation with user log
   /**
-   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
-   * 
-   * @param request 
-   * @param conversation 
-   * @returns 
+   * Test V1 - Test hội thoại với user log tóm tắt
+   * @note request dùng để lấy token xác thực, có thể chuyển sang axios interceptor
    */
   @Public()
   @Post('test/v1')
+  @ApiOperation({ summary: 'Test V1 - Test hội thoại với log tóm tắt' })
   @ApiBaseResponse(ConversationRequestDto)
   async convserationV1Test(
     @Req() request: Request,
@@ -287,17 +282,14 @@ export class ConversationController {
     };
   }
 
-  //Test response conversation with user log
+  /**
+   * Test V2 - Test hội thoại với user log chi tiết
+   * @note request dùng để lấy token xác thực, có thể chuyển sang axios interceptor
+   */
   @Public()
   @Post('test/v2')
+  @ApiOperation({ summary: 'Test V2 - Test hội thoại với log chi tiết' })
   @ApiBaseResponse(ConversationRequestDto)
-  /**
-   * Chú ý, request dùng để lấy token xác thực người dùng và có thể bỏ để tránh lỗi và chuyển sang dùng qua axios interceptor
-   * 
-   * @param request 
-   * @param conversation 
-   * @returns 
-   */
   async convserationV2Test(
     @Req() request: Request,
     @Query('userId') userId: string,

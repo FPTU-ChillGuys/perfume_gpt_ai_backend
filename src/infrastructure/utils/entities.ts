@@ -1,4 +1,5 @@
 import { AdminInstruction } from 'src/domain/entities/admin-instruction.entity';
+import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
 import { AIReviewSummary } from 'src/domain/entities/ai-review-summary.entity';
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { Message } from 'src/domain/entities/message.entity';
@@ -23,5 +24,6 @@ export const entities = [
   UserLog,
   UserMessageLog,
   UserQuizLog,
-  UserSearchLog
+  UserSearchLog,
+  AIAcceptance
 ];

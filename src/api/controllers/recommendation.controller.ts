@@ -6,11 +6,15 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import {
   ADVANCED_MATCHING_SYSTEM_PROMPT,
   repurchaseRecommendationPrompt,
-  aiRecommendationPrompt
+  aiRecommendationPrompt,
+  recommendationReportPrompt,
+  recommendationSummaryPrompt,
+  INSTRUCTION_TYPE_RECOMMENDATION
 } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { Request } from 'express';
@@ -24,7 +28,8 @@ export class RecommendationController {
   constructor(
     private userLogService: UserLogService,
     private orderService: OrderService,
-    @Inject(AI_SERVICE) private aiService: AIService
+    @Inject(AI_SERVICE) private aiService: AIService,
+    private readonly adminInstructionService: AdminInstructionService
   ) {}
 
   /** Gợi ý mua lại V2 - Dùng log chi tiết từ user log service */
@@ -63,9 +68,13 @@ export class RecommendationController {
 
     //-------------------------------------------------------------
 
+    // Lấy admin instruction cho domain recommendation (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
+
     // Tom tat voi AI
     const summaryResponse = await this.aiService.textGenerateFromPrompt(
-      `${combinedPrompt}`
+      `${combinedPrompt}`,
+      adminPrompt
     );
 
     if (!summaryResponse.success) {
@@ -74,7 +83,8 @@ export class RecommendationController {
 
     //Tao repurchase recommendation prompt dua tren summary response
     const recommendationResponse = await this.aiService.textGenerateFromPrompt(
-      repurchaseRecommendationPrompt(summaryResponse.data ?? '')
+      repurchaseRecommendationPrompt(summaryResponse.data ?? ''),
+      adminPrompt
     );
 
     if (!recommendationResponse.success) {
@@ -124,9 +134,13 @@ export class RecommendationController {
 
     //-------------------------------------------------------------
 
+    // Lấy admin instruction cho domain recommendation (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
+
     // Tom tat voi AI
     const summaryResponse = await this.aiService.textGenerateFromPrompt(
-      `${combinedPrompt}`
+      `${combinedPrompt}`,
+      adminPrompt
     );
 
     if (!summaryResponse.success) {
@@ -135,7 +149,8 @@ export class RecommendationController {
 
     //Tao repurchase recommendation prompt dua tren summary response
     const recommendationResponse = await this.aiService.textGenerateFromPrompt(
-      repurchaseRecommendationPrompt(summaryResponse.data ?? '')
+      repurchaseRecommendationPrompt(summaryResponse.data ?? ''),
+      adminPrompt
     );
 
     if (!recommendationResponse.success) {
@@ -170,8 +185,13 @@ export class RecommendationController {
       return { success: true, data: INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION };
     }
 
+    // Lấy admin instruction cho domain recommendation (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
+    const recSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
+
     const reportResponse = await this.aiService.textGenerateFromPrompt(
-      `Từ report: ${reportAndPromptSummary.data!.prompt}, hãy đưa ra các đề xuất phù hợp cho người dùng dựa trên hành vi và sở thích của họ. `
+      recommendationReportPrompt(reportAndPromptSummary.data!.prompt),
+      adminPrompt
     );
 
     if (!reportResponse.success) {
@@ -181,7 +201,7 @@ export class RecommendationController {
     //Create repurchase recommendation prompt base on summary response
     const recommendationResponse = await this.aiService.textGenerateFromPrompt(
       aiRecommendationPrompt(reportResponse.data ?? ''),
-      ADVANCED_MATCHING_SYSTEM_PROMPT
+      recSystemPrompt
     );
 
     if (!recommendationResponse.success) {
@@ -219,10 +239,15 @@ export class RecommendationController {
       return { success: true, data: INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION };
     }
 
+    // Lấy admin instruction cho domain recommendation (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
+    const recSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
+
     const summaryReportPrompt = `Here is the summary of user logs:\n${summaryReport.data!}`;
 
     const summaryResponse = await this.aiService.textGenerateFromPrompt(
-      `Từ summary report: ${summaryReportPrompt}. Hãy dự đoán và tóm tắt lại hành vi, sở thích của người dùng.`,
+      recommendationSummaryPrompt(summaryReportPrompt),
+      adminPrompt
     );
 
     if (!summaryResponse.success) {
@@ -232,7 +257,7 @@ export class RecommendationController {
     //Create repurchase recommendation prompt base on summary response
     const recommendationResponse = await this.aiService.textGenerateFromPrompt(
       aiRecommendationPrompt(summaryResponse.data ?? ''),
-      ADVANCED_MATCHING_SYSTEM_PROMPT
+      recSystemPrompt
     );
 
     if (!recommendationResponse.success) {
@@ -281,8 +306,13 @@ export class RecommendationController {
       };
     }
 
+    // Lấy admin instruction cho domain recommendation (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
+    const recSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
+
     const reportResponse = await this.aiService.textGenerateFromPrompt(
-      `Từ report: ${reportAndPromptSummary.data!.prompt}, hãy đưa ra các đề xuất phù hợp cho người dùng dựa trên hành vi và sở thích của họ. `
+      recommendationReportPrompt(reportAndPromptSummary.data!.prompt),
+      adminPrompt
     );
 
     if (!reportResponse.success) {
@@ -291,7 +321,7 @@ export class RecommendationController {
 
     const recommendationResponse = await this.aiService.textGenerateFromPrompt(
       aiRecommendationPrompt(reportResponse.data ?? ''),
-      ADVANCED_MATCHING_SYSTEM_PROMPT
+      recSystemPrompt
     );
 
     if (!recommendationResponse.success) {

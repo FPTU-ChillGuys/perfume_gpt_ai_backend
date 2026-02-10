@@ -45,6 +45,7 @@ import {
   buildCombinedPromptV2
 } from 'src/infrastructure/utils/chat-prompt-builder';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 
 @ApiTags('Conversation')
 @Controller('conversation')
@@ -54,7 +55,8 @@ export class ConversationController {
     private conversationService: ConversationService,
     private logService: UserLogService,
     private orderService: OrderService,
-    private profileService: ProfileService
+    private profileService: ProfileService,
+    private adminInstructionService: AdminInstructionService
   ) {}
 
   /** Lấy tất cả cuộc hội thoại */
@@ -417,6 +419,7 @@ export class ConversationController {
       this.logService,
       this.orderService,
       this.profileService,
+      this.adminInstructionService,
       conversation.userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -472,6 +475,7 @@ export class ConversationController {
       this.logService,
       this.orderService,
       this.profileService,
+      this.adminInstructionService,
       conversation.userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -525,6 +529,7 @@ export class ConversationController {
       this.logService,
       this.orderService,
       this.profileService,
+      this.adminInstructionService,
       userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -567,6 +572,7 @@ export class ConversationController {
       this.logService,
       this.orderService,
       this.profileService,
+      this.adminInstructionService,
       userId,
       extractTokenFromHeader(request) ?? ''
     );

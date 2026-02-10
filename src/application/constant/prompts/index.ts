@@ -21,7 +21,10 @@ export {
   reviewSummaryPrompt,
   repurchaseRecommendationPrompt,
   aiRecommendationPrompt,
-  orderSummaryPrompt
+  orderSummaryPrompt,
+  inventoryReportPrompt,
+  recommendationReportPrompt,
+  recommendationSummaryPrompt
 } from './controller.prompt';
 
 // Service prompts
@@ -30,3 +33,16 @@ export {
   convertQuesAnsesToString,
   quizPrompt
 } from './service.prompt';
+
+// Admin instruction type constants
+export {
+  INSTRUCTION_TYPE_REVIEW,
+  INSTRUCTION_TYPE_ORDER,
+  INSTRUCTION_TYPE_INVENTORY,
+  INSTRUCTION_TYPE_TREND,
+  INSTRUCTION_TYPE_RECOMMENDATION,
+  INSTRUCTION_TYPE_LOG,
+  INSTRUCTION_TYPE_CONVERSATION,
+  ALL_INSTRUCTION_TYPES
+} from './admin-instruction-types';
+export type { InstructionDomainType } from './admin-instruction-types';

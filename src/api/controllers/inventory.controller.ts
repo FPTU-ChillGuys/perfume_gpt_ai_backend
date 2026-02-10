@@ -12,10 +12,12 @@ import { InventoryStockResponse } from 'src/application/dtos/response/inventory-
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIInventoryReportStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
+import { inventoryReportPrompt, INSTRUCTION_TYPE_INVENTORY } from 'src/application/constant/prompts';
 
 @Public()
 @ApiTags('Inventory')
@@ -23,7 +25,8 @@ import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/util
 export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
-    @Inject(AI_SERVICE) private readonly aiService: AIService
+    @Inject(AI_SERVICE) private readonly aiService: AIService,
+    private readonly adminInstructionService: AdminInstructionService
   ) {}
 
   /** Lấy thông tin tồn kho */
@@ -84,9 +87,13 @@ export class InventoryController {
       return { success: true, data: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT };
     }
 
+    // Lấy admin instruction cho domain inventory (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+
     // Generate AI summary
     const aiResponse = await this.aiService.textGenerateFromPrompt(
-      `Generate a concise inventory report based on the following data:\n\n${report}`
+      inventoryReportPrompt(report.toString()),
+      adminPrompt
     );
 
     if (!aiResponse.success) {
@@ -124,8 +131,12 @@ export class InventoryController {
       };
     }
 
+    // Lấy admin instruction cho domain inventory (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+
     const aiResponse = await this.aiService.textGenerateFromPrompt(
-      `Generate a concise inventory report based on the following data:\n\n${report}`
+      inventoryReportPrompt(report.toString()),
+      adminPrompt
     );
 
     if (!aiResponse.success) {

@@ -138,6 +138,20 @@ export class AdminInstructionService {
     );
   }
 
+  /**
+   * Lấy system prompt cho một domain cụ thể (review, order, inventory, trend, recommendation, log, conversation).
+   * Trả về chuỗi rỗng nếu không có instruction nào cho domain đó.
+   * Dùng để inject admin instruction vào các AI endpoint.
+   */
+  async getSystemPromptForDomain(domain: string): Promise<string> {
+    try {
+      const combined = await this.unitOfWork.AdminInstructionRepo.getCombinedInstructionsByType(domain);
+      return combined || '';
+    } catch {
+      return '';
+    }
+  }
+
   /** Convert entity → response DTO */
   private toResponse(entity: AdminInstruction): AdminInstructionResponse {
     return new AdminInstructionResponse({

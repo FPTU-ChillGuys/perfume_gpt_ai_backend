@@ -3,10 +3,11 @@ import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { ADVANCED_MATCHING_SYSTEM_PROMPT, trendForecastingPrompt } from 'src/application/constant/prompts';
+import { ADVANCED_MATCHING_SYSTEM_PROMPT, trendForecastingPrompt, INSTRUCTION_TYPE_TREND } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { AITrendForecastStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
@@ -16,7 +17,8 @@ import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/util
 export class TrendController {
   constructor(
     private userLogService: UserLogService,
-    @Inject(AI_SERVICE) private aiService: AIService
+    @Inject(AI_SERVICE) private aiService: AIService,
+    private readonly adminInstructionService: AdminInstructionService
   ) {}
 
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
@@ -50,10 +52,14 @@ export class TrendController {
 
     //Trend forecasting prompt base on summary response
     const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
+
+    // Lấy admin instruction cho domain trend (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_TREND);
+    const trendSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
     
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,
-      ADVANCED_MATCHING_SYSTEM_PROMPT
+      trendSystemPrompt
     );
 
     if (!trendResponse.success) {
@@ -108,9 +114,13 @@ export class TrendController {
 
     const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
 
+    // Lấy admin instruction cho domain trend (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_TREND);
+    const trendSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
+
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,
-      ADVANCED_MATCHING_SYSTEM_PROMPT
+      trendSystemPrompt
     );
 
     if (!trendResponse.success) {

@@ -42,7 +42,7 @@
     "@nestjs/swagger": "^11.2.5",
     "@scalar/nestjs-api-reference": "^1.0.18",
     "ai": "^6.0.42",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "jwt-decode": "^4.0.0",

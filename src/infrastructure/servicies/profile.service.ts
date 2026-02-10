@@ -11,7 +11,7 @@ export class ProfileService {
 
   async getOwnProfile(
     authHeader: string
-  ): Promise<BaseResponseAPI<PagedResult<ProfileResponse>>> {
+  ): Promise<BaseResponseAPI<ProfileResponse>> {
     return await funcHandlerAsync(
       async () => {
         console.log(ApiUrl().PROFILE_URL('me'));
@@ -30,5 +30,28 @@ export class ProfileService {
       'Failed to fetch profile',
       true
     );
+  }
+
+  async createProfileReport(profileResponse?: ProfileResponse): Promise<string> {
+    // Convert profileResponse to string for prompt
+    const profileReport = `User Profile:
+    - User ID: ${profileResponse?.userId}
+    - Profile ID: ${profileResponse?.id}
+    - Favorite Notes: ${profileResponse?.favoriteNotes || 'Not specified'}
+    - Preferred Style: ${profileResponse?.preferredStyle || 'Not specified'}
+    - Scent Preference: ${profileResponse?.scentPreference || 'Not specified'}
+    - Budget Range: ${profileResponse?.minBudget || 'Not specified'} - ${profileResponse?.maxBudget || 'Not specified'}
+    - Created At: ${profileResponse?.createdAt}
+    - Updated At: ${profileResponse?.updatedAt || 'Not updated'}`;
+
+    return profileReport;
+  }
+
+  async createSystemPromptFromProfile(
+    profileResponse?: ProfileResponse
+  ): Promise<string> {
+    const profileReport = await this.createProfileReport(profileResponse);
+    const systemPrompt = `Here is the user's profile information:\n\n${profileReport}\n\nUse this information to provide personalized perfume recommendations and advice.`;
+    return systemPrompt;
   }
 }

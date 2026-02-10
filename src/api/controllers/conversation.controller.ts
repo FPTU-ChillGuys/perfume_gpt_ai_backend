@@ -44,6 +44,7 @@ import {
   buildCombinedPromptV1,
   buildCombinedPromptV2
 } from 'src/infrastructure/utils/chat-prompt-builder';
+import { ProfileService } from 'src/infrastructure/servicies/profile.service';
 
 @ApiTags('Conversation')
 @Controller('conversation')
@@ -52,7 +53,8 @@ export class ConversationController {
     @Inject(AI_SERVICE) private aiService: AIService,
     private conversationService: ConversationService,
     private logService: UserLogService,
-    private orderService: OrderService
+    private orderService: OrderService,
+    private profileService: ProfileService
   ) {}
 
   /** Lấy tất cả cuộc hội thoại */
@@ -121,9 +123,14 @@ export class ConversationController {
         extractTokenFromHeader(request) ?? ''
       );
 
+    const profile = await this.profileService.getOwnProfile(extractTokenFromHeader(request) ?? '');
+
+    const profileReport = await this.profileService.createSystemPromptFromProfile(profile.payload!);
+
     // Ket hop prompt tu log nguoi dung va report don hang
     const combinedPrompt = `${userLogPromptText}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}`;
+    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
+    Profile:\n${profileReport ?? ''}`;
 
     //-------------------------------------------------------------
 
@@ -199,10 +206,15 @@ export class ConversationController {
         extractTokenFromHeader(request) ?? ''
       );
 
+    const profile = await this.profileService.getOwnProfile(extractTokenFromHeader(request) ?? '');
+
+    const profileReport = await this.profileService.createSystemPromptFromProfile(profile.payload!);
+
     // Ket hop prompt tu log nguoi dung va report don hang
     // Lay response tu user log service
     const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}`;
+    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
+    Profile:\n${profileReport ?? ''}`;
 
     //-------------------------------------------------------------
 
@@ -277,8 +289,13 @@ export class ConversationController {
         extractTokenFromHeader(request) ?? ''
       );
 
+    const profile = await this.profileService.getOwnProfile(extractTokenFromHeader(request) ?? '');
+
+    const profileReport = await this.profileService.createSystemPromptFromProfile(profile.payload!);
+
     const combinedPrompt = `${userLogPromptText}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}`;
+    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
+    Profile:\n${profileReport ?? ''}`;
 
     //-------------------------------------------------------------
 
@@ -327,8 +344,13 @@ export class ConversationController {
         extractTokenFromHeader(request) ?? ''
       );
 
+    const profile = await this.profileService.getOwnProfile(extractTokenFromHeader(request) ?? '');
+
+    const profileReport = await this.profileService.createSystemPromptFromProfile(profile.payload!);
+
     const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}`;
+    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
+    Profile:\n${profileReport ?? ''}`;
 
     //-------------------------------------------------------------
 
@@ -368,6 +390,7 @@ export class ConversationController {
     const promptResult = await buildCombinedPromptV1(
       this.logService,
       this.orderService,
+      this.profileService,
       conversation.userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -419,6 +442,7 @@ export class ConversationController {
     const promptResult = await buildCombinedPromptV2(
       this.logService,
       this.orderService,
+      this.profileService,
       conversation.userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -468,6 +492,7 @@ export class ConversationController {
     const promptResult = await buildCombinedPromptV1(
       this.logService,
       this.orderService,
+      this.profileService,
       userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -506,6 +531,7 @@ export class ConversationController {
     const promptResult = await buildCombinedPromptV2(
       this.logService,
       this.orderService,
+      this.profileService,
       userId,
       extractTokenFromHeader(request) ?? ''
     );

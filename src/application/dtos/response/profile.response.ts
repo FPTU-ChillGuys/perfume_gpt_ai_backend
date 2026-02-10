@@ -27,4 +27,8 @@ export class ProfileResponse {
 
     @ApiProperty({ description: 'Associated user ID' })
     userId: string;
+
+    constructor(partial: Partial<ProfileResponse>) {
+        Object.assign(this, partial);
+    }
 }

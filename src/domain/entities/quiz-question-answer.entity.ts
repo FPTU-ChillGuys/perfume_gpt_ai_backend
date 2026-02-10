@@ -4,13 +4,16 @@ import { QuizQuestionAnswerRepository } from 'src/infrastructure/repositories/qu
 import { QuizQuestionAnswerDetail } from './quiz-question-answer-detail.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
+/** Entity lưu bản ghi bài quiz của người dùng (gồm nhiều chi tiết câu hỏi - câu trả lời) */
 @Entity({ repository: () => QuizQuestionAnswerRepository })
 export class QuizQuestionAnswer extends Common {
-  @ApiProperty()
+  /** ID người dùng làm quiz */
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   @Property()
   userId!: string;
 
-  @ApiProperty({ type: () => QuizQuestionAnswerDetail, isArray: true })
+  /** Danh sách chi tiết câu hỏi - câu trả lời */
+  @ApiProperty({ description: 'Danh sách chi tiết câu hỏi - câu trả lời', type: () => QuizQuestionAnswerDetail, isArray: true })
   @OneToMany(() => QuizQuestionAnswerDetail, (detail) => detail.quesAns)
   details = new Collection<QuizQuestionAnswerDetail>(this);
 

@@ -1,16 +1,23 @@
 import { Sentiment } from 'src/domain/enum/sentiment.enum';
 import { CommonResponse } from './common/common.response';
 import { ApiProperty } from '@nestjs/swagger';
-import { BaseEntity } from '@mikro-orm/core';
 
+/** Response tóm tắt đánh giá sản phẩm bởi AI */
 export class AIReviewSummaryResponse extends CommonResponse {
-  @ApiProperty()
+  /** ID sản phẩm */
+  @ApiProperty({ description: 'ID sản phẩm', format: 'uuid' })
   productId!: string;
-  @ApiProperty()
+
+  /** Nội dung tóm tắt đánh giá */
+  @ApiProperty({ description: 'Nội dung tóm tắt đánh giá từ AI' })
   summary!: string;
-  @ApiProperty()
+
+  /** Cảm xúc chung */
+  @ApiProperty({ description: 'Cảm xúc chung', enum: Sentiment })
   sentiment!: Sentiment;
-  @ApiProperty()
+
+  /** Số lượng đánh giá được tóm tắt */
+  @ApiProperty({ description: 'Số lượng đánh giá' })
   reviewCount!: number;
 
   constructor(init?: Partial<AIReviewSummaryResponse>) {

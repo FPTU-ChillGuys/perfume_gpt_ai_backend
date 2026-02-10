@@ -5,17 +5,21 @@ import { QuizQuestionRepository } from 'src/infrastructure/repositories/quiz-que
 import { QuizQuestionAnswerDetail } from './quiz-question-answer-detail.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
+/** Entity lưu câu hỏi quiz */
 @Entity({ repository: () => QuizQuestionRepository })
 export class QuizQuestion extends Common {
-  @ApiProperty()
+  /** Nội dung câu hỏi */
+  @ApiProperty({ description: 'Nội dung câu hỏi' })
   @Property()
   question!: string;
 
-  @ApiProperty({ type: () => QuizAnswer, isArray: true })
+  /** Danh sách câu trả lời của câu hỏi */
+  @ApiProperty({ description: 'Danh sách câu trả lời', type: () => QuizAnswer, isArray: true })
   @OneToMany(() => QuizAnswer, (quizAns) => quizAns.question)
   answers = new Collection<QuizAnswer>(this);
 
-  @ApiProperty({ type: () => QuizQuestionAnswerDetail, isArray: true })
+  /** Danh sách chi tiết bài quiz liên quan */
+  @ApiProperty({ description: 'Danh sách chi tiết bài quiz', type: () => QuizQuestionAnswerDetail, isArray: true })
   @OneToMany(() => QuizQuestionAnswerDetail, (qqa) => qqa.question)
   quizQuestionAnswers = new Collection<QuizQuestionAnswerDetail>(this);
 

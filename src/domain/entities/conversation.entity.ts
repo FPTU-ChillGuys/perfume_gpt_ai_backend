@@ -4,13 +4,16 @@ import { Message } from './message.entity';
 import { ConversationRepository } from 'src/infrastructure/repositories/conversation.repository';
 import { ApiProperty } from '@nestjs/swagger';
 
+/** Entity lưu cuộc hội thoại giữa người dùng và AI */
 @Entity({ repository: () => ConversationRepository })
 export class Conversation extends Common {
-  @ApiProperty()
+  /** ID người dùng sở hữu cuộc hội thoại */
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   @Property()
   userId!: string;
 
-  @ApiProperty({ type: () => Message, isArray: true })
+  /** Danh sách tin nhắn trong cuộc hội thoại */
+  @ApiProperty({ description: 'Danh sách tin nhắn', type: () => Message, isArray: true })
   @OneToMany(() => Message, (message) => message.conversation)
   messages = new Collection<Message>(this);
 

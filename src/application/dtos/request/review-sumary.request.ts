@@ -1,14 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Sentiment } from 'src/domain/enum/sentiment.enum';
 
+/** Request tạo bản tóm tắt đánh giá sản phẩm */
 export class ReviewSumaryRequest {
-  @ApiProperty()
+  /** ID sản phẩm */
+  @ApiProperty({ description: 'ID sản phẩm', format: 'uuid' })
   productId!: string;
-  @ApiProperty()
+
+  /** Nội dung tóm tắt */
+  @ApiProperty({ description: 'Nội dung tóm tắt đánh giá' })
   summary!: string;
-  @ApiProperty({ enum: Sentiment })
+
+  /** Cảm xúc chung */
+  @ApiProperty({ description: 'Cảm xúc chung', enum: Sentiment })
   sentiment!: Sentiment;
-  @ApiProperty()
+
+  /** Số lượng đánh giá */
+  @ApiProperty({ description: 'Số lượng đánh giá được tóm tắt' })
   reviewCount!: number;
 
   constructor(init?: Partial<ReviewSumaryRequest>) {

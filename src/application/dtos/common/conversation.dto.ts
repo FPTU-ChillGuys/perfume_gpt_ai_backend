@@ -2,10 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { MessageDto, MessageRequestDto } from './message.dto';
 import { CommonResponse } from '../response/common/common.response';
 
+/** DTO cuộc hội thoại (response) */
 export class ConversationDto extends CommonResponse{
-  @ApiProperty()
+  /** ID người dùng sở hữu cuộc hội thoại */
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid', required: false })
   userId?: string;
-  @ApiProperty({ type: () => [MessageDto] })
+
+  /** Danh sách tin nhắn trong cuộc hội thoại */
+  @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageDto], required: false })
   messages?: MessageDto[];
 
   constructor(init?: Partial<ConversationDto>) {
@@ -14,15 +18,19 @@ export class ConversationDto extends CommonResponse{
   }
 }
 
+/** DTO cuộc hội thoại (request) */
 export class ConversationRequestDto {
 
-  @ApiProperty()
+  /** ID cuộc hội thoại */
+  @ApiProperty({ description: 'ID cuộc hội thoại', format: 'uuid' })
   id!: string;
 
-  @ApiProperty()
+  /** ID người dùng */
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   userId!: string;
 
-  @ApiProperty({ type: () => [MessageRequestDto] })
+  /** Danh sách tin nhắn */
+  @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageRequestDto] })
   messages!: MessageRequestDto[];
 
   constructor(init?: Partial<ConversationRequestDto>) {

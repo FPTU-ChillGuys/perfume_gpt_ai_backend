@@ -1,32 +1,58 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Gender } from 'src/domain/enum/gender.enum';
 
+/** Response thông tin sản phẩm nước hoa */
 export class ProductResponse {
-  @ApiProperty()
+  /** ID sản phẩm */
+  @ApiProperty({ description: 'ID sản phẩm', format: 'uuid' })
   id!: string;
-  @ApiProperty()
+
+  /** Tên sản phẩm */
+  @ApiProperty({ description: 'Tên sản phẩm' })
   name!: string;
-  @ApiProperty()
+
+  /** ID thương hiệu */
+  @ApiProperty({ description: 'ID thương hiệu' })
   brandId!: number;
-  @ApiProperty()
+
+  /** Tên thương hiệu */
+  @ApiProperty({ description: 'Tên thương hiệu' })
   brandName!: string;
-  @ApiProperty()
+
+  /** ID danh mục */
+  @ApiProperty({ description: 'ID danh mục' })
   categoryId!: number;
-  @ApiProperty()
+
+  /** Tên danh mục */
+  @ApiProperty({ description: 'Tên danh mục' })
   categoryName!: string;
-  @ApiProperty()
+
+  /** ID dòng hương */
+  @ApiProperty({ description: 'ID dòng hương', nullable: true })
   familyId!: number | null;
-  @ApiProperty()
+
+  /** Tên dòng hương */
+  @ApiProperty({ description: 'Tên dòng hương', nullable: true })
   familyName!: string | null;
-  @ApiProperty()
+
+  /** Giới tính hướng đến */
+  @ApiProperty({ description: 'Giới tính hướng đến', enum: Gender })
   gender: Gender;
-  @ApiProperty()
+
+  /** Mô tả sản phẩm */
+  @ApiProperty({ description: 'Mô tả sản phẩm' })
   description!: string;
-  @ApiProperty()
+
+  /** Hương đầu (top notes) */
+  @ApiProperty({ description: 'Hương đầu (top notes)' })
   topNotes!: string;
-  @ApiProperty()
+
+  /** Hương giữa (middle notes) */
+  @ApiProperty({ description: 'Hương giữa (middle notes)' })
   middleNotes!: string;
-  @ApiProperty()
+
+  /** Hương cuối (base notes) */
+  @ApiProperty({ description: 'Hương cuối (base notes)' })
   baseNotes!: string;
 }
 

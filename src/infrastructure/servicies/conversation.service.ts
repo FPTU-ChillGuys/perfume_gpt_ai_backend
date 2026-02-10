@@ -13,6 +13,8 @@ import {
   ConversationMapper,
   MessageMapper
 } from 'src/application/mapping/custom';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 
 @Injectable()
 export class ConversationService {
@@ -144,6 +146,51 @@ export class ConversationService {
         return { success: true, data: response };
       },
       'Failed to get all conversations',
+      true
+    );
+  }
+
+  /**
+   * Lấy danh sách cuộc hội thoại có phân trang.
+   * Hỗ trợ lọc theo userId (tùy chọn).
+   */
+  async getAllConversationsPaginated(
+    request: PagedConversationRequest
+  ): Promise<BaseResponse<PagedResult<ConversationDto>>> {
+    return await funcHandlerAsync(
+      async () => {
+        const pageNumber = Math.max(Number(request.pageNumber) || 1, 1);
+        const pageSize = Math.max(Number(request.pageSize) || 10, 1);
+
+        const where: Record<string, any> = {};
+        if (request.userId) {
+          where.userId = request.userId;
+        }
+
+        const [conversations, totalCount] = await this.unitOfWork.AIConversationRepo.findAndCount(
+          where,
+          {
+            populate: ['messages'],
+            limit: pageSize,
+            offset: (pageNumber - 1) * pageSize,
+            orderBy: { createdAt: 'DESC' }
+          }
+        );
+
+        const items = ConversationMapper.toResponseList(conversations, false);
+        const totalPages = Math.ceil(totalCount / pageSize);
+
+        const pagedResult = new PagedResult<ConversationDto>({
+          items,
+          pageNumber,
+          pageSize,
+          totalCount,
+          totalPages
+        });
+
+        return { success: true, data: pagedResult };
+      },
+      'Failed to get paginated conversations',
       true
     );
   }

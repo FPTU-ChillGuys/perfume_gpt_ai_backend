@@ -6,29 +6,35 @@ import { Common } from './common/common.entities';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserQuizLog } from './user-quiz-log.entity';
 
+/** Entity lưu chi tiết từng cặp câu hỏi - câu trả lời mà người dùng đã chọn */
 @Entity()
 export class QuizQuestionAnswerDetail extends Common {
-  @ApiProperty({type: () => QuizQuestion})
+  /** Câu hỏi được trả lời */
+  @ApiProperty({ description: 'Câu hỏi được trả lời', type: () => QuizQuestion })
   @ManyToOne(() => QuizQuestion, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })
   question!: QuizQuestion;
-  @ApiProperty({type: () => QuizAnswer})
+
+  /** Câu trả lời được chọn */
+  @ApiProperty({ description: 'Câu trả lời được chọn', type: () => QuizAnswer })
   @ManyToOne(() => QuizAnswer, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })
   answer!: QuizAnswer;
 
-  @ApiProperty({type: () => QuizQuestionAnswer})
+  /** Bản ghi bài quiz chứa chi tiết này */
+  @ApiProperty({ description: 'Bản ghi bài quiz cha', type: () => QuizQuestionAnswer })
   @ManyToOne(() => QuizQuestionAnswer, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })
   quesAns!: QuizQuestionAnswer;
 
-  @ApiProperty({ type: () => UserQuizLog, nullable: true  })
+  /** Log quiz của người dùng (nếu có) */
+  @ApiProperty({ description: 'Log quiz của người dùng', type: () => UserQuizLog, nullable: true })
   @OneToOne(() => UserQuizLog, { nullable: true })
   userQuizLog?: UserQuizLog;
 

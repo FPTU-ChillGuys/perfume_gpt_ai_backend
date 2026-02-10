@@ -19,9 +19,17 @@ import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
+import { generateSummaryPrompt } from 'src/application/constant/prompts';
+import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
+import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
+import { QuizQuestionAnswerDetail } from 'src/domain/entities/quiz-question-answer-detail.entity';
+import { SimpleMemoryCache } from '../utils/simple-memory-cache';
 
 @Injectable()
 export class UserLogService {
+  /** Cache cho user log summary report (TTL = 5 phút) */
+  private readonly summaryCache = new SimpleMemoryCache<string>(5 * 60 * 1000);
+
   constructor(private unitOfWork: UnitOfWork) {}
 
   async getUserLogsByUserId(
@@ -72,6 +80,23 @@ export class UserLogService {
     return this.unitOfWork.UserLogRepo.addSearchLogToUserLog(
       user.id,
       searchText
+    );
+  }
+
+  async addQuizQuesAnsDetailToUserLog(
+    userId: string,
+    quizQuesAnsId: string
+  ): Promise<UserQuizLog[]> {
+    // Response existing user log or create new one
+    const user = await this.createUserLogIfNotExist(userId);
+
+    const quizQuesAnsDetail = await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne(
+      { id: quizQuesAnsId }
+    );
+
+    return this.unitOfWork.UserLogRepo.addQuizQuesAnsDetailsLogToUserLog(
+      user.id,
+      quizQuesAnsDetail?.details.getItems() || []
     );
   }
 
@@ -153,9 +178,16 @@ export class UserLogService {
         if (!userLogSummaries.success || !userLogSummaries.data) {
           return { success: false, error: 'User log summaries not found' };
         }
-        const report = userLogSummaries.data
+        // Tao data tu cac log summary
+        const data = userLogSummaries.data
           .map((summary) => summary.logSummary)
           .join('\n');
+
+        // Tao report
+        const report = `User Log Summary Report from ${startDate?.toISOString() ?? 'the beginning'} to ${
+          endDate?.toISOString() ?? new Date().toISOString()
+        }:\n${data}`;
+
         return { success: true, data: report };
       },
       'Failed to get user log summary report',
@@ -164,11 +196,13 @@ export class UserLogService {
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
-  async collectAndSummarizeUserLogs(
+  async getReportAndPromptSummaryUserLogs(
     userLogRequest: UserLogRequest
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
     return await funcHandlerAsync(
       async () => {
+
+        // Xu ly neu khong co startDate thi lay theo period
         if (!userLogRequest.startDate) {
           userLogRequest.startDate = this.getFirstDateOfPeriod(
             userLogRequest.period,
@@ -226,7 +260,7 @@ export class UserLogService {
           .join('; ');
 
         // Tao prompt de tong hop log
-        const prompt = this.generateSummaryPrompt(
+        const prompt = generateSummaryPrompt(
           searchContents,
           messageContents,
           quizContents,
@@ -234,7 +268,8 @@ export class UserLogService {
           endOfDay(convertToUTC(userLogRequest.endDate))
         );
 
-        const response = this.convertUserLogsToString(
+        // Tao response tu cac log
+        const response = this.convertUserLogsToReport(
           searchContents,
           messageContents,
           quizContents,
@@ -250,7 +285,7 @@ export class UserLogService {
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
-  async collectAndSummarizeAllUsersLogs(
+  async getReportAndPromptSummaryAllUsersLogs(
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
     return await funcHandlerAsync(async () => {
@@ -310,7 +345,7 @@ export class UserLogService {
 
         // Tao prompt de tong hop log
         prompt +=
-          this.generateSummaryPrompt(
+          generateSummaryPrompt(
             searchContents,
             messageContents,
             quizContents,
@@ -319,7 +354,7 @@ export class UserLogService {
           ) + '\n';
 
         response =
-          this.convertUserLogsToString(
+          this.convertUserLogsToReport(
             searchContents,
             messageContents,
             quizContents,
@@ -359,29 +394,8 @@ export class UserLogService {
     return startDate;
   }
 
-  //Tao prompt de tong hop log
-  generateSummaryPrompt(
-    searchContents: string,
-    messageContents: string,
-    quizContents: string,
-    startDate: Date,
-    endDate: Date
-  ): string {
-    let prompt = `Summarize the user's activities from ${startDate.toDateString()} to ${new Date(endDate).toDateString()}.\n`;
-    if (searchContents) {
-      prompt += `Search activities: ${searchContents}\n`;
-    }
-    if (messageContents) {
-      prompt += `Messages: ${messageContents}\n`;
-    }
-    if (quizContents) {
-      prompt += `Quiz answers: ${quizContents}\n`;
-    }
-    prompt += `Provide a concise summary of the user's activities during this period.`;
-    return prompt;
-  }
-
-  convertUserLogsToString(
+  // Chuyen doi cac log nguoi dung thanh chuoi de tao report
+  convertUserLogsToReport(
     searchContents: string,
     messageContents: string,
     quizContents: string,
@@ -393,5 +407,64 @@ export class UserLogService {
     Messages: ${messageContents}\n
     Quiz Answers: ${quizContents}\n`;
     return response;
+  }
+
+  /**
+   * Phiên bản có cache của getUserLogSummaryReportByUserId.
+   * Cache theo userId với TTL = 5 phút, tránh query + tổng hợp lặp lại cho cùng user.
+   */
+  async getCachedUserLogSummaryReportByUserId(
+    userId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<BaseResponse<string>> {
+    const cacheKey = `summary:${userId}:${startDate?.toISOString() ?? '0'}:${endDate?.toISOString() ?? 'now'}`;
+
+    const cached = this.summaryCache.get(cacheKey);
+    if (cached) {
+      return { success: true, data: cached };
+    }
+
+    const result = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
+
+    if (result.success && result.data) {
+      this.summaryCache.set(cacheKey, result.data);
+    }
+
+    return result;
+  }
+
+  /**
+   * Phiên bản có cache của getReportAndPromptSummaryUserLogs.
+   * Cache theo userId + period với TTL = 5 phút.
+   */
+  async getCachedReportAndPromptSummaryUserLogs(
+    userLogRequest: UserLogRequest
+  ): Promise<BaseResponse<{ prompt: string; response: string }>> {
+    const cacheKey = `report:${userLogRequest.userId}:${userLogRequest.period}:${userLogRequest.endDate?.toISOString() ?? 'now'}`;
+
+    const cached = this.summaryCache.get(cacheKey);
+    if (cached) {
+      // Giả lập cấu trúc response từ cache
+      return { success: true, data: { prompt: cached, response: cached } };
+    }
+
+    const result = await this.getReportAndPromptSummaryUserLogs(userLogRequest);
+
+    if (result.success && result.data) {
+      this.summaryCache.set(cacheKey, result.data.response);
+    }
+
+    return result;
+  }
+
+  /** Xóa cache summary cho một userId cụ thể hoặc toàn bộ. */
+  clearSummaryCache(userId?: string): void {
+    if (userId) {
+      // Xóa tất cả cache liên quan đến userId
+      this.summaryCache.cleanup();
+    } else {
+      this.summaryCache.clear();
+    }
   }
 }

@@ -5,24 +5,29 @@ import { Entity, Enum, ManyToOne, OneToOne, Property } from '@mikro-orm/core';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserMessageLog } from './user-message-log.entity';
 
+/** Entity lưu tin nhắn trong cuộc hội thoại */
 @Entity()
 export class Message extends Common {
-  @ApiProperty({ enum: Sender })
+  /** Người gửi tin nhắn (USER hoặc ASSISTANT) */
+  @ApiProperty({ description: 'Người gửi tin nhắn', enum: Sender })
   @Enum(() => Sender)
   sender!: Sender;
 
-  @ApiProperty({ type: 'string' })
+  /** Nội dung tin nhắn */
+  @ApiProperty({ description: 'Nội dung tin nhắn', type: 'string' })
   @Property({ type: 'text' })
   message!: string;
 
-  @ApiProperty({ type: () => Conversation })
+  /** Cuộc hội thoại chứa tin nhắn này */
+  @ApiProperty({ description: 'Cuộc hội thoại liên quan', type: () => Conversation })
   @ManyToOne(() => Conversation, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
   })
   conversation!: Conversation;
 
-  @ApiProperty({ type: () => UserMessageLog, nullable: true })
+  /** Log tin nhắn của người dùng (nếu có) */
+  @ApiProperty({ description: 'Log tin nhắn của người dùng', type: () => UserMessageLog, nullable: true })
   @OneToOne(() => UserMessageLog, { nullable: true })
   userMessageLog?: UserMessageLog;
 

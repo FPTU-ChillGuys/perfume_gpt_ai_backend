@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
+import { SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { AIService } from '../servicies/ai.service';
 import { Tools } from 'src/chatbot/utils/tools';
 import { Module, Provider } from '@nestjs/common';

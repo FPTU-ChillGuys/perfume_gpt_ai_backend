@@ -12,10 +12,14 @@ export const searchOutput = {
         description: z.string(),
         brandName: z.string(),
         categoryName: z.string(),
-        familyName: z.string().nullable(),
-        topNotes: z.string(),
-        middleNotes: z.string(),
-        baseNotes: z.string()
+        primaryImage: z.string().nullable(),
+        attributes: z.array(
+          z.object({
+            attribute: z.string(),
+            value: z.string(),
+            desciption: z.string().nullable()
+          })
+        )
       })
     )
   })

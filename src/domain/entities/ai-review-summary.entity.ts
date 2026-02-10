@@ -4,22 +4,27 @@ import { Common } from './common/common.entities';
 import { Entity, Enum, Property } from '@mikro-orm/core';
 import { ApiProperty } from '@nestjs/swagger';
 
+/** Entity lưu bản tóm tắt đánh giá sản phẩm do AI tạo */
 @Entity({ repository: () => AIReviewSummaryRepository })
 export class AIReviewSummary extends Common {
 
-  @ApiProperty()
+  /** ID sản phẩm được tóm tắt */
+  @ApiProperty({ description: 'ID sản phẩm', format: 'uuid' })
   @Property()
   productId!: string;
 
-  @ApiProperty()
+  /** Nội dung tóm tắt đánh giá */
+  @ApiProperty({ description: 'Nội dung tóm tắt đánh giá từ AI' })
   @Property()
   summary!: string;
 
-  @ApiProperty({ enum: Sentiment })
+  /** Cảm xúc chung của đánh giá (positive / negative / neutral) */
+  @ApiProperty({ description: 'Cảm xúc chung', enum: Sentiment })
   @Enum(() => Sentiment)
   sentiment!: Sentiment;
 
-  @ApiProperty()
+  /** Số lượng đánh giá được tóm tắt */
+  @ApiProperty({ description: 'Số lượng đánh giá' })
   @Property()
   reviewCount!: number;
   

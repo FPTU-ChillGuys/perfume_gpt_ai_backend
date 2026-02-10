@@ -4,22 +4,27 @@ import { ApiProperty } from '@nestjs/swagger';
 import { PeriodEnum } from '../enum/period.enum';
 import { UserLogSummaryRepository } from 'src/infrastructure/repositories/user-log-summary.repository';
 
+/** Entity lưu bản tóm tắt hành vi người dùng theo khoảng thời gian */
 @Entity({repository: () => UserLogSummaryRepository})
 export class UserLogSummary extends Common {
   
-  @ApiProperty()
+  /** ID người dùng */
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   @Property()
   userId!: string;
 
-  @ApiProperty()
+  /** Ngày bắt đầu khoảng thời gian tóm tắt */
+  @ApiProperty({ description: 'Ngày bắt đầu' })
   @Property()
   startDate!: Date;
 
-  @ApiProperty()
+  /** Ngày kết thúc khoảng thời gian tóm tắt */
+  @ApiProperty({ description: 'Ngày kết thúc' })
   @Property()
   endDate!: Date;
 
-  @ApiProperty({type: 'string' })
+  /** Nội dung tóm tắt hành vi người dùng */
+  @ApiProperty({ description: 'Nội dung tóm tắt log', type: 'string' })
   @Property({ type: 'text' })
   logSummary!: string;
 

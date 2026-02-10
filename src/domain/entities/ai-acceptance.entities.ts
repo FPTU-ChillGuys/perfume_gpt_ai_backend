@@ -3,13 +3,16 @@ import { ApiProperty } from '@nestjs/swagger';
 import { AIAcceptanceRepository } from 'src/infrastructure/repositories/ai-acceptance.repository';
 import { Common } from './common/common.entities';
 
+/** Entity lưu trạng thái chấp nhận đề xuất AI của người dùng */
 @Entity({ repository: () => AIAcceptanceRepository })
 export class AIAcceptance extends Common {
-  @ApiProperty()
+  /** ID người dùng */
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   @Property()
   userId: string;
 
-  @ApiProperty()
+  /** Người dùng có chấp nhận đề xuất AI hay không */
+  @ApiProperty({ description: 'Trạng thái chấp nhận AI' })
   @Property()
   isAccepted: boolean;
 

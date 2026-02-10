@@ -2,10 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { CommonResponse } from '../response/common/common.response';
 import { Sender } from 'src/domain/enum/sender.enum';
 
+/** DTO tin nhắn (response) */
 export class MessageDto extends CommonResponse {
-  @ApiProperty()
+  /** Người gửi tin nhắn */
+  @ApiProperty({ description: 'Người gửi tin nhắn (user hoặc assistant)' })
   sender!: string;
-  @ApiProperty()
+
+  /** Nội dung tin nhắn */
+  @ApiProperty({ description: 'Nội dung tin nhắn' })
   message!: string;
 
   constructor(init?: Partial<MessageDto>) {
@@ -14,10 +18,14 @@ export class MessageDto extends CommonResponse {
   }
 }
 
+/** DTO tin nhắn (request) */
 export class MessageRequestDto {
-  @ApiProperty()
+  /** Người gửi tin nhắn */
+  @ApiProperty({ description: 'Người gửi tin nhắn', enum: Sender })
   sender!: Sender;
-  @ApiProperty()
+
+  /** Nội dung tin nhắn */
+  @ApiProperty({ description: 'Nội dung tin nhắn' })
   message!: string;
 
   constructor(init?: Partial<MessageRequestDto>) {

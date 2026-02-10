@@ -1,10 +1,11 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { MessageDto } from "../common/message.dto";
 import { CommonResponse } from "./common/common.response";
 
+/** Response log tin nhắn của người dùng */
 export class UserMessageLogResponse extends CommonResponse {
 
-    @ApiProperty()
+    /** ID tin nhắn được ghi log */
+    @ApiProperty({ description: 'ID tin nhắn', format: 'uuid' })
     messageId!: string;
 
     constructor(init?: Partial<UserMessageLogResponse>) {

@@ -4,13 +4,16 @@ import { Common } from './common/common.entities';
 import { Message } from './message.entity';
 import { UserLog } from './user-log.entity';
 
+/** Entity lưu log tin nhắn của người dùng - liên kết Message với UserLog */
 @Entity()
 export class UserMessageLog extends Common {
-  @ApiProperty({ type: () => Message, nullable: true })
+  /** Tin nhắn được ghi log (nếu có) */
+  @ApiProperty({ description: 'Tin nhắn được ghi log', type: () => Message, nullable: true })
   @OneToOne(() => Message, { nullable: true })
   message?: Message;
 
-  @ApiProperty({ type: () => UserLog })
+  /** Bản ghi user log cha */
+  @ApiProperty({ description: 'User log cha', type: () => UserLog })
   @ManyToOne(() => UserLog)
   userLog: UserLog;
 

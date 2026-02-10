@@ -4,17 +4,22 @@ import { UserMessageLogResponse } from './user-message-log.response';
 import { UserQuizLogResponse } from './user-quiz-log.response';
 import { UserSearchLogResponse } from './user-search-log.response';
 
+/** Response log hành vi người dùng */
 export class UserLogResponse extends CommonResponse {
-  @ApiProperty()
+  /** ID người dùng */
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   userId!: string;
 
-  @ApiProperty()
+  /** Danh sách log tin nhắn */
+  @ApiProperty({ description: 'Danh sách log tin nhắn', type: [UserMessageLogResponse] })
   userMessageLogs!: UserMessageLogResponse[];
 
-  @ApiProperty()
+  /** Danh sách log quiz */
+  @ApiProperty({ description: 'Danh sách log quiz', type: [UserQuizLogResponse] })
   userQuizLogs!: UserQuizLogResponse[];
 
-  @ApiProperty()
+  /** Danh sách log tìm kiếm */
+  @ApiProperty({ description: 'Danh sách log tìm kiếm', type: [UserSearchLogResponse] })
   userSearchLogs!: UserSearchLogResponse[]
 
 }

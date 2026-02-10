@@ -88,6 +88,21 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     return userLog.userQuizLogs.getItems();
   }
 
+  async addQuizQuesAnsDetailsLogToUserLog(
+    userId: string,
+    quizQuesAnsDetails: QuizQuestionAnswerDetail[]
+  ) {
+    let userLog = await this.findOne({ userId });
+    if (!userLog) {
+      userLog = this.createUserLog(userId);
+    }
+    quizQuesAnsDetails.forEach(quizQuesAnsDetail => {
+      userLog.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog }));
+    });
+    await this.em.flush();
+    return userLog.userQuizLogs.getItems();
+  }
+
   async getUserLogsWithQuizDetails(userId: string): Promise<UserLog | null> {
     return this.findOne(
       { userId },

@@ -1,14 +1,16 @@
 import { Body, Controller, Inject, Post } from '@nestjs/common';
-import { ApiBody } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/chatbot/utils/prompts';
+import { ADVANCED_MATCHING_SYSTEM_PROMPT, trendForecastingPrompt } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { AITrendForecastStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 
+@ApiTags('Trends')
 @Controller('trends')
 export class TrendController {
   constructor(
@@ -16,34 +18,33 @@ export class TrendController {
     @Inject(AI_SERVICE) private aiService: AIService
   ) {}
 
-  // Trend forcasting
+  /** Dự đoán xu hướng từ tổng hợp log người dùng */
   @Public()
   @Post('summary')
+  @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
   @ApiBaseResponse(String)
   @ApiBody({ type: AllUserLogRequest })
   async summarizeLogs(
     @Body() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<string>> {
-    const response =
-      await this.userLogService.collectAndSummarizeAllUsersLogs(allUserLogRequest);
+    const reportAndPromptSummary =
+      await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
 
-    if (!response.success) {
+    if (!reportAndPromptSummary.success) {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
     // Summarize with AI
-    const summaryResponse = await this.aiService.textGenerateFromPrompt(
-       `${response.data!.prompt}`
+    const reportResponse = await this.aiService.textGenerateFromPrompt(
+       `${reportAndPromptSummary.data!.prompt}`
     );
     
-    if (!summaryResponse.success) {
+    if (!reportResponse.success) {
       return { success: false, error: 'Failed to get AI response' };
     }
 
     //Trend forecasting prompt base on summary response
-    const trendPrompt = 
-    `Based on the following summarized user logs, identify emerging trends and patterns that could inform future product development and marketing strategies. Provide insights into user behavior, preferences, and potential market opportunities:\n
-    ${summaryResponse.data}`;
+    const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
     
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,
@@ -55,5 +56,58 @@ export class TrendController {
     }
 
     return { success: true, data: trendResponse.data };
+  }
+
+  /**
+   * Dự đoán xu hướng có cấu trúc - Trả về metadata bổ sung (thời gian xử lý, khoảng thời gian phân tích).
+   */
+  @Public()
+  @Post('summary/structured')
+  @ApiOperation({ summary: 'Dự đoán xu hướng có cấu trúc với metadata' })
+  @ApiBaseResponse(AITrendForecastStructuredResponse)
+  @ApiBody({ type: AllUserLogRequest })
+  async summarizeLogsStructured(
+    @Body() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<AITrendForecastStructuredResponse>> {
+    const startTime = Date.now();
+
+    const reportAndPromptSummary =
+      await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
+
+    if (!reportAndPromptSummary.success) {
+      return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    const reportResponse = await this.aiService.textGenerateFromPrompt(
+      `${reportAndPromptSummary.data!.prompt}`
+    );
+
+    if (!reportResponse.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
+
+    const trendResponse = await this.aiService.textGenerateFromPrompt(
+      trendPrompt,
+      ADVANCED_MATCHING_SYSTEM_PROMPT
+    );
+
+    if (!trendResponse.success) {
+      return { success: false, error: 'Failed to get AI trend response' };
+    }
+
+    const processingTimeMs = Date.now() - startTime;
+
+    const period = allUserLogRequest.period ?? 'custom';
+    const structuredResponse = new AITrendForecastStructuredResponse({
+      forecast: trendResponse.data ?? '',
+      period: period.toString(),
+      analyzedLogCount: 0,
+      generatedAt: new Date(),
+      metadata: new AIResponseMetadata({ processingTimeMs })
+    });
+
+    return { success: true, data: structuredResponse };
   }
 }

@@ -1,12 +1,21 @@
 import { Controller, Get, Inject, Query } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
+import { reviewSummaryPrompt } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { AIReviewSummaryStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
+import { AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 
 @Public()
+@ApiTags('Reviews')
 @Controller('reviews')
 export class ReviewController {
 
@@ -15,16 +24,20 @@ export class ReviewController {
         @Inject(AI_SERVICE) private aiService: AIService
     ) {}
 
-    //Get reviews
+    /** Lấy danh sách đánh giá */
     @Get()
-    async getReviews(@Query() request: GetPagedReviewRequest): Promise<any> {
+    @ApiOperation({ summary: 'Lấy danh sách đánh giá (phân trang)' })
+    @ApiBaseResponse(PagedResult<ReviewListItemResponse>)
+    async getReviews(@Query() request: GetPagedReviewRequest): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
         return await this.reviewService.getAllReviews(request);
     }
 
-    // Review summary
-    // Review theo tung variant
+    /** Tóm tắt đánh giá bằng AI theo variant ID */
     @Get('summary/:variantId')
-    async getReviewSummaryByVariantId(@Query('variantId') variantId: string): Promise<any> {
+    @ApiBaseResponse(String)
+    @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI theo variant ID' })
+    @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
+    async getReviewSummaryByVariantId(@Query('variantId') variantId: string): Promise<BaseResponse<string>> {
         const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
 
         if (!reviewsResponse.success) {
@@ -34,12 +47,8 @@ export class ReviewController {
         const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
         const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
 
-        const summaryPrompt = 
-        `Summarize the following product reviews, highlighting key points such as common praises, frequent complaints, and overall sentiment. Provide insights that could help improve the product or inform potential buyers:\n
-        ${reviewsText}`;
-
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            summaryPrompt
+            reviewSummaryPrompt(reviewsText)
         );
 
         if (!summaryResponse.success) {
@@ -49,10 +58,11 @@ export class ReviewController {
         return { success: true, data: summaryResponse.data };
     }
 
-    // Review summary
-    // Review theo tung variant
+    /** Tóm tắt đánh giá bằng AI cho tất cả variant */
     @Get('summary/all')
-    async getReviewSummaryFromAllVariant(request: GetPagedReviewRequest): Promise<any> {
+    @ApiBaseResponse(String)
+    @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
+    async getReviewSummaryFromAllVariant(request: GetPagedReviewRequest): Promise<BaseResponse<string>> {
         const reviewsResponse = await this.reviewService.getAllReviews(request);
 
         if (!reviewsResponse.success) {
@@ -62,12 +72,8 @@ export class ReviewController {
         const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
         const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
 
-        const summaryPrompt = 
-        `Summarize the following product reviews, highlighting key points such as common praises, frequent complaints, and overall sentiment. Provide insights that could help improve the product or inform potential buyers:\n
-        ${reviewsText}`;
-
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            summaryPrompt
+            reviewSummaryPrompt(reviewsText)
         );
 
         if (!summaryResponse.success) {
@@ -75,6 +81,49 @@ export class ReviewController {
         }
 
         return { success: true, data: summaryResponse.data };
+    }
+
+    /**
+     * Tóm tắt đánh giá bằng AI theo variant ID - Phiên bản có cấu trúc.
+     * Trả về response có metadata (thời gian xử lý, số review đã phân tích).
+     */
+    @Get('summary/structured/:variantId')
+    @ApiBaseResponse(AIReviewSummaryStructuredResponse)
+    @ApiOperation({ summary: 'Tóm tắt đánh giá có cấu trúc theo variant ID' })
+    @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
+    async getStructuredReviewSummaryByVariantId(
+        @Query('variantId') variantId: string
+    ): Promise<BaseResponse<AIReviewSummaryStructuredResponse>> {
+        const startTime = Date.now();
+
+        const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
+
+        if (!reviewsResponse.success) {
+            return { success: false, error: 'Failed to fetch reviews' };
+        }
+
+        const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
+        const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
+
+        const summaryResponse = await this.aiService.textGenerateFromPrompt(
+            reviewSummaryPrompt(reviewsText)
+        );
+
+        if (!summaryResponse.success) {
+            return { success: false, error: 'Failed to get AI summary response' };
+        }
+
+        const processingTimeMs = Date.now() - startTime;
+
+        const structuredResponse = new AIReviewSummaryStructuredResponse({
+            summary: summaryResponse.data ?? '',
+            variantId,
+            reviewCount: reviews.length,
+            generatedAt: new Date(),
+            metadata: new AIResponseMetadata({ processingTimeMs })
+        });
+
+        return { success: true, data: structuredResponse };
     }
     
     

@@ -1,98 +1,305 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Perfume GPT AI Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> AI Chatbot backend cho hệ thống PerfumeGPT - được xây dựng bằng NestJS, MikroORM và PostgreSQL.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Mục lục
 
-## Description
+- [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
+- [Cài đặt từng bước](#cài-đặt-từng-bước)
+  - [Bước 1: Clone repository & cài đặt dependencies](#bước-1-clone-repository--cài-đặt-dependencies)
+  - [Bước 2: Cài đặt PostgreSQL (Docker)](#bước-2-cài-đặt-postgresql-docker)
+  - [Bước 3: Cấu hình file môi trường (.env)](#bước-3-cấu-hình-file-môi-trường-env)
+  - [Bước 4: Cấu hình kết nối database (host-config.mjs)](#bước-4-cấu-hình-kết-nối-database-host-configmjs)
+  - [Bước 5: Cấu hình RSA Keys (public_key.pem)](#bước-5-cấu-hình-rsa-keys-public_keypem)
+  - [Bước 6: Kiểm tra kết nối database](#bước-6-kiểm-tra-kết-nối-database)
+  - [Bước 7: Chạy migration](#bước-7-chạy-migration)
+  - [Bước 8: Chạy project](#bước-8-chạy-project)
+- [Cài đặt Backend chính (.NET)](#cài-đặt-backend-chính-net)
+- [Tổng quan kiến trúc](#tổng-quan-kiến-trúc)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## Yêu cầu hệ thống
 
-```bash
-$ pnpm install
-```
+| Tool          | Phiên bản tối thiểu | Ghi chú                          |
+| ------------- | -------------------- | -------------------------------- |
+| **Node.js**   | >= 18                |                                  |
+| **pnpm**      | >= 8                 | **Sử dụng pnpm, KHÔNG dùng npm** |
+| **Docker**    | Latest               | Để chạy PostgreSQL               |
+| **PostgreSQL**| >= 14                | Chạy qua Docker                  |
+| **.NET SDK**  | >= 8.0               | Cho backend chính (perfume-gpt-backend) |
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ pnpm run start
+## Cài đặt từng bước
 
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
-```
-
-## Run tests
+### Bước 1: Clone repository & cài đặt dependencies
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+git clone https://github.com/FPTU-ChillGuys/perfume_gpt_ai_backend.git
+cd perfume_gpt_ai_backend
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+> **Lưu ý:** Sử dụng `pnpm` để install, **KHÔNG** dùng `npm`.
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm install
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+### Bước 2: Cài đặt PostgreSQL (Docker)
 
-Check out a few resources that may come in handy when working with NestJS:
+Cài đặt [Docker Desktop](https://www.docker.com/products/docker-desktop/) nếu chưa có, sau đó chạy PostgreSQL container:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+docker run --name perfume-gpt-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=your_password \
+  -e POSTGRES_DB=perfume_gpt_ai \
+  -p 5432:5432 \
+  -d postgres:16
+```
 
-## Support
+> Thay `your_password` bằng mật khẩu bạn muốn đặt.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Kiểm tra container đã chạy:
 
-## Stay in touch
+```bash
+docker ps
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
+### Bước 3: Cấu hình file môi trường (.env)
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Tạo file `.env` tại thư mục gốc của project với nội dung sau:
+
+```env
+# Server
+PORT=3000
+
+# .NET Backend URL (perfume-gpt-backend)
+BASE_URL=https://localhost:7011/api
+
+# JWT Configuration (phải trùng với cấu hình bên perfume-gpt-backend)
+JWT_ISSUER=PerfumeGPT
+JWT_AUDIENCE=PerfumeGPT
+
+# OpenAI API Key
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+> **Lưu ý:**
+> - `BASE_URL` trỏ tới backend .NET (`perfume-gpt-backend`). Mặc định là `https://localhost:7011/api`.
+> - `JWT_ISSUER` và `JWT_AUDIENCE` phải **trùng khớp** với cấu hình JWT bên repo `perfume-gpt-backend`.
+> - `OPENAI_API_KEY` là API key từ OpenAI để sử dụng các tính năng AI.
+
+---
+
+### Bước 4: Cấu hình kết nối database (host-config.mjs)
+
+Copy file `host-config.mjs.example` thành `host-config.mjs` và chỉnh sửa thông tin kết nối PostgreSQL:
+
+```bash
+cp host-config.mjs.example host-config.mjs
+```
+
+Mở file `host-config.mjs` và sửa `user` & `password` cho khớp với PostgreSQL container đã tạo ở Bước 2:
+
+```js
+export const host_config = {
+  host: 'localhost',    // Mặc định localhost, không cần sửa
+  port: 5432,           // Mặc định 5432, không cần sửa
+  user: 'postgres',     // Sửa thành user PostgreSQL của bạn
+  password: 'your_password'  // Sửa thành password PostgreSQL của bạn
+};
+```
+
+> **Lưu ý:** Thông thường PostgreSQL mặc định `host` là `localhost` và `port` là `5432`, nên bạn **chỉ cần sửa `user` và `password`**.
+
+---
+
+### Bước 5: Cấu hình RSA Keys (public_key.pem)
+
+Project này sử dụng xác thực JWT bằng RSA (RS256). Bạn cần có cặp key RSA (`private_key.pem` và `public_key.pem`).
+
+#### Đối với `perfume_gpt_ai_backend` (project này):
+
+Chỉ cần **copy file `public_key.pem`** vào **thư mục gốc** của project:
+
+```
+perfume_gpt_ai_backend/
+├── public_key.pem       <-- Copy file vào đây
+├── host-config.mjs
+├── package.json
+├── ...
+```
+
+> Project này chỉ cần `public_key.pem` để **verify** JWT token (không cần private key).
+
+#### Đối với `perfume-gpt-backend` (backend .NET):
+
+Cần cấu hình **cả 2 key** trong file `.env` hoặc `appsettings.json`:
+
+| Key trong .env       | File PEM            | Mô tả                           |
+| -------------------- | ------------------- | -------------------------------- |
+| `Jwt__Key`           | `private_key.pem`   | Mở file, copy toàn bộ nội dung  |
+| `JWT_PUBLIC_KEY`     | `public_key.pem`    | Mở file, copy toàn bộ nội dung  |
+
+Cách thực hiện:
+1. Mở file `private_key.pem` → Copy toàn bộ nội dung → Paste vào giá trị `Jwt__Key` trong `.env` của backend .NET
+2. Mở file `public_key.pem` → Copy toàn bộ nội dung → Paste vào giá trị `JWT_PUBLIC_KEY` trong `.env` của backend .NET
+
+> **Nếu chưa có cặp key RSA**, có thể tạo bằng OpenSSL:
+> ```bash
+> # Tạo private key
+> openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:2048
+>
+> # Tạo public key từ private key
+> openssl rsa -pubout -in private_key.pem -out public_key.pem
+> ```
+
+---
+
+### Bước 6: Kiểm tra kết nối database
+
+Chạy lệnh sau để kiểm tra kết nối tới PostgreSQL:
+
+```bash
+npx mikro-orm debug
+```
+
+Nếu kết nối thành công, bạn sẽ thấy output tương tự:
+
+```
+- searched for config name: default
+- configuration found
+- driver dependencies:
+  - knex 3.1.0
+  - pg 8.17.2
+- database connection successful     ✅
+- will use 'entities' array (contains X references and 0 paths)
+```
+
+> **Quan trọng:** Nếu hiện `database connection successful` thì đã kết nối OK. Nếu bị lỗi, hãy kiểm tra lại thông tin `user`, `password` trong `host-config.mjs` và đảm bảo PostgreSQL container đang chạy.
+
+---
+
+### Bước 7: Chạy migration
+
+Sau khi kết nối database thành công, chạy migration để tạo các bảng trong database:
+
+```bash
+npx mikro-orm migration:up
+```
+
+---
+
+### Bước 8: Chạy project
+
+```bash
+# Development (watch mode - tự động reload khi thay đổi code)
+pnpm run start:dev
+
+# Hoặc chạy bình thường
+pnpm run start
+
+# Production mode
+pnpm run start:prod
+```
+
+Server sẽ chạy tại: **http://localhost:3000**
+
+API Reference (Scalar): **http://localhost:3000/reference**
+
+---
+
+## Cài đặt Backend chính (.NET)
+
+Project AI Backend này gọi API tới backend chính [perfume-gpt-backend](https://github.com/FPTU-ChillGuys/perfume-gpt-backend) (xây dựng bằng .NET) để sử dụng các chức năng như: **Product, Order, Inventory, Review**, v.v.
+
+> **Bắt buộc phải chạy backend .NET song song** với project này để các tính năng hoạt động đầy đủ.
+
+### Các bước cài đặt perfume-gpt-backend:
+
+1. **Clone repository:**
+   ```bash
+   git clone https://github.com/FPTU-ChillGuys/perfume-gpt-backend.git
+   cd perfume-gpt-backend
+   ```
+
+2. **Cấu hình `.env`:**
+   Copy file `.env.example` thành `.env` và điền các thông tin cần thiết:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Trong file `.env`, cấu hình các giá trị quan trọng:
+   ```env
+   # Database (SQL Server)
+   ConnectionStrings__DefaultConnection=Server=localhost;Database=PerfumeGPT;...
+   
+   # JWT - RSA Keys
+   Jwt__Key=<nội dung private_key.pem>
+   JWT_PUBLIC_KEY=<nội dung public_key.pem>
+   Jwt__Issuer=PerfumeGPT
+   Jwt__Audience=PerfumeGPT
+   
+   # CORS - AI Backend URL
+   Back-end__aiUrl=http://localhost:3000
+   ```
+
+3. **Chạy project:**
+   ```bash
+   dotnet run --project PerfumeGPT.API
+   ```
+   
+   Backend .NET sẽ chạy tại: **https://localhost:7011**
+   
+   OpenAPI docs: **https://localhost:7011/openapi/v1.json**
+
+---
+
+## Tổng quan kiến trúc
+
+```
+┌─────────────────────┐     API calls      ┌──────────────────────────┐
+│                     │ ──────────────────> │                          │
+│  perfume_gpt_ai_    │                     │   perfume-gpt-backend    │
+│  backend            │                     │   (.NET)                 │
+│  (NestJS + AI)      │ <────────────────── │                          │
+│  Port: 3000         │    JSON responses   │   Port: 7011             │
+│                     │                     │                          │
+│  - AI Chatbot       │                     │   - Products API         │
+│  - Recommendations  │                     │   - Orders API           │
+│  - Quiz             │                     │   - Inventory API        │
+│  - Conversations    │                     │   - Reviews API          │
+│  - Trend Analysis   │                     │   - Auth (JWT RS256)     │
+│                     │                     │                          │
+└────────┬────────────┘                     └────────┬─────────────────┘
+         │                                           │
+         │ MikroORM                                  │ EF Core
+         ▼                                           ▼
+   ┌───────────┐                              ┌───────────┐
+   │PostgreSQL │                              │SQL Server │
+   │(AI Data)  │                              │(Main Data)│
+   └───────────┘                              └───────────┘
+```
+
+---
+
+## Tóm tắt nhanh
+
+| Bước | Lệnh / Hành động                              | Mô tả                                     |
+| ---- | ---------------------------------------------- | ------------------------------------------ |
+| 1    | `pnpm install`                                 | Cài đặt dependencies (dùng pnpm)           |
+| 2    | `docker run ... postgres:16`                   | Chạy PostgreSQL bằng Docker                |
+| 3    | Tạo file `.env`                                | Cấu hình biến môi trường                   |
+| 4    | `cp host-config.mjs.example host-config.mjs`   | Cấu hình kết nối database                  |
+| 5    | Copy `public_key.pem` vào thư mục gốc         | Cấu hình RSA public key cho JWT            |
+| 6    | `npx mikro-orm debug`                          | Kiểm tra kết nối database                  |
+| 7    | `npx mikro-orm migration:up`                   | Chạy migration tạo bảng                    |
+| 8    | `pnpm run start:dev`                           | Khởi chạy server development               |
+
+> **Nhớ:** Cần chạy [perfume-gpt-backend](https://github.com/FPTU-ChillGuys/perfume-gpt-backend) (.NET) song song để sử dụng đầy đủ các chức năng (Product, Order, Inventory, Review, ...).

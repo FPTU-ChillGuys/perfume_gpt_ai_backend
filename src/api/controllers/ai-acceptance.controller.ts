@@ -25,7 +25,7 @@ export class AIAcceptanceController {
   @ApiOperation({ summary: 'Lấy trạng thái chấp nhận AI theo user ID' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   @ApiBaseResponse(AIAcceptance)
-  async getAIAcceptanceStatus(@Param('userId') userId: string) {
+  async getAIAcceptanceStatus(@Param('userId') userId: string): Promise<BaseResponse<AIAcceptance | null>> {
     return this.aiAcceptanceService.getAIAcceptanceByUserId(userId);
   }
 
@@ -34,7 +34,7 @@ export class AIAcceptanceController {
   @ApiOperation({ summary: 'Lấy tỷ lệ chấp nhận AI theo trạng thái' })
   @ApiQuery({ name: 'isAccepted', required: true, description: 'Trạng thái chấp nhận (true/false)' })
   @ApiBaseResponse(Number)
-  async getAIAcceptanceRate(@Query('isAccepted') isAccepted: string) {
+  async getAIAcceptanceRate(@Query('isAccepted') isAccepted: string): Promise<BaseResponse<number>> {
     return this.aiAcceptanceService.getAIAcceptanceRateByAcceptanceStatus(isAccepted === 'true');
   }
 
@@ -43,7 +43,7 @@ export class AIAcceptanceController {
   @ApiOperation({ summary: 'Lấy tỷ lệ chấp nhận AI theo user ID' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   @ApiBaseResponse(Number)
-  async getAIAcceptanceRateByUserId(@Param('userId') userId: string) {
+  async getAIAcceptanceRateByUserId(@Param('userId') userId: string): Promise<BaseResponse<number>> {
     return this.aiAcceptanceService.getAIAcceptanceRateByAcceptanceStatusWithUserId(userId);
   }
 
@@ -53,7 +53,7 @@ export class AIAcceptanceController {
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   @ApiQuery({ name: 'isAccepted', required: true, description: 'Trạng thái chấp nhận (true/false)' })
   @ApiBaseResponse(AIAcceptance)
-  async createAIAcceptanceRecord(@Param('userId') userId: string, @Query('isAccepted') isAccepted: string) {
+  async createAIAcceptanceRecord(@Param('userId') userId: string, @Query('isAccepted') isAccepted: string): Promise<BaseResponse<AIAcceptance>> {
     return this.aiAcceptanceService.createAIAcceptanceRecord(userId, isAccepted === 'false');
   }
 

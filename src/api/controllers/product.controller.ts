@@ -3,6 +3,7 @@ import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
 import { ExtendApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
@@ -17,7 +18,7 @@ export class ProductController {
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả sản phẩm' })
   @ExtendApiBaseResponse(PagedResult<ProductResponse>)
-  async getAllProducts(@Query() request: PagedAndSortedRequest) {
+  async getAllProducts(@Query() request: PagedAndSortedRequest): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
     return this.productService.getAllProducts(request);
   }
 
@@ -27,7 +28,7 @@ export class ProductController {
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search' })
   @ApiQuery({ name: 'searchText', description: 'Từ khóa tìm kiếm' })
   @ExtendApiBaseResponse(PagedResult<ProductResponse>)
-  async getProductsBySemanticSearch(@Query('searchText') searchText: string, @Query() request: PagedAndSortedRequest) {
+  async getProductsBySemanticSearch(@Query('searchText') searchText: string, @Query() request: PagedAndSortedRequest): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
     return this.productService.getProductsUsingSemanticSearch(searchText, request);
   }
 

@@ -8,6 +8,8 @@ import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 
 @Public()
@@ -23,7 +25,8 @@ export class ReviewController {
     /** Lấy danh sách đánh giá */
     @Get()
     @ApiOperation({ summary: 'Lấy danh sách đánh giá (phân trang)' })
-    async getReviews(@Query() request: GetPagedReviewRequest): Promise<any> {
+    @ApiBaseResponse(PagedResult<ReviewListItemResponse>)
+    async getReviews(@Query() request: GetPagedReviewRequest): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
         return await this.reviewService.getAllReviews(request);
     }
 

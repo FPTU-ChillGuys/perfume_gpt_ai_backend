@@ -53,7 +53,8 @@ export class QuizController {
   @Public()
   @Post('questions')
   @ApiOperation({ summary: 'Tạo câu hỏi quiz mới' })
-  async createQuizQues(@Body() quizQuestionRequest: QuizQuestionRequest) {
+  @ApiBaseResponse(String)
+  async createQuizQues(@Body() quizQuestionRequest: QuizQuestionRequest): Promise<BaseResponse<string>> {
     return this.quizService.addQuizQues(quizQuestionRequest);
   }
 
@@ -62,7 +63,8 @@ export class QuizController {
   @Get('user/:userId/check-first-time')
   @ApiOperation({ summary: 'Kiểm tra người dùng đã làm quiz lần đầu chưa' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
-  async checkFirstTime(@Param('userId') userId: string) {
+  @ApiBaseResponse(Boolean)
+  async checkFirstTime(@Param('userId') userId: string): Promise<BaseResponse<boolean>> {
     const isFirstTime =
       await this.quizService.checkExistQuizQuesAnwsByUserId(userId);
     return { success: true, data: isFirstTime };
@@ -73,7 +75,8 @@ export class QuizController {
   @Post('questions/list')
   @ApiOperation({ summary: 'Tạo nhiều câu hỏi quiz cùng lúc' })
   @ApiBody({ type: [QuizQuestionRequest] })
-  async createQuizQueses(@Body() quizQuestionRequest: QuizQuestionRequest[]) {
+  @ApiBaseResponse(String)
+  async createQuizQueses(@Body() quizQuestionRequest: QuizQuestionRequest[]): Promise<BaseResponse<void>> {
     for (const quizQuestion of quizQuestionRequest) {
       await this.quizService.addQuizQues(quizQuestion);
     }

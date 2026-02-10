@@ -5,6 +5,8 @@ import { Public } from 'src/application/common/Metadata';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
@@ -29,7 +31,7 @@ export class InventoryController {
   async getInventoryStock(
     @Req() request: Request,
     @Query() inventoryStockRequest: InventoryStockRequest
-  ) {
+  ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return this.inventoryService.getInventoryStock(
       inventoryStockRequest,
       extractTokenFromHeader(request!) ?? ''
@@ -40,7 +42,7 @@ export class InventoryController {
   @Get('batches')
   @ApiOperation({ summary: 'Lấy danh sách batch' })
   @ApiBaseResponse(PagedResult<BatchResponse>)
-  async getBatch(@Req() request: Request, @Query() batchRequest: BatchRequest) {
+  async getBatch(@Req() request: Request, @Query() batchRequest: BatchRequest): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
     return this.inventoryService.getBatch(
       batchRequest,
       extractTokenFromHeader(request!) ?? ''
@@ -53,14 +55,14 @@ export class InventoryController {
   @ApiBaseResponse(String)
   async getInventoryReport(
     @Req() request: Request,
-  ) {
+  ): Promise<BaseResponse<string>> {
     const authHeader = extractTokenFromHeader(request!) ?? '';
 
     // Fetch stock and batch data
     const report =
       await this.inventoryService.createReportFromBatchAndStock(authHeader);
 
-    return { success: true, data: report };
+    return { success: true, data: report.toString() };
   }
 
   /** Tạo báo cáo tồn kho bằng AI */
@@ -69,7 +71,7 @@ export class InventoryController {
   @ApiBaseResponse(String)
   async getAIInventoryReport(
     @Req() request: Request,
-  ) {
+  ): Promise<BaseResponse<string>> {
     const authHeader = extractTokenFromHeader(request!) ?? '';
 
     // Fetch stock and batch data

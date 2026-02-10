@@ -10,8 +10,10 @@ import {
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { OrderRequest } from 'src/application/dtos/request/order.request';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
-import { OrderResponse } from 'src/application/dtos/response/order.response';
+import { OrderListItemResponse, OrderResponse } from 'src/application/dtos/response/order.response';
 import { orderSummaryPrompt } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
@@ -34,7 +36,7 @@ export class OrderController {
   async getAllOrders(
     @Req() request: Request,
     @Query('orderRequest') orderRequest: OrderRequest
-  ) {
+  ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
     return await this.orderService.getAllOrders(
       orderRequest,
       extractTokenFromHeader(request!) ?? ''
@@ -50,7 +52,7 @@ export class OrderController {
     @Req() request: Request,
     @Param('userId') userId: string,
     @Query('orderRequest') orderRequest: OrderRequest
-  ) {
+  ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
     return await this.orderService.getOrdersByUserId(
       userId,
       orderRequest,
@@ -66,7 +68,7 @@ export class OrderController {
   async getAIOrderSummary(
     @Req() request: Request,
     @Query('userId') userId: string
-  ) {
+  ): Promise<BaseResponse<string>> {
 
     // Lay tat ca don hang cua user
     const ordersResponse =

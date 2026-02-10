@@ -182,7 +182,7 @@ export class RecommendationController {
 
   /** Gợi ý sản phẩm bằng AI V2 - Dùng log tóm tắt */
   @Public()
-  @Post('recommend/ai/v1')
+  @Post('recommend/ai/v2')
   @ApiOperation({ summary: 'Gợi ý AI V2 - Dùng log tóm tắt' })
   @ApiBaseResponse(String)
   @ApiBody({ type: UserLogRequest })

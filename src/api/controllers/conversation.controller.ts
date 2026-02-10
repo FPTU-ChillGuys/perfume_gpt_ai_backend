@@ -15,7 +15,6 @@ import {
   ConversationDto,
   ConversationRequestDto
 } from 'src/application/dtos/common/conversation.dto';
-import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/application/constant/prompts';
@@ -81,7 +80,7 @@ export class ConversationController {
   async conversationV1(
     @Req() request: Request,
     @Body() conversation: ConversationRequestDto
-  ) {
+  ): Promise<BaseResponse<ConversationDto>> {
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
@@ -160,7 +159,7 @@ export class ConversationController {
   async conversationV2(
     @Req() request: Request,
     @Body() conversation: ConversationRequestDto
-  ) {
+  ): Promise<BaseResponse<ConversationDto>> {
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
@@ -240,7 +239,7 @@ export class ConversationController {
     @Req() request: Request,
     @Query('userId') userId: string,
     @Query('prompt') prompt: string
-  ) {
+  ): Promise<BaseResponse<string>> {
     // -----------------------------Test V1 -------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
     const userLog = await this.logService.getUserLogSummaryReportByUserId(
@@ -294,7 +293,7 @@ export class ConversationController {
     @Req() request: Request,
     @Query('userId') userId: string,
     @Query('prompt') prompt: string
-  ) {
+  ): Promise<BaseResponse<string>> {
     // -----------------------------Test V1 -------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
     const userLogResponse = await this.logService.getReportAndPromptSummaryUserLogs({

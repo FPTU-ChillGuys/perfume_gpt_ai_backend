@@ -1,9 +1,10 @@
 import { Entity, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
 import { ApiProperty } from '@nestjs/swagger';
+import { AdminInstructionRepository } from 'src/infrastructure/repositories/admin-instruction.repository';
 
 /** Entity lưu trữ chỉ thị của admin cho hệ thống AI */
-@Entity()
+@Entity({repository : () => AdminInstructionRepository})
 export class AdminInstruction extends Common {
 
   /** Nội dung chỉ thị */

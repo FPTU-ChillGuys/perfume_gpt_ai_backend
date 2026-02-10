@@ -123,9 +123,12 @@ export class ConversationController {
         extractTokenFromHeader(request) ?? ''
       );
 
-    const profile = await this.profileService.getOwnProfile(extractTokenFromHeader(request) ?? '');
+    const profile = await this.profileService.getOwnProfile(
+      extractTokenFromHeader(request) ?? ''
+    );
 
-    const profileReport = await this.profileService.createSystemPromptFromProfile(profile.payload!);
+    const profileReport =
+      await this.profileService.createSystemPromptFromProfile(profile.payload!);
 
     // Ket hop prompt tu log nguoi dung va report don hang
     const combinedPrompt = `${userLogPromptText}\n\n
@@ -193,12 +196,13 @@ export class ConversationController {
     /* 
       Cách này lấy log trực tiếp từ user log service (Chậm hơn nhưng luôn đầy đủ nội dung)
     */
-    const userLogResponse = await this.logService.getReportAndPromptSummaryUserLogs({
-      userId: conversation.userId,
-      period: PeriodEnum.MONTHLY,
-      endDate: convertToUTC(new Date()),
-      startDate: undefined
-    });
+    const userLogResponse =
+      await this.logService.getReportAndPromptSummaryUserLogs({
+        userId: conversation.userId,
+        period: PeriodEnum.MONTHLY,
+        endDate: convertToUTC(new Date()),
+        startDate: undefined
+      });
 
     const orderReport =
       await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
@@ -206,9 +210,12 @@ export class ConversationController {
         extractTokenFromHeader(request) ?? ''
       );
 
-    const profile = await this.profileService.getOwnProfile(extractTokenFromHeader(request) ?? '');
+    const profile = await this.profileService.getOwnProfile(
+      extractTokenFromHeader(request) ?? ''
+    );
 
-    const profileReport = await this.profileService.createSystemPromptFromProfile(profile.payload!);
+    const profileReport =
+      await this.profileService.createSystemPromptFromProfile(profile.payload!);
 
     // Ket hop prompt tu log nguoi dung va report don hang
     // Lay response tu user log service
@@ -264,7 +271,11 @@ export class ConversationController {
   @Post('test/v1')
   @ApiOperation({ summary: 'Test V1 - Test hội thoại với log tóm tắt' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
-  @ApiQuery({ name: 'prompt', type: String, description: 'Nội dung tin nhắn test' })
+  @ApiQuery({
+    name: 'prompt',
+    type: String,
+    description: 'Nội dung tin nhắn test'
+  })
   @ApiBaseResponse(ConversationRequestDto)
   async convserationV1Test(
     @Req() request: Request,
@@ -291,9 +302,12 @@ export class ConversationController {
         extractTokenFromHeader(request) ?? ''
       );
 
-    const profile = await this.profileService.getOwnProfile(extractTokenFromHeader(request) ?? '');
+    const profile = await this.profileService.getOwnProfile(
+      extractTokenFromHeader(request) ?? ''
+    );
 
-    const profileReport = await this.profileService.createSystemPromptFromProfile(profile.payload!);
+    const profileReport =
+      await this.profileService.createSystemPromptFromProfile(profile.payload!);
 
     const combinedPrompt = `${userLogPromptText}\n\n
     Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
@@ -325,7 +339,11 @@ export class ConversationController {
   @Post('test/v2')
   @ApiOperation({ summary: 'Test V2 - Test hội thoại với log chi tiết' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
-  @ApiQuery({ name: 'prompt', type: String, description: 'Nội dung tin nhắn test' })
+  @ApiQuery({
+    name: 'prompt',
+    type: String,
+    description: 'Nội dung tin nhắn test'
+  })
   @ApiBaseResponse(ConversationRequestDto)
   async convserationV2Test(
     @Req() request: Request,
@@ -334,12 +352,13 @@ export class ConversationController {
   ): Promise<BaseResponse<string>> {
     // -----------------------------Test V1 -------------------------------------
     // Lay log nguoi dung tu db trong khoan 1 thang
-    const userLogResponse = await this.logService.getReportAndPromptSummaryUserLogs({
-      userId: userId,
-      period: PeriodEnum.MONTHLY,
-      endDate: convertToUTC(new Date()),
-      startDate: undefined
-    });
+    const userLogResponse =
+      await this.logService.getReportAndPromptSummaryUserLogs({
+        userId: userId,
+        period: PeriodEnum.MONTHLY,
+        endDate: convertToUTC(new Date()),
+        startDate: undefined
+      });
 
     // Tam thoi lay order cua nguoi dung theo userID
     const orderReport =
@@ -348,9 +367,12 @@ export class ConversationController {
         extractTokenFromHeader(request) ?? ''
       );
 
-    const profile = await this.profileService.getOwnProfile(extractTokenFromHeader(request) ?? '');
+    const profile = await this.profileService.getOwnProfile(
+      extractTokenFromHeader(request) ?? ''
+    );
 
-    const profileReport = await this.profileService.createSystemPromptFromProfile(profile.payload!);
+    const profileReport =
+      await this.profileService.createSystemPromptFromProfile(profile.payload!);
 
     const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
     Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
@@ -407,7 +429,10 @@ export class ConversationController {
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
       Output.object(searchOutput),
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, promptResult.data.combinedPrompt)
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      )
     );
 
     if (!message.success) {
@@ -459,7 +484,10 @@ export class ConversationController {
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
       Output.object(searchOutput),
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, promptResult.data.combinedPrompt)
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      )
     );
 
     if (!message.success) {
@@ -507,7 +535,10 @@ export class ConversationController {
 
     const message = await this.aiService.textGenerateFromPrompt(
       prompt,
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, promptResult.data.combinedPrompt)
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      )
     );
 
     if (!message.success) {
@@ -546,7 +577,10 @@ export class ConversationController {
 
     const message = await this.aiService.textGenerateFromPrompt(
       prompt,
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, promptResult.data.combinedPrompt)
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      )
     );
 
     if (!message.success) {

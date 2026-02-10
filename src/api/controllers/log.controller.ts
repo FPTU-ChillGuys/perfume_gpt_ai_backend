@@ -12,6 +12,7 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
+import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 
 @ApiTags('Logs')
 @Controller('logs')
@@ -55,6 +56,10 @@ export class LogController {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
+    if (isDataEmpty(response.data?.prompt)) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
+    }
+
     // Summarize with AI
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       response.data!.prompt
@@ -96,6 +101,10 @@ export class LogController {
 
     if (!response.success) {
       return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    if (isDataEmpty(response.data?.prompt)) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
     }
 
     // Summarize with AI

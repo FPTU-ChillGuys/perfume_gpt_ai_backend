@@ -15,6 +15,7 @@ import { InventoryService } from 'src/infrastructure/servicies/inventory.service
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIInventoryReportStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
+import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 
 @Public()
 @ApiTags('Inventory')
@@ -79,6 +80,10 @@ export class InventoryController {
     const report =
       await this.inventoryService.createReportFromBatchAndStock(authHeader);
 
+    if (isDataEmpty(report?.toString())) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT };
+    }
+
     // Generate AI summary
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       `Generate a concise inventory report based on the following data:\n\n${report}`
@@ -106,6 +111,18 @@ export class InventoryController {
 
     const report =
       await this.inventoryService.createReportFromBatchAndStock(authHeader);
+
+    if (isDataEmpty(report?.toString())) {
+      const processingTimeMs = Date.now() - startTime;
+      return {
+        success: true,
+        data: new AIInventoryReportStructuredResponse({
+          report: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT,
+          generatedAt: new Date(),
+          metadata: new AIResponseMetadata({ processingTimeMs })
+        })
+      };
+    }
 
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       `Generate a concise inventory report based on the following data:\n\n${report}`

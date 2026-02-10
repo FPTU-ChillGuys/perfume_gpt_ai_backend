@@ -9,6 +9,7 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { AITrendForecastStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
+import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 
 @ApiTags('Trends')
 @Controller('trends')
@@ -32,6 +33,10 @@ export class TrendController {
 
     if (!reportAndPromptSummary.success) {
       return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.TREND_FORECAST };
     }
 
     // Summarize with AI
@@ -76,6 +81,21 @@ export class TrendController {
 
     if (!reportAndPromptSummary.success) {
       return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
+      const processingTimeMs = Date.now() - startTime;
+      const period = allUserLogRequest.period ?? 'custom';
+      return {
+        success: true,
+        data: new AITrendForecastStructuredResponse({
+          forecast: INSUFFICIENT_DATA_MESSAGES.TREND_FORECAST,
+          period: period.toString(),
+          analyzedLogCount: 0,
+          generatedAt: new Date(),
+          metadata: new AIResponseMetadata({ processingTimeMs })
+        })
+      };
     }
 
     const reportResponse = await this.aiService.textGenerateFromPrompt(

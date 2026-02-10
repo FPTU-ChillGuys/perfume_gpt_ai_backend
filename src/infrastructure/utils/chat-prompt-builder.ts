@@ -9,6 +9,7 @@ import {
 } from 'src/application/constant/prompts';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
+import { isDataEmpty, buildDataAvailabilityNote } from 'src/infrastructure/utils/insufficient-data';
 
 /**
  * Kết quả xây dựng combined prompt từ user log + order report.
@@ -55,9 +56,16 @@ export async function buildCombinedPromptV1(
   const profile = await profileService.getOwnProfile(authToken);
   const profileReport = await profileService.createSystemPromptFromProfile(profile.payload!);
 
+  // Kiểm tra dữ liệu và thêm ghi chú nếu thiếu
+  const dataNote = buildDataAvailabilityNote({
+    hasUserLog: !isDataEmpty(userLogData),
+    hasOrderReport: !isDataEmpty(orderReportData),
+    hasProfile: !isDataEmpty(profileReport)
+  });
+
   const combinedPrompt = `${userLogPromptText}\n\n
     Order Report:\n${orderReportPrompt(orderReportData)}\n\n
-    Profile:\n${profileReport ?? ''}`;
+    Profile:\n${profileReport ?? ''}${dataNote}`;
 
   return {
     success: true,
@@ -109,9 +117,16 @@ export async function buildCombinedPromptV2(
   const profile = await profileService.getOwnProfile(authToken);
   const profileReport = await profileService.createSystemPromptFromProfile(profile.payload!);
 
+  // Kiểm tra dữ liệu và thêm ghi chú nếu thiếu
+  const dataNote = buildDataAvailabilityNote({
+    hasUserLog: !isDataEmpty(userLogData),
+    hasOrderReport: !isDataEmpty(orderReportData),
+    hasProfile: !isDataEmpty(profileReport)
+  });
+
   const combinedPrompt = `${userLogData}\n\n
     Order Report:\n${orderReportPrompt(orderReportData)}\n\n
-    Profile:\n${profileReport ?? ''}`;
+    Profile:\n${profileReport ?? ''}${dataNote}`;
 
   return {
     success: true,

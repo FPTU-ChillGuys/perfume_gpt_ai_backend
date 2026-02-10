@@ -21,6 +21,7 @@ import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIOrderSummaryStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
+import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 
 @ApiTags('Orders')
 @Controller('orders')
@@ -87,6 +88,10 @@ export class OrderController {
       };
     }
 
+    if (isDataEmpty(ordersResponse.data)) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.ORDER_SUMMARY };
+    }
+
     // Goi AI service de tao summary
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       orderSummaryPrompt(ordersResponse.data ?? '')
@@ -125,6 +130,19 @@ export class OrderController {
       return {
         success: false,
         error: 'Failed to retrieve orders for AI summary'
+      };
+    }
+
+    if (isDataEmpty(ordersResponse.data)) {
+      const processingTimeMs = Date.now() - startTime;
+      return {
+        success: true,
+        data: new AIOrderSummaryStructuredResponse({
+          summary: INSUFFICIENT_DATA_MESSAGES.ORDER_SUMMARY,
+          userId,
+          generatedAt: new Date(),
+          metadata: new AIResponseMetadata({ processingTimeMs })
+        })
       };
     }
 

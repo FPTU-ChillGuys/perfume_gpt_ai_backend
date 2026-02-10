@@ -13,6 +13,7 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { AIReviewSummaryStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
 import { AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
+import { isArrayEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 
 @Public()
 @ApiTags('Reviews')
@@ -45,6 +46,11 @@ export class ReviewController {
         }
 
         const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
+
+        if (isArrayEmpty(reviews)) {
+            return { success: true, data: INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY };
+        }
+
         const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
 
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
@@ -70,6 +76,11 @@ export class ReviewController {
         }
 
         const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
+
+        if (isArrayEmpty(reviews)) {
+            return { success: true, data: INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY };
+        }
+
         const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
 
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
@@ -103,6 +114,17 @@ export class ReviewController {
         }
 
         const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
+
+        if (isArrayEmpty(reviews)) {
+            return { success: true, data: new AIReviewSummaryStructuredResponse({
+                summary: INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY,
+                variantId,
+                reviewCount: 0,
+                generatedAt: new Date(),
+                metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
+            })};
+        }
+
         const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
 
         const summaryResponse = await this.aiService.textGenerateFromPrompt(

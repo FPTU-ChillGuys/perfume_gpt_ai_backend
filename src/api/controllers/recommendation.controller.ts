@@ -16,6 +16,7 @@ import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { Request } from 'express';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIRecommendationStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
+import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -53,6 +54,10 @@ export class RecommendationController {
         userLogRequest.userId,
         extractTokenFromHeader(request) ?? ''
       );
+
+    if (isDataEmpty(reportAndPromptSummary.data?.prompt) && isDataEmpty(orderReport.data)) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.REPURCHASE };
+    }
 
     const combinedPrompt = `${reportAndPromptSummary.data!.prompt}\n\n${orderReport.data ?? ''}`;
 
@@ -111,6 +116,10 @@ export class RecommendationController {
         extractTokenFromHeader(request) ?? ''
       );
 
+    if (isDataEmpty(userLogResponse.data) && isDataEmpty(orderReport.data)) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.REPURCHASE };
+    }
+
     const combinedPrompt = `${userLogResponse.data!}\n\n${orderReport.data ?? ''}`;
 
     //-------------------------------------------------------------
@@ -155,6 +164,10 @@ export class RecommendationController {
 
     if (!reportAndPromptSummary.success) {
       return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION };
     }
 
     const reportResponse = await this.aiService.textGenerateFromPrompt(
@@ -202,6 +215,10 @@ export class RecommendationController {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
+    if (isDataEmpty(summaryReport.data)) {
+      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION };
+    }
+
     const summaryReportPrompt = `Here is the summary of user logs:\n${summaryReport.data!}`;
 
     const summaryResponse = await this.aiService.textGenerateFromPrompt(
@@ -247,6 +264,21 @@ export class RecommendationController {
 
     if (!reportAndPromptSummary.success) {
       return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
+      const processingTimeMs = Date.now() - startTime;
+      const period = userLogRequest.period ?? 'custom';
+      return {
+        success: true,
+        data: new AIRecommendationStructuredResponse({
+          recommendation: INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION,
+          userId: userLogRequest.userId,
+          period: period.toString(),
+          generatedAt: new Date(),
+          metadata: new AIResponseMetadata({ processingTimeMs })
+        })
+      };
     }
 
     const reportResponse = await this.aiService.textGenerateFromPrompt(

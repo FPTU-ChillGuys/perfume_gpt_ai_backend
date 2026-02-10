@@ -9,10 +9,13 @@ export default function ApiUrl() {
 
   const INVENTORY_URL = (url: string) => `${BASE_URL}/inventory/${url}`;
 
+  const PROFILE_URL = (url: string) => `${BASE_URL}/profiles/${url}`;
+
   return {
     PRODUCT_URL,
     REVIEW_URL,
     ORDER_URL,
-    INVENTORY_URL
+    INVENTORY_URL,
+    PROFILE_URL
   };
 }

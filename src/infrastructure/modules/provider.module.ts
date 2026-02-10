@@ -22,6 +22,7 @@ import { AIAcceptanceModule } from './ai-acceptance.module';
 import { AIAcceptanceController } from 'src/api/controllers/ai-acceptance.controller';
 import { AdminInstructionModule } from './admin-instruction.module';
 import { AdminInstructionController } from 'src/api/controllers/admin-instruction.controller';
+import { ProfileModule } from './profile.module';
 
 const modules = [
   ConversationModule,
@@ -36,7 +37,8 @@ const modules = [
   InventoryModule,
   OrderModule,
   AIAcceptanceModule,
-  AdminInstructionModule
+  AdminInstructionModule,
+  ProfileModule
 ];
 
 @Module({

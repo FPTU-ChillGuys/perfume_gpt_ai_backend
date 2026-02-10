@@ -8,6 +8,7 @@ import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { AITrendForecastStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 
 @ApiTags('Trends')
 @Controller('trends')
@@ -55,5 +56,58 @@ export class TrendController {
     }
 
     return { success: true, data: trendResponse.data };
+  }
+
+  /**
+   * Dự đoán xu hướng có cấu trúc - Trả về metadata bổ sung (thời gian xử lý, khoảng thời gian phân tích).
+   */
+  @Public()
+  @Post('summary/structured')
+  @ApiOperation({ summary: 'Dự đoán xu hướng có cấu trúc với metadata' })
+  @ApiBaseResponse(AITrendForecastStructuredResponse)
+  @ApiBody({ type: AllUserLogRequest })
+  async summarizeLogsStructured(
+    @Body() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<AITrendForecastStructuredResponse>> {
+    const startTime = Date.now();
+
+    const reportAndPromptSummary =
+      await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
+
+    if (!reportAndPromptSummary.success) {
+      return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    const reportResponse = await this.aiService.textGenerateFromPrompt(
+      `${reportAndPromptSummary.data!.prompt}`
+    );
+
+    if (!reportResponse.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
+
+    const trendResponse = await this.aiService.textGenerateFromPrompt(
+      trendPrompt,
+      ADVANCED_MATCHING_SYSTEM_PROMPT
+    );
+
+    if (!trendResponse.success) {
+      return { success: false, error: 'Failed to get AI trend response' };
+    }
+
+    const processingTimeMs = Date.now() - startTime;
+
+    const period = allUserLogRequest.period ?? 'custom';
+    const structuredResponse = new AITrendForecastStructuredResponse({
+      forecast: trendResponse.data ?? '',
+      period: period.toString(),
+      analyzedLogCount: 0,
+      generatedAt: new Date(),
+      metadata: new AIResponseMetadata({ processingTimeMs })
+    });
+
+    return { success: true, data: structuredResponse };
   }
 }

@@ -14,6 +14,7 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
+import { AIInventoryReportStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 
 @Public()
 @ApiTags('Inventory')
@@ -88,5 +89,40 @@ export class InventoryController {
     }
 
     return { success: true, data: aiResponse.data };
+  }
+
+  /**
+   * Tạo báo cáo tồn kho bằng AI - Phiên bản có cấu trúc.
+   * Trả về response kèm metadata (thời gian xử lý).
+   */
+  @Get('report/ai/structured')
+  @ApiOperation({ summary: 'Tạo báo cáo tồn kho AI có cấu trúc' })
+  @ApiBaseResponse(AIInventoryReportStructuredResponse)
+  async getStructuredAIInventoryReport(
+    @Req() request: Request,
+  ): Promise<BaseResponse<AIInventoryReportStructuredResponse>> {
+    const startTime = Date.now();
+    const authHeader = extractTokenFromHeader(request!) ?? '';
+
+    const report =
+      await this.inventoryService.createReportFromBatchAndStock(authHeader);
+
+    const aiResponse = await this.aiService.textGenerateFromPrompt(
+      `Generate a concise inventory report based on the following data:\n\n${report}`
+    );
+
+    if (!aiResponse.success) {
+      return { success: false, error: 'Failed to get AI inventory report' };
+    }
+
+    const processingTimeMs = Date.now() - startTime;
+
+    const structuredResponse = new AIInventoryReportStructuredResponse({
+      report: aiResponse.data ?? '',
+      generatedAt: new Date(),
+      metadata: new AIResponseMetadata({ processingTimeMs })
+    });
+
+    return { success: true, data: structuredResponse };
   }
 }

@@ -20,6 +20,7 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
+import { AIOrderSummaryStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 
 @ApiTags('Orders')
 @Controller('orders')
@@ -96,5 +97,55 @@ export class OrderController {
       };
     }
     return { success: true, data: aiResponse.data };
+  }
+
+  /**
+   * Tạo báo cáo tóm tắt đơn hàng bằng AI - Phiên bản có cấu trúc.
+   * Trả về response kèm metadata (thời gian xử lý, userId).
+   */
+  @Get('summary/ai/structured')
+  @ApiOperation({ summary: 'Tạo báo cáo tóm tắt đơn hàng AI có cấu trúc' })
+  @ApiQuery({ name: 'userId', description: 'ID của người dùng' })
+  @ApiBaseResponse(AIOrderSummaryStructuredResponse)
+  async getStructuredAIOrderSummary(
+    @Req() request: Request,
+    @Query('userId') userId: string
+  ): Promise<BaseResponse<AIOrderSummaryStructuredResponse>> {
+    const startTime = Date.now();
+
+    const ordersResponse =
+      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+        userId,
+        extractTokenFromHeader(request!) ?? ''
+      );
+
+    if (!ordersResponse.success) {
+      return {
+        success: false,
+        error: 'Failed to retrieve orders for AI summary'
+      };
+    }
+
+    const aiResponse = await this.aiService.textGenerateFromPrompt(
+      orderSummaryPrompt(ordersResponse.data ?? '')
+    );
+
+    if (!aiResponse.success) {
+      return {
+        success: false,
+        error: 'Failed to generate AI order summary'
+      };
+    }
+
+    const processingTimeMs = Date.now() - startTime;
+
+    const structuredResponse = new AIOrderSummaryStructuredResponse({
+      summary: aiResponse.data ?? '',
+      userId,
+      generatedAt: new Date(),
+      metadata: new AIResponseMetadata({ processingTimeMs })
+    });
+
+    return { success: true, data: structuredResponse };
   }
 }

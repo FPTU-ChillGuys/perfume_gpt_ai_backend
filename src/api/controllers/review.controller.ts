@@ -11,6 +11,8 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { AIReviewSummaryStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
+import { AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 
 @Public()
 @ApiTags('Reviews')
@@ -79,6 +81,49 @@ export class ReviewController {
         }
 
         return { success: true, data: summaryResponse.data };
+    }
+
+    /**
+     * Tóm tắt đánh giá bằng AI theo variant ID - Phiên bản có cấu trúc.
+     * Trả về response có metadata (thời gian xử lý, số review đã phân tích).
+     */
+    @Get('summary/structured/:variantId')
+    @ApiBaseResponse(AIReviewSummaryStructuredResponse)
+    @ApiOperation({ summary: 'Tóm tắt đánh giá có cấu trúc theo variant ID' })
+    @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
+    async getStructuredReviewSummaryByVariantId(
+        @Query('variantId') variantId: string
+    ): Promise<BaseResponse<AIReviewSummaryStructuredResponse>> {
+        const startTime = Date.now();
+
+        const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
+
+        if (!reviewsResponse.success) {
+            return { success: false, error: 'Failed to fetch reviews' };
+        }
+
+        const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
+        const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
+
+        const summaryResponse = await this.aiService.textGenerateFromPrompt(
+            reviewSummaryPrompt(reviewsText)
+        );
+
+        if (!summaryResponse.success) {
+            return { success: false, error: 'Failed to get AI summary response' };
+        }
+
+        const processingTimeMs = Date.now() - startTime;
+
+        const structuredResponse = new AIReviewSummaryStructuredResponse({
+            summary: summaryResponse.data ?? '',
+            variantId,
+            reviewCount: reviews.length,
+            generatedAt: new Date(),
+            metadata: new AIResponseMetadata({ processingTimeMs })
+        });
+
+        return { success: true, data: structuredResponse };
     }
     
     

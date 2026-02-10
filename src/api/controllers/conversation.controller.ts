@@ -10,12 +10,14 @@ import {
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Request } from 'express';
-import { Public } from 'src/application/common/Metadata';
+import { Public, Role } from 'src/application/common/Metadata';
 import {
   ConversationDto,
   ConversationRequestDto
 } from 'src/application/dtos/common/conversation.dto';
+import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import {
@@ -38,6 +40,10 @@ import {
   overrideMessagesToConversation
 } from 'src/infrastructure/utils/message-helper';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
+import {
+  buildCombinedPromptV1,
+  buildCombinedPromptV2
+} from 'src/infrastructure/utils/chat-prompt-builder';
 
 @ApiTags('Conversation')
 @Controller('conversation')
@@ -67,6 +73,17 @@ export class ConversationController {
     @Query('id') id: string
   ): Promise<BaseResponse<ConversationDto>> {
     return await this.conversationService.getConversationById(id);
+  }
+
+  /** Lấy danh sách cuộc hội thoại có phân trang (cải thiện so với getAllConversations) */
+  @Public()
+  @Get('list/paged')
+  @ApiOperation({ summary: 'Lấy danh sách cuộc hội thoại có phân trang' })
+  @ApiBaseResponse(PagedResult<ConversationDto>)
+  async getAllConversationsPaginated(
+    @Query() request: PagedConversationRequest
+  ): Promise<BaseResponse<PagedResult<ConversationDto>>> {
+    return await this.conversationService.getAllConversationsPaginated(request);
   }
 
   /**
@@ -329,5 +346,204 @@ export class ConversationController {
       success: true,
       data: message.data
     };
+  }
+
+  /**
+   * Chat V3 - Phiên bản cải thiện dùng common helper, giảm code trùng lặp.
+   * Logic tương tự V1 nhưng sử dụng buildCombinedPromptV1 helper.
+   */
+  @Public()
+  @Post('chat/v3')
+  @ApiOperation({ summary: 'Chat V3 - Dùng common helper (cải thiện từ V1)' })
+  @ApiBaseResponse(ConversationRequestDto)
+  async conversationV3(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    const convertedMessages: UIMessage[] = convertToMessages(
+      conversation.messages || []
+    );
+
+    // Dùng common helper thay vì code trùng lặp
+    const promptResult = await buildCombinedPromptV1(
+      this.logService,
+      this.orderService,
+      conversation.userId,
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      return { success: false, error: 'Failed to build combined prompt' };
+    }
+
+    // Call AI service
+    const message = await this.aiService.textGenerateFromMessages(
+      convertedMessages,
+      Output.object(searchOutput),
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, promptResult.data.combinedPrompt)
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    // Lưu conversation
+    const responseConversation = overrideMessagesToConversation(
+      conversation.id || '',
+      conversation.userId || '',
+      addMessageToMessages(message.data || '', conversation.messages || [])
+    );
+
+    await this.saveOrUpdateConversation(responseConversation);
+
+    return { success: true, data: responseConversation };
+  }
+
+  /**
+   * Chat V4 - Phiên bản cải thiện dùng common helper, giảm code trùng lặp.
+   * Logic tương tự V2 nhưng sử dụng buildCombinedPromptV2 helper.
+   */
+  @Public()
+  @Post('chat/v4')
+  @ApiOperation({ summary: 'Chat V4 - Dùng common helper (cải thiện từ V2)' })
+  @ApiBaseResponse(ConversationRequestDto)
+  async conversationV4(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    const convertedMessages: UIMessage[] = convertToMessages(
+      conversation.messages || []
+    );
+
+    // Dùng common helper thay vì code trùng lặp
+    const promptResult = await buildCombinedPromptV2(
+      this.logService,
+      this.orderService,
+      conversation.userId,
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      return { success: false, error: 'Failed to build combined prompt' };
+    }
+
+    // Call AI service
+    const message = await this.aiService.textGenerateFromMessages(
+      convertedMessages,
+      Output.object(searchOutput),
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, promptResult.data.combinedPrompt)
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    // Lưu conversation
+    const responseConversation = overrideMessagesToConversation(
+      conversation.id || '',
+      conversation.userId || '',
+      addMessageToMessages(message.data || '', conversation.messages || [])
+    );
+
+    await this.saveOrUpdateConversation(responseConversation);
+
+    return { success: true, data: responseConversation };
+  }
+
+  /**
+   * Test V1 - Bảo vệ bằng role admin.
+   * Endpoint test chỉ dành cho admin, tránh lộ ra production.
+   */
+  @Post('test/guarded/v1')
+  @Role('admin')
+  @ApiOperation({ summary: 'Test V1 có xác thực role admin' })
+  @ApiQuery({ name: 'userId', type: String })
+  @ApiQuery({ name: 'prompt', type: String })
+  @ApiBaseResponse(String)
+  async guardedTestV1(
+    @Req() request: Request,
+    @Query('userId') userId: string,
+    @Query('prompt') prompt: string
+  ): Promise<BaseResponse<string>> {
+    const promptResult = await buildCombinedPromptV1(
+      this.logService,
+      this.orderService,
+      userId,
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      return { success: false, error: 'Failed to build combined prompt' };
+    }
+
+    const message = await this.aiService.textGenerateFromPrompt(
+      prompt,
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, promptResult.data.combinedPrompt)
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    return { success: true, data: message.data };
+  }
+
+  /**
+   * Test V2 - Bảo vệ bằng role admin.
+   * Endpoint test chỉ dành cho admin, tránh lộ ra production.
+   */
+  @Post('test/guarded/v2')
+  @Role('admin')
+  @ApiOperation({ summary: 'Test V2 có xác thực role admin' })
+  @ApiQuery({ name: 'userId', type: String })
+  @ApiQuery({ name: 'prompt', type: String })
+  @ApiBaseResponse(String)
+  async guardedTestV2(
+    @Req() request: Request,
+    @Query('userId') userId: string,
+    @Query('prompt') prompt: string
+  ): Promise<BaseResponse<string>> {
+    const promptResult = await buildCombinedPromptV2(
+      this.logService,
+      this.orderService,
+      userId,
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      return { success: false, error: 'Failed to build combined prompt' };
+    }
+
+    const message = await this.aiService.textGenerateFromPrompt(
+      prompt,
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, promptResult.data.combinedPrompt)
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    return { success: true, data: message.data };
+  }
+
+  /**
+   * Helper: Lưu hoặc cập nhật conversation vào DB.
+   * Giảm code trùng lặp giữa các endpoint chat.
+   */
+  private async saveOrUpdateConversation(
+    conversation: ConversationDto
+  ): Promise<void> {
+    if (
+      !(await this.conversationService.isExistConversation(
+        conversation.id || ''
+      ))
+    ) {
+      await this.conversationService.addConversation(conversation);
+    } else {
+      await this.conversationService.updateMessageToConversation(
+        conversation.id!,
+        conversation.messages || []
+      );
+    }
   }
 }

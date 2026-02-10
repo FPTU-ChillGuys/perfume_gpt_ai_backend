@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AdminInstructionRepository } from './admin-instruction.repository';
 import { ConversationRepository } from './conversation.repository';
 import { QuizQuestionAnswerRepository } from './quiz-question-answer.repository';
 import { QuizQuestionRepository } from './quiz-question.repository';
@@ -16,7 +17,8 @@ export class UnitOfWork {
     private readonly userLogRepository: UserLogRepository,
     private readonly aiReviewSummaryRepository: AIReviewSummaryRepository,
     private readonly userLogSummaryRepository: UserLogSummaryRepository,
-    private readonly aiAcceptanceRepository: AIAcceptanceRepository
+    private readonly aiAcceptanceRepository: AIAcceptanceRepository,
+    private readonly adminInstructionRepository: AdminInstructionRepository
   ) {}
 
   get AIConversationRepo(): ConversationRepository {
@@ -40,5 +42,9 @@ export class UnitOfWork {
 
   get AIAcceptanceRepo(): AIAcceptanceRepository {
     return this.aiAcceptanceRepository;
+  }
+
+  get AdminInstructionRepo(): AdminInstructionRepository {
+    return this.adminInstructionRepository;
   }
 }

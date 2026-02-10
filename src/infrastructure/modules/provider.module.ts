@@ -20,6 +20,8 @@ import { InventoryController } from 'src/api/controllers/inventory.controller';
 import { OrderModule } from './order.module';
 import { AIAcceptanceModule } from './ai-acceptance.module';
 import { AIAcceptanceController } from 'src/api/controllers/ai-acceptance.controller';
+import { AdminInstructionModule } from './admin-instruction.module';
+import { AdminInstructionController } from 'src/api/controllers/admin-instruction.controller';
 
 const modules = [
   ConversationModule,
@@ -33,7 +35,8 @@ const modules = [
   ReviewModule,
   InventoryModule,
   OrderModule,
-  AIAcceptanceModule
+  AIAcceptanceModule,
+  AdminInstructionModule
 ];
 
 @Module({
@@ -48,7 +51,8 @@ const modules = [
     ReviewController,
     RecommendationController,
     InventoryController,
-    AIAcceptanceController
+    AIAcceptanceController,
+    AdminInstructionController
   ],
   exports: modules
 })

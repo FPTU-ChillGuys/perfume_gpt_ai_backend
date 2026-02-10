@@ -15,6 +15,7 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { Request } from 'express';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
+import { AIRecommendationStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -225,5 +226,60 @@ export class RecommendationController {
     }
 
     return { success: true, data: recommendationResponse.data };
+  }
+
+  /**
+   * Gợi ý sản phẩm bằng AI có cấu trúc - Dùng log chi tiết.
+   * Trả về response kèm metadata (thời gian xử lý, userId, period).
+   */
+  @Public()
+  @Post('recommend/ai/structured')
+  @ApiOperation({ summary: 'Gợi ý AI có cấu trúc - Dùng log chi tiết' })
+  @ApiBaseResponse(AIRecommendationStructuredResponse)
+  @ApiBody({ type: UserLogRequest })
+  async aiRecommendationStructured(
+    @Body() userLogRequest: UserLogRequest
+  ): Promise<BaseResponse<AIRecommendationStructuredResponse>> {
+    const startTime = Date.now();
+
+    const reportAndPromptSummary =
+      await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
+
+    if (!reportAndPromptSummary.success) {
+      return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    const reportResponse = await this.aiService.textGenerateFromPrompt(
+      `Từ report: ${reportAndPromptSummary.data!.prompt}, hãy đưa ra các đề xuất phù hợp cho người dùng dựa trên hành vi và sở thích của họ. `
+    );
+
+    if (!reportResponse.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    const recommendationResponse = await this.aiService.textGenerateFromPrompt(
+      aiRecommendationPrompt(reportResponse.data ?? ''),
+      ADVANCED_MATCHING_SYSTEM_PROMPT
+    );
+
+    if (!recommendationResponse.success) {
+      return {
+        success: false,
+        error: 'Failed to get AI recommendation response'
+      };
+    }
+
+    const processingTimeMs = Date.now() - startTime;
+    const period = userLogRequest.period ?? 'custom';
+
+    const structuredResponse = new AIRecommendationStructuredResponse({
+      recommendation: recommendationResponse.data ?? '',
+      userId: userLogRequest.userId,
+      period: period.toString(),
+      generatedAt: new Date(),
+      metadata: new AIResponseMetadata({ processingTimeMs })
+    });
+
+    return { success: true, data: structuredResponse };
   }
 }

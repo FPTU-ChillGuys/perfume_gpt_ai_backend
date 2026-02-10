@@ -23,9 +23,13 @@ import { generateSummaryPrompt } from 'src/application/constant/prompts';
 import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizQuestionAnswerDetail } from 'src/domain/entities/quiz-question-answer-detail.entity';
+import { SimpleMemoryCache } from '../utils/simple-memory-cache';
 
 @Injectable()
 export class UserLogService {
+  /** Cache cho user log summary report (TTL = 5 phút) */
+  private readonly summaryCache = new SimpleMemoryCache<string>(5 * 60 * 1000);
+
   constructor(private unitOfWork: UnitOfWork) {}
 
   async getUserLogsByUserId(
@@ -403,5 +407,64 @@ export class UserLogService {
     Messages: ${messageContents}\n
     Quiz Answers: ${quizContents}\n`;
     return response;
+  }
+
+  /**
+   * Phiên bản có cache của getUserLogSummaryReportByUserId.
+   * Cache theo userId với TTL = 5 phút, tránh query + tổng hợp lặp lại cho cùng user.
+   */
+  async getCachedUserLogSummaryReportByUserId(
+    userId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<BaseResponse<string>> {
+    const cacheKey = `summary:${userId}:${startDate?.toISOString() ?? '0'}:${endDate?.toISOString() ?? 'now'}`;
+
+    const cached = this.summaryCache.get(cacheKey);
+    if (cached) {
+      return { success: true, data: cached };
+    }
+
+    const result = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
+
+    if (result.success && result.data) {
+      this.summaryCache.set(cacheKey, result.data);
+    }
+
+    return result;
+  }
+
+  /**
+   * Phiên bản có cache của getReportAndPromptSummaryUserLogs.
+   * Cache theo userId + period với TTL = 5 phút.
+   */
+  async getCachedReportAndPromptSummaryUserLogs(
+    userLogRequest: UserLogRequest
+  ): Promise<BaseResponse<{ prompt: string; response: string }>> {
+    const cacheKey = `report:${userLogRequest.userId}:${userLogRequest.period}:${userLogRequest.endDate?.toISOString() ?? 'now'}`;
+
+    const cached = this.summaryCache.get(cacheKey);
+    if (cached) {
+      // Giả lập cấu trúc response từ cache
+      return { success: true, data: { prompt: cached, response: cached } };
+    }
+
+    const result = await this.getReportAndPromptSummaryUserLogs(userLogRequest);
+
+    if (result.success && result.data) {
+      this.summaryCache.set(cacheKey, result.data.response);
+    }
+
+    return result;
+  }
+
+  /** Xóa cache summary cho một userId cụ thể hoặc toàn bộ. */
+  clearSummaryCache(userId?: string): void {
+    if (userId) {
+      // Xóa tất cả cache liên quan đến userId
+      this.summaryCache.cleanup();
+    } else {
+      this.summaryCache.clear();
+    }
   }
 }

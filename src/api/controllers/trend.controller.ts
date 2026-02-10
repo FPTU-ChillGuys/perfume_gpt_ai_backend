@@ -24,24 +24,24 @@ export class TrendController {
   async summarizeLogs(
     @Body() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<string>> {
-    const response =
+    const reportAndPromptSummary =
       await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
 
-    if (!response.success) {
+    if (!reportAndPromptSummary.success) {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
     // Summarize with AI
-    const summaryResponse = await this.aiService.textGenerateFromPrompt(
-       `${response.data!.prompt}`
+    const reportResponse = await this.aiService.textGenerateFromPrompt(
+       `${reportAndPromptSummary.data!.prompt}`
     );
     
-    if (!summaryResponse.success) {
+    if (!reportResponse.success) {
       return { success: false, error: 'Failed to get AI response' };
     }
 
     //Trend forecasting prompt base on summary response
-    const trendPrompt = trendForecastingPrompt(summaryResponse.data ?? '');
+    const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
     
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,

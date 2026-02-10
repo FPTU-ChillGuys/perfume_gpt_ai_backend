@@ -143,26 +143,26 @@ export class RecommendationController {
   async aiRecommendationV1(
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
-    const response =
+    const reportAndPromptSummary =
       await this.userLogService.getReportAndPromptSummaryUserLogs(
         userLogRequest
       );
 
-    if (!response.success) {
+    if (!reportAndPromptSummary.success) {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
-    const summaryResponse = await this.aiService.textGenerateFromPrompt(
-      `${response.data!.prompt}`
+    const reportResponse = await this.aiService.textGenerateFromPrompt(
+      `Từ report: ${reportAndPromptSummary.data!.prompt}, hãy đưa ra các đề xuất phù hợp cho người dùng dựa trên hành vi và sở thích của họ. `
     );
 
-    if (!summaryResponse.success) {
+    if (!reportResponse.success) {
       return { success: false, error: 'Failed to get AI response' };
     }
 
     //Create repurchase recommendation prompt base on summary response
     const recommendationResponse = await this.aiService.textGenerateFromPrompt(
-      aiRecommendationPrompt(summaryResponse.data ?? ''),
+      aiRecommendationPrompt(reportResponse.data ?? ''),
       ADVANCED_MATCHING_SYSTEM_PROMPT
     );
 
@@ -176,25 +176,30 @@ export class RecommendationController {
     return { success: true, data: recommendationResponse.data };
   }
 
-  //AI recommendation
+  //AI recommendation V2
   @Public()
   @Post('recommend/ai/v1')
   @ApiBaseResponse(String)
   @ApiBody({ type: UserLogRequest })
-  async aiRecommendation(
+  async aiRecommendationV2(
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
-    const response =
-      await this.userLogService.getReportAndPromptSummaryUserLogs(
-        userLogRequest
+    
+    const summaryReport =
+      await this.userLogService.getUserLogSummaryReportByUserId(
+        userLogRequest.userId,
+        userLogRequest.startDate!,
+        userLogRequest.endDate!
       );
 
-    if (!response.success) {
+    if (!summaryReport.success) {
       return { success: false, error: 'Failed to summarize user logs' };
     }
 
+    const summaryReportPrompt = `Here is the summary of user logs:\n${summaryReport.data!}`;
+
     const summaryResponse = await this.aiService.textGenerateFromPrompt(
-      `${response.data!.prompt}`
+      `Từ summary report: ${summaryReportPrompt}. Hãy dự đoán và tóm tắt lại hành vi, sở thích của người dùng.`,
     );
 
     if (!summaryResponse.success) {

@@ -177,7 +177,7 @@ export class ConversationService {
           }
         );
 
-        const items = ConversationMapper.toResponseList(conversations, false);
+        const items = ConversationMapper.toResponseList(conversations, true);
         const totalPages = Math.ceil(totalCount / pageSize);
 
         const pagedResult = new PagedResult<ConversationDto>({

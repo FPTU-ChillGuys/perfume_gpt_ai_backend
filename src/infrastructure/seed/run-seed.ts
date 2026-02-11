@@ -7,19 +7,22 @@
  * Không cần khởi động NestJS app.
  */
 import { MikroORM } from '@mikro-orm/core';
-import config from '../../mikro-orm.config';
 import { seedAdminInstructions } from './admin-instruction.seeder';
+import mikroConfig from 'mikro-orm.config';
 
 async function runSeed() {
   console.log('[Seed Runner] Đang kết nối database...');
 
+  const config = await mikroConfig();
   const orm = await MikroORM.init(config);
 
   try {
     // Chạy migration trước (đảm bảo bảng đã tồn tại)
     const pendingMigrations = await orm.migrator.getPendingMigrations();
     if (pendingMigrations.length > 0) {
-      console.log(`[Seed Runner] Áp dụng ${pendingMigrations.length} migration(s) trước khi seed...`);
+      console.log(
+        `[Seed Runner] Áp dụng ${pendingMigrations.length} migration(s) trước khi seed...`
+      );
       await orm.migrator.up();
     }
 

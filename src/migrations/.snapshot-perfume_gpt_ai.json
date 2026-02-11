@@ -38,13 +38,12 @@
         },
         "instruction": {
           "name": "instruction",
-          "type": "varchar(255)",
+          "type": "text",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "length": 255,
-          "mappedType": "string"
+          "mappedType": "text"
         },
         "instruction_type": {
           "name": "instruction_type",

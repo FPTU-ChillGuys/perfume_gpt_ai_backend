@@ -8,11 +8,20 @@ import { ALL_INSTRUCTION_TYPES } from 'src/application/constant/prompts/admin-in
  * Idempotent: chỉ thêm instruction cho domain chưa có dữ liệu.
  *
  * Gọi trong main.ts sau khi migration hoàn tất.
+ * Nếu bảng chưa tồn tại (migration chưa chạy), sẽ bỏ qua và in cảnh báo.
  */
 export async function seedAdminInstructions(orm: MikroORM): Promise<void> {
   const em = orm.em.fork();
 
   try {
+    // Kiểm tra bảng có tồn tại không bằng cách query nhỏ
+    try {
+      await em.count(AdminInstruction);
+    } catch {
+      console.warn('[Seeder] Bảng admin_instruction chưa tồn tại. Hãy chạy migration trước: npx mikro-orm migration:up');
+      return;
+    }
+
     // Kiểm tra từng domain type - chỉ seed nếu domain đó chưa có instruction nào
     for (const domainType of ALL_INSTRUCTION_TYPES) {
       const existingCount = await em.count(AdminInstruction, { instructionType: domainType });

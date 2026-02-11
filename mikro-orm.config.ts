@@ -32,6 +32,10 @@ export default async function mikroConfig(): Promise<PostgreSqlOptions> {
     host: host,
     port: port,
     user: user,
-    password: password
+    password: password,
+    migrations: {
+      path: './dist/migrations',
+      pathTs: './src/migrations',
+    }
   };
 }

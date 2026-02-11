@@ -5,31 +5,36 @@ import { apiReference } from '@scalar/nestjs-api-reference';
 import { HttpExceptionFilter } from './application/filters/http-error-handler.filter';
 import { MikroORM } from '@mikro-orm/core';
 import { seedAdminInstructions } from './infrastructure/seed/admin-instruction.seeder';
+import { execSync } from 'child_process';
+
+/** Tạm thời: chạy migration bằng CLI trực tiếp */
+function runMigrationCLI(): void {
+  try {
+    console.log('[MikroORM] Đang chạy npx mikro-orm migration:up ...');
+    const output = execSync('npx mikro-orm migration:up', {
+      cwd: process.cwd(),
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    console.log('[MikroORM] Migration CLI output:\n', output);
+  } catch (error: any) {
+    console.error('[MikroORM] Migration CLI thất bại:', error.stderr || error.message);
+    throw error;
+  }
+}
 
 async function bootstrap() {
+  // Chạy migration trước khi khởi tạo NestJS app
+  runMigrationCLI();
+
   const app = await NestFactory.create(AppModule, { cors: true });
 
-  // Tự động chạy migration khi khởi động - vừa cập nhật DB vừa xác nhận kết nối
+  // Seed dữ liệu mặc định cho admin instructions (idempotent)
   try {
     const orm = app.get(MikroORM);
-    const migrator = orm.migrator;
-    const pendingMigrations = await migrator.getPendingMigrations();
-
-    if (pendingMigrations.length > 0) {
-      console.log(`[MikroORM] Đang áp dụng ${pendingMigrations.length} migration(s)...`);
-      await migrator.up();
-      console.log('[MikroORM] Migration hoàn tất.');
-    } else {
-      console.log('[MikroORM] Database đã cập nhật, không có migration mới.');
-    }
-
-    console.log('[MikroORM] Kết nối database thành công.');
-
-    // Seed dữ liệu mặc định cho admin instructions (idempotent - chỉ thêm nếu chưa có)
     await seedAdminInstructions(orm);
   } catch (error) {
-    console.error('[MikroORM] Lỗi kết nối database hoặc migration thất bại:', error);
-    process.exit(1);
+    console.error('[MikroORM] Seed thất bại:', error);
   }
 
   const config = new DocumentBuilder()

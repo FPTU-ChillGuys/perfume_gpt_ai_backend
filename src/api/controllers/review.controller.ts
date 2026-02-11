@@ -3,10 +3,11 @@ import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
-import { reviewSummaryPrompt } from 'src/application/constant/prompts';
+import { reviewSummaryPrompt, INSTRUCTION_TYPE_REVIEW } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -22,7 +23,8 @@ export class ReviewController {
 
     constructor(
         private readonly reviewService: ReviewService,
-        @Inject(AI_SERVICE) private aiService: AIService
+        @Inject(AI_SERVICE) private aiService: AIService,
+        private readonly adminInstructionService: AdminInstructionService
     ) {}
 
     /** Lấy danh sách đánh giá */
@@ -53,8 +55,12 @@ export class ReviewController {
 
         const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
 
+        // Lấy admin instruction cho domain review (nếu có)
+        const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
+
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            reviewSummaryPrompt(reviewsText)
+            reviewSummaryPrompt(reviewsText),
+            adminPrompt
         );
 
         if (!summaryResponse.success) {
@@ -83,8 +89,12 @@ export class ReviewController {
 
         const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
 
+        // Lấy admin instruction cho domain review (nếu có)
+        const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
+
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            reviewSummaryPrompt(reviewsText)
+            reviewSummaryPrompt(reviewsText),
+            adminPrompt
         );
 
         if (!summaryResponse.success) {
@@ -127,8 +137,12 @@ export class ReviewController {
 
         const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
 
+        // Lấy admin instruction cho domain review (nếu có)
+        const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
+
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            reviewSummaryPrompt(reviewsText)
+            reviewSummaryPrompt(reviewsText),
+            adminPrompt
         );
 
         if (!summaryResponse.success) {

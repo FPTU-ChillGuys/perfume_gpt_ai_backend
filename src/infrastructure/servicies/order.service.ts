@@ -40,7 +40,6 @@ export class OrderService {
         return data;
       },
       'Failed to fetch inventory stock',
-      true
     );
   }
 
@@ -121,7 +120,6 @@ export class OrderService {
         return { success: true, payload: orderDetailsList };
       },
       'Failed to fetch order details with orders by user id',
-      true
     );
   }
 
@@ -146,7 +144,6 @@ export class OrderService {
         return { success: true, payload: report };
       },
       'Failed to create order report',
-      true
     );
   }
 }

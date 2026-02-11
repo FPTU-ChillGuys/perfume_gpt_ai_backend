@@ -70,3 +70,25 @@ export const orderSummaryPrompt = (orderDetails: string): string =>
  */
 export const aiRecommendationPrompt = (summaryData: string): string =>
   `Based on the following summarized user logs, provide personalized AI-driven recommendations for products or services that align with the users' interests and preferences. Consider their past interactions, preferences, and any emerging trends that could enhance their experience:\n${summaryData}`;
+
+// ==================== Inventory Prompts ====================
+
+/**
+ * Prompt tạo báo cáo tồn kho bằng AI
+ */
+export const inventoryReportPrompt = (reportData: string): string =>
+  `Generate a concise inventory report based on the following data:\n\n${reportData}`;
+
+// ==================== Recommendation Inline Prompts ====================
+
+/**
+ * Prompt phân tích report để đưa ra đề xuất cho người dùng
+ */
+export const recommendationReportPrompt = (reportPrompt: string): string =>
+  `Từ report: ${reportPrompt}, hãy đưa ra các đề xuất phù hợp cho người dùng dựa trên hành vi và sở thích của họ.`;
+
+/**
+ * Prompt dự đoán và tóm tắt hành vi, sở thích người dùng từ summary report
+ */
+export const recommendationSummaryPrompt = (summaryReportPrompt: string): string =>
+  `Từ summary report: ${summaryReportPrompt}. Hãy dự đoán và tóm tắt lại hành vi, sở thích của người dùng.`;

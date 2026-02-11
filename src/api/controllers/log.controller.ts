@@ -10,16 +10,19 @@ import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
+import { INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
 
 @ApiTags('Logs')
 @Controller('logs')
 export class LogController {
   constructor(
     private userLogService: UserLogService,
-    @Inject(AI_SERVICE) private aiService: AIService
+    @Inject(AI_SERVICE) private aiService: AIService,
+    private readonly adminInstructionService: AdminInstructionService
   ) {}
 
   /** Lấy báo cáo log hoạt động người dùng */
@@ -60,9 +63,13 @@ export class LogController {
       return { success: true, data: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
     }
 
+    // Lấy admin instruction cho domain log (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_LOG);
+
     // Summarize with AI
     const aiResponse = await this.aiService.textGenerateFromPrompt(
-      response.data!.prompt
+      response.data!.prompt,
+      adminPrompt
     );
 
     // Determine start date
@@ -107,9 +114,13 @@ export class LogController {
       return { success: true, data: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
     }
 
+    // Lấy admin instruction cho domain log (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_LOG);
+
     // Summarize with AI
     const aiResponse = await this.aiService.textGenerateFromPrompt(
-      response.data!.prompt
+      response.data!.prompt,
+      adminPrompt
     );
 
     if (!aiResponse.success) {

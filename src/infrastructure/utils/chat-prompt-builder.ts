@@ -3,9 +3,11 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import {
   userLogPrompt,
-  orderReportPrompt
+  orderReportPrompt,
+  INSTRUCTION_TYPE_CONVERSATION
 } from 'src/application/constant/prompts';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
@@ -19,6 +21,7 @@ export interface CombinedPromptResult {
   userLogData: string;
   orderReportData: string;
   profileReport: string;
+  adminInstruction: string;
 }
 
 /**
@@ -28,6 +31,7 @@ export interface CombinedPromptResult {
  * @param logService - UserLogService instance
  * @param orderService - OrderService instance
  * @param profileService - ProfileService instance
+ * @param adminInstructionService - AdminInstructionService instance
  * @param userId - ID người dùng
  * @param authToken - Token xác thực để gọi Order API và Profile API
  * @returns Combined prompt + dữ liệu thành phần
@@ -36,6 +40,7 @@ export async function buildCombinedPromptV1(
   logService: UserLogService,
   orderService: OrderService,
   profileService: ProfileService,
+  adminInstructionService: AdminInstructionService,
   userId: string,
   authToken: string
 ): Promise<BaseResponse<CombinedPromptResult>> {
@@ -56,6 +61,9 @@ export async function buildCombinedPromptV1(
   const profile = await profileService.getOwnProfile(authToken);
   const profileReport = await profileService.createSystemPromptFromProfile(profile.payload!);
 
+  // Lấy admin instruction cho conversation (nếu có)
+  const adminInstruction = await adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
+
   // Kiểm tra dữ liệu và thêm ghi chú nếu thiếu
   const dataNote = buildDataAvailabilityNote({
     hasUserLog: !isDataEmpty(userLogData),
@@ -65,7 +73,7 @@ export async function buildCombinedPromptV1(
 
   const combinedPrompt = `${userLogPromptText}\n\n
     Order Report:\n${orderReportPrompt(orderReportData)}\n\n
-    Profile:\n${profileReport ?? ''}${dataNote}`;
+    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''}`;
 
   return {
     success: true,
@@ -73,7 +81,8 @@ export async function buildCombinedPromptV1(
       combinedPrompt,
       userLogData,
       orderReportData,
-      profileReport: profileReport ?? ''
+      profileReport: profileReport ?? '',
+      adminInstruction
     }
   };
 }
@@ -85,6 +94,7 @@ export async function buildCombinedPromptV1(
  * @param logService - UserLogService instance
  * @param orderService - OrderService instance
  * @param profileService - ProfileService instance
+ * @param adminInstructionService - AdminInstructionService instance
  * @param userId - ID người dùng
  * @param authToken - Token xác thực để gọi Order API và Profile API
  * @returns Combined prompt + dữ liệu thành phần
@@ -93,6 +103,7 @@ export async function buildCombinedPromptV2(
   logService: UserLogService,
   orderService: OrderService,
   profileService: ProfileService,
+  adminInstructionService: AdminInstructionService,
   userId: string,
   authToken: string
 ): Promise<BaseResponse<CombinedPromptResult>> {
@@ -117,6 +128,9 @@ export async function buildCombinedPromptV2(
   const profile = await profileService.getOwnProfile(authToken);
   const profileReport = await profileService.createSystemPromptFromProfile(profile.payload!);
 
+  // Lấy admin instruction cho conversation (nếu có)
+  const adminInstruction = await adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
+
   // Kiểm tra dữ liệu và thêm ghi chú nếu thiếu
   const dataNote = buildDataAvailabilityNote({
     hasUserLog: !isDataEmpty(userLogData),
@@ -126,7 +140,7 @@ export async function buildCombinedPromptV2(
 
   const combinedPrompt = `${userLogData}\n\n
     Order Report:\n${orderReportPrompt(orderReportData)}\n\n
-    Profile:\n${profileReport ?? ''}${dataNote}`;
+    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''}`;
 
   return {
     success: true,
@@ -134,7 +148,8 @@ export async function buildCombinedPromptV2(
       combinedPrompt,
       userLogData,
       orderReportData,
-      profileReport: profileReport ?? ''
+      profileReport: profileReport ?? '',
+      adminInstruction
     }
   };
 }

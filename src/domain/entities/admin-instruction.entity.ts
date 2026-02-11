@@ -9,7 +9,7 @@ export class AdminInstruction extends Common {
 
   /** Nội dung chỉ thị */
   @ApiProperty({ description: 'Nội dung chỉ thị của admin' })
-  @Property()
+  @Property({ type: 'text' })
   instruction!: string;
 
   /** Loại chỉ thị (ví dụ: system, prompt, rule) */

@@ -45,6 +45,7 @@ import {
   buildCombinedPromptV2
 } from 'src/infrastructure/utils/chat-prompt-builder';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 
 @ApiTags('Conversation')
 @Controller('conversation')
@@ -54,7 +55,8 @@ export class ConversationController {
     private conversationService: ConversationService,
     private logService: UserLogService,
     private orderService: OrderService,
-    private profileService: ProfileService
+    private profileService: ProfileService,
+    private adminInstructionService: AdminInstructionService
   ) {}
 
   /** Lấy tất cả cuộc hội thoại */
@@ -397,6 +399,100 @@ export class ConversationController {
   }
 
   /**
+   * Test V3 - Test hội thoại dùng common helper (tương tự V3)
+   * Sử dụng buildCombinedPromptV1 helper, giảm code trùng lặp.
+   */
+  @Public()
+  @Post('test/v3')
+  @ApiOperation({ summary: 'Test V3 - Test hội thoại dùng common helper (cải thiện từ test V1)' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({
+    name: 'prompt',
+    type: String,
+    description: 'Nội dung tin nhắn test'
+  })
+  @ApiBaseResponse(String)
+  async conversationV3Test(
+    @Req() request: Request,
+    @Query('userId') userId: string,
+    @Query('prompt') prompt: string
+  ): Promise<BaseResponse<string>> {
+    const promptResult = await buildCombinedPromptV1(
+      this.logService,
+      this.orderService,
+      this.profileService,
+      this.adminInstructionService,
+      userId,
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      return { success: false, error: 'Failed to build combined prompt' };
+    }
+
+    const message = await this.aiService.textGenerateFromPrompt(
+      prompt,
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      )
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    return { success: true, data: message.data };
+  }
+
+  /**
+   * Test V4 - Test hội thoại dùng common helper (tương tự V4)
+   * Sử dụng buildCombinedPromptV2 helper, giảm code trùng lặp.
+   */
+  @Public()
+  @Post('test/v4')
+  @ApiOperation({ summary: 'Test V4 - Test hội thoại dùng common helper (cải thiện từ test V2)' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({
+    name: 'prompt',
+    type: String,
+    description: 'Nội dung tin nhắn test'
+  })
+  @ApiBaseResponse(String)
+  async conversationV4Test(
+    @Req() request: Request,
+    @Query('userId') userId: string,
+    @Query('prompt') prompt: string
+  ): Promise<BaseResponse<string>> {
+    const promptResult = await buildCombinedPromptV2(
+      this.logService,
+      this.orderService,
+      this.profileService,
+      this.adminInstructionService,
+      userId,
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      return { success: false, error: 'Failed to build combined prompt' };
+    }
+
+    const message = await this.aiService.textGenerateFromPrompt(
+      prompt,
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      )
+    );
+
+    if (!message.success) {
+      return { success: false, error: 'Failed to get AI response' };
+    }
+
+    return { success: true, data: message.data };
+  }
+
+  /**
    * Chat V3 - Phiên bản cải thiện dùng common helper, giảm code trùng lặp.
    * Logic tương tự V1 nhưng sử dụng buildCombinedPromptV1 helper.
    */
@@ -417,6 +513,7 @@ export class ConversationController {
       this.logService,
       this.orderService,
       this.profileService,
+      this.adminInstructionService,
       conversation.userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -472,6 +569,7 @@ export class ConversationController {
       this.logService,
       this.orderService,
       this.profileService,
+      this.adminInstructionService,
       conversation.userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -525,6 +623,7 @@ export class ConversationController {
       this.logService,
       this.orderService,
       this.profileService,
+      this.adminInstructionService,
       userId,
       extractTokenFromHeader(request) ?? ''
     );
@@ -567,6 +666,7 @@ export class ConversationController {
       this.logService,
       this.orderService,
       this.profileService,
+      this.adminInstructionService,
       userId,
       extractTokenFromHeader(request) ?? ''
     );

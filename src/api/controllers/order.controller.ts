@@ -14,10 +14,11 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { OrderListItemResponse, OrderResponse } from 'src/application/dtos/response/order.response';
-import { orderSummaryPrompt } from 'src/application/constant/prompts';
+import { orderSummaryPrompt, INSTRUCTION_TYPE_ORDER } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIOrderSummaryStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
@@ -28,7 +29,8 @@ import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/util
 export class OrderController {
   constructor(
     private orderService: OrderService,
-    @Inject(AI_SERVICE) private aiService: AIService
+    @Inject(AI_SERVICE) private aiService: AIService,
+    private readonly adminInstructionService: AdminInstructionService
   ) {}
 
   /** Lấy danh sách tất cả đơn hàng */
@@ -92,9 +94,13 @@ export class OrderController {
       return { success: true, data: INSUFFICIENT_DATA_MESSAGES.ORDER_SUMMARY };
     }
 
+    // Lấy admin instruction cho domain order (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_ORDER);
+
     // Goi AI service de tao summary
     const aiResponse = await this.aiService.textGenerateFromPrompt(
-      orderSummaryPrompt(ordersResponse.data ?? '')
+      orderSummaryPrompt(ordersResponse.data ?? ''),
+      adminPrompt
     );
 
     if (!aiResponse.success) {
@@ -146,8 +152,12 @@ export class OrderController {
       };
     }
 
+    // Lấy admin instruction cho domain order (nếu có)
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_ORDER);
+
     const aiResponse = await this.aiService.textGenerateFromPrompt(
-      orderSummaryPrompt(ordersResponse.data ?? '')
+      orderSummaryPrompt(ordersResponse.data ?? ''),
+      adminPrompt
     );
 
     if (!aiResponse.success) {

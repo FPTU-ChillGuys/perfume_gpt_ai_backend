@@ -7,7 +7,7 @@ import {
   Query,
   Req
 } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
@@ -92,11 +92,12 @@ export class ConversationController {
 
   /**
    * Chat V1 - Sử dụng log tóm tắt từ user log service (nhanh hơn nhưng phụ thuộc nội dung tóm tắt của service)
-   * @note request dùng để lấy token xác thực, có thể chuyển sang axios interceptor
+   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
    */
   @Public()
   @Post('chat/v1')
-  @ApiOperation({ summary: 'Chat V1 - Dùng log tóm tắt từ user log summary' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat V1 - Dùng log tóm tắt (có token: profile+order, guest: chỉ log)' })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV1(
     @Req() request: Request,
@@ -179,11 +180,12 @@ export class ConversationController {
 
   /**
    * Chat V2 - Lấy log trực tiếp từ user log service (chậm hơn nhưng luôn đầy đủ nội dung)
-   * @note request dùng để lấy token xác thực, có thể chuyển sang axios interceptor
+   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
    */
   @Public()
   @Post('chat/v2')
-  @ApiOperation({ summary: 'Chat V2 - Dùng log chi tiết từ user log service' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat V2 - Dùng log chi tiết (có token: profile+order, guest: chỉ log)' })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV2(
     @Req() request: Request,
@@ -267,11 +269,12 @@ export class ConversationController {
 
   /**
    * Test V1 - Test hội thoại với user log tóm tắt
-   * @note request dùng để lấy token xác thực, có thể chuyển sang axios interceptor
+   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
    */
   @Public()
   @Post('test/v1')
-  @ApiOperation({ summary: 'Test V1 - Test hội thoại với log tóm tắt' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Test V1 - Log tóm tắt (có token: profile+order, guest: chỉ log)' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
@@ -335,11 +338,12 @@ export class ConversationController {
 
   /**
    * Test V2 - Test hội thoại với user log chi tiết
-   * @note request dùng để lấy token xác thực, có thể chuyển sang axios interceptor
+   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
    */
   @Public()
   @Post('test/v2')
-  @ApiOperation({ summary: 'Test V2 - Test hội thoại với log chi tiết' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Test V2 - Log chi tiết (có token: profile+order, guest: chỉ log)' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
@@ -399,12 +403,14 @@ export class ConversationController {
   }
 
   /**
-   * Test V3 - Test hội thoại dùng common helper (tương tự V3)
+   * Test V3 - Test hội thoại dùng common helper (tương tự chat V3)
    * Sử dụng buildCombinedPromptV1 helper, giảm code trùng lặp.
+   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
    */
   @Public()
   @Post('test/v3')
-  @ApiOperation({ summary: 'Test V3 - Test hội thoại dùng common helper (cải thiện từ test V1)' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Test V3 - Common helper + log tóm tắt (có token: profile+order, guest: chỉ log)' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
@@ -446,12 +452,14 @@ export class ConversationController {
   }
 
   /**
-   * Test V4 - Test hội thoại dùng common helper (tương tự V4)
+   * Test V4 - Test hội thoại dùng common helper (tương tự chat V4)
    * Sử dụng buildCombinedPromptV2 helper, giảm code trùng lặp.
+   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
    */
   @Public()
   @Post('test/v4')
-  @ApiOperation({ summary: 'Test V4 - Test hội thoại dùng common helper (cải thiện từ test V2)' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Test V4 - Common helper + log chi tiết (có token: profile+order, guest: chỉ log)' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
@@ -495,10 +503,12 @@ export class ConversationController {
   /**
    * Chat V3 - Phiên bản cải thiện dùng common helper, giảm code trùng lặp.
    * Logic tương tự V1 nhưng sử dụng buildCombinedPromptV1 helper.
+   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
    */
   @Public()
   @Post('chat/v3')
-  @ApiOperation({ summary: 'Chat V3 - Dùng common helper (cải thiện từ V1)' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat V3 - Common helper + log tóm tắt (có token: profile+order, guest: chỉ log)' })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV3(
     @Req() request: Request,
@@ -551,10 +561,12 @@ export class ConversationController {
   /**
    * Chat V4 - Phiên bản cải thiện dùng common helper, giảm code trùng lặp.
    * Logic tương tự V2 nhưng sử dụng buildCombinedPromptV2 helper.
+   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
    */
   @Public()
   @Post('chat/v4')
-  @ApiOperation({ summary: 'Chat V4 - Dùng common helper (cải thiện từ V2)' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat V4 - Common helper + log chi tiết (có token: profile+order, guest: chỉ log)' })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV4(
     @Req() request: Request,
@@ -607,10 +619,12 @@ export class ConversationController {
   /**
    * Test V1 - Bảo vệ bằng role admin.
    * Endpoint test chỉ dành cho admin, tránh lộ ra production.
+   * @note Admin token không thể decode profile → profile sẽ trống. Chỉ có user log + order.
    */
   @Post('test/guarded/v1')
   @Role('admin')
-  @ApiOperation({ summary: 'Test V1 có xác thực role admin' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Test Guarded V1 - Admin only (không lấy được profile từ admin token)' })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'prompt', type: String })
   @ApiBaseResponse(String)
@@ -650,10 +664,12 @@ export class ConversationController {
   /**
    * Test V2 - Bảo vệ bằng role admin.
    * Endpoint test chỉ dành cho admin, tránh lộ ra production.
+   * @note Admin token không thể decode profile → profile sẽ trống. Chỉ có user log + order.
    */
   @Post('test/guarded/v2')
   @Role('admin')
-  @ApiOperation({ summary: 'Test V2 có xác thực role admin' })
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Test Guarded V2 - Admin only (không lấy được profile từ admin token)' })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'prompt', type: String })
   @ApiBaseResponse(String)

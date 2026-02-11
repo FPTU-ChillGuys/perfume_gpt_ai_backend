@@ -5,7 +5,9 @@ import { ProfileResponse } from 'src/application/dtos/response/profile.response'
 import { funcHandlerAsync } from '../utils/error-handler';
 import ApiUrl from '../api/api_url';
 import { firstValueFrom } from 'rxjs';
+import { Injectable } from '@nestjs/common';
 
+@Injectable()
 export class ProfileService {
   constructor(private readonly httpService: HttpService) {}
 
@@ -28,7 +30,6 @@ export class ProfileService {
         return data;
       },
       'Failed to fetch profile',
-      true
     );
   }
 

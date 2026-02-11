@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { HttpExceptionFilter } from './application/filters/http-error-handler.filter';
 import { MikroORM } from '@mikro-orm/core';
+import { seedAdminInstructions } from './infrastructure/seed/admin-instruction.seeder';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
@@ -23,6 +24,9 @@ async function bootstrap() {
     }
 
     console.log('[MikroORM] Kết nối database thành công.');
+
+    // Seed dữ liệu mặc định cho admin instructions (idempotent - chỉ thêm nếu chưa có)
+    await seedAdminInstructions(orm);
   } catch (error) {
     console.error('[MikroORM] Lỗi kết nối database hoặc migration thất bại:', error);
     process.exit(1);

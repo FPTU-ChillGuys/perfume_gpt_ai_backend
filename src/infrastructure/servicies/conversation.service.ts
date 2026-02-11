@@ -140,7 +140,7 @@ export class ConversationService {
 
         const response = ConversationMapper.toResponseList(
           conversations,
-          false
+          true
         );
 
         return { success: true, data: response };

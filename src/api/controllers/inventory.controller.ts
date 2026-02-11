@@ -1,7 +1,7 @@
 import { Controller, Get, Inject, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { Public } from 'src/application/common/Metadata';
+import { Public, Role } from 'src/application/common/Metadata';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
@@ -20,6 +20,7 @@ import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/util
 import { inventoryReportPrompt, INSTRUCTION_TYPE_INVENTORY } from 'src/application/constant/prompts';
 
 @Public()
+@Role('admin')
 @ApiTags('Inventory')
 @Controller('inventory')
 export class InventoryController {
@@ -56,6 +57,7 @@ export class InventoryController {
 
   /** Lấy báo cáo tồn kho */
   @Get('report')
+
   @ApiOperation({ summary: 'Lấy báo cáo tồn kho' })
   @ApiBaseResponse(String)
   async getInventoryReport(

@@ -18,7 +18,14 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:unit": "jest --config ./test/jest-unit.json",
+    "test:unit:watch": "jest --config ./test/jest-unit.json --watch",
+    "test:unit:cov": "jest --config ./test/jest-unit.json --coverage",
+    "test:integration": "jest --config ./test/jest-integration.json --runInBand",
+    "test:integration:watch": "jest --config ./test/jest-integration.json --runInBand --watch",
+    "test:integration:cov": "jest --config ./test/jest-integration.json --runInBand --coverage",
+    "test:integration:setup": "node test/integration/helpers/create-test-db.js"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.13",
@@ -29,7 +36,7 @@
     "@mikro-orm/cli": "^6.6.4",
     "@mikro-orm/core": "^6.6.4",
     "@mikro-orm/entity-generator": "^6.6.4",
-    "@mikro-orm/migrations": "^6.6.4",
+    "@mikro-orm/migrations": "6.6.4",
     "@mikro-orm/nestjs": "^6.1.1",
     "@mikro-orm/postgresql": "^6.6.4",
     "@mikro-orm/reflection": "6.6.4",

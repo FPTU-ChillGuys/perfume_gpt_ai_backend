@@ -7,7 +7,7 @@ import {
   Query,
   Req
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
@@ -624,6 +624,8 @@ export class ConversationController {
   @Post('test/guarded/v1')
   @Role('admin')
   @ApiBearerAuth('jwt')
+  @ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+  @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
   @ApiOperation({ summary: 'Test Guarded V1 - Admin only (không lấy được profile từ admin token)' })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'prompt', type: String })
@@ -669,6 +671,8 @@ export class ConversationController {
   @Post('test/guarded/v2')
   @Role('admin')
   @ApiBearerAuth('jwt')
+  @ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+  @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
   @ApiOperation({ summary: 'Test Guarded V2 - Admin only (không lấy được profile từ admin token)' })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'prompt', type: String })

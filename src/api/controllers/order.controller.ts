@@ -7,7 +7,7 @@ import {
   Query,
   Req
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Request } from 'express';
 import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -25,6 +25,8 @@ import { AIOrderSummaryStructuredResponse, AIResponseMetadata } from 'src/applic
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 
 @ApiTags('Orders')
+@ApiBearerAuth('jwt')
+@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
 @Controller('orders')
 export class OrderController {
   constructor(

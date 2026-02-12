@@ -1,11 +1,13 @@
 import { Controller, Get, Param, Post, Query } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import { BaseResponse } from "src/application/dtos/response/common/base-response";
 import { AIAcceptance } from "src/domain/entities/ai-acceptance.entities";
 import { AIAcceptanceService } from "src/infrastructure/servicies/ai-acceptance.service";
 import { ApiBaseResponse } from "src/infrastructure/utils/api-response-decorator";
 
 @ApiTags('AI Acceptance')
+@ApiBearerAuth('jwt')
+@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
 @Controller('ai-acceptance')
 export class AIAcceptanceController {
   constructor(private readonly aiAcceptanceService: AIAcceptanceService) {}

@@ -38,13 +38,27 @@ async function bootstrap() {
   }
 
   const config = new DocumentBuilder()
+    .setTitle('PerfumeGPT AI Backend')
+    .setDescription(
+      `API backend cho hệ thống PerfumeGPT AI.\n\n` +
+      `## Xác thực (Authentication)\n` +
+      `- Các endpoint **không có biểu tượng 🔒** là **public**, không cần token.\n` +
+      `- Các endpoint **có biểu tượng 🔒** yêu cầu **Bearer JWT token** trong header \`Authorization\`.\n` +
+      `- Một số endpoint yêu cầu role **admin** — sẽ trả về **403 Forbidden** nếu không đủ quyền.\n\n` +
+      `## Cách sử dụng\n` +
+      `1. Click nút **Authorize** (hoặc biểu tượng 🔒) ở trên.\n` +
+      `2. Nhập JWT token (không cần prefix "Bearer ").\n` +
+      `3. Các request sẽ tự động gửi kèm token.`
+    )
+    .setVersion('1.0.0')
     .addBearerAuth(
       {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
         in: 'header',
-        name: 'Authorization'
+        name: 'Authorization',
+        description: 'Nhập JWT token để xác thực. Một số endpoint yêu cầu role admin.'
       },
       'jwt' // tên security
     )

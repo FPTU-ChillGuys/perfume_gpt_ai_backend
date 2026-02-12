@@ -1,5 +1,5 @@
 import { Controller, Get, Inject, Query, Req } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
@@ -22,6 +22,9 @@ import { inventoryReportPrompt, INSTRUCTION_TYPE_INVENTORY } from 'src/applicati
 @Public()
 @Role('admin')
 @ApiTags('Inventory')
+@ApiBearerAuth('jwt')
+@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+@ApiForbiddenResponse({ description: 'Yêu cầu role: admin (⚠️ hiện tại @Public() ở class-level khiến AuthGuard skip)' })
 @Controller('inventory')
 export class InventoryController {
   constructor(

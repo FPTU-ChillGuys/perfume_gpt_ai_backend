@@ -8,7 +8,7 @@ import {
   Put,
   Query
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiForbiddenResponse, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Role } from 'src/application/common/Metadata';
 import {
   CreateAdminInstructionRequest,
@@ -24,6 +24,9 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
  * Cho phép admin CRUD các instruction dùng để điều khiển hành vi AI.
  */
 @ApiTags('Admin Instructions')
+@ApiBearerAuth('jwt')
+@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+@ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
 @Controller('admin/instructions')
 export class AdminInstructionController {
   constructor(

@@ -21,7 +21,11 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:unit": "jest --config ./test/jest-unit.json",
     "test:unit:watch": "jest --config ./test/jest-unit.json --watch",
-    "test:unit:cov": "jest --config ./test/jest-unit.json --coverage"
+    "test:unit:cov": "jest --config ./test/jest-unit.json --coverage",
+    "test:integration": "jest --config ./test/jest-integration.json --runInBand",
+    "test:integration:watch": "jest --config ./test/jest-integration.json --runInBand --watch",
+    "test:integration:cov": "jest --config ./test/jest-integration.json --runInBand --coverage",
+    "test:integration:setup": "node test/integration/helpers/create-test-db.js"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.13",

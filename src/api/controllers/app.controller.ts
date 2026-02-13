@@ -10,7 +10,7 @@ export class AppController {
   @Get()
   @ApiOperation({ summary: 'Health check - Kiểm tra trạng thái server' })
   @ApiResponse({ status: 200, description: 'Server đang hoạt động', type: String })
-  getHello(): string {
-    return this.appService.getHello();
+  checkHealth(): string {
+    return this.appService.checkHealth();
   }
 }

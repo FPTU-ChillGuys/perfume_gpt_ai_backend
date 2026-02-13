@@ -142,7 +142,9 @@ export class QuizService {
   > {
     return await funcHandlerAsync(async () => {
       const quizQuestionAnswers =
-        await this.unitOfWork.AIQuizQuestionAnswerRepo.findAll();
+        await this.unitOfWork.AIQuizQuestionAnswerRepo.findAll({
+          populate: ['details', 'details.question', 'details.answer']
+        });
 
       const quizQuestionAnswersResponses =
         QuizQuestionAnswerMapper.toResponseList(quizQuestionAnswers, true);
@@ -156,7 +158,10 @@ export class QuizService {
   ): Promise<BaseResponse<QuizQuestionAnswerResponse>> {
     return await funcHandlerAsync(async () => {
       const quizQuestionAnswer =
-        await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({ id });
+        await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne(
+          { id },
+          { populate: ['details', 'details.question', 'details.answer'] }
+        );
       if (!quizQuestionAnswer) {
         return { success: false, error: 'Quiz question answer not found' };
       }
@@ -172,7 +177,7 @@ export class QuizService {
   ): Promise<BaseResponse<QuizQuestionAnswerResponse>> {
     return await funcHandlerAsync(async () => {
       const quizQuestionAnswer =
-        await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({ userId });
+        await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({ userId }, { populate: ['details', 'details.question', 'details.answer'] });
       if (!quizQuestionAnswer) {
         return { success: false, error: 'Quiz question answer not found' };
       }

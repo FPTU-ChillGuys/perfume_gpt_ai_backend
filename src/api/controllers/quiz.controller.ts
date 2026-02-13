@@ -8,14 +8,24 @@ import {
   Put,
   Query
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags
+} from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
-import { QuizQuestionAnswerMapper, QuizQuestionMapper } from 'src/application/mapping';
+import {
+  QuizQuestionAnswerMapper,
+  QuizQuestionMapper
+} from 'src/application/mapping';
 import { QUIZ_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
@@ -26,6 +36,7 @@ import { quizPrompt } from 'src/application/constant/prompts';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { Output } from 'ai';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
 
 @Public()
 @ApiTags('Quizzes')
@@ -58,7 +69,9 @@ export class QuizController {
   @ApiOperation({ summary: 'Lấy câu hỏi quiz theo ID' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
   @ApiBaseResponse(QuizQuestion)
-  async getQuizQuesById(@Param('id') id: string): Promise<BaseResponse<QuizQuestionResponse>> {
+  async getQuizQuesById(
+    @Param('id') id: string
+  ): Promise<BaseResponse<QuizQuestionResponse>> {
     return this.quizService.getQuizQuesById(id);
   }
 
@@ -67,7 +80,9 @@ export class QuizController {
   @Post('questions')
   @ApiOperation({ summary: 'Tạo câu hỏi quiz mới' })
   @ApiBaseResponse(String)
-  async createQuizQues(@Body() quizQuestionRequest: QuizQuestionRequest): Promise<BaseResponse<string>> {
+  async createQuizQues(
+    @Body() quizQuestionRequest: QuizQuestionRequest
+  ): Promise<BaseResponse<string>> {
     return this.quizService.addQuizQues(quizQuestionRequest);
   }
 
@@ -77,7 +92,9 @@ export class QuizController {
   @ApiOperation({ summary: 'Kiểm tra người dùng đã làm quiz lần đầu chưa' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   @ApiBaseResponse(Boolean)
-  async checkFirstTime(@Param('userId') userId: string): Promise<BaseResponse<boolean>> {
+  async checkFirstTime(
+    @Param('userId') userId: string
+  ): Promise<BaseResponse<boolean>> {
     const isFirstTime =
       await this.quizService.checkExistQuizQuesAnwsByUserId(userId);
     return { success: true, data: isFirstTime };
@@ -89,7 +106,9 @@ export class QuizController {
   @ApiOperation({ summary: 'Tạo nhiều câu hỏi quiz cùng lúc' })
   @ApiBody({ type: [QuizQuestionRequest] })
   @ApiBaseResponse(String)
-  async createQuizQueses(@Body() quizQuestionRequest: QuizQuestionRequest[]): Promise<BaseResponse<void>> {
+  async createQuizQueses(
+    @Body() quizQuestionRequest: QuizQuestionRequest[]
+  ): Promise<BaseResponse<void>> {
     for (const quizQuestion of quizQuestionRequest) {
       await this.quizService.addQuizQues(quizQuestion);
     }
@@ -119,7 +138,7 @@ export class QuizController {
     schema: { example: [{ questionId: 'string', answerId: 'string' }] }
   })
   async chatQuiz(
-    @Query('userId') userId: string, 
+    @Query('userId') userId: string,
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
     // Lay cau hoi quiz va cau tra loi tuong ung
@@ -157,9 +176,8 @@ export class QuizController {
       details: quizAnswers
     });
 
-    const savedQuizQuesAnsResponse = await this.quizService.addQuizQuesAnws(
-      quizQuesAnsDetail
-    );
+    const savedQuizQuesAnsResponse =
+      await this.quizService.addQuizQuesAnws(quizQuesAnsDetail);
 
     if (!savedQuizQuesAnsResponse.success) {
       return { success: false, error: 'Failed to save quiz question answers' };
@@ -175,7 +193,7 @@ export class QuizController {
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       prompt,
       QUIZ_SYSTEM_PROMPT,
-      Output.object(searchOutput),
+      Output.object(searchOutput)
     );
 
     // Return response
@@ -184,5 +202,19 @@ export class QuizController {
     }
 
     return { success: true, data: aiResponse.data };
+  }
+
+  /** Lấy tất cả câu hỏi và câu trả lời quiz của người dùng */
+  @Public()
+  @Get('user/:userId')
+  @ApiOperation({
+    summary: 'Lấy tất cả câu hỏi và câu trả lời quiz của người dùng'
+  })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
+  @ApiBaseResponse(QuizQuestionAnswerResponse)
+  async getQuizQuesAnwsByUserId(
+    @Param('userId') userId: string
+  ): Promise<BaseResponse<QuizQuestionAnswerResponse>> {
+    return this.quizService.getQuizQuesAnwsByUserId(userId);
   }
 }

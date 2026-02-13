@@ -183,10 +183,11 @@ export class UserLogService {
         const data = userLogSummaries.data
           .map((summary) => summary.logSummary)
           .join('\n');
+          
 
         // Tao report
-        const report = `User Log Summary Report from ${startDate?.toISOString() ?? 'the beginning'} to ${
-          endDate?.toISOString() ?? new Date().toISOString()
+        const report = `User Log Summary Report from ${startDate ? convertToUTC(startDate) : 'the beginning'} to ${
+          endDate ? convertToUTC(endDate) : new Date().toISOString()
         }:\n${data}`;
 
         return { success: true, data: report };

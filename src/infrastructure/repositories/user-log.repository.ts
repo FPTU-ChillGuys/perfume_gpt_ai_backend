@@ -36,6 +36,8 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
           'userMessageLogs.message',
           'userQuizLogs',
           'userQuizLogs.quizQuesAnsDetail',
+          'userQuizLogs.quizQuesAnsDetail.question',
+          'userQuizLogs.quizQuesAnsDetail.answer',
           'userSearchLogs'
         ]
       }
@@ -70,6 +72,8 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
         'userMessageLogs.message',
         'userQuizLogs',
         'userQuizLogs.quizQuesAnsDetail',
+        'userQuizLogs.quizQuesAnsDetail.question',
+        'userQuizLogs.quizQuesAnsDetail.answer',
         'userSearchLogs'
       ]
     });
@@ -106,21 +110,23 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
       userLog = this.createUserLog(userId);
     }
 
-    const detailIds = quizQuesAnsDetails.map(item => item.id);
+    const detailIds = quizQuesAnsDetails.map((item) => item.id);
     const existingQuizLogs = await this.em.find(UserQuizLog, {
       quizQuesAnsDetail: { $in: detailIds }
     });
     const existingDetailIds = new Set(
-      existingQuizLogs.map(item => item.quizQuesAnsDetail!.id)
+      existingQuizLogs.map((item) => item.quizQuesAnsDetail!.id)
     );
 
     const addedInRequest = new Set<string>();
-    quizQuesAnsDetails.forEach(quizQuesAnsDetail => {
+    quizQuesAnsDetails.forEach((quizQuesAnsDetail) => {
       if (
         !existingDetailIds.has(quizQuesAnsDetail.id) &&
         !addedInRequest.has(quizQuesAnsDetail.id)
       ) {
-        userLog.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog }));
+        userLog.userQuizLogs.add(
+          new UserQuizLog({ quizQuesAnsDetail, userLog })
+        );
         addedInRequest.add(quizQuesAnsDetail.id);
       }
     });

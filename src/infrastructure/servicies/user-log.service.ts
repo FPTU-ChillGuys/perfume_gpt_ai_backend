@@ -90,9 +90,10 @@ export class UserLogService {
     // Response existing user log or create new one
     const user = await this.createUserLogIfNotExist(userId);
 
-    const quizQuesAnsDetail = await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne(
-      { id: quizQuesAnsId }
-    );
+    const quizQuesAnsDetail =
+      await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({
+        id: quizQuesAnsId
+      });
 
     return this.unitOfWork.UserLogRepo.addQuizQuesAnsDetailsLogToUserLog(
       user.id,
@@ -201,7 +202,6 @@ export class UserLogService {
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
     return await funcHandlerAsync(
       async () => {
-
         // Xu ly neu khong co startDate thi lay theo period
         if (!userLogRequest.startDate) {
           userLogRequest.startDate = this.getFirstDateOfPeriod(
@@ -256,8 +256,15 @@ export class UserLogService {
 
         // Lay noi dung quiz
         const quizContents = quizLogs
-          .map((log) => log.quizQuesAnsDetail?.answer)
+          .map((log) =>
+            `Question: ${log.quizQuesAnsDetail?.question?.question ?? ''}\n Answer: ${log.quizQuesAnsDetail?.answer?.answer ?? ''}`.trim()
+          )
           .join('; ');
+
+        console.log(`User ID: ${userLog.userId}`);
+        console.log(`Search Contents: ${searchContents}`);
+        console.log(`Message Contents: ${messageContents}`);
+        console.log(`Quiz Contents: ${quizContents}`);
 
         // Tao prompt de tong hop log
         const prompt = generateSummaryPrompt(
@@ -340,8 +347,15 @@ export class UserLogService {
 
         // Lay noi dung quiz
         const quizContents = quizLogs
-          .map((log) => log.quizQuesAnsDetail?.answer)
+          .map((log) =>
+            `Question: ${log.quizQuesAnsDetail?.question?.question ?? ''}\n Answer: ${log.quizQuesAnsDetail?.answer?.answer ?? ''}`.trim()
+          )
           .join('; ');
+
+        console.log(`User ID: ${userLog.userId}`);
+        console.log(`Search Contents: ${searchContents}`);
+        console.log(`Message Contents: ${messageContents}`);
+        console.log(`Quiz Contents: ${quizContents}`);
 
         // Tao prompt de tong hop log
         prompt +=
@@ -425,7 +439,11 @@ export class UserLogService {
       return { success: true, data: cached };
     }
 
-    const result = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
+    const result = await this.getUserLogSummaryReportByUserId(
+      userId,
+      startDate,
+      endDate
+    );
 
     if (result.success && result.data) {
       this.summaryCache.set(cacheKey, result.data);

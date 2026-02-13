@@ -24,6 +24,8 @@ import { QuizService } from 'src/infrastructure/servicies/quiz.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { quizPrompt } from 'src/application/constant/prompts';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { Output } from 'ai';
+import { searchOutput } from 'src/chatbot/utils/output/search.output';
 
 @Public()
 @ApiTags('Quizzes')
@@ -172,7 +174,8 @@ export class QuizController {
     // Get AI response
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       prompt,
-      QUIZ_SYSTEM_PROMPT
+      QUIZ_SYSTEM_PROMPT,
+      Output.object(searchOutput),
     );
 
     // Return response

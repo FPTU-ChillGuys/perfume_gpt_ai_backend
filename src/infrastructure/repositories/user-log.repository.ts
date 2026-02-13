@@ -83,8 +83,17 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     if (!userLog) {
       userLog = this.createUserLog(userId);
     }
-    userLog.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog }));
-    await this.em.flush();
+
+    const existingQuizLog = await this.em.findOne(UserQuizLog, {
+      quizQuesAnsDetail: quizQuesAnsDetail.id
+    });
+
+    if (!existingQuizLog) {
+      userLog.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog }));
+      await this.em.flush();
+    }
+
+    await userLog.userQuizLogs.init();
     return userLog.userQuizLogs.getItems();
   }
 
@@ -96,10 +105,31 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     if (!userLog) {
       userLog = this.createUserLog(userId);
     }
-    quizQuesAnsDetails.forEach(quizQuesAnsDetail => {
-      userLog.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog }));
+
+    const detailIds = quizQuesAnsDetails.map(item => item.id);
+    const existingQuizLogs = await this.em.find(UserQuizLog, {
+      quizQuesAnsDetail: { $in: detailIds }
     });
-    await this.em.flush();
+    const existingDetailIds = new Set(
+      existingQuizLogs.map(item => item.quizQuesAnsDetail!.id)
+    );
+
+    const addedInRequest = new Set<string>();
+    quizQuesAnsDetails.forEach(quizQuesAnsDetail => {
+      if (
+        !existingDetailIds.has(quizQuesAnsDetail.id) &&
+        !addedInRequest.has(quizQuesAnsDetail.id)
+      ) {
+        userLog.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog }));
+        addedInRequest.add(quizQuesAnsDetail.id);
+      }
+    });
+
+    if (addedInRequest.size > 0) {
+      await this.em.flush();
+    }
+
+    await userLog.userQuizLogs.init();
     return userLog.userQuizLogs.getItems();
   }
 

@@ -134,7 +134,7 @@ export class QuizService {
       );
 
       return { success: true, data: savedQuesAns };
-    }, 'Failed to add quiz question answer');
+    }, 'Failed to add quiz question answer', true);
   }
 
   async getAllQuizQuesAnws(): Promise<

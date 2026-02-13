@@ -15,7 +15,8 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
   systemPrompt?: string,
   tools?: ToolSet,
   errorMessage?: string,
-  stopWhen?: number
+  stopWhen?: number,
+  output?: any
 ) {
   try {
     const result = await generateText({
@@ -23,7 +24,8 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
       prompt: prompt,
       system: systemPrompt ? systemPrompt : undefined,
       tools: tools ? tools : undefined,
-      stopWhen: stepCountIs(stopWhen ? stopWhen : 5)
+      stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
+      output: output ? output : undefined
     });
     return result.text;
   } catch (error) {

@@ -7,7 +7,14 @@ import {
   Query,
   Req
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse
+} from '@nestjs/swagger';
 import { Output, UIMessage } from 'ai';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
@@ -97,7 +104,10 @@ export class ConversationController {
   @Public()
   @Post('chat/v1')
   @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Chat V1 - Dùng log tóm tắt (có token: profile+order, guest: chỉ log)' })
+  @ApiOperation({
+    summary:
+      'Chat V1 - Dùng log tóm tắt (có token: profile+order, guest: chỉ log)'
+  })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV1(
     @Req() request: Request,
@@ -143,8 +153,8 @@ export class ConversationController {
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      Output.object(searchOutput),
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt)
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt),
+      Output.object(searchOutput)
     );
 
     if (!message.success) {
@@ -185,7 +195,10 @@ export class ConversationController {
   @Public()
   @Post('chat/v2')
   @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Chat V2 - Dùng log chi tiết (có token: profile+order, guest: chỉ log)' })
+  @ApiOperation({
+    summary:
+      'Chat V2 - Dùng log chi tiết (có token: profile+order, guest: chỉ log)'
+  })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV2(
     @Req() request: Request,
@@ -232,8 +245,8 @@ export class ConversationController {
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      Output.object(searchOutput),
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt)
+      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt),
+      Output.object(searchOutput)
     );
 
     if (!message.success) {
@@ -274,7 +287,9 @@ export class ConversationController {
   @Public()
   @Post('test/v1')
   @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Test V1 - Log tóm tắt (có token: profile+order, guest: chỉ log)' })
+  @ApiOperation({
+    summary: 'Test V1 - Log tóm tắt (có token: profile+order, guest: chỉ log)'
+  })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
@@ -343,7 +358,9 @@ export class ConversationController {
   @Public()
   @Post('test/v2')
   @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Test V2 - Log chi tiết (có token: profile+order, guest: chỉ log)' })
+  @ApiOperation({
+    summary: 'Test V2 - Log chi tiết (có token: profile+order, guest: chỉ log)'
+  })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
@@ -410,7 +427,10 @@ export class ConversationController {
   @Public()
   @Post('test/v3')
   @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Test V3 - Common helper + log tóm tắt (có token: profile+order, guest: chỉ log)' })
+  @ApiOperation({
+    summary:
+      'Test V3 - Common helper + log tóm tắt (có token: profile+order, guest: chỉ log)'
+  })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
@@ -459,7 +479,10 @@ export class ConversationController {
   @Public()
   @Post('test/v4')
   @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Test V4 - Common helper + log chi tiết (có token: profile+order, guest: chỉ log)' })
+  @ApiOperation({
+    summary:
+      'Test V4 - Common helper + log chi tiết (có token: profile+order, guest: chỉ log)'
+  })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
@@ -508,7 +531,10 @@ export class ConversationController {
   @Public()
   @Post('chat/v3')
   @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Chat V3 - Common helper + log tóm tắt (có token: profile+order, guest: chỉ log)' })
+  @ApiOperation({
+    summary:
+      'Chat V3 - Common helper + log tóm tắt (có token: profile+order, guest: chỉ log)'
+  })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV3(
     @Req() request: Request,
@@ -535,11 +561,11 @@ export class ConversationController {
     // Call AI service
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      Output.object(searchOutput),
       conversationSystemPrompt(
         ADVANCED_MATCHING_SYSTEM_PROMPT,
         promptResult.data.combinedPrompt
-      )
+      ),
+      Output.object(searchOutput)
     );
 
     if (!message.success) {
@@ -566,7 +592,10 @@ export class ConversationController {
   @Public()
   @Post('chat/v4')
   @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Chat V4 - Common helper + log chi tiết (có token: profile+order, guest: chỉ log)' })
+  @ApiOperation({
+    summary:
+      'Chat V4 - Common helper + log chi tiết (có token: profile+order, guest: chỉ log)'
+  })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV4(
     @Req() request: Request,
@@ -593,11 +622,11 @@ export class ConversationController {
     // Call AI service
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      Output.object(searchOutput),
       conversationSystemPrompt(
         ADVANCED_MATCHING_SYSTEM_PROMPT,
         promptResult.data.combinedPrompt
-      )
+      ),
+      Output.object(searchOutput)
     );
 
     if (!message.success) {
@@ -624,9 +653,14 @@ export class ConversationController {
   @Post('test/guarded/v1')
   @Role('admin')
   @ApiBearerAuth('jwt')
-  @ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+  @ApiUnauthorizedResponse({
+    description: 'Token JWT không hợp lệ hoặc không được cung cấp'
+  })
   @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
-  @ApiOperation({ summary: 'Test Guarded V1 - Admin only (không lấy được profile từ admin token)' })
+  @ApiOperation({
+    summary:
+      'Test Guarded V1 - Admin only (không lấy được profile từ admin token)'
+  })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'prompt', type: String })
   @ApiBaseResponse(String)
@@ -671,9 +705,14 @@ export class ConversationController {
   @Post('test/guarded/v2')
   @Role('admin')
   @ApiBearerAuth('jwt')
-  @ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+  @ApiUnauthorizedResponse({
+    description: 'Token JWT không hợp lệ hoặc không được cung cấp'
+  })
   @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
-  @ApiOperation({ summary: 'Test Guarded V2 - Admin only (không lấy được profile từ admin token)' })
+  @ApiOperation({
+    summary:
+      'Test Guarded V2 - Admin only (không lấy được profile từ admin token)'
+  })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'prompt', type: String })
   @ApiBaseResponse(String)

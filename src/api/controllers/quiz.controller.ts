@@ -50,6 +50,16 @@ export class QuizController {
     return { success: true, data: quizQues.data };
   }
 
+  /** Lấy câu hỏi quiz theo ID */
+  @Public()
+  @Get('questions/:id')
+  @ApiOperation({ summary: 'Lấy câu hỏi quiz theo ID' })
+  @ApiParam({ name: 'id', description: 'ID câu hỏi' })
+  @ApiBaseResponse(QuizQuestion)
+  async getQuizQuesById(@Param('id') id: string): Promise<BaseResponse<QuizQuestionResponse>> {
+    return this.quizService.getQuizQuesById(id);
+  }
+
   /** Tạo câu hỏi quiz mới */
   @Public()
   @Post('questions')

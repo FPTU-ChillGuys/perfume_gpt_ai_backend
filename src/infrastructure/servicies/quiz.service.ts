@@ -76,7 +76,7 @@ export class QuizService {
         return { success: false, error: 'Quiz question not found' };
       }
 
-      const quizQuestionResponse = QuizQuestionMapper.toResponse(quizQuestion);
+      const quizQuestionResponse = QuizQuestionMapper.toResponse(quizQuestion, true);
 
       return { success: true, data: quizQuestionResponse };
     }, 'Failed to get quiz question by id');
@@ -104,7 +104,7 @@ export class QuizService {
         });
 
         const quizQuestionsResponses =
-          QuizQuestionMapper.toResponseList(quizQuestions);
+          QuizQuestionMapper.toResponseList(quizQuestions, true);
 
         return { success: true, data: quizQuestionsResponses };
       },

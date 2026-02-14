@@ -29,6 +29,10 @@ export class LogController {
   @Public()
   @Get('report/activity')
   @ApiOperation({ summary: 'Lấy báo cáo log hoạt động người dùng' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({ name: 'period', enum: PeriodEnum, description: 'Khoảng thời gian lọc' })
+  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
+  @ApiQuery({ name: 'startDate', type: Date, required: false, description: 'Ngày bắt đầu (tùy chọn)' })
   @ApiBaseResponse(String)
   async collectLogs(
     @Query() userLogRequest: UserLogRequest
@@ -48,6 +52,10 @@ export class LogController {
   @Public()
   @Get('summarize')
   @ApiOperation({ summary: 'Tóm tắt log người dùng bằng AI' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({ name: 'period', enum: PeriodEnum, description: 'Khoảng thời gian lọc' })
+  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
+  @ApiQuery({ name: 'startDate', type: Date, required: false, description: 'Ngày bắt đầu (tùy chọn)' })
   @ApiBaseResponse(String)
   async summarizeLogs(
     @Query() userLogRequest: UserLogRequest
@@ -99,6 +107,9 @@ export class LogController {
   @Public()
   @Get('summarize/all')
   @ApiOperation({ summary: 'Tóm tắt log tất cả người dùng bằng AI' })
+  @ApiQuery({ name: 'period', enum: PeriodEnum, description: 'Khoảng thời gian lọc' })
+  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
+  @ApiQuery({ name: 'startDate', type: Date, required: false, description: 'Ngày bắt đầu (tùy chọn)' })
   @ApiBaseResponse(String)
   async summarizeAllLogs(
     @Query() allUserLogRequest: AllUserLogRequest

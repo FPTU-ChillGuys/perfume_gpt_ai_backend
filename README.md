@@ -418,7 +418,7 @@ Hệ thống gồm **14 controller** chia thành 3 nhóm theo quyền truy cập
 | [ProductController](#7-productcontroller) | `/products` | 🌐 Public | — | 2 |
 | [ProfileController](#8-profilecontroller) | `/profile` | 🌐 Public | — | 2 |
 | [ReviewController](#9-reviewcontroller) | `/reviews` | 🌐 Public | — | 4 |
-| [QuizController](#10-quizcontroller) | `/quizzes` | 🌐 Public | — | 6 |
+| [QuizController](#10-quizcontroller) | `/quizzes` | 🌐 Public | — | 8 |
 | [LogController](#11-logcontroller) | `/logs` | 🌐 Public | — | 6 (+2 cron) |
 | [TrendController](#12-trendcontroller) | `/trends` | 🌐 Public | — | 2 |
 | [RecommendationController](#13-recommendationcontroller) | `/recommendation` | 🌐 Public | — | 5 |
@@ -732,11 +732,13 @@ Quản lý câu hỏi quiz tìm hiểu sở thích nước hoa và nhận gợi 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
 | `GET` | `/quizzes/questions` | Lấy danh sách câu hỏi quiz | 🌐 Public |
+| `GET` | `/quizzes/questions/:id` | Lấy câu hỏi quiz theo ID | 🌐 Public |
 | `POST` | `/quizzes/questions` | Tạo câu hỏi quiz mới | 🌐 Public |
 | `POST` | `/quizzes/questions/list` | Tạo nhiều câu hỏi quiz cùng lúc (batch) | 🌐 Public |
 | `PUT` | `/quizzes/questions/:id` | Cập nhật câu trả lời quiz | 🌐 Public |
 | `GET` | `/quizzes/user/:userId/check-first-time` | Kiểm tra user đã làm quiz chưa | 🌐 Public |
 | `POST` | `/quizzes/user?userId=` | Trả lời quiz và nhận gợi ý nước hoa từ AI | 🌐 Public |
+| `GET` | `/quizzes/user/:userId` | Lấy lịch sử câu hỏi/câu trả lời quiz của user | 🌐 Public |
 
 **Cách sử dụng:**
 ```bash
@@ -751,7 +753,7 @@ curl -X POST -H "Content-Type: application/json" \
 
 > **Lưu ý:**
 > - Endpoint `POST /quizzes/user` thực hiện nhiều bước: lấy câu hỏi → match câu trả lời → tạo prompt → lưu quiz answer → lưu user log → gọi AI.
-> - ⚠️ Việc lưu user log (`addQuizQuesAnsDetailToUserLog`) chạy fire-and-forget, có thể gây lỗi FK violation nếu entity chưa flush xong. Trong test cần mock phần này.
+> - Việc lưu user log đã được `await` và có cơ chế chống trùng (`ON CONFLICT DO NOTHING`) cho quiz detail log.
 > - Tất cả endpoint đều public — bao gồm cả endpoint tạo/cập nhật câu hỏi. Trong production nên bảo vệ các endpoint tạo/cập nhật bằng role admin.
 
 ---

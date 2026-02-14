@@ -13,26 +13,21 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
-  ApiResponse,
   ApiTags
 } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
+import { QuizQuesAnsDetailRequest } from 'src/application/dtos/request/quiz-ques-ans-detail.request';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
-import {
-  QuizQuestionAnswerMapper,
-  QuizQuestionMapper
-} from 'src/application/mapping';
-import { QUIZ_SYSTEM_PROMPT } from 'src/application/constant/prompts';
+import { QUIZ_SYSTEM_PROMPT, quizPrompt } from 'src/application/constant/prompts';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { QuizService } from 'src/infrastructure/servicies/quiz.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { quizPrompt } from 'src/application/constant/prompts';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { Output } from 'ai';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
@@ -52,7 +47,7 @@ export class QuizController {
   @Public()
   @Get('questions')
   @ApiOperation({ summary: 'Lấy danh sách câu hỏi quiz' })
-  @ApiBaseResponse(QuizQuestion)
+  @ApiBaseResponse(QuizQuestionResponse, true)
   async getAllQuizzes(): Promise<BaseResponse<QuizQuestionResponse[]>> {
     const quizQues = await this.quizService.getAllQuizQues();
 
@@ -68,7 +63,7 @@ export class QuizController {
   @Get('questions/:id')
   @ApiOperation({ summary: 'Lấy câu hỏi quiz theo ID' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
-  @ApiBaseResponse(QuizQuestion)
+  @ApiBaseResponse(QuizQuestionResponse)
   async getQuizQuesById(
     @Param('id') id: string
   ): Promise<BaseResponse<QuizQuestionResponse>> {
@@ -121,6 +116,7 @@ export class QuizController {
   @ApiOperation({ summary: 'Cập nhật câu trả lời quiz' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
   @ApiBody({ type: [QuizAnswerRequest] })
+  @ApiBaseResponse(QuizQuestionResponse)
   async updateQuizAnswer(
     @Param('id') id: string,
     @Body() quizAnswerRequest: QuizAnswerRequest[]
@@ -134,9 +130,7 @@ export class QuizController {
   @ApiOperation({ summary: 'Trả lời quiz và nhận gợi ý AI' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiBaseResponse(String)
-  @ApiBody({
-    schema: { example: [{ questionId: 'string', answerId: 'string' }] }
-  })
+  @ApiBody({ type: [QuizQuesAnsDetailRequest] })
   async chatQuiz(
     @Query('userId') userId: string,
     @Body() quizAnswers: { questionId: string; answerId: string }[]

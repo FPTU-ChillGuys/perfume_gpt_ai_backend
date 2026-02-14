@@ -1,4 +1,4 @@
-import { Entity, ManyToOne, OneToOne } from '@mikro-orm/core';
+import { Collection, Entity, ManyToOne, OneToMany } from '@mikro-orm/core';
 import { QuizQuestion } from './quiz-question.entity';
 import { QuizAnswer } from './quiz-answer.entity';
 import { QuizQuestionAnswer } from './quiz-question-answer.entity';
@@ -35,8 +35,8 @@ export class QuizQuestionAnswerDetail extends Common {
 
   /** Log quiz của người dùng (nếu có) */
   @ApiProperty({ description: 'Log quiz của người dùng', type: () => UserQuizLog, nullable: true })
-  @OneToOne(() => UserQuizLog, { nullable: true })
-  userQuizLog?: UserQuizLog;
+  @OneToMany(() => UserQuizLog, userQuizLog => userQuizLog.quizQuesAnsDetail)
+  userQuizLog? = new Collection<UserQuizLog>(this);
 
   constructor(init?: Partial<QuizQuestionAnswerDetail>) {
     super();

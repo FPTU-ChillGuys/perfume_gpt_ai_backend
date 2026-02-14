@@ -1,4 +1,4 @@
-import { Collection, Entity, ManyToOne, OneToMany } from '@mikro-orm/core';
+import { Collection, Entity, ManyToOne, OneToMany, OneToOne } from '@mikro-orm/core';
 import { QuizQuestion } from './quiz-question.entity';
 import { QuizAnswer } from './quiz-answer.entity';
 import { QuizQuestionAnswer } from './quiz-question-answer.entity';

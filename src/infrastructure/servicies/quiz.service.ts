@@ -125,7 +125,7 @@ export class QuizService {
       //Log last quiz question answer
       this.unitOfWork.UserLogRepo.addQuizQuesAnsDetailLogToUserLog(
         quizQuesAnws.userId,
-        quizQuestionAnswer.details[quizQuesAnws.details.length - 1]
+        quizQuestionAnswer.details.getItems()
       );
 
       const savedQuesAns = QuizQuestionAnswerMapper.toResponse(

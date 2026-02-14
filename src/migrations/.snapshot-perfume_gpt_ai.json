@@ -587,6 +587,124 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "question_id": {
+          "name": "question_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "mappedType": "uuid"
+        },
+        "answer_id": {
+          "name": "answer_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "mappedType": "uuid"
+        },
+        "ques_ans_id": {
+          "name": "ques_ans_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "mappedType": "uuid"
+        }
+      },
+      "name": "quiz_question_answer_detail",
+      "schema": "public",
+      "indexes": [
+        {
+          "keyName": "quiz_question_answer_detail_pkey",
+          "columnNames": [
+            "id"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "quiz_question_answer_detail_question_id_foreign": {
+          "constraintName": "quiz_question_answer_detail_question_id_foreign",
+          "columnNames": [
+            "question_id"
+          ],
+          "localTableName": "public.quiz_question_answer_detail",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.quiz_question",
+          "deleteRule": "cascade",
+          "updateRule": "cascade"
+        },
+        "quiz_question_answer_detail_answer_id_foreign": {
+          "constraintName": "quiz_question_answer_detail_answer_id_foreign",
+          "columnNames": [
+            "answer_id"
+          ],
+          "localTableName": "public.quiz_question_answer_detail",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.quiz_answer",
+          "deleteRule": "cascade",
+          "updateRule": "cascade"
+        },
+        "quiz_question_answer_detail_ques_ans_id_foreign": {
+          "constraintName": "quiz_question_answer_detail_ques_ans_id_foreign",
+          "columnNames": [
+            "ques_ans_id"
+          ],
+          "localTableName": "public.quiz_question_answer_detail",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.quiz_question_answer",
+          "deleteRule": "cascade",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "mappedType": "uuid"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamptz",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 6,
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 6,
+          "mappedType": "datetime"
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
@@ -993,16 +1111,6 @@
       "schema": "public",
       "indexes": [
         {
-          "columnNames": [
-            "quiz_ques_ans_detail_id"
-          ],
-          "composite": false,
-          "keyName": "user_quiz_log_quiz_ques_ans_detail_id_unique",
-          "constraint": true,
-          "primary": false,
-          "unique": true
-        },
-        {
           "keyName": "user_quiz_log_pkey",
           "columnNames": [
             "id"
@@ -1038,156 +1146,6 @@
             "id"
           ],
           "referencedTableName": "public.user_log",
-          "updateRule": "cascade"
-        }
-      },
-      "nativeEnums": {}
-    },
-    {
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "default": "gen_random_uuid()",
-          "mappedType": "uuid"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamptz",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": 6,
-          "mappedType": "datetime"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamptz",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": 6,
-          "mappedType": "datetime"
-        },
-        "question_id": {
-          "name": "question_id",
-          "type": "uuid",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "mappedType": "uuid"
-        },
-        "answer_id": {
-          "name": "answer_id",
-          "type": "uuid",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "mappedType": "uuid"
-        },
-        "ques_ans_id": {
-          "name": "ques_ans_id",
-          "type": "uuid",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "mappedType": "uuid"
-        },
-        "user_quiz_log_id": {
-          "name": "user_quiz_log_id",
-          "type": "uuid",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": true,
-          "mappedType": "uuid"
-        }
-      },
-      "name": "quiz_question_answer_detail",
-      "schema": "public",
-      "indexes": [
-        {
-          "columnNames": [
-            "user_quiz_log_id"
-          ],
-          "composite": false,
-          "keyName": "quiz_question_answer_detail_user_quiz_log_id_unique",
-          "constraint": true,
-          "primary": false,
-          "unique": true
-        },
-        {
-          "keyName": "quiz_question_answer_detail_pkey",
-          "columnNames": [
-            "id"
-          ],
-          "composite": false,
-          "constraint": true,
-          "primary": true,
-          "unique": true
-        }
-      ],
-      "checks": [],
-      "foreignKeys": {
-        "quiz_question_answer_detail_question_id_foreign": {
-          "constraintName": "quiz_question_answer_detail_question_id_foreign",
-          "columnNames": [
-            "question_id"
-          ],
-          "localTableName": "public.quiz_question_answer_detail",
-          "referencedColumnNames": [
-            "id"
-          ],
-          "referencedTableName": "public.quiz_question",
-          "deleteRule": "cascade",
-          "updateRule": "cascade"
-        },
-        "quiz_question_answer_detail_answer_id_foreign": {
-          "constraintName": "quiz_question_answer_detail_answer_id_foreign",
-          "columnNames": [
-            "answer_id"
-          ],
-          "localTableName": "public.quiz_question_answer_detail",
-          "referencedColumnNames": [
-            "id"
-          ],
-          "referencedTableName": "public.quiz_answer",
-          "deleteRule": "cascade",
-          "updateRule": "cascade"
-        },
-        "quiz_question_answer_detail_ques_ans_id_foreign": {
-          "constraintName": "quiz_question_answer_detail_ques_ans_id_foreign",
-          "columnNames": [
-            "ques_ans_id"
-          ],
-          "localTableName": "public.quiz_question_answer_detail",
-          "referencedColumnNames": [
-            "id"
-          ],
-          "referencedTableName": "public.quiz_question_answer",
-          "deleteRule": "cascade",
-          "updateRule": "cascade"
-        },
-        "quiz_question_answer_detail_user_quiz_log_id_foreign": {
-          "constraintName": "quiz_question_answer_detail_user_quiz_log_id_foreign",
-          "columnNames": [
-            "user_quiz_log_id"
-          ],
-          "localTableName": "public.quiz_question_answer_detail",
-          "referencedColumnNames": [
-            "id"
-          ],
-          "referencedTableName": "public.user_quiz_log",
-          "deleteRule": "set null",
           "updateRule": "cascade"
         }
       },

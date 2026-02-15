@@ -25,9 +25,9 @@ export class ConversationRequestDto {
   @ApiProperty({ description: 'ID cuộc hội thoại', format: 'uuid' })
   id!: string;
 
-  /** ID người dùng */
-  @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
-  userId!: string;
+  /** ID người dùng (tự động lấy từ JWT token, không cần truyền) */
+  @ApiProperty({ description: 'ID người dùng (tự động lấy từ token, không cần truyền)', format: 'uuid', required: false })
+  userId?: string;
 
   /** Danh sách tin nhắn */
   @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageRequestDto] })

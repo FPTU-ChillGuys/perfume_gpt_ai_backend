@@ -36,17 +36,17 @@
 | CV-F-002 | `/conversation?id={id}` | GET | Lấy cuộc hội thoại theo ID hợp lệ | `id` = UUID hợp lệ có trong DB | `{ success: true, data: { id, userId, messages } }` | 200 |
 | CV-F-003 | `/conversation?id={id}` | GET | Lấy cuộc hội thoại với ID không tồn tại | `id` = UUID không tồn tại | `{ success: false, error: "..." }` | 404 |
 | CV-F-004 | `/conversation/list/paged` | GET | Lấy hội thoại phân trang | `page=1&pageSize=10` | `{ success: true, data: { items: [...], totalCount, page } }` | 200 |
-| CV-F-005 | `/conversation/chat/v1` | POST | Chat V1 với token hợp lệ (có profile+order) | Body: `{ userId, messages }`, Header: `Authorization: Bearer <token>` | `{ success: true, data: { id, userId, messages } }` | 200 |
-| CV-F-006 | `/conversation/chat/v1` | POST | Chat V1 không có token (guest - chỉ log) | Body: `{ userId, messages }`, Không có header Authorization | `{ success: true, data: { id, userId, messages } }` (chỉ dùng user log) | 200 |
-| CV-F-007 | `/conversation/chat/v2` | POST | Chat V2 với log chi tiết + token | Body: `{ userId, messages }`, Header: `Authorization: Bearer <token>` | `{ success: true, data: { id, userId, messages } }` | 200 |
-| CV-F-008 | `/conversation/chat/v3` | POST | Chat V3 dùng common helper (V1 cải thiện) | Body: `{ userId, messages }`, Header: `Authorization: Bearer <token>` | `{ success: true, data: { id, userId, messages } }` | 200 |
-| CV-F-009 | `/conversation/chat/v4` | POST | Chat V4 dùng common helper (V2 cải thiện) | Body: `{ userId, messages }`, Header: `Authorization: Bearer <token>` | `{ success: true, data: { id, userId, messages } }` | 200 |
-| CV-F-010 | `/conversation/test/v1` | POST | Test V1 với userId và prompt | `userId={id}&prompt="Tìm nước hoa nam mùi gỗ"` | `{ success: true, data: "AI response text" }` | 200 |
-| CV-F-011 | `/conversation/test/v2` | POST | Test V2 với userId và prompt | `userId={id}&prompt="Tìm nước hoa nữ dưới 1 triệu"` | `{ success: true, data: "AI response text" }` | 200 |
-| CV-F-012 | `/conversation/test/v3` | POST | Test V3 common helper | `userId={id}&prompt="Gợi ý nước hoa cho mùa hè"` | `{ success: true, data: "AI response text" }` | 200 |
-| CV-F-013 | `/conversation/test/v4` | POST | Test V4 common helper | `userId={id}&prompt="Nước hoa unisex phong cách"` | `{ success: true, data: "AI response text" }` | 200 |
-| CV-F-014 | `/conversation/test/guarded/v1` | POST | Test Guarded V1 - Admin only | Header: `Authorization: Bearer <admin_token>`, `userId={id}&prompt="test"` | `{ success: true, data: "AI response text" }` | 200 |
-| CV-F-015 | `/conversation/test/guarded/v2` | POST | Test Guarded V2 - Admin only | Header: `Authorization: Bearer <admin_token>`, `userId={id}&prompt="test"` | `{ success: true, data: "AI response text" }` | 200 |
+| CV-F-005 | `/conversation/chat/v1` | POST | Chat V1 với token hợp lệ (userId từ token + profile+order) | Body: `{ messages }`, Header: `Authorization: Bearer <token>` | `{ success: true, data: { id, userId, messages } }` | 200 |
+| CV-F-006 | `/conversation/chat/v1` | POST | Chat V1 không có token (guest - không lấy log) | Body: `{ messages }`, Không có header Authorization | `{ success: true, data: { id, messages } }` (không lấy log/order/profile) | 200 |
+| CV-F-007 | `/conversation/chat/v2` | POST | Chat V2 với log chi tiết + token | Body: `{ messages }`, Header: `Authorization: Bearer <token>` | `{ success: true, data: { id, userId, messages } }` | 200 |
+| CV-F-008 | `/conversation/chat/v3` | POST | Chat V3 dùng common helper (V1 cải thiện) | Body: `{ messages }`, Header: `Authorization: Bearer <token>` | `{ success: true, data: { id, userId, messages } }` | 200 |
+| CV-F-009 | `/conversation/chat/v4` | POST | Chat V4 dùng common helper (V2 cải thiện) | Body: `{ messages }`, Header: `Authorization: Bearer <token>` | `{ success: true, data: { id, userId, messages } }` | 200 |
+| CV-F-010 | `/conversation/test/v1` | POST | Test V1 với token + prompt | Header: `Authorization: Bearer <token>`, `prompt="Tìm nước hoa nam mùi gỗ"` | `{ success: true, data: "AI response text" }` | 200 |
+| CV-F-011 | `/conversation/test/v2` | POST | Test V2 với token + prompt | Header: `Authorization: Bearer <token>`, `prompt="Tìm nước hoa nữ dưới 1 triệu"` | `{ success: true, data: "AI response text" }` | 200 |
+| CV-F-012 | `/conversation/test/v3` | POST | Test V3 common helper | Header: `Authorization: Bearer <token>`, `prompt="Gợi ý nước hoa cho mùa hè"` | `{ success: true, data: "AI response text" }` | 200 |
+| CV-F-013 | `/conversation/test/v4` | POST | Test V4 common helper | Header: `Authorization: Bearer <token>`, `prompt="Nước hoa unisex phong cách"` | `{ success: true, data: "AI response text" }` | 200 |
+| CV-F-014 | `/conversation/test/guarded/v1` | POST | Test Guarded V1 - Admin only | Header: `Authorization: Bearer <admin_token>`, `prompt="test"` | `{ success: true, data: "AI response text" }` | 200 |
+| CV-F-015 | `/conversation/test/guarded/v2` | POST | Test Guarded V2 - Admin only | Header: `Authorization: Bearer <admin_token>`, `prompt="test"` | `{ success: true, data: "AI response text" }` | 200 |
 | CV-F-016 | `/conversation/chat/v1` | POST | Chat V1 - AI service trả về lỗi | Body hợp lệ, AI service fail | `{ success: false, error: "Failed to get AI response" }` | 200 |
 | CV-F-017 | `/conversation/chat/v3` | POST | Chat V3 - Build prompt thất bại | Body hợp lệ, logService/orderService fail | `{ success: false, error: "Failed to build combined prompt" }` | 200 |
 
@@ -185,9 +185,9 @@
 
 | TC-ID | Endpoint | Mô tả | Input sai | Expected | HTTP Code |
 |-------|----------|--------|-----------|----------|-----------|
-| DV-001 | `POST /conversation/chat/v1` | Thiếu userId trong body | `{ messages: [...] }` (không có userId) | `{ success: false, error: "userId is required" }` | 400 |
-| DV-002 | `POST /conversation/chat/v1` | Messages rỗng | `{ userId: "abc", messages: [] }` | Xử lý bình thường hoặc trả lỗi | 200/400 |
-| DV-003 | `POST /conversation/chat/v1` | userId rỗng | `{ userId: "", messages: [...] }` | Xử lý gracefully - không crash | 200 |
+| DV-001 | `POST /conversation/chat/v1` | Guest (không có token) | `{ messages: [...] }` (không có token) | Chat hoạt động bình thường, không lấy log/order/profile | 200 |
+| DV-002 | `POST /conversation/chat/v1` | Messages rỗng | `{ messages: [] }`, Header: `Authorization: Bearer <token>` | Xử lý bình thường hoặc trả lỗi | 200/400 |
+| DV-003 | `POST /conversation/chat/v1` | Token không hợp lệ | `{ messages: [...] }`, Invalid token | Xử lý gracefully - không crash, chat như guest | 200 |
 | DV-004 | `POST /quizzes/user?userId={id}` | Body không đúng format array | `{ questionId: "...", answerId: "..." }` (object thay vì array) | Validation error | 400 |
 | DV-005 | `POST /quizzes/user?userId={id}` | Array rỗng | `[]` | Trả response rỗng hoặc lỗi | 400 |
 | DV-006 | `POST /quizzes/questions` | Thiếu trường question | `{ answers: [...] }` | Validation error | 400 |
@@ -317,7 +317,7 @@
 
 | TC-ID | Mô tả | Kiểm tra | Expected |
 |-------|--------|----------|----------|
-| IT-001 | Chat tạo conversation mới trong DB | POST /conversation/chat/v3 với userId mới → kiểm tra DB | Record mới trong bảng `conversation` + `message` |
+| IT-001 | Chat tạo conversation mới trong DB | POST /conversation/chat/v3 với token hợp lệ → kiểm tra DB | Record mới trong bảng `conversation` + `message` |
 | IT-002 | Chat cập nhật conversation có sẵn | POST /conversation/chat/v3 với conversationId có sẵn | Messages được append, không tạo duplicate |
 | IT-003 | Quiz lưu kết quả vào DB | POST /quizzes/user → kiểm tra bảng `quiz_question_answer` | Record mới với userId, questionId, answerId |
 | IT-004 | Quiz tạo user log entry | POST /quizzes/user → kiểm tra user_log | Quiz log entry created |
@@ -419,7 +419,7 @@
 | 1 | SM-001 | `GET /products` | Kiểm tra server sống, DB kết nối |
 | 2 | SM-002 | `GET /products/search?searchText=nước hoa` | Kiểm tra search hoạt động |
 | 3 | SM-003 | `GET /quizzes/questions` | Kiểm tra quiz data tồn tại |
-| 4 | SM-004 | `POST /conversation/test/v3?userId=test&prompt=hello` | Kiểm tra AI service hoạt động |
+| 4 | SM-004 | `POST /conversation/test/v3?prompt=hello` (với Bearer token) | Kiểm tra AI service hoạt động |
 | 5 | SM-005 | `GET /reviews` | Kiểm tra review listing |
 | 6 | SM-006 | `GET /admin/instructions` (admin token) | Kiểm tra admin auth + instructions |
 | 7 | SM-007 | `GET /ai-acceptance/rate?isAccepted=true` | Kiểm tra acceptance tracking |

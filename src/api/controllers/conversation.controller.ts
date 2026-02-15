@@ -40,7 +40,7 @@ import { ConversationService } from 'src/infrastructure/servicies/conversation.s
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
+import { extractTokenFromHeader, getTokenPayloadFromRequest } from 'src/infrastructure/utils/extract-token';
 import {
   addMessageToMessages,
   convertToMessages,
@@ -99,55 +99,51 @@ export class ConversationController {
 
   /**
    * Chat V1 - Sử dụng log tóm tắt từ user log service (nhanh hơn nhưng phụ thuộc nội dung tóm tắt của service)
-   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
+   * @note userId được lấy từ JWT token. Guest (không có token) sẽ không lấy log/order/profile.
    */
   @Public()
   @Post('chat/v1')
   @ApiBearerAuth('jwt')
   @ApiOperation({
     summary:
-      'Chat V1 - Dùng log tóm tắt (có token: profile+order, guest: chỉ log)'
+      'Chat V1 - Dùng log tóm tắt (có token: userId+profile+order, guest: không lấy log)'
   })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV1(
     @Req() request: Request,
     @Body() conversation: ConversationRequestDto
   ): Promise<BaseResponse<ConversationDto>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
 
     //---------------------V1-------------------------------------
-    // Lay log nguoi dung tu db trong khoan 1 thang
-    /* 
-      Cách này lấy log tóm tắt từ user log service (Nhanh hơn nhưng tùy thuộc nội dung tóm tắt của service)
-    */
-    const userLog = await this.logService.getUserLogSummaryReportByUserId(
-      conversation.userId
-    );
+    let combinedPrompt = '';
 
-    // Tao prompt cho AI tu log nguoi dung
-    const userLogPromptText = userLogPrompt(userLog.data ?? '');
+    if (userId) {
+      // Đã đăng nhập - lấy log tóm tắt + order + profile
+      const userLog = await this.logService.getUserLogSummaryReportByUserId(userId);
+      const userLogPromptText = userLogPrompt(userLog.data ?? '');
 
-    // Tam thoi lay order cua nguoi dung theo userID
-    const orderReport =
-      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        conversation.userId,
+      const orderReport =
+        await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+          userId,
+          extractTokenFromHeader(request) ?? ''
+        );
+
+      const profile = await this.profileService.getOwnProfile(
         extractTokenFromHeader(request) ?? ''
       );
 
-    const profile = await this.profileService.getOwnProfile(
-      extractTokenFromHeader(request) ?? ''
-    );
+      const profileReport =
+        await this.profileService.createSystemPromptFromProfile(profile.payload!);
 
-    const profileReport =
-      await this.profileService.createSystemPromptFromProfile(profile.payload!);
-
-    // Ket hop prompt tu log nguoi dung va report don hang
-    const combinedPrompt = `${userLogPromptText}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
-    Profile:\n${profileReport ?? ''}`;
-
+      combinedPrompt = `${userLogPromptText}\n\n
+      Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
+      Profile:\n${profileReport ?? ''}`;
+    }
+    // Guest: không lấy log, order, profile
     //-------------------------------------------------------------
 
     // Call AI service to get response
@@ -164,7 +160,7 @@ export class ConversationController {
     // Prepare response conversation
     const responseConversation = overrideMessagesToConversation(
       conversation.id || '',
-      conversation.userId || '',
+      userId || '',
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 
@@ -190,56 +186,56 @@ export class ConversationController {
 
   /**
    * Chat V2 - Lấy log trực tiếp từ user log service (chậm hơn nhưng luôn đầy đủ nội dung)
-   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
+   * @note userId được lấy từ JWT token. Guest (không có token) sẽ không lấy log/order/profile.
    */
   @Public()
   @Post('chat/v2')
   @ApiBearerAuth('jwt')
   @ApiOperation({
     summary:
-      'Chat V2 - Dùng log chi tiết (có token: profile+order, guest: chỉ log)'
+      'Chat V2 - Dùng log chi tiết (có token: userId+profile+order, guest: không lấy log)'
   })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV2(
     @Req() request: Request,
     @Body() conversation: ConversationRequestDto
   ): Promise<BaseResponse<ConversationDto>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
 
     //---------------------V2-------------------------------------
-    // Lay log nguoi dung tu db trong khoan 1 thang
-    /* 
-      Cách này lấy log trực tiếp từ user log service (Chậm hơn nhưng luôn đầy đủ nội dung)
-    */
-    const userLogResponse =
-      await this.logService.getReportAndPromptSummaryUserLogs({
-        userId: conversation.userId,
-        period: PeriodEnum.MONTHLY,
-        endDate: convertToUTC(new Date()),
-        startDate: undefined
-      });
+    let combinedPrompt = '';
 
-    const orderReport =
-      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        conversation.userId,
+    if (userId) {
+      // Đã đăng nhập - lấy log chi tiết + order + profile
+      const userLogResponse =
+        await this.logService.getReportAndPromptSummaryUserLogs({
+          userId: userId,
+          period: PeriodEnum.MONTHLY,
+          endDate: convertToUTC(new Date()),
+          startDate: undefined
+        });
+
+      const orderReport =
+        await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+          userId,
+          extractTokenFromHeader(request) ?? ''
+        );
+
+      const profile = await this.profileService.getOwnProfile(
         extractTokenFromHeader(request) ?? ''
       );
 
-    const profile = await this.profileService.getOwnProfile(
-      extractTokenFromHeader(request) ?? ''
-    );
+      const profileReport =
+        await this.profileService.createSystemPromptFromProfile(profile.payload!);
 
-    const profileReport =
-      await this.profileService.createSystemPromptFromProfile(profile.payload!);
-
-    // Ket hop prompt tu log nguoi dung va report don hang
-    // Lay response tu user log service
-    const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
-    Profile:\n${profileReport ?? ''}`;
-
+      combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
+      Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
+      Profile:\n${profileReport ?? ''}`;
+    }
+    // Guest: không lấy log, order, profile
     //-------------------------------------------------------------
 
     // Call AI service to get response
@@ -256,7 +252,7 @@ export class ConversationController {
     // Prepare response conversation
     const responseConversation = overrideMessagesToConversation(
       conversation.id || '',
-      conversation.userId || '',
+      userId || '',
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 
@@ -282,15 +278,14 @@ export class ConversationController {
 
   /**
    * Test V1 - Test hội thoại với user log tóm tắt
-   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
+   * @note Nếu có Bearer token → lấy userId + profile + order. Không có token (guest) → không lấy log.
    */
   @Public()
   @Post('test/v1')
   @ApiBearerAuth('jwt')
   @ApiOperation({
-    summary: 'Test V1 - Log tóm tắt (có token: profile+order, guest: chỉ log)'
+    summary: 'Test V1 - Log tóm tắt (có token: userId+profile+order, guest: không lấy log)'
   })
-  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
     type: String,
@@ -299,40 +294,43 @@ export class ConversationController {
   @ApiBaseResponse(ConversationRequestDto)
   async convserationV1Test(
     @Req() request: Request,
-    @Query('userId') userId: string,
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
+
     // -----------------------------Test V1 -------------------------------------
-    // Lay log nguoi dung tu db trong khoan 1 thang
-    const userLog = await this.logService.getUserLogSummaryReportByUserId(
-      userId,
-      new Date(0),
-      convertToUTC(new Date())
-    );
+    let combinedPrompt = '';
 
-    console.log('User log data:', userLog.data);
-
-    // Tao prompt cho AI tu log nguoi dung
-    const userLogPromptText = userLogPrompt(userLog.data ?? '');
-
-    // Tam thoi lay order cua nguoi dung theo userID
-    const orderReport =
-      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+    if (userId) {
+      // Đã đăng nhập - lấy log tóm tắt + order + profile
+      const userLog = await this.logService.getUserLogSummaryReportByUserId(
         userId,
+        new Date(0),
+        convertToUTC(new Date())
+      );
+
+      console.log('User log data:', userLog.data);
+
+      const userLogPromptText = userLogPrompt(userLog.data ?? '');
+
+      const orderReport =
+        await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+          userId,
+          extractTokenFromHeader(request) ?? ''
+        );
+
+      const profile = await this.profileService.getOwnProfile(
         extractTokenFromHeader(request) ?? ''
       );
 
-    const profile = await this.profileService.getOwnProfile(
-      extractTokenFromHeader(request) ?? ''
-    );
+      const profileReport =
+        await this.profileService.createSystemPromptFromProfile(profile.payload!);
 
-    const profileReport =
-      await this.profileService.createSystemPromptFromProfile(profile.payload!);
-
-    const combinedPrompt = `${userLogPromptText}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
-    Profile:\n${profileReport ?? ''}`;
-
+      combinedPrompt = `${userLogPromptText}\n\n
+      Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
+      Profile:\n${profileReport ?? ''}`;
+    }
+    // Guest: không lấy log, order, profile
     //-------------------------------------------------------------
 
     // Call AI service to get response
@@ -353,15 +351,14 @@ export class ConversationController {
 
   /**
    * Test V2 - Test hội thoại với user log chi tiết
-   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
+   * @note Nếu có Bearer token → lấy userId + profile + order. Không có token (guest) → không lấy log.
    */
   @Public()
   @Post('test/v2')
   @ApiBearerAuth('jwt')
   @ApiOperation({
-    summary: 'Test V2 - Log chi tiết (có token: profile+order, guest: chỉ log)'
+    summary: 'Test V2 - Log chi tiết (có token: userId+profile+order, guest: không lấy log)'
   })
-  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
     type: String,
@@ -370,37 +367,41 @@ export class ConversationController {
   @ApiBaseResponse(ConversationRequestDto)
   async convserationV2Test(
     @Req() request: Request,
-    @Query('userId') userId: string,
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
-    // -----------------------------Test V1 -------------------------------------
-    // Lay log nguoi dung tu db trong khoan 1 thang
-    const userLogResponse =
-      await this.logService.getReportAndPromptSummaryUserLogs({
-        userId: userId,
-        period: PeriodEnum.MONTHLY,
-        endDate: convertToUTC(new Date()),
-        startDate: undefined
-      });
+    const userId = getTokenPayloadFromRequest(request)?.id;
 
-    // Tam thoi lay order cua nguoi dung theo userID
-    const orderReport =
-      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userId,
+    // -----------------------------Test V2 -------------------------------------
+    let combinedPrompt = '';
+
+    if (userId) {
+      // Đã đăng nhập - lấy log chi tiết + order + profile
+      const userLogResponse =
+        await this.logService.getReportAndPromptSummaryUserLogs({
+          userId: userId,
+          period: PeriodEnum.MONTHLY,
+          endDate: convertToUTC(new Date()),
+          startDate: undefined
+        });
+
+      const orderReport =
+        await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+          userId,
+          extractTokenFromHeader(request) ?? ''
+        );
+
+      const profile = await this.profileService.getOwnProfile(
         extractTokenFromHeader(request) ?? ''
       );
 
-    const profile = await this.profileService.getOwnProfile(
-      extractTokenFromHeader(request) ?? ''
-    );
+      const profileReport =
+        await this.profileService.createSystemPromptFromProfile(profile.payload!);
 
-    const profileReport =
-      await this.profileService.createSystemPromptFromProfile(profile.payload!);
-
-    const combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
-    Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
-    Profile:\n${profileReport ?? ''}`;
-
+      combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
+      Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
+      Profile:\n${profileReport ?? ''}`;
+    }
+    // Guest: không lấy log, order, profile
     //-------------------------------------------------------------
 
     // Call AI service to get response
@@ -422,16 +423,15 @@ export class ConversationController {
   /**
    * Test V3 - Test hội thoại dùng common helper (tương tự chat V3)
    * Sử dụng buildCombinedPromptV1 helper, giảm code trùng lặp.
-   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
+   * @note Nếu có Bearer token → lấy userId + profile + order. Không có token (guest) → không lấy log.
    */
   @Public()
   @Post('test/v3')
   @ApiBearerAuth('jwt')
   @ApiOperation({
     summary:
-      'Test V3 - Common helper + log tóm tắt (có token: profile+order, guest: chỉ log)'
+      'Test V3 - Common helper + log tóm tắt (có token: userId+profile+order, guest: không lấy log)'
   })
-  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
     type: String,
@@ -440,9 +440,10 @@ export class ConversationController {
   @ApiBaseResponse(String)
   async conversationV3Test(
     @Req() request: Request,
-    @Query('userId') userId: string,
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
+
     const promptResult = await buildCombinedPromptV1(
       this.logService,
       this.orderService,
@@ -474,16 +475,15 @@ export class ConversationController {
   /**
    * Test V4 - Test hội thoại dùng common helper (tương tự chat V4)
    * Sử dụng buildCombinedPromptV2 helper, giảm code trùng lặp.
-   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
+   * @note Nếu có Bearer token → lấy userId + profile + order. Không có token (guest) → không lấy log.
    */
   @Public()
   @Post('test/v4')
   @ApiBearerAuth('jwt')
   @ApiOperation({
     summary:
-      'Test V4 - Common helper + log chi tiết (có token: profile+order, guest: chỉ log)'
+      'Test V4 - Common helper + log chi tiết (có token: userId+profile+order, guest: không lấy log)'
   })
-  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
     name: 'prompt',
     type: String,
@@ -492,9 +492,10 @@ export class ConversationController {
   @ApiBaseResponse(String)
   async conversationV4Test(
     @Req() request: Request,
-    @Query('userId') userId: string,
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
+
     const promptResult = await buildCombinedPromptV2(
       this.logService,
       this.orderService,
@@ -526,20 +527,21 @@ export class ConversationController {
   /**
    * Chat V3 - Phiên bản cải thiện dùng common helper, giảm code trùng lặp.
    * Logic tương tự V1 nhưng sử dụng buildCombinedPromptV1 helper.
-   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
+   * @note userId được lấy từ JWT token. Guest (không có token) sẽ không lấy log/order/profile.
    */
   @Public()
   @Post('chat/v3')
   @ApiBearerAuth('jwt')
   @ApiOperation({
     summary:
-      'Chat V3 - Common helper + log tóm tắt (có token: profile+order, guest: chỉ log)'
+      'Chat V3 - Common helper + log tóm tắt (có token: userId+profile+order, guest: không lấy log)'
   })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV3(
     @Req() request: Request,
     @Body() conversation: ConversationRequestDto
   ): Promise<BaseResponse<ConversationDto>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
@@ -550,7 +552,7 @@ export class ConversationController {
       this.orderService,
       this.profileService,
       this.adminInstructionService,
-      conversation.userId,
+      userId,
       extractTokenFromHeader(request) ?? ''
     );
 
@@ -575,7 +577,7 @@ export class ConversationController {
     // Lưu conversation
     const responseConversation = overrideMessagesToConversation(
       conversation.id || '',
-      conversation.userId || '',
+      userId || '',
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 
@@ -587,20 +589,21 @@ export class ConversationController {
   /**
    * Chat V4 - Phiên bản cải thiện dùng common helper, giảm code trùng lặp.
    * Logic tương tự V2 nhưng sử dụng buildCombinedPromptV2 helper.
-   * @note Nếu có Bearer token → lấy được profile + order. Không có token (guest) → chỉ có user log.
+   * @note userId được lấy từ JWT token. Guest (không có token) sẽ không lấy log/order/profile.
    */
   @Public()
   @Post('chat/v4')
   @ApiBearerAuth('jwt')
   @ApiOperation({
     summary:
-      'Chat V4 - Common helper + log chi tiết (có token: profile+order, guest: chỉ log)'
+      'Chat V4 - Common helper + log chi tiết (có token: userId+profile+order, guest: không lấy log)'
   })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV4(
     @Req() request: Request,
     @Body() conversation: ConversationRequestDto
   ): Promise<BaseResponse<ConversationDto>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
@@ -611,7 +614,7 @@ export class ConversationController {
       this.orderService,
       this.profileService,
       this.adminInstructionService,
-      conversation.userId,
+      userId,
       extractTokenFromHeader(request) ?? ''
     );
 
@@ -636,7 +639,7 @@ export class ConversationController {
     // Lưu conversation
     const responseConversation = overrideMessagesToConversation(
       conversation.id || '',
-      conversation.userId || '',
+      userId || '',
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 
@@ -648,7 +651,7 @@ export class ConversationController {
   /**
    * Test V1 - Bảo vệ bằng role admin.
    * Endpoint test chỉ dành cho admin, tránh lộ ra production.
-   * @note Admin token không thể decode profile → profile sẽ trống. Chỉ có user log + order.
+   * @note userId được lấy từ JWT token.
    */
   @Post('test/guarded/v1')
   @Role('admin')
@@ -659,16 +662,16 @@ export class ConversationController {
   @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
   @ApiOperation({
     summary:
-      'Test Guarded V1 - Admin only (không lấy được profile từ admin token)'
+      'Test Guarded V1 - Admin only (userId lấy từ token)'
   })
-  @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'prompt', type: String })
   @ApiBaseResponse(String)
   async guardedTestV1(
     @Req() request: Request,
-    @Query('userId') userId: string,
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
+
     const promptResult = await buildCombinedPromptV1(
       this.logService,
       this.orderService,
@@ -700,7 +703,7 @@ export class ConversationController {
   /**
    * Test V2 - Bảo vệ bằng role admin.
    * Endpoint test chỉ dành cho admin, tránh lộ ra production.
-   * @note Admin token không thể decode profile → profile sẽ trống. Chỉ có user log + order.
+   * @note userId được lấy từ JWT token.
    */
   @Post('test/guarded/v2')
   @Role('admin')
@@ -711,16 +714,16 @@ export class ConversationController {
   @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
   @ApiOperation({
     summary:
-      'Test Guarded V2 - Admin only (không lấy được profile từ admin token)'
+      'Test Guarded V2 - Admin only (userId lấy từ token)'
   })
-  @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'prompt', type: String })
   @ApiBaseResponse(String)
   async guardedTestV2(
     @Req() request: Request,
-    @Query('userId') userId: string,
     @Query('prompt') prompt: string
   ): Promise<BaseResponse<string>> {
+    const userId = getTokenPayloadFromRequest(request)?.id;
+
     const promptResult = await buildCombinedPromptV2(
       this.logService,
       this.orderService,

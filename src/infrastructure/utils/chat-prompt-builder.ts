@@ -41,25 +41,33 @@ export async function buildCombinedPromptV1(
   orderService: OrderService,
   profileService: ProfileService,
   adminInstructionService: AdminInstructionService,
-  userId: string,
+  userId: string | undefined,
   authToken: string
 ): Promise<BaseResponse<CombinedPromptResult>> {
-  // Lấy log tóm tắt từ bảng user_log_summary
-  const userLog = await logService.getUserLogSummaryReportByUserId(userId);
-  const userLogData = userLog.data ?? '';
-  const userLogPromptText = userLogPrompt(userLogData);
+  let userLogData = '';
+  let userLogPromptText = '';
+  let orderReportData = '';
+  let profileReport = '';
 
-  // Lấy order report
-  const orderReport =
-    await orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-      userId,
-      authToken
-    );
-  const orderReportData = orderReport.data ?? '';
+  // Chỉ lấy log và order khi có userId (user đã đăng nhập)
+  if (userId) {
+    const userLog = await logService.getUserLogSummaryReportByUserId(userId);
+    userLogData = userLog.data ?? '';
+    userLogPromptText = userLogPrompt(userLogData);
 
-  // Lấy profile
-  const profile = await profileService.getOwnProfile(authToken);
-  const profileReport = await profileService.createSystemPromptFromProfile(profile.payload!);
+    const orderReport =
+      await orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+        userId,
+        authToken
+      );
+    orderReportData = orderReport.data ?? '';
+  }
+
+  // Profile chỉ lấy được khi có auth token
+  if (authToken) {
+    const profile = await profileService.getOwnProfile(authToken);
+    profileReport = await profileService.createSystemPromptFromProfile(profile.payload!) ?? '';
+  }
 
   // Lấy admin instruction cho conversation (nếu có)
   const adminInstruction = await adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
@@ -104,29 +112,36 @@ export async function buildCombinedPromptV2(
   orderService: OrderService,
   profileService: ProfileService,
   adminInstructionService: AdminInstructionService,
-  userId: string,
+  userId: string | undefined,
   authToken: string
 ): Promise<BaseResponse<CombinedPromptResult>> {
-  // Lấy log chi tiết và tổng hợp real-time
-  const userLogResponse = await logService.getReportAndPromptSummaryUserLogs({
-    userId,
-    period: PeriodEnum.MONTHLY,
-    endDate: convertToUTC(new Date()),
-    startDate: undefined
-  });
-  const userLogData = userLogResponse.data ? userLogResponse.data.response : '';
+  let userLogData = '';
+  let orderReportData = '';
+  let profileReport = '';
 
-  // Lấy order report
-  const orderReport =
-    await orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+  // Chỉ lấy log và order khi có userId (user đã đăng nhập)
+  if (userId) {
+    const userLogResponse = await logService.getReportAndPromptSummaryUserLogs({
       userId,
-      authToken
-    );
-  const orderReportData = orderReport.data ?? '';
+      period: PeriodEnum.MONTHLY,
+      endDate: convertToUTC(new Date()),
+      startDate: undefined
+    });
+    userLogData = userLogResponse.data ? userLogResponse.data.response : '';
 
-  // Lấy profile
-  const profile = await profileService.getOwnProfile(authToken);
-  const profileReport = await profileService.createSystemPromptFromProfile(profile.payload!);
+    const orderReport =
+      await orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
+        userId,
+        authToken
+      );
+    orderReportData = orderReport.data ?? '';
+  }
+
+  // Profile chỉ lấy được khi có auth token
+  if (authToken) {
+    const profile = await profileService.getOwnProfile(authToken);
+    profileReport = await profileService.createSystemPromptFromProfile(profile.payload!) ?? '';
+  }
 
   // Lấy admin instruction cho conversation (nếu có)
   const adminInstruction = await adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);

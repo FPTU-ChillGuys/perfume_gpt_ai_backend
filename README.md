@@ -600,44 +600,47 @@ Controller phức tạp nhất — quản lý chatbot AI tư vấn nước hoa. 
 | `POST` | `/conversation/chat/v3` | Chat V3 — cải thiện V1, dùng common helper | 🌐 Public (JWT tùy chọn) |
 | `POST` | `/conversation/chat/v4` | Chat V4 — cải thiện V2, dùng common helper | 🌐 Public (JWT tùy chọn) |
 
+> **Lưu ý về userId:** `userId` không cần truyền trong request body nữa — hệ thống tự động lấy từ JWT token (`getTokenPayloadFromRequest`). Guest (không có token) sẽ không được lấy log/order/profile.
+
 #### Endpoint Test (Public, hỗ trợ JWT tùy chọn)
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| `POST` | `/conversation/test/v1?userId=&prompt=` | Test V1 — trả về text thay vì conversation | 🌐 Public (JWT tùy chọn) |
-| `POST` | `/conversation/test/v2?userId=&prompt=` | Test V2 — log chi tiết | 🌐 Public (JWT tùy chọn) |
-| `POST` | `/conversation/test/v3?userId=&prompt=` | Test V3 — common helper + log tóm tắt | 🌐 Public (JWT tùy chọn) |
-| `POST` | `/conversation/test/v4?userId=&prompt=` | Test V4 — common helper + log chi tiết | 🌐 Public (JWT tùy chọn) |
+| `POST` | `/conversation/test/v1?prompt=` | Test V1 — trả về text thay vì conversation | 🌐 Public (JWT tùy chọn) |
+| `POST` | `/conversation/test/v2?prompt=` | Test V2 — log chi tiết | 🌐 Public (JWT tùy chọn) |
+| `POST` | `/conversation/test/v3?prompt=` | Test V3 — common helper + log tóm tắt | 🌐 Public (JWT tùy chọn) |
+| `POST` | `/conversation/test/v4?prompt=` | Test V4 — common helper + log chi tiết | 🌐 Public (JWT tùy chọn) |
 
 #### Endpoint Guarded Test (Admin only)
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| `POST` | `/conversation/test/guarded/v1?userId=&prompt=` | Test V1 dành riêng cho admin | 🔒 admin |
-| `POST` | `/conversation/test/guarded/v2?userId=&prompt=` | Test V2 dành riêng cho admin | 🔒 admin |
+| `POST` | `/conversation/test/guarded/v1?prompt=` | Test V1 dành riêng cho admin (userId lấy từ token) | 🔒 admin |
+| `POST` | `/conversation/test/guarded/v2?prompt=` | Test V2 dành riêng cho admin (userId lấy từ token) | 🔒 admin |
 
 **Cách sử dụng:**
 ```bash
-# Chat V3 (khuyến nghị) — không cần token (guest)
+# Chat V3 (khuyến nghị) — không cần token (guest, không lấy log/order/profile)
 curl -X POST -H "Content-Type: application/json" \
-  -d '{"userId":"<userId>","messages":[{"id":"1","role":"user","content":"Gợi ý nước hoa cho mùa hè","parts":[{"type":"text","text":"Gợi ý nước hoa cho mùa hè"}]}]}' \
+  -d '{"messages":[{"id":"1","role":"user","content":"Gợi ý nước hoa cho mùa hè","parts":[{"type":"text","text":"Gợi ý nước hoa cho mùa hè"}]}]}' \
   http://localhost:3000/conversation/chat/v3
 
-# Chat V3 — có token (lấy thêm profile + order)
+# Chat V3 — có token (lấy thêm userId, profile + order)
 curl -X POST -H "Content-Type: application/json" \
   -H "Authorization: Bearer <user_token>" \
-  -d '{"userId":"<userId>","messages":[...]}' \
+  -d '{"messages":[...]}' \
   http://localhost:3000/conversation/chat/v3
 
-# Test nhanh
-curl -X POST "http://localhost:3000/conversation/test/v3?userId=<userId>&prompt=Gợi ý nước hoa"
+# Test nhanh (có token)
+curl -X POST -H "Authorization: Bearer <user_token>" \
+  "http://localhost:3000/conversation/test/v3?prompt=Gợi%20ý%20nước%20hoa"
 ```
 
 > **Lưu ý:**
 > - **V1/V3** dùng log tóm tắt (nhanh, phụ thuộc vào chất lượng tóm tắt). **V2/V4** dùng log chi tiết (chậm hơn, đầy đủ hơn).
 > - **V3/V4** là phiên bản cải thiện của V1/V2, dùng `buildCombinedPromptV1/V2` helper, giảm code trùng lặp. **Khuyến nghị sử dụng V3/V4.**
-> - Nếu có **Bearer token** → AI lấy thêm profile + order history của user. Nếu không có token (guest) → chỉ dùng user log từ database.
-> - **Guarded test endpoint** yêu cầu admin token. Lưu ý: admin token KHÔNG decode được profile user → profile sẽ trống.
+> - `userId` **không cần truyền trong request** nữa — hệ thống tự động lấy từ JWT token. Nếu có **Bearer token** → AI lấy thêm profile + order history + user log. Nếu không có token (guest) → **không lấy log/order/profile** (vì guest không có log).
+> - **Guarded test endpoint** yêu cầu admin token. userId cũng được lấy từ token.
 > - Conversation được tự động lưu vào DB (tạo mới hoặc cập nhật nếu đã tồn tại).
 > - Body request cần tuân theo format `ConversationRequestDto` với `messages` là mảng `MessageRequestDto`.
 

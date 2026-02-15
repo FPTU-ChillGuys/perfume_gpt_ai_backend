@@ -50,11 +50,13 @@ export class ConversationService {
         //Luu conversation
         await this.unitOfWork.AIConversationRepo.addConversation(conversation);
 
-        //Luu message vao log
-        await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
-          conversation.userId,
-          conversation.messages.getItems()[0]
-        );
+        //Luu message vao log (chỉ khi user đã đăng nhập)
+        if (conversation.userId) {
+          await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
+            conversation.userId,
+            conversation.messages.getItems()[0]
+          );
+        }
 
         const conversationDto = ConversationMapper.toResponse(
           conversation,
@@ -88,11 +90,13 @@ export class ConversationService {
             messages
           );
 
-        //Lay message luu vao log
-        await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
-          conversation.userId,
-          messages[messages.length - 1]
-        );
+        //Lay message luu vao log (chỉ khi user đã đăng nhập)
+        if (conversation.userId) {
+          await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
+            conversation.userId,
+            messages[messages.length - 1]
+          );
+        }
 
         return {
           success: true,

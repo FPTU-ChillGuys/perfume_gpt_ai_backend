@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import { mikro } from '@automapper/mikro';
 import { CamelCaseNamingConvention } from '@automapper/core';
 import { ScheduleModule } from '@nestjs/schedule';
+import { MailerModule } from '@nestjs-modules/mailer';
 
 @Module({
   imports: [
@@ -45,7 +46,26 @@ import { ScheduleModule } from '@nestjs/schedule';
         }
       })
     }),
-    ScheduleModule.forRoot()
+    ScheduleModule.forRoot(),
+    MailerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        transport: {
+          host: 'smtp.gmail.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: config.get<string>('GOOGLE_EMAIL'),
+            pass: config.get<string>('GOOGLE_APP_PASSWORD')
+          }
+        },
+        defaults: {
+          from: 'No reply <noreply@perfume.com>'
+        },
+        preview: true
+      })
+    })
   ],
   controllers: [AppController],
   providers: [

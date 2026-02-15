@@ -16,11 +16,3 @@ export class SendEmailRequestDto {
   @IsNotEmpty()
   text!: string;
 }
-
-export class SendEmailResponseDto {
-  @ApiProperty({ description: 'Trạng thái gửi email', example: true })
-  success!: boolean;
-
-  @ApiProperty({ description: 'Thông báo kết quả', example: 'Email sent successfully' })
-  message!: string;
-}

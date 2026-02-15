@@ -1,4 +1,9 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  InternalServerErrorException,
+  Post
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -7,9 +12,13 @@ import {
   ApiOperation,
   ApiTags
 } from '@nestjs/swagger';
-import { SendEmailRequestDto, SendEmailResponseDto } from 'src/application/dtos/common/email.dto';
+import {
+  SendEmailRequestDto,
+} from 'src/application/dtos/common/email.dto';
 import { Public } from 'src/application/common/Metadata';
 import { EmailService } from 'src/infrastructure/servicies/mail.service';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 
 @Public()
 @ApiTags('Email')
@@ -20,18 +29,25 @@ export class EmailController {
   @Post('send')
   @ApiOperation({ summary: 'Gửi email text cơ bản' })
   @ApiBody({ type: SendEmailRequestDto })
-  @ApiOkResponse({
-    description: 'Gửi email thành công',
-    type: SendEmailResponseDto
-  })
+  @ApiBaseResponse(String)
   @ApiBadRequestResponse({ description: 'Dữ liệu request không hợp lệ' })
   @ApiInternalServerErrorResponse({ description: 'Không thể gửi email' })
-  async sendEmail(@Body() body: SendEmailRequestDto): Promise<SendEmailResponseDto> {
-    await this.emailService.sendEmail(body.to, body.subject, body.text);
+  async sendEmail(
+    @Body() body: SendEmailRequestDto
+  ): Promise<BaseResponse<string>> {
+    const result = await this.emailService.sendEmail(
+      body.to,
+      body.subject,
+      body.text
+    );
+
+    if (!result.success) {
+      throw new InternalServerErrorException(result.error);
+    }
 
     return {
       success: true,
-      message: 'Email sent successfully'
+      data: 'Email sent successfully'
     };
   }
 }

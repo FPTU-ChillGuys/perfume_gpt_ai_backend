@@ -6,6 +6,7 @@ import { MikroORM } from '@mikro-orm/core';
 import { seedAdminInstructions } from './infrastructure/seed/admin-instruction.seeder';
 import { execSync } from 'child_process';
 import { HttpExceptionFilter } from './application/filters/http-exception.filter';
+import { SuccessResponseInterceptor } from './application/common/interceptors/success-response.interceptor';
 
 /** Tạm thời: chạy migration bằng CLI trực tiếp */
 function runMigrationCLI(): void {
@@ -77,6 +78,7 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(new SuccessResponseInterceptor());
 
   await app.listen(process.env.PORT ?? 3000);
 }

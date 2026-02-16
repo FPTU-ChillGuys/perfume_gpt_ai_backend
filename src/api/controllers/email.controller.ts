@@ -8,7 +8,6 @@ import {
   ApiBadRequestResponse,
   ApiBody,
   ApiInternalServerErrorResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiTags
 } from '@nestjs/swagger';
@@ -19,6 +18,7 @@ import { Public } from 'src/application/common/Metadata';
 import { EmailService } from 'src/infrastructure/servicies/mail.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { Ok } from 'src/application/dtos/response/common/success-response';
 
 @Public()
 @ApiTags('Email')
@@ -45,9 +45,6 @@ export class EmailController {
       throw new InternalServerErrorException(result.error); 
     }
 
-    return {
-      success: true,
-      data: 'Email sent successfully'
-    };
+    return Ok('Email sent successfully');
   }
 }

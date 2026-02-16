@@ -42,7 +42,7 @@ export class EmailController {
     );
 
     if (!result.success) {
-      throw new InternalServerErrorException(result.error);
+      throw new InternalServerErrorException(result.error); 
     }
 
     return {

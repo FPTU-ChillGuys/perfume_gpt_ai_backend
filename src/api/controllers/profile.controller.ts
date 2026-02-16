@@ -8,6 +8,8 @@ import { ProfileService } from 'src/infrastructure/servicies/profile.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @ApiTags('Profile')
 @Controller('profile')
@@ -40,10 +42,10 @@ export class ProfileController {
     );
 
     if (!profile.success) {
-      return { success: false, error: 'Failed to fetch profile' };
+      throw new InternalServerErrorWithDetailsException('Failed to fetch profile', { service: 'ProfileService' });
     }
 
     const report = await this.profileService.createProfileReport(profile.payload!);
-    return { success: true, data: report };
+    return Ok(report);
   }
 }

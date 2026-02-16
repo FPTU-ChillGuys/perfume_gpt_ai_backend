@@ -9,6 +9,8 @@ import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { getTokenPayloadFromRequest } from 'src/infrastructure/utils/extract-token';
 import { v4 as uuidv4 } from 'uuid';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @ApiTags('AI')
 @Controller('ai')
@@ -38,9 +40,9 @@ export class AIController {
     }
     const aiResponse = await this.aiService.textGenerateFromPrompt(prompt);
     if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', { service: 'AIService', prompt });
     }
-    return { success: true, data: aiResponse.data };
+    return Ok(aiResponse.data);
   }
 
 }

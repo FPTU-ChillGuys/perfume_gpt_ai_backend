@@ -18,6 +18,7 @@ import {
 import { Output, UIMessage } from 'ai';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import {
   ConversationDto,
   ConversationRequestDto
@@ -25,6 +26,7 @@ import {
 import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import { Ok } from 'src/application/dtos/response/common/success-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import {
@@ -154,7 +156,12 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        conversationId: conversation.id,
+        service: 'AIService',
+        endpoint: 'chat/v1'
+      });
     }
 
     // Prepare response conversation
@@ -246,7 +253,12 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        conversationId: conversation.id,
+        service: 'AIService',
+        endpoint: 'chat/v2'
+      });
     }
 
     // Prepare response conversation
@@ -340,7 +352,11 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        service: 'AIService',
+        endpoint: 'test/v1'
+      });
     }
 
     return {
@@ -411,7 +427,11 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        service: 'AIService',
+        endpoint: 'test/v2'
+      });
     }
 
     return {
@@ -454,7 +474,11 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      return { success: false, error: 'Failed to build combined prompt' };
+      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
+        userId,
+        service: 'PromptBuilder',
+        endpoint: 'test/v3'
+      });
     }
 
     const message = await this.aiService.textGenerateFromPrompt(
@@ -466,10 +490,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        service: 'AIService',
+        endpoint: 'test/v3'
+      });
     }
 
-    return { success: true, data: message.data };
+    return Ok(message.data);
   }
 
   /**
@@ -506,7 +534,11 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      return { success: false, error: 'Failed to build combined prompt' };
+      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
+        userId,
+        service: 'PromptBuilder',
+        endpoint: 'test/v4'
+      });
     }
 
     const message = await this.aiService.textGenerateFromPrompt(
@@ -518,10 +550,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        service: 'AIService',
+        endpoint: 'test/v4'
+      });
     }
 
-    return { success: true, data: message.data };
+    return Ok(message.data);
   }
 
   /**
@@ -557,7 +593,12 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      return { success: false, error: 'Failed to build combined prompt' };
+      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
+        userId,
+        conversationId: conversation.id,
+        service: 'PromptBuilder',
+        endpoint: 'chat/v3'
+      });
     }
 
     // Call AI service
@@ -571,7 +612,12 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        conversationId: conversation.id,
+        service: 'AIService',
+        endpoint: 'chat/v3'
+      });
     }
 
     // Lưu conversation
@@ -583,7 +629,7 @@ export class ConversationController {
 
     await this.saveOrUpdateConversation(responseConversation);
 
-    return { success: true, data: responseConversation };
+    return Ok(responseConversation);
   }
 
   /**
@@ -619,7 +665,12 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      return { success: false, error: 'Failed to build combined prompt' };
+      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
+        userId,
+        conversationId: conversation.id,
+        service: 'PromptBuilder',
+        endpoint: 'chat/v4'
+      });
     }
 
     // Call AI service
@@ -633,7 +684,12 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        conversationId: conversation.id,
+        service: 'AIService',
+        endpoint: 'chat/v4'
+      });
     }
 
     // Lưu conversation
@@ -645,7 +701,7 @@ export class ConversationController {
 
     await this.saveOrUpdateConversation(responseConversation);
 
-    return { success: true, data: responseConversation };
+    return Ok(responseConversation);
   }
 
   /**
@@ -682,7 +738,11 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      return { success: false, error: 'Failed to build combined prompt' };
+      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
+        userId,
+        service: 'PromptBuilder',
+        endpoint: 'test/guarded/v1'
+      });
     }
 
     const message = await this.aiService.textGenerateFromPrompt(
@@ -694,10 +754,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        service: 'AIService',
+        endpoint: 'test/guarded/v1'
+      });
     }
 
-    return { success: true, data: message.data };
+    return Ok(message.data);
   }
 
   /**
@@ -734,7 +798,11 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      return { success: false, error: 'Failed to build combined prompt' };
+      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
+        userId,
+        service: 'PromptBuilder',
+        endpoint: 'test/guarded/v2'
+      });
     }
 
     const message = await this.aiService.textGenerateFromPrompt(
@@ -746,10 +814,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId,
+        service: 'AIService',
+        endpoint: 'test/guarded/v2'
+      });
     }
 
-    return { success: true, data: message.data };
+    return Ok(message.data);
   }
 
   /**

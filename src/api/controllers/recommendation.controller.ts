@@ -21,6 +21,8 @@ import { Request } from 'express';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIRecommendationStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException, BadRequestWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -50,7 +52,11 @@ export class RecommendationController {
       );
 
     if (!reportAndPromptSummary.success) {
-      return { success: false, error: 'Failed to get user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to get user logs', {
+        userId: userLogRequest.userId,
+        service: 'UserLogService',
+        endpoint: 'recommendation/repurchase/v2'
+      });
     }
 
     // Lay report don hang cua nguoi dung
@@ -61,7 +67,7 @@ export class RecommendationController {
       );
 
     if (isDataEmpty(reportAndPromptSummary.data?.prompt) && isDataEmpty(orderReport.data)) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.REPURCHASE };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.REPURCHASE);
     }
 
     const combinedPrompt = `${reportAndPromptSummary.data!.prompt}\n\n${orderReport.data ?? ''}`;
@@ -78,7 +84,11 @@ export class RecommendationController {
     );
 
     if (!summaryResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/repurchase/v2'
+      });
     }
 
     //Tao repurchase recommendation prompt dua tren summary response
@@ -88,13 +98,14 @@ export class RecommendationController {
     );
 
     if (!recommendationResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to get AI recommendation response'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/repurchase/v2'
+      });
     }
 
-    return { success: true, data: recommendationResponse.data };
+    return Ok(recommendationResponse.data);
   }
 
   /** Gợi ý mua lại V1 - Dùng log tóm tắt */
@@ -116,7 +127,11 @@ export class RecommendationController {
     );
 
     if (!userLogResponse.success) {
-      return { success: false, error: 'Failed to get user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to get user logs', {
+        userId: userLogRequest.userId,
+        service: 'UserLogService',
+        endpoint: 'recommendation/repurchase/v1'
+      });
     }
 
     // Lay report don hang cua nguoi dung
@@ -127,7 +142,7 @@ export class RecommendationController {
       );
 
     if (isDataEmpty(userLogResponse.data) && isDataEmpty(orderReport.data)) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.REPURCHASE };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.REPURCHASE);
     }
 
     const combinedPrompt = `${userLogResponse.data!}\n\n${orderReport.data ?? ''}`;
@@ -144,7 +159,11 @@ export class RecommendationController {
     );
 
     if (!summaryResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/repurchase/v1'
+      });
     }
 
     //Tao repurchase recommendation prompt dua tren summary response
@@ -154,13 +173,14 @@ export class RecommendationController {
     );
 
     if (!recommendationResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to get AI recommendation response'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/repurchase/v1'
+      });
     }
 
-    return { success: true, data: recommendationResponse.data };
+    return Ok(recommendationResponse.data);
   }
 
   /** Gợi ý sản phẩm bằng AI V1 - Dùng log chi tiết */
@@ -178,11 +198,15 @@ export class RecommendationController {
       );
 
     if (!reportAndPromptSummary.success) {
-      return { success: false, error: 'Failed to summarize user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
+        userId: userLogRequest.userId,
+        service: 'UserLogService',
+        endpoint: 'recommendation/recommend/ai/v1'
+      });
     }
 
     if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION);
     }
 
     // Lấy admin instruction cho domain recommendation (nếu có)
@@ -195,7 +219,11 @@ export class RecommendationController {
     );
 
     if (!reportResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/recommend/ai/v1'
+      });
     }
 
     //Create repurchase recommendation prompt base on summary response
@@ -205,13 +233,14 @@ export class RecommendationController {
     );
 
     if (!recommendationResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to get AI recommendation response'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/recommend/ai/v1'
+      });
     }
 
-    return { success: true, data: recommendationResponse.data };
+    return Ok(recommendationResponse.data);
   }
 
   /** Gợi ý sản phẩm bằng AI V2 - Dùng log tóm tắt */
@@ -232,11 +261,15 @@ export class RecommendationController {
       );
 
     if (!summaryReport.success) {
-      return { success: false, error: 'Failed to summarize user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
+        userId: userLogRequest.userId,
+        service: 'UserLogService',
+        endpoint: 'recommendation/recommend/ai/v2'
+      });
     }
 
     if (isDataEmpty(summaryReport.data)) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION);
     }
 
     // Lấy admin instruction cho domain recommendation (nếu có)
@@ -251,7 +284,11 @@ export class RecommendationController {
     );
 
     if (!summaryResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/recommend/ai/v2'
+      });
     }
 
     //Create repurchase recommendation prompt base on summary response
@@ -261,13 +298,14 @@ export class RecommendationController {
     );
 
     if (!recommendationResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to get AI recommendation response'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/recommend/ai/v2'
+      });
     }
 
-    return { success: true, data: recommendationResponse.data };
+    return Ok(recommendationResponse.data);
   }
 
   /**
@@ -288,7 +326,11 @@ export class RecommendationController {
       await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
 
     if (!reportAndPromptSummary.success) {
-      return { success: false, error: 'Failed to summarize user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
+        userId: userLogRequest.userId,
+        service: 'UserLogService',
+        endpoint: 'recommendation/recommend/ai/structured'
+      });
     }
 
     if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
@@ -316,7 +358,11 @@ export class RecommendationController {
     );
 
     if (!reportResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/recommend/ai/structured'
+      });
     }
 
     const recommendationResponse = await this.aiService.textGenerateFromPrompt(
@@ -325,10 +371,11 @@ export class RecommendationController {
     );
 
     if (!recommendationResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to get AI recommendation response'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
+        userId: userLogRequest.userId,
+        service: 'AIService',
+        endpoint: 'recommendation/recommend/ai/structured'
+      });
     }
 
     const processingTimeMs = Date.now() - startTime;
@@ -342,6 +389,6 @@ export class RecommendationController {
       metadata: new AIResponseMetadata({ processingTimeMs })
     });
 
-    return { success: true, data: structuredResponse };
+    return Ok(structuredResponse);
   }
 }

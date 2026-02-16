@@ -32,6 +32,8 @@ import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { Output } from 'ai';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @Public()
 @ApiTags('Quizzes')
@@ -52,10 +54,10 @@ export class QuizController {
     const quizQues = await this.quizService.getAllQuizQues();
 
     if (!quizQues.success) {
-      return { success: false, error: 'Failed to get quiz questions' };
+      throw new InternalServerErrorWithDetailsException('Failed to get quiz questions', { service: 'QuizService' });
     }
 
-    return { success: true, data: quizQues.data };
+    return Ok(quizQues.data);
   }
 
   /** Lấy câu hỏi quiz theo ID */
@@ -92,7 +94,7 @@ export class QuizController {
   ): Promise<BaseResponse<boolean>> {
     const isFirstTime =
       await this.quizService.checkExistQuizQuesAnwsByUserId(userId);
-    return { success: true, data: isFirstTime };
+    return Ok(isFirstTime);
   }
 
   /** Tạo nhiều câu hỏi quiz cùng lúc */
@@ -107,7 +109,7 @@ export class QuizController {
     for (const quizQuestion of quizQuestionRequest) {
       await this.quizService.addQuizQues(quizQuestion);
     }
-    return { success: true };
+    return Ok();
   }
 
   /** Cập nhật câu trả lời quiz */
@@ -139,10 +141,10 @@ export class QuizController {
     const questionIds = quizAnswers.map((qa) => qa.questionId);
     const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
     if (!quizQueses.success) {
-      return { success: false, error: 'Failed to get quiz question' };
+      throw new InternalServerErrorWithDetailsException('Failed to get quiz question', { questionIds });
     }
 
-    // Tim cau tra loi trong cau hoi
+    // Lay cau tra loi tuong ung    // Tim cau tra loi trong cau hoi
     const quesAnses: Array<{ question: string; answer: string }> = [];
     if (quizQueses.data) {
       for (let i = 0; i < quizQueses.data.length; i++) {
@@ -174,7 +176,7 @@ export class QuizController {
       await this.quizService.addQuizQuesAnws(quizQuesAnsDetail);
 
     if (!savedQuizQuesAnsResponse.success) {
-      return { success: false, error: 'Failed to save quiz question answers' };
+      throw new InternalServerErrorWithDetailsException('Failed to save quiz question answers', { userId });
     }
 
     // Save user quiz log
@@ -192,10 +194,10 @@ export class QuizController {
 
     // Return response
     if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', { userId, service: 'AIService' });
     }
 
-    return { success: true, data: aiResponse.data };
+    return Ok(aiResponse.data);
   }
 
   /** Lấy tất cả câu hỏi và câu trả lời quiz của người dùng */

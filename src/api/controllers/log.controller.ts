@@ -15,6 +15,8 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 import { INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @ApiTags('Logs')
 @Controller('logs')
@@ -64,11 +66,11 @@ export class LogController {
       await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
 
     if (!response.success) {
-      return { success: false, error: 'Failed to summarize user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', { userId: userLogRequest.userId, period: userLogRequest.period });
     }
 
     if (isDataEmpty(response.data?.prompt)) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE);
     }
 
     // Lấy admin instruction cho domain log (nếu có)
@@ -97,10 +99,10 @@ export class LogController {
     );
 
     if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', { userId: userLogRequest.userId, service: 'AIService' });
     }
 
-    return { success: true, data: aiResponse.data, error: aiResponse.error };
+    return Ok(aiResponse.data);
   }
 
   /** Tóm tắt log của tất cả người dùng bằng AI (chú ý: có thể mất thời gian và không lưu vào DB) */
@@ -118,11 +120,11 @@ export class LogController {
       await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
 
     if (!response.success) {
-      return { success: false, error: 'Failed to summarize user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', { period: allUserLogRequest.period });
     }
 
     if (isDataEmpty(response.data?.prompt)) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE);
     }
 
     // Lấy admin instruction cho domain log (nếu có)
@@ -135,10 +137,10 @@ export class LogController {
     );
 
     if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', { service: 'AIService' });
     }
 
-    return { success: true, data: aiResponse.data, error: aiResponse.error };
+    return Ok(aiResponse.data);
   }
 
   @Cron(CronExpression.EVERY_WEEK) // Runs every day at weekly
@@ -197,7 +199,7 @@ export class LogController {
 
     console.log('Scheduled task completed: User logs summarized and saved.');
 
-    return { success: true, data: 'Scheduled task completed.' };
+    return Ok('Scheduled task completed.');
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_10AM) // Runs every day at daily
@@ -256,7 +258,7 @@ export class LogController {
 
     console.log('Scheduled task completed: User logs summarized and saved.');
 
-    return { success: true, data: 'Scheduled task completed.' };
+    return Ok('Scheduled task completed.');
   }
 
   /** Xem chi tiết các bản tóm tắt log người dùng */
@@ -318,8 +320,8 @@ export class LogController {
     );
 
     if (!response.success) {
-      return { success: false, error: 'Failed to save user log summary' };
+      throw new InternalServerErrorWithDetailsException('Failed to save user log summary', { userId: userLogRequest.userId });
     }
-    return { success: true, data: 'User log summary saved successfully' };
+    return Ok('User log summary saved successfully');
   }
 }

@@ -23,6 +23,8 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIOrderSummaryStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @ApiTags('Orders')
 @ApiBearerAuth('jwt')
@@ -86,14 +88,15 @@ export class OrderController {
       );
 
     if (!ordersResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to retrieve orders for AI summary'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to retrieve orders for AI summary', {
+        userId,
+        service: 'OrderService',
+        endpoint: 'orders/summary/ai'
+      });
     }
 
     if (isDataEmpty(ordersResponse.data)) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.ORDER_SUMMARY };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.ORDER_SUMMARY);
     }
 
     // Lấy admin instruction cho domain order (nếu có)
@@ -106,12 +109,13 @@ export class OrderController {
     );
 
     if (!aiResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to generate AI order summary'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to generate AI order summary', {
+        userId,
+        service: 'AIService',
+        endpoint: 'orders/summary/ai'
+      });
     }
-    return { success: true, data: aiResponse.data };
+    return Ok(aiResponse.data);
   }
 
   /**
@@ -135,10 +139,11 @@ export class OrderController {
       );
 
     if (!ordersResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to retrieve orders for AI summary'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to retrieve orders for AI summary', {
+        userId,
+        service: 'OrderService',
+        endpoint: 'orders/summary/ai/structured'
+      });
     }
 
     if (isDataEmpty(ordersResponse.data)) {
@@ -163,10 +168,11 @@ export class OrderController {
     );
 
     if (!aiResponse.success) {
-      return {
-        success: false,
-        error: 'Failed to generate AI order summary'
-      };
+      throw new InternalServerErrorWithDetailsException('Failed to generate AI order summary', {
+        userId,
+        service: 'AIService',
+        endpoint: 'orders/summary/ai/structured'
+      });
     }
 
     const processingTimeMs = Date.now() - startTime;
@@ -178,6 +184,6 @@ export class OrderController {
       metadata: new AIResponseMetadata({ processingTimeMs })
     });
 
-    return { success: true, data: structuredResponse };
+    return Ok(structuredResponse);
   }
 }

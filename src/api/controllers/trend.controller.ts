@@ -11,6 +11,8 @@ import { AdminInstructionService } from 'src/infrastructure/servicies/admin-inst
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { AITrendForecastStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @ApiTags('Trends')
 @Controller('trends')
@@ -34,11 +36,15 @@ export class TrendController {
       await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
 
     if (!reportAndPromptSummary.success) {
-      return { success: false, error: 'Failed to summarize user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
+        service: 'UserLogService',
+        period: allUserLogRequest.period,
+        endpoint: 'trends/summary'
+      });
     }
 
     if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.TREND_FORECAST };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.TREND_FORECAST);
     }
 
     // Summarize with AI
@@ -47,7 +53,11 @@ export class TrendController {
     );
     
     if (!reportResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        service: 'AIService',
+        period: allUserLogRequest.period,
+        endpoint: 'trends/summary'
+      });
     }
 
     //Trend forecasting prompt base on summary response
@@ -63,10 +73,14 @@ export class TrendController {
     );
 
     if (!trendResponse.success) {
-      return { success: false, error: 'Failed to get AI trend response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI trend response', {
+        service: 'AIService',
+        period: allUserLogRequest.period,
+        endpoint: 'trends/summary'
+      });
     }
 
-    return { success: true, data: trendResponse.data };
+    return Ok(trendResponse.data);
   }
 
   /**
@@ -86,7 +100,11 @@ export class TrendController {
       await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
 
     if (!reportAndPromptSummary.success) {
-      return { success: false, error: 'Failed to summarize user logs' };
+      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
+        service: 'UserLogService',
+        period: allUserLogRequest.period,
+        endpoint: 'trends/summary/structured'
+      });
     }
 
     if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
@@ -109,7 +127,11 @@ export class TrendController {
     );
 
     if (!reportResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
+        service: 'AIService',
+        period: allUserLogRequest.period,
+        endpoint: 'trends/summary/structured'
+      });
     }
 
     const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
@@ -124,7 +146,11 @@ export class TrendController {
     );
 
     if (!trendResponse.success) {
-      return { success: false, error: 'Failed to get AI trend response' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI trend response', {
+        service: 'AIService',
+        period: allUserLogRequest.period,
+        endpoint: 'trends/summary/structured'
+      });
     }
 
     const processingTimeMs = Date.now() - startTime;
@@ -138,6 +164,6 @@ export class TrendController {
       metadata: new AIResponseMetadata({ processingTimeMs })
     });
 
-    return { success: true, data: structuredResponse };
+    return Ok(structuredResponse);
   }
 }

@@ -15,6 +15,8 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 import { AIReviewSummaryStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
 import { AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 import { isArrayEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @Public()
 @ApiTags('Reviews')
@@ -44,13 +46,17 @@ export class ReviewController {
         const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
 
         if (!reviewsResponse.success) {
-            return { success: false, error: 'Failed to fetch reviews' };
+            throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
+                variantId,
+                service: 'ReviewService',
+                endpoint: 'reviews/summary/:variantId'
+            });
         }
 
         const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
 
         if (isArrayEmpty(reviews)) {
-            return { success: true, data: INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY };
+            return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
         }
 
         const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
@@ -64,10 +70,14 @@ export class ReviewController {
         );
 
         if (!summaryResponse.success) {
-            return { success: false, error: 'Failed to get AI summary response' };
+            throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
+                variantId,
+                service: 'AIService',
+                endpoint: 'reviews/summary/:variantId'
+            });
         }
 
-        return { success: true, data: summaryResponse.data };
+        return Ok(summaryResponse.data);
     }
 
     /** Tóm tắt đánh giá bằng AI cho tất cả variant */
@@ -78,13 +88,16 @@ export class ReviewController {
         const reviewsResponse = await this.reviewService.getAllReviews(request);
 
         if (!reviewsResponse.success) {
-            return { success: false, error: 'Failed to fetch reviews' };
+            throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
+                service: 'ReviewService',
+                endpoint: 'reviews/summary/all'
+            });
         }
 
         const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
 
         if (isArrayEmpty(reviews)) {
-            return { success: true, data: INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY };
+            return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
         }
 
         const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
@@ -98,10 +111,13 @@ export class ReviewController {
         );
 
         if (!summaryResponse.success) {
-            return { success: false, error: 'Failed to get AI summary response' };
+            throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
+                service: 'AIService',
+                endpoint: 'reviews/summary/all'
+            });
         }
 
-        return { success: true, data: summaryResponse.data };
+        return Ok(summaryResponse.data);
     }
 
     /**
@@ -120,19 +136,23 @@ export class ReviewController {
         const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
 
         if (!reviewsResponse.success) {
-            return { success: false, error: 'Failed to fetch reviews' };
+            throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
+                variantId,
+                service: 'ReviewService',
+                endpoint: 'reviews/summary/structured/:variantId'
+            });
         }
 
         const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
 
         if (isArrayEmpty(reviews)) {
-            return { success: true, data: new AIReviewSummaryStructuredResponse({
+            return Ok(new AIReviewSummaryStructuredResponse({
                 summary: INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY,
                 variantId,
                 reviewCount: 0,
                 generatedAt: new Date(),
                 metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
-            })};
+            }));
         }
 
         const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
@@ -146,7 +166,11 @@ export class ReviewController {
         );
 
         if (!summaryResponse.success) {
-            return { success: false, error: 'Failed to get AI summary response' };
+            throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
+                variantId,
+                service: 'AIService',
+                endpoint: 'reviews/summary/structured/:variantId'
+            });
         }
 
         const processingTimeMs = Date.now() - startTime;
@@ -159,8 +183,6 @@ export class ReviewController {
             metadata: new AIResponseMetadata({ processingTimeMs })
         });
 
-        return { success: true, data: structuredResponse };
+        return Ok(structuredResponse);
     }
-    
-    
 }

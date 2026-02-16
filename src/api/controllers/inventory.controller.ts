@@ -18,6 +18,8 @@ import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIInventoryReportStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 import { inventoryReportPrompt, INSTRUCTION_TYPE_INVENTORY } from 'src/application/constant/prompts';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @Public()
 @Role('admin')
@@ -72,7 +74,7 @@ export class InventoryController {
     const report =
       await this.inventoryService.createReportFromBatchAndStock(authHeader);
 
-    return { success: true, data: report.toString() };
+    return Ok(report.toString());
   }
 
   /** Tạo báo cáo tồn kho bằng AI */
@@ -89,7 +91,7 @@ export class InventoryController {
       await this.inventoryService.createReportFromBatchAndStock(authHeader);
 
     if (isDataEmpty(report?.toString())) {
-      return { success: true, data: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT };
+      return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
     }
 
     // Lấy admin instruction cho domain inventory (nếu có)
@@ -102,10 +104,10 @@ export class InventoryController {
     );
 
     if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI inventory report' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', { service: 'AIService' });
     }
 
-    return { success: true, data: aiResponse.data };
+    return Ok(aiResponse.data);
   }
 
   /**
@@ -145,7 +147,7 @@ export class InventoryController {
     );
 
     if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI inventory report' };
+      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', { service: 'AIService' });
     }
 
     const processingTimeMs = Date.now() - startTime;
@@ -156,6 +158,6 @@ export class InventoryController {
       metadata: new AIResponseMetadata({ processingTimeMs })
     });
 
-    return { success: true, data: structuredResponse };
+    return Ok(structuredResponse);
   }
 }

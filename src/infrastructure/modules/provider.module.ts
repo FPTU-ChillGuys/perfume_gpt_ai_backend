@@ -25,6 +25,7 @@ import { AdminInstructionController } from 'src/api/controllers/admin-instructio
 import { ProfileModule } from './profile.module';
 import { EmailModule } from './email.module';
 import { UserModule } from './user.module';
+import { OrderController } from 'src/api/controllers/order.controller';
 
 const modules = [
   ConversationModule,
@@ -58,7 +59,8 @@ const modules = [
     RecommendationController,
     InventoryController,
     AIAcceptanceController,
-    AdminInstructionController
+    AdminInstructionController,
+    OrderController 
   ],
   exports: modules
 })

@@ -7,28 +7,49 @@ import {
   Query,
   Req
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse
+} from '@nestjs/swagger';
 import { Request } from 'express';
 import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
-import { OrderListItemResponse, OrderResponse } from 'src/application/dtos/response/order.response';
-import { orderSummaryPrompt, INSTRUCTION_TYPE_ORDER } from 'src/application/constant/prompts';
+import {
+  OrderListItemResponse,
+  OrderResponse
+} from 'src/application/dtos/response/order.response';
+import {
+  orderSummaryPrompt,
+  INSTRUCTION_TYPE_ORDER
+} from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
-import { AIOrderSummaryStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
-import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
+import {
+  AIOrderSummaryStructuredResponse,
+  AIResponseMetadata
+} from 'src/application/dtos/response/ai-structured.response';
+import {
+  isDataEmpty,
+  INSUFFICIENT_DATA_MESSAGES
+} from 'src/infrastructure/utils/insufficient-data';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 @ApiTags('Orders')
 @ApiBearerAuth('jwt')
-@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+@ApiUnauthorizedResponse({
+  description: 'Token JWT không hợp lệ hoặc không được cung cấp'
+})
 @Controller('orders')
 export class OrderController {
   constructor(
@@ -40,15 +61,19 @@ export class OrderController {
   /** Lấy danh sách tất cả đơn hàng */
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả đơn hàng' })
-  @ApiQuery({ name: 'orderRequest', type: String, required: false, description: 'Tham số lọc đơn hàng' })
+  @ApiQuery({
+    name: 'orderRequest',
+    type: String,
+    required: false,
+    description: 'Tham số lọc đơn hàng'
+  })
   @ApiBaseResponse(PagedResult<OrderResponse>)
   async getAllOrders(
-    @Req() request: Request,
-    @Query('orderRequest') orderRequest: OrderRequest
+    @Query() orderRequest: OrderRequest
   ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
     return await this.orderService.getAllOrders(
       orderRequest,
-      extractTokenFromHeader(request!) ?? ''
+      process.env.PERFUME_GPT_API_TOKEN ?? ''
     );
   }
 
@@ -56,12 +81,17 @@ export class OrderController {
   @Get('user/:userId')
   @ApiOperation({ summary: 'Lấy đơn hàng theo user ID' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
-  @ApiQuery({ name: 'orderRequest', type: String, required: false, description: 'Tham số lọc đơn hàng' })
+  @ApiQuery({
+    name: 'orderRequest',
+    type: String,
+    required: false,
+    description: 'Tham số lọc đơn hàng'
+  })
   @ApiBaseResponse(PagedResult<OrderResponse>)
   async getOrdersByUserId(
     @Req() request: Request,
     @Param('userId') userId: string,
-    @Query('orderRequest') orderRequest: OrderRequest
+    @Query() orderRequest: OrderRequest
   ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
     return await this.orderService.getOrdersByUserId(
       userId,
@@ -79,7 +109,6 @@ export class OrderController {
     @Req() request: Request,
     @Query('userId') userId: string
   ): Promise<BaseResponse<string>> {
-
     // Lay tat ca don hang cua user
     const ordersResponse =
       await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
@@ -88,11 +117,14 @@ export class OrderController {
       );
 
     if (!ordersResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to retrieve orders for AI summary', {
-        userId,
-        service: 'OrderService',
-        endpoint: 'orders/summary/ai'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to retrieve orders for AI summary',
+        {
+          userId,
+          service: 'OrderService',
+          endpoint: 'orders/summary/ai'
+        }
+      );
     }
 
     if (isDataEmpty(ordersResponse.data)) {
@@ -100,7 +132,10 @@ export class OrderController {
     }
 
     // Lấy admin instruction cho domain order (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_ORDER);
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_ORDER
+      );
 
     // Goi AI service de tao summary
     const aiResponse = await this.aiService.textGenerateFromPrompt(
@@ -109,11 +144,14 @@ export class OrderController {
     );
 
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to generate AI order summary', {
-        userId,
-        service: 'AIService',
-        endpoint: 'orders/summary/ai'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to generate AI order summary',
+        {
+          userId,
+          service: 'AIService',
+          endpoint: 'orders/summary/ai'
+        }
+      );
     }
     return Ok(aiResponse.data);
   }
@@ -139,11 +177,14 @@ export class OrderController {
       );
 
     if (!ordersResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to retrieve orders for AI summary', {
-        userId,
-        service: 'OrderService',
-        endpoint: 'orders/summary/ai/structured'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to retrieve orders for AI summary',
+        {
+          userId,
+          service: 'OrderService',
+          endpoint: 'orders/summary/ai/structured'
+        }
+      );
     }
 
     if (isDataEmpty(ordersResponse.data)) {
@@ -160,7 +201,10 @@ export class OrderController {
     }
 
     // Lấy admin instruction cho domain order (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_ORDER);
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_ORDER
+      );
 
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       orderSummaryPrompt(ordersResponse.data ?? ''),
@@ -168,11 +212,14 @@ export class OrderController {
     );
 
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to generate AI order summary', {
-        userId,
-        service: 'AIService',
-        endpoint: 'orders/summary/ai/structured'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to generate AI order summary',
+        {
+          userId,
+          service: 'AIService',
+          endpoint: 'orders/summary/ai/structured'
+        }
+      );
     }
 
     const processingTimeMs = Date.now() - startTime;

@@ -39,7 +39,8 @@ export class OrderService {
         );
         return data;
       },
-      'Failed to fetch inventory stock',
+      'Failed to fetch all order',
+      true
     );
   }
 

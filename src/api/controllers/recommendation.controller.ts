@@ -19,18 +19,33 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { Request } from 'express';
 import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
-import { AIRecommendationStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
-import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
+import {
+  AIRecommendationStructuredResponse,
+  AIResponseMetadata
+} from 'src/application/dtos/response/ai-structured.response';
+import {
+  isDataEmpty,
+  INSUFFICIENT_DATA_MESSAGES
+} from 'src/infrastructure/utils/insufficient-data';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { InternalServerErrorWithDetailsException, BadRequestWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import {
+  InternalServerErrorWithDetailsException,
+  BadRequestWithDetailsException
+} from 'src/application/common/exceptions/http-with-details.exception';
+import { Cron } from '@nestjs/schedule';
+import { UserService } from 'src/infrastructure/servicies/user.service';
+import { ProfileService } from 'src/infrastructure/servicies/profile.service';
+import { buildCombinedPromptV2 } from 'src/infrastructure/utils/prompt-builder';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
 export class RecommendationController {
   constructor(
-    private userLogService: UserLogService,
-    private orderService: OrderService,
-    @Inject(AI_SERVICE) private aiService: AIService,
+    private readonly userLogService: UserLogService,
+    @Inject(AI_SERVICE) private readonly aiService: AIService,
+    private readonly userService: UserService,
+    private readonly orderService: OrderService,
+    private readonly profileService: ProfileService,
     private readonly adminInstructionService: AdminInstructionService
   ) {}
 
@@ -44,68 +59,51 @@ export class RecommendationController {
     @Req() request: Request,
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
-    //-----------------------------V2 -------------------------------------
-    // Lay report va prompt tom tat log nguoi dung chi tiet hon V1
+    const endpoint = 'recommendation/repurchase/v2';
+
+    // Lấy user log chi tiết
     const reportAndPromptSummary =
       await this.userLogService.getReportAndPromptSummaryUserLogs(
         userLogRequest
       );
 
     if (!reportAndPromptSummary.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get user logs', {
-        userId: userLogRequest.userId,
-        service: 'UserLogService',
-        endpoint: 'recommendation/repurchase/v2'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get user logs',
+        {
+          userId: userLogRequest.userId,
+          service: 'UserLogService',
+          endpoint
+        }
+      );
     }
 
-    // Lay report don hang cua nguoi dung
+    // Lấy order report
     const orderReport =
       await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
         userLogRequest.userId,
         extractTokenFromHeader(request) ?? ''
       );
 
-    if (isDataEmpty(reportAndPromptSummary.data?.prompt) && isDataEmpty(orderReport.data)) {
+    // Check data empty
+    if (
+      isDataEmpty(reportAndPromptSummary.data?.prompt) &&
+      isDataEmpty(orderReport.data)
+    ) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.REPURCHASE);
     }
 
+    // Combine prompts
     const combinedPrompt = `${reportAndPromptSummary.data!.prompt}\n\n${orderReport.data ?? ''}`;
 
-    //-------------------------------------------------------------
-
-    // Lấy admin instruction cho domain recommendation (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
-
-    // Tom tat voi AI
-    const summaryResponse = await this.aiService.textGenerateFromPrompt(
-      `${combinedPrompt}`,
-      adminPrompt
+    // Gọi AI 2 lần (summary + recommendation)
+    const recommendation = await this.generateRepurchaseRecommendation(
+      combinedPrompt,
+      userLogRequest.userId,
+      endpoint
     );
 
-    if (!summaryResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/repurchase/v2'
-      });
-    }
-
-    //Tao repurchase recommendation prompt dua tren summary response
-    const recommendationResponse = await this.aiService.textGenerateFromPrompt(
-      repurchaseRecommendationPrompt(summaryResponse.data ?? ''),
-      adminPrompt
-    );
-
-    if (!recommendationResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/repurchase/v2'
-      });
-    }
-
-    return Ok(recommendationResponse.data);
+    return Ok(recommendation);
   }
 
   /** Gợi ý mua lại V1 - Dùng log tóm tắt */
@@ -118,69 +116,50 @@ export class RecommendationController {
     @Req() request: Request,
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
-    //-----------------------------V1 -------------------------------------
-    // Lay va tom tat log nguoi dung (Nhanh hon nhung khong chi tiet bang V2)
-    const userLogResponse = await this.userLogService.getUserLogSummaryReportByUserId(
-      userLogRequest.userId,
-      userLogRequest.startDate!,
-      userLogRequest.endDate!
-    );
+    const endpoint = 'recommendation/repurchase/v1';
+
+    // Lấy user log summary (nhanh hơn V2)
+    const userLogResponse =
+      await this.userLogService.getUserLogSummaryReportByUserId(
+        userLogRequest.userId,
+        userLogRequest.startDate!,
+        userLogRequest.endDate!
+      );
 
     if (!userLogResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get user logs', {
-        userId: userLogRequest.userId,
-        service: 'UserLogService',
-        endpoint: 'recommendation/repurchase/v1'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get user logs',
+        {
+          userId: userLogRequest.userId,
+          service: 'UserLogService',
+          endpoint
+        }
+      );
     }
 
-    // Lay report don hang cua nguoi dung
+    // Lấy order report
     const orderReport =
       await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
         userLogRequest.userId,
         extractTokenFromHeader(request) ?? ''
       );
 
+    // Check data empty
     if (isDataEmpty(userLogResponse.data) && isDataEmpty(orderReport.data)) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.REPURCHASE);
     }
 
+    // Combine prompts
     const combinedPrompt = `${userLogResponse.data!}\n\n${orderReport.data ?? ''}`;
 
-    //-------------------------------------------------------------
-
-    // Lấy admin instruction cho domain recommendation (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
-
-    // Tom tat voi AI
-    const summaryResponse = await this.aiService.textGenerateFromPrompt(
-      `${combinedPrompt}`,
-      adminPrompt
+    // Gọi AI 2 lần (summary + recommendation)
+    const recommendation = await this.generateRepurchaseRecommendation(
+      combinedPrompt,
+      userLogRequest.userId,
+      endpoint
     );
 
-    if (!summaryResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/repurchase/v1'
-      });
-    }
-
-    //Tao repurchase recommendation prompt dua tren summary response
-    const recommendationResponse = await this.aiService.textGenerateFromPrompt(
-      repurchaseRecommendationPrompt(summaryResponse.data ?? ''),
-      adminPrompt
-    );
-
-    if (!recommendationResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/repurchase/v1'
-      });
-    }
-
-    return Ok(recommendationResponse.data);
+    return Ok(recommendation);
   }
 
   /** Gợi ý sản phẩm bằng AI V1 - Dùng log chi tiết */
@@ -192,55 +171,38 @@ export class RecommendationController {
   async aiRecommendationV1(
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
+    const endpoint = 'recommendation/recommend/ai/v1';
+
+    // Lấy user log chi tiết
     const reportAndPromptSummary =
       await this.userLogService.getReportAndPromptSummaryUserLogs(
         userLogRequest
       );
 
     if (!reportAndPromptSummary.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
-        userId: userLogRequest.userId,
-        service: 'UserLogService',
-        endpoint: 'recommendation/recommend/ai/v1'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to summarize user logs',
+        {
+          userId: userLogRequest.userId,
+          service: 'UserLogService',
+          endpoint
+        }
+      );
     }
 
+    // Check data empty
     if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION);
     }
 
-    // Lấy admin instruction cho domain recommendation (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
-    const recSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
-
-    const reportResponse = await this.aiService.textGenerateFromPrompt(
-      recommendationReportPrompt(reportAndPromptSummary.data!.prompt),
-      adminPrompt
+    // Gọi AI 2 lần (report + recommendation)
+    const recommendation = await this.generateAIRecommendation(
+      reportAndPromptSummary.data!.prompt,
+      userLogRequest.userId,
+      endpoint
     );
 
-    if (!reportResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/recommend/ai/v1'
-      });
-    }
-
-    //Create repurchase recommendation prompt base on summary response
-    const recommendationResponse = await this.aiService.textGenerateFromPrompt(
-      aiRecommendationPrompt(reportResponse.data ?? ''),
-      recSystemPrompt
-    );
-
-    if (!recommendationResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/recommend/ai/v1'
-      });
-    }
-
-    return Ok(recommendationResponse.data);
+    return Ok(recommendation);
   }
 
   /** Gợi ý sản phẩm bằng AI V2 - Dùng log tóm tắt */
@@ -252,7 +214,9 @@ export class RecommendationController {
   async aiRecommendationV2(
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
-    
+    const endpoint = 'recommendation/recommend/ai/v2';
+
+    // Lấy user log summary (nhanh hơn V1)
     const summaryReport =
       await this.userLogService.getUserLogSummaryReportByUserId(
         userLogRequest.userId,
@@ -261,51 +225,45 @@ export class RecommendationController {
       );
 
     if (!summaryReport.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
-        userId: userLogRequest.userId,
-        service: 'UserLogService',
-        endpoint: 'recommendation/recommend/ai/v2'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to summarize user logs',
+        {
+          userId: userLogRequest.userId,
+          service: 'UserLogService',
+          endpoint
+        }
+      );
     }
 
+    // Check data empty
     if (isDataEmpty(summaryReport.data)) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION);
     }
 
-    // Lấy admin instruction cho domain recommendation (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
-    const recSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
+    // Format prompt
+    const userLogPrompt = `Here is the summary of user logs:\n${summaryReport.data!}`;
 
-    const summaryReportPrompt = `Here is the summary of user logs:\n${summaryReport.data!}`;
+    // Gọi AI với summary prompt wrapper
+    const { adminPrompt, systemPrompt } =
+      await this.getRecommendationPrompts();
 
-    const summaryResponse = await this.aiService.textGenerateFromPrompt(
-      recommendationSummaryPrompt(summaryReportPrompt),
-      adminPrompt
+    const summaryResponse = await this.callAI(
+      recommendationSummaryPrompt(userLogPrompt),
+      adminPrompt,
+      userLogRequest.userId,
+      endpoint,
+      'Failed to get AI summary'
     );
 
-    if (!summaryResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/recommend/ai/v2'
-      });
-    }
-
-    //Create repurchase recommendation prompt base on summary response
-    const recommendationResponse = await this.aiService.textGenerateFromPrompt(
-      aiRecommendationPrompt(summaryResponse.data ?? ''),
-      recSystemPrompt
+    const recommendation = await this.callAI(
+      aiRecommendationPrompt(summaryResponse),
+      systemPrompt,
+      userLogRequest.userId,
+      endpoint,
+      'Failed to get AI recommendation response'
     );
 
-    if (!recommendationResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/recommend/ai/v2'
-      });
-    }
-
-    return Ok(recommendationResponse.data);
+    return Ok(recommendation);
   }
 
   /**
@@ -321,18 +279,26 @@ export class RecommendationController {
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<AIRecommendationStructuredResponse>> {
     const startTime = Date.now();
+    const endpoint = 'recommendation/recommend/ai/structured';
 
+    // Lấy user log chi tiết
     const reportAndPromptSummary =
-      await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
+      await this.userLogService.getReportAndPromptSummaryUserLogs(
+        userLogRequest
+      );
 
     if (!reportAndPromptSummary.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
-        userId: userLogRequest.userId,
-        service: 'UserLogService',
-        endpoint: 'recommendation/recommend/ai/structured'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to summarize user logs',
+        {
+          userId: userLogRequest.userId,
+          service: 'UserLogService',
+          endpoint
+        }
+      );
     }
 
+    // Check data empty - trả về structured response với insufficient data
     if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
       const processingTimeMs = Date.now() - startTime;
       const period = userLogRequest.period ?? 'custom';
@@ -348,41 +314,19 @@ export class RecommendationController {
       };
     }
 
-    // Lấy admin instruction cho domain recommendation (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RECOMMENDATION);
-    const recSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
-
-    const reportResponse = await this.aiService.textGenerateFromPrompt(
-      recommendationReportPrompt(reportAndPromptSummary.data!.prompt),
-      adminPrompt
+    // Gọi AI 2 lần (report + recommendation)
+    const recommendation = await this.generateAIRecommendation(
+      reportAndPromptSummary.data!.prompt,
+      userLogRequest.userId,
+      endpoint
     );
 
-    if (!reportResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/recommend/ai/structured'
-      });
-    }
-
-    const recommendationResponse = await this.aiService.textGenerateFromPrompt(
-      aiRecommendationPrompt(reportResponse.data ?? ''),
-      recSystemPrompt
-    );
-
-    if (!recommendationResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
-        userId: userLogRequest.userId,
-        service: 'AIService',
-        endpoint: 'recommendation/recommend/ai/structured'
-      });
-    }
-
+    // Build structured response
     const processingTimeMs = Date.now() - startTime;
     const period = userLogRequest.period ?? 'custom';
 
     const structuredResponse = new AIRecommendationStructuredResponse({
-      recommendation: recommendationResponse.data ?? '',
+      recommendation,
       userId: userLogRequest.userId,
       period: period.toString(),
       generatedAt: new Date(),
@@ -390,5 +334,188 @@ export class RecommendationController {
     });
 
     return Ok(structuredResponse);
+  }
+
+  // ==================== PRIVATE HELPER METHODS ====================
+
+  /**
+   * Lấy admin instruction và build recommendation system prompt
+   */
+  private async getRecommendationPrompts(): Promise<{
+    adminPrompt: string;
+    systemPrompt: string;
+  }> {
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_RECOMMENDATION
+      );
+    const systemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
+    return { adminPrompt, systemPrompt };
+  }
+
+  /**
+   * Gọi AI service với error handling tự động
+   */
+  private async callAI(
+    prompt: string,
+    systemPrompt: string,
+    userId: string,
+    endpoint: string,
+    errorMessage: string
+  ): Promise<string> {
+    const response = await this.aiService.textGenerateFromPrompt(
+      prompt,
+      systemPrompt
+    );
+
+    if (!response.success) {
+      throw new InternalServerErrorWithDetailsException(errorMessage, {
+        userId,
+        service: 'AIService',
+        endpoint
+      });
+    }
+
+    return response.data ?? '';
+  }
+
+  /**
+   * Logic chung: Gọi AI 2 lần (summary -> recommendation) cho repurchase
+   */
+  private async generateRepurchaseRecommendation(
+    combinedPrompt: string,
+    userId: string,
+    endpoint: string
+  ): Promise<string> {
+    const { adminPrompt } = await this.getRecommendationPrompts();
+
+    // Bước 1: Tạo summary
+    // const summary = await this.callAI(
+    //   combinedPrompt,
+    //   adminPrompt,
+    //   userId,
+    //   endpoint,
+    //   'Failed to get AI summary'
+    // );
+
+    // Bước 2: Tạo recommendation từ summary
+    const recommendation = await this.callAI(
+      combinedPrompt,
+      adminPrompt,
+      userId,
+      endpoint,
+      'Failed to get AI recommendation response'
+    );
+
+    return recommendation;
+  }
+
+  /**
+   * Logic chung: Gọi AI 2 lần (report -> recommendation) cho AI recommendation
+   */
+  private async generateAIRecommendation(
+    userLogPrompt: string,
+    userId: string,
+    endpoint: string
+  ): Promise<string> {
+    const { adminPrompt, systemPrompt } = await this.getRecommendationPrompts();
+
+    // Bước 1: Tạo report
+    // const report = await this.callAI(
+    //   recommendationReportPrompt(userLogPrompt),
+    //   adminPrompt,
+    //   userId,
+    //   endpoint,
+    //   'Failed to get AI report'
+    // );
+
+    // Bước 2: Tạo recommendation từ report
+    const recommendation = await this.callAI(
+      aiRecommendationPrompt(userLogPrompt),
+      systemPrompt,
+      userId,
+      endpoint,
+      'Failed to get AI recommendation response'
+    );
+
+    return recommendation;
+  }
+
+  // ==================== CRON JOB ====================
+
+  @Cron('0 0 * * *') // Chạy vào lúc 00:00 hàng ngày
+  async generateDailyRecommendations() {
+    // Logic để lấy danh sách user và tạo recommendation cho từng user
+    const userIds = await this.userLogService.getAllUserIdsFromLogs();
+    for (const userId of userIds) {
+      try {
+        const email = await this.userService.getEmailById(userId);
+        // Gọi hàm tạo recommendation (có thể tái sử dụng hàm repurchaseRecommendationV2 hoặc aiRecommendationV1)
+        // Sau đó gửi email cho user với recommendation
+        // Ví dụ: await this.emailService.sendRecommendationEmail(email, recommendationData);
+        const recommendationData = await this.repurchaseRecommendationV2NonApi({
+          userId,
+          startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Lấy log trong 7 ngày qua
+          endDate: new Date()
+        } as UserLogRequest);
+      } catch (error) {
+        // Log lỗi nếu có
+        console.error(
+          `Failed to generate/send recommendation for user ${userId}:`,
+          error
+        );
+      }
+    }
+  }
+
+  /**
+   * Non-API method dùng cho CRON job
+   * Tạo repurchase recommendation mà không cần HTTP Request object
+   */
+  private async repurchaseRecommendationV2NonApi(
+    userLogRequest: UserLogRequest
+  ): Promise<BaseResponse<string>> {
+    const endpoint = 'recommendation/repurchase/v2/cron';
+
+    // Build combined prompt từ user logs + orders + profile
+    const combinedPromptResult = await buildCombinedPromptV2(
+      INSTRUCTION_TYPE_RECOMMENDATION,
+      this.userLogService,
+      this.orderService,
+      this.profileService,
+      this.adminInstructionService,
+      userLogRequest.userId,
+      process.env.PERFUME_GPT_API_TOKEN ?? ''
+    );
+
+    if (!combinedPromptResult.success || !combinedPromptResult.data) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId: userLogRequest.userId,
+          service: 'PromptBuilder',
+          endpoint
+        }
+      );
+    }
+
+    // Gọi AI 2 lần (summary + recommendation) 
+    // const summary = await this.callAI(
+    //   combinedPromptResult.data.combinedPrompt,
+    //   combinedPromptResult.data.adminInstruction ?? '',
+    //   userLogRequest.userId,
+    //   endpoint,
+    //   'Failed to get AI summary'
+    // );
+
+    const recommendation = await this.callAI(
+      combinedPromptResult.data.combinedPrompt,
+      combinedPromptResult.data.adminInstruction ?? '',
+      userLogRequest.userId,
+      endpoint,
+      'Failed to get AI recommendation response'
+    );
+
+    return Ok(recommendation);
   }
 }

@@ -11,11 +11,13 @@ export default function ApiUrl() {
 
   const PROFILE_URL = (url: string) => `${BASE_URL}/profiles/${url}`;
 
+  const USER_URL = (url: string) => `${BASE_URL}/users/${url}`; 
   return {
     PRODUCT_URL,
     REVIEW_URL,
     ORDER_URL,
     INVENTORY_URL,
-    PROFILE_URL
+    PROFILE_URL,
+    USER_URL
   };
 }

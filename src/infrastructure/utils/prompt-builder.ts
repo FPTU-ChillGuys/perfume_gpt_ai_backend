@@ -28,6 +28,7 @@ export interface CombinedPromptResult {
  * Xây dựng combined prompt cho V1 (dùng log tóm tắt từ summary table).
  * Nhanh hơn nhưng phụ thuộc nội dung đã tóm tắt sẵn trong DB.
  *
+ * @param typeOfInstruction - Loại instruction domain để lấy admin instruction tương ứng
  * @param logService - UserLogService instance
  * @param orderService - OrderService instance
  * @param profileService - ProfileService instance
@@ -37,6 +38,7 @@ export interface CombinedPromptResult {
  * @returns Combined prompt + dữ liệu thành phần
  */
 export async function buildCombinedPromptV1(
+  typeOfInstruction: string,
   logService: UserLogService,
   orderService: OrderService,
   profileService: ProfileService,
@@ -70,7 +72,7 @@ export async function buildCombinedPromptV1(
   }
 
   // Lấy admin instruction cho conversation (nếu có)
-  const adminInstruction = await adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
+  const adminInstruction = await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
 
   // Kiểm tra dữ liệu và thêm ghi chú nếu thiếu
   const dataNote = buildDataAvailabilityNote({
@@ -99,6 +101,7 @@ export async function buildCombinedPromptV1(
  * Xây dựng combined prompt cho V2 (dùng log chi tiết, tổng hợp real-time).
  * Chậm hơn nhưng luôn đầy đủ nội dung.
  *
+ * @param typeOfInstruction - Loại instruction domain để lấy admin instruction tương ứng
  * @param logService - UserLogService instance
  * @param orderService - OrderService instance
  * @param profileService - ProfileService instance
@@ -108,6 +111,7 @@ export async function buildCombinedPromptV1(
  * @returns Combined prompt + dữ liệu thành phần
  */
 export async function buildCombinedPromptV2(
+  typeOfInstruction: string,
   logService: UserLogService,
   orderService: OrderService,
   profileService: ProfileService,
@@ -144,7 +148,7 @@ export async function buildCombinedPromptV2(
   }
 
   // Lấy admin instruction cho conversation (nếu có)
-  const adminInstruction = await adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
+  const adminInstruction = await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
 
   // Kiểm tra dữ liệu và thêm ghi chú nếu thiếu
   const dataNote = buildDataAvailabilityNote({

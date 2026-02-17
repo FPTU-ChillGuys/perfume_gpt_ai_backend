@@ -28,12 +28,14 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
-import { ADVANCED_MATCHING_SYSTEM_PROMPT } from 'src/application/constant/prompts';
+import {
+  ADVANCED_MATCHING_SYSTEM_PROMPT,
+  INSTRUCTION_TYPE_CONVERSATION
+} from 'src/application/constant/prompts';
 import {
   userLogPrompt,
   orderReportPrompt,
-  conversationSystemPrompt,
-  conversationTestSystemPrompt
+  conversationSystemPrompt
 } from 'src/application/constant/prompts';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
@@ -42,19 +44,22 @@ import { ConversationService } from 'src/infrastructure/servicies/conversation.s
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { extractTokenFromHeader, getTokenPayloadFromRequest } from 'src/infrastructure/utils/extract-token';
+import {
+  extractTokenFromHeader,
+  getTokenPayloadFromRequest
+} from 'src/infrastructure/utils/extract-token';
 import {
   addMessageToMessages,
   convertToMessages,
   overrideMessagesToConversation
 } from 'src/infrastructure/utils/message-helper';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
+import { ProfileService } from 'src/infrastructure/servicies/profile.service';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import {
   buildCombinedPromptV1,
   buildCombinedPromptV2
-} from 'src/infrastructure/utils/chat-prompt-builder';
-import { ProfileService } from 'src/infrastructure/servicies/profile.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+} from 'src/infrastructure/utils/prompt-builder';
 
 @ApiTags('Conversation')
 @Controller('conversation')
@@ -125,7 +130,8 @@ export class ConversationController {
 
     if (userId) {
       // Đã đăng nhập - lấy log tóm tắt + order + profile
-      const userLog = await this.logService.getUserLogSummaryReportByUserId(userId);
+      const userLog =
+        await this.logService.getUserLogSummaryReportByUserId(userId);
       const userLogPromptText = userLogPrompt(userLog.data ?? '');
 
       const orderReport =
@@ -139,7 +145,9 @@ export class ConversationController {
       );
 
       const profileReport =
-        await this.profileService.createSystemPromptFromProfile(profile.payload!);
+        await this.profileService.createSystemPromptFromProfile(
+          profile.payload!
+        );
 
       combinedPrompt = `${userLogPromptText}\n\n
       Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
@@ -156,12 +164,15 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        conversationId: conversation.id,
-        service: 'AIService',
-        endpoint: 'chat/v1'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'AIService',
+          endpoint: 'chat/v1'
+        }
+      );
     }
 
     // Prepare response conversation
@@ -236,7 +247,9 @@ export class ConversationController {
       );
 
       const profileReport =
-        await this.profileService.createSystemPromptFromProfile(profile.payload!);
+        await this.profileService.createSystemPromptFromProfile(
+          profile.payload!
+        );
 
       combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
       Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
@@ -253,12 +266,15 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        conversationId: conversation.id,
-        service: 'AIService',
-        endpoint: 'chat/v2'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'AIService',
+          endpoint: 'chat/v2'
+        }
+      );
     }
 
     // Prepare response conversation
@@ -296,7 +312,8 @@ export class ConversationController {
   @Post('test/v1')
   @ApiBearerAuth('jwt')
   @ApiOperation({
-    summary: 'Test V1 - Log tóm tắt (có token: userId+profile+order, guest: không lấy log)'
+    summary:
+      'Test V1 - Log tóm tắt (có token: userId+profile+order, guest: không lấy log)'
   })
   @ApiQuery({
     name: 'prompt',
@@ -336,7 +353,9 @@ export class ConversationController {
       );
 
       const profileReport =
-        await this.profileService.createSystemPromptFromProfile(profile.payload!);
+        await this.profileService.createSystemPromptFromProfile(
+          profile.payload!
+        );
 
       combinedPrompt = `${userLogPromptText}\n\n
       Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
@@ -352,11 +371,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        service: 'AIService',
-        endpoint: 'test/v1'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          service: 'AIService',
+          endpoint: 'test/v1'
+        }
+      );
     }
 
     return {
@@ -373,7 +395,8 @@ export class ConversationController {
   @Post('test/v2')
   @ApiBearerAuth('jwt')
   @ApiOperation({
-    summary: 'Test V2 - Log chi tiết (có token: userId+profile+order, guest: không lấy log)'
+    summary:
+      'Test V2 - Log chi tiết (có token: userId+profile+order, guest: không lấy log)'
   })
   @ApiQuery({
     name: 'prompt',
@@ -411,7 +434,9 @@ export class ConversationController {
       );
 
       const profileReport =
-        await this.profileService.createSystemPromptFromProfile(profile.payload!);
+        await this.profileService.createSystemPromptFromProfile(
+          profile.payload!
+        );
 
       combinedPrompt = `${userLogResponse.data ? userLogResponse.data.response : ''}\n\n
       Order Report:\n${orderReportPrompt(orderReport.data ?? '')}\n\n
@@ -427,11 +452,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        service: 'AIService',
-        endpoint: 'test/v2'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          service: 'AIService',
+          endpoint: 'test/v2'
+        }
+      );
     }
 
     return {
@@ -465,6 +493,7 @@ export class ConversationController {
     const userId = getTokenPayloadFromRequest(request)?.id;
 
     const promptResult = await buildCombinedPromptV1(
+      INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.orderService,
       this.profileService,
@@ -474,11 +503,14 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
-        userId,
-        service: 'PromptBuilder',
-        endpoint: 'test/v3'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          service: 'PromptBuilder',
+          endpoint: 'test/v3'
+        }
+      );
     }
 
     const message = await this.aiService.textGenerateFromPrompt(
@@ -490,11 +522,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        service: 'AIService',
-        endpoint: 'test/v3'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          service: 'AIService',
+          endpoint: 'test/v3'
+        }
+      );
     }
 
     return Ok(message.data);
@@ -525,6 +560,7 @@ export class ConversationController {
     const userId = getTokenPayloadFromRequest(request)?.id;
 
     const promptResult = await buildCombinedPromptV2(
+      INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.orderService,
       this.profileService,
@@ -534,11 +570,14 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
-        userId,
-        service: 'PromptBuilder',
-        endpoint: 'test/v4'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          service: 'PromptBuilder',
+          endpoint: 'test/v4'
+        }
+      );
     }
 
     const message = await this.aiService.textGenerateFromPrompt(
@@ -550,11 +589,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        service: 'AIService',
-        endpoint: 'test/v4'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          service: 'AIService',
+          endpoint: 'test/v4'
+        }
+      );
     }
 
     return Ok(message.data);
@@ -584,6 +626,7 @@ export class ConversationController {
 
     // Dùng common helper thay vì code trùng lặp
     const promptResult = await buildCombinedPromptV1(
+      INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.orderService,
       this.profileService,
@@ -593,12 +636,15 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
-        userId,
-        conversationId: conversation.id,
-        service: 'PromptBuilder',
-        endpoint: 'chat/v3'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'PromptBuilder',
+          endpoint: 'chat/v3'
+        }
+      );
     }
 
     // Call AI service
@@ -612,12 +658,15 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        conversationId: conversation.id,
-        service: 'AIService',
-        endpoint: 'chat/v3'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'AIService',
+          endpoint: 'chat/v3'
+        }
+      );
     }
 
     // Lưu conversation
@@ -656,6 +705,7 @@ export class ConversationController {
 
     // Dùng common helper thay vì code trùng lặp
     const promptResult = await buildCombinedPromptV2(
+      INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.orderService,
       this.profileService,
@@ -665,12 +715,15 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
-        userId,
-        conversationId: conversation.id,
-        service: 'PromptBuilder',
-        endpoint: 'chat/v4'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'PromptBuilder',
+          endpoint: 'chat/v4'
+        }
+      );
     }
 
     // Call AI service
@@ -684,12 +737,15 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        conversationId: conversation.id,
-        service: 'AIService',
-        endpoint: 'chat/v4'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'AIService',
+          endpoint: 'chat/v4'
+        }
+      );
     }
 
     // Lưu conversation
@@ -717,8 +773,7 @@ export class ConversationController {
   })
   @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
   @ApiOperation({
-    summary:
-      'Test Guarded V1 - Admin only (userId lấy từ token)'
+    summary: 'Test Guarded V1 - Admin only (userId lấy từ token)'
   })
   @ApiQuery({ name: 'prompt', type: String })
   @ApiBaseResponse(String)
@@ -729,6 +784,7 @@ export class ConversationController {
     const userId = getTokenPayloadFromRequest(request)?.id;
 
     const promptResult = await buildCombinedPromptV1(
+      INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.orderService,
       this.profileService,
@@ -738,11 +794,14 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
-        userId,
-        service: 'PromptBuilder',
-        endpoint: 'test/guarded/v1'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          service: 'PromptBuilder',
+          endpoint: 'test/guarded/v1'
+        }
+      );
     }
 
     const message = await this.aiService.textGenerateFromPrompt(
@@ -754,11 +813,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        service: 'AIService',
-        endpoint: 'test/guarded/v1'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          service: 'AIService',
+          endpoint: 'test/guarded/v1'
+        }
+      );
     }
 
     return Ok(message.data);
@@ -777,8 +839,7 @@ export class ConversationController {
   })
   @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
   @ApiOperation({
-    summary:
-      'Test Guarded V2 - Admin only (userId lấy từ token)'
+    summary: 'Test Guarded V2 - Admin only (userId lấy từ token)'
   })
   @ApiQuery({ name: 'prompt', type: String })
   @ApiBaseResponse(String)
@@ -789,6 +850,7 @@ export class ConversationController {
     const userId = getTokenPayloadFromRequest(request)?.id;
 
     const promptResult = await buildCombinedPromptV2(
+      INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.orderService,
       this.profileService,
@@ -798,11 +860,14 @@ export class ConversationController {
     );
 
     if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
-        userId,
-        service: 'PromptBuilder',
-        endpoint: 'test/guarded/v2'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          service: 'PromptBuilder',
+          endpoint: 'test/guarded/v2'
+        }
+      );
     }
 
     const message = await this.aiService.textGenerateFromPrompt(
@@ -814,11 +879,14 @@ export class ConversationController {
     );
 
     if (!message.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        userId,
-        service: 'AIService',
-        endpoint: 'test/guarded/v2'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          service: 'AIService',
+          endpoint: 'test/guarded/v2'
+        }
+      );
     }
 
     return Ok(message.data);

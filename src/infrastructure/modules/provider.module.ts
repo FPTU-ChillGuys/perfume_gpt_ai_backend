@@ -24,6 +24,7 @@ import { AdminInstructionModule } from './admin-instruction.module';
 import { AdminInstructionController } from 'src/api/controllers/admin-instruction.controller';
 import { ProfileModule } from './profile.module';
 import { EmailModule } from './email.module';
+import { UserModule } from './user.module';
 
 const modules = [
   ConversationModule,
@@ -40,7 +41,8 @@ const modules = [
   AIAcceptanceModule,
   AdminInstructionModule,
   ProfileModule,
-  EmailModule
+  EmailModule,
+  UserModule
 ];
 
 @Module({

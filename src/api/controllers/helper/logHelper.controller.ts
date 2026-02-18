@@ -1,0 +1,107 @@
+import { Inject } from '@nestjs/common';
+import { INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
+import { UserLogRequest } from 'src/application/dtos/request/user-log.request';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { AdminInstruction } from 'src/domain/entities/admin-instruction.entity';
+import { PeriodEnum } from 'src/domain/enum/period.enum';
+import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+import { AIService } from 'src/infrastructure/servicies/ai.service';
+import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { convertToUTC } from 'src/infrastructure/utils/time-zone';
+
+export class LogHelper {
+  constructor(
+    private userLogService: UserLogService,
+    @Inject(AI_SERVICE) private aiService: AIService,
+    private readonly adminInstructionService: AdminInstructionService
+  ) {}
+
+  async summarizeLogs(period: PeriodEnum) {
+    console.log('Running scheduled task to summarize user logs...');
+
+    console.log('Fetching all user IDs from logs...');
+    // Lay tat ca userId co trong log
+    const userIds = await this.userLogService.getAllUserIdsFromLogs();
+    console.log(`Found ${userIds.length} unique user IDs.`);
+
+    // Duyet tung userId de tong hop log va luu vao db
+    for (const userId of userIds) {
+      const userLogRequest: UserLogRequest = new UserLogRequest({
+        userId,
+        period: period,
+        endDate: new Date()
+      });
+
+      const response =
+        await this.userLogService.getReportAndPromptSummaryUserLogs(
+          userLogRequest
+        );
+
+      if (!response.success) {
+        console.log(`Failed to summarize logs for userId: ${userId}`);
+        return { success: false, error: 'Failed to summarize user logs' };
+      }
+
+      const logPrompt =
+        await this.adminInstructionService.getSystemPromptForDomain(
+          INSTRUCTION_TYPE_LOG
+        );
+
+      // Summarize with AI
+      const aiResponse = await this.aiService.textGenerateFromPrompt(
+        response.data!.prompt,
+        logPrompt
+      );
+
+      // Lay ngay bat dau
+      const startDate =
+        convertToUTC(userLogRequest.startDate) ||
+        this.userLogService.getFirstDateOfPeriod(
+          userLogRequest.period!,
+          userLogRequest.endDate!
+        );
+
+      // Save summary to database
+      await this.userLogService.saveUserLogSummary(
+        userLogRequest.userId,
+        startDate,
+        userLogRequest.endDate!,
+        aiResponse.data || ''
+      );
+
+      if (!aiResponse.success) {
+        console.log(`Failed to get AI response for userId: ${userId}`);
+      }
+
+      console.log(`Successfully summarized logs for userId: ${userId}`);
+    }
+
+    console.log('Scheduled task completed: User logs summarized and saved.');
+  }
+
+  async summarizeLogsPerWeek() {
+    try {
+      await this.summarizeLogs(PeriodEnum.WEEKLY);
+    } catch (error) {
+      console.error('Error summarizing weekly logs:', error);
+    }
+  }
+
+  async summarizeLogsPerMonth() {
+    try {
+      await this.summarizeLogs(PeriodEnum.MONTHLY);
+    } catch (error) {
+      console.error('Error summarizing monthly logs:', error);
+    }
+  }
+
+  async summarizeLogsPerYear() {
+    try {
+      await this.summarizeLogs(PeriodEnum.YEARLY);
+    } catch (error) {
+      console.error('Error summarizing yearly logs:', error);
+    }
+  }
+}

@@ -18,74 +18,8 @@ export class LogHelper {
     private readonly adminInstructionService: AdminInstructionService
   ) {}
 
-  async summarizeLogsForAllUsers(period: PeriodEnum) {
-    console.log('Running scheduled task to summarize user logs...');
-
-    console.log('Fetching all user IDs from logs...');
-    // Lay tat ca userId co trong log
-    const userIds = await this.userLogService.getAllUserIdsFromLogs();
-    console.log(`Found ${userIds.length} unique user IDs.`);
-
-    // Duyet tung userId de tong hop log va luu vao db
-    for (const userId of userIds) {
-      const userLogRequest: UserLogRequest = new UserLogRequest({
-        userId,
-        period: period,
-        endDate: new Date()
-      });
-
-      const response =
-        await this.userLogService.getReportAndPromptSummaryUserLogs(
-          userLogRequest
-        );
-
-      if (!response.success) {
-        console.log(`Failed to summarize logs for userId: ${userId}`);
-        return { success: false, error: 'Failed to summarize user logs' };
-      }
-
-      const logPrompt =
-        await this.adminInstructionService.getSystemPromptForDomain(
-          INSTRUCTION_TYPE_LOG
-        );
-
-      // Summarize with AI
-      const aiResponse = await this.aiService.textGenerateFromPrompt(
-        response.data!.prompt,
-        logPrompt
-      );
-
-      // Lay ngay bat dau
-      const startDate =
-        convertToUTC(userLogRequest.startDate) ||
-        this.userLogService.getFirstDateOfPeriod(
-          userLogRequest.period!,
-          userLogRequest.endDate!
-        );
-
-      // Save summary to database
-      await this.userLogService.saveUserLogSummary(
-        userLogRequest.userId,
-        startDate,
-        userLogRequest.endDate!,
-        aiResponse.data || ''
-      );
-
-      if (!aiResponse.success) {
-        console.log(`Failed to get AI response for userId: ${userId}`);
-      }
-
-      console.log(`Successfully summarized logs for userId: ${userId}`);
-    }
-
-    console.log('Scheduled task completed: User logs summarized and saved.');
-  }
-
-  async summarizeLogsForUser(userId: string, period: PeriodEnum) {
-    console.log('Running scheduled task to summarize user logs...');
-
-    console.log('Fetching all user IDs from logs...');
-
+  
+   async summarizeLogsForUser(userId: string, period: PeriodEnum) {
     // Duyet tung userId de tong hop log va luu vao db
     const userLogRequest: UserLogRequest = new UserLogRequest({
       userId,
@@ -136,6 +70,23 @@ export class LogHelper {
 
     console.log(`Successfully summarized logs for userId: ${userId}`);
   }
+  
+  async summarizeLogsForAllUsers(period: PeriodEnum) {
+    console.log('Fetching all user IDs from logs...');
+    // Lay tat ca userId co trong log
+    const userIds = await this.userLogService.getAllUserIdsFromLogs();
+    console.log(`Found ${userIds.length} unique user IDs.`);
+
+    // Duyet tung userId de tong hop log va luu vao db
+    for (const userId of userIds) {
+      await this.summarizeLogsForUser(userId, period);
+    }
+
+    console.log('Scheduled task completed: User logs summarized and saved.');
+  }
+
+ 
+
 
   async summarizeLogsPerWeek() {
     try {

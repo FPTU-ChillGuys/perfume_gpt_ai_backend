@@ -35,7 +35,7 @@ import {
 import { Cron } from '@nestjs/schedule';
 import { UserService } from 'src/infrastructure/servicies/user.service';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
-import { buildCombinedPromptV2 } from 'src/infrastructure/utils/prompt-builder';
+import { buildCombinedPromptV1, buildCombinedPromptV2 } from 'src/infrastructure/utils/prompt-builder';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -61,44 +61,19 @@ export class RecommendationController {
   ): Promise<BaseResponse<string>> {
     const endpoint = 'recommendation/repurchase/v2';
 
-    // Lấy user log chi tiết
-    const reportAndPromptSummary =
-      await this.userLogService.getReportAndPromptSummaryUserLogs(
-        userLogRequest
-      );
+    const combinedPromptResult = await buildCombinedPromptV2(
+      INSTRUCTION_TYPE_RECOMMENDATION,
+      this.userLogService,
+      this.orderService,
+      this.profileService,
+      this.adminInstructionService,
+      userLogRequest.userId,
+      process.env.PERFUME_GPT_API_TOKEN ?? ''
+    );
 
-    if (!reportAndPromptSummary.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get user logs',
-        {
-          userId: userLogRequest.userId,
-          service: 'UserLogService',
-          endpoint
-        }
-      );
-    }
 
-    // Lấy order report
-    const orderReport =
-      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userLogRequest.userId,
-        extractTokenFromHeader(request) ?? ''
-      );
-
-    // Check data empty
-    if (
-      isDataEmpty(reportAndPromptSummary.data?.prompt) &&
-      isDataEmpty(orderReport.data)
-    ) {
-      return Ok(INSUFFICIENT_DATA_MESSAGES.REPURCHASE);
-    }
-
-    // Combine prompts
-    const combinedPrompt = `${reportAndPromptSummary.data!.prompt}\n\n${orderReport.data ?? ''}`;
-
-    // Gọi AI 2 lần (summary + recommendation)
     const recommendation = await this.generateRepurchaseRecommendation(
-      combinedPrompt,
+      combinedPromptResult.data?.combinedPrompt ?? '',
       userLogRequest.userId,
       endpoint
     );
@@ -118,43 +93,19 @@ export class RecommendationController {
   ): Promise<BaseResponse<string>> {
     const endpoint = 'recommendation/repurchase/v1';
 
-    // Lấy user log summary (nhanh hơn V2)
-    const userLogResponse =
-      await this.userLogService.getUserLogSummaryReportByUserId(
-        userLogRequest.userId,
-        userLogRequest.startDate!,
-        userLogRequest.endDate!
-      );
-
-    if (!userLogResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get user logs',
-        {
-          userId: userLogRequest.userId,
-          service: 'UserLogService',
-          endpoint
-        }
-      );
-    }
-
-    // Lấy order report
-    const orderReport =
-      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userLogRequest.userId,
-        extractTokenFromHeader(request) ?? ''
-      );
-
-    // Check data empty
-    if (isDataEmpty(userLogResponse.data) && isDataEmpty(orderReport.data)) {
-      return Ok(INSUFFICIENT_DATA_MESSAGES.REPURCHASE);
-    }
-
-    // Combine prompts
-    const combinedPrompt = `${userLogResponse.data!}\n\n${orderReport.data ?? ''}`;
+    const combinedPromptResult = await buildCombinedPromptV1(
+      INSTRUCTION_TYPE_RECOMMENDATION,
+      this.userLogService,
+      this.orderService,
+      this.profileService,
+      this.adminInstructionService,
+      userLogRequest.userId,
+      process.env.PERFUME_GPT_API_TOKEN ?? ''
+    );
 
     // Gọi AI 2 lần (summary + recommendation)
     const recommendation = await this.generateRepurchaseRecommendation(
-      combinedPrompt,
+      combinedPromptResult.data?.combinedPrompt ?? '',
       userLogRequest.userId,
       endpoint
     );
@@ -247,16 +198,8 @@ export class RecommendationController {
     const { adminPrompt, systemPrompt } =
       await this.getRecommendationPrompts();
 
-    const summaryResponse = await this.callAI(
-      recommendationSummaryPrompt(userLogPrompt),
-      adminPrompt,
-      userLogRequest.userId,
-      endpoint,
-      'Failed to get AI summary'
-    );
-
     const recommendation = await this.callAI(
-      aiRecommendationPrompt(summaryResponse),
+      aiRecommendationPrompt(userLogPrompt),
       systemPrompt,
       userLogRequest.userId,
       endpoint,
@@ -389,16 +332,7 @@ export class RecommendationController {
   ): Promise<string> {
     const { adminPrompt } = await this.getRecommendationPrompts();
 
-    // Bước 1: Tạo summary
-    // const summary = await this.callAI(
-    //   combinedPrompt,
-    //   adminPrompt,
-    //   userId,
-    //   endpoint,
-    //   'Failed to get AI summary'
-    // );
-
-    // Bước 2: Tạo recommendation từ summary
+    // Tạo recommendation từ summary
     const recommendation = await this.callAI(
       combinedPrompt,
       adminPrompt,
@@ -498,15 +432,6 @@ export class RecommendationController {
         }
       );
     }
-
-    // Gọi AI 2 lần (summary + recommendation) 
-    // const summary = await this.callAI(
-    //   combinedPromptResult.data.combinedPrompt,
-    //   combinedPromptResult.data.adminInstruction ?? '',
-    //   userLogRequest.userId,
-    //   endpoint,
-    //   'Failed to get AI summary'
-    // );
 
     const recommendation = await this.callAI(
       combinedPromptResult.data.combinedPrompt,

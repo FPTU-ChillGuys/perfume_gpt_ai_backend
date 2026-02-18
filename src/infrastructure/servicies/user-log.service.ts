@@ -513,7 +513,7 @@ export class UserLogService {
     return response.data?.count! > 0;
   }
 
-  /** Kiem tra neu co log trong tuan khong bat dau tu chu nhat luc 23:59 */
+  /** Kiem tra neu co log trong thang khong */
   async isLogsFromLastMonth(userId: string): Promise<boolean> {
     const response = await this.getReportAndPromptSummaryUserLogs(
       new UserLogRequest({
@@ -529,7 +529,7 @@ export class UserLogService {
     return response.data?.count! > 0;
   }
 
-  /** Kiem tra neu co log trong tuan khong bat dau tu chu nhat luc 23:59 */
+  /** Kiem tra neu co log trong nam khong */
   async isLogsFromLastYear(userId: string): Promise<boolean> {
     const response = await this.getReportAndPromptSummaryUserLogs(
       new UserLogRequest({

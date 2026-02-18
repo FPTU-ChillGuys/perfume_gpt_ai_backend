@@ -18,8 +18,7 @@ export class LogHelper {
     private readonly adminInstructionService: AdminInstructionService
   ) {}
 
-  
-   async summarizeLogsForUser(userId: string, period: PeriodEnum) {
+  async summarizeLogsForUser(userId: string, period: PeriodEnum) {
     // Duyet tung userId de tong hop log va luu vao db
     const userLogRequest: UserLogRequest = new UserLogRequest({
       userId,
@@ -70,7 +69,7 @@ export class LogHelper {
 
     console.log(`Successfully summarized logs for userId: ${userId}`);
   }
-  
+
   async summarizeLogsForAllUsers(period: PeriodEnum) {
     console.log('Fetching all user IDs from logs...');
     // Lay tat ca userId co trong log
@@ -84,9 +83,6 @@ export class LogHelper {
 
     console.log('Scheduled task completed: User logs summarized and saved.');
   }
-
- 
-
 
   async summarizeLogsPerWeek() {
     try {
@@ -112,9 +108,9 @@ export class LogHelper {
     }
   }
 
-  async summarizeLogsPerWeekIfHasLog(userId: string) {
+  async summarizeLogsAtEndOfWeekIfHasLog(userId: string) {
     try {
-      if (!this.userLogService.isLogsFromLastWeek(userId)) {
+      if (!this.userLogService.isLogsFromLastWeek(userId) && this.isEndOfPeriod(new Date(), PeriodEnum.WEEKLY)) {
         await this.summarizeLogsForUser(userId, PeriodEnum.WEEKLY);
       }
     } catch (error) {
@@ -122,19 +118,40 @@ export class LogHelper {
     }
   }
 
-  async summarizeLogsPerMonthIfHasLog(userId: string) {
+  async summarizeLogsAtEndOfMonthIfHasLog(userId: string) {
     try {
-      await this.summarizeLogsForUser(userId, PeriodEnum.MONTHLY);
+      if (!this.userLogService.isLogsFromLastMonth(userId) && this.isEndOfPeriod(new Date(), PeriodEnum.MONTHLY)) {
+        await this.summarizeLogsForUser(userId, PeriodEnum.MONTHLY);
+      }
     } catch (error) {
       console.error('Error summarizing monthly logs:', error);
     }
   }
 
-  async summarizeLogsPerYearIfHasLog(userId: string) {
+  async summarizeLogsAtEndOfYearIfHasLog(userId: string) {
     try {
-      await this.summarizeLogsForUser(userId, PeriodEnum.YEARLY);
+      if (!this.userLogService.isLogsFromLastYear(userId) && this.isEndOfPeriod(new Date(), PeriodEnum.YEARLY)) {
+        await this.summarizeLogsForUser(userId, PeriodEnum.YEARLY);
+      }
     } catch (error) {
       console.error('Error summarizing yearly logs:', error);
+    }
+  }
+
+  isEndOfPeriod(date: Date, period: PeriodEnum): boolean {
+    const now = new Date();
+    switch (period) {
+      case PeriodEnum.WEEKLY:
+        return date.getDay() === 0; // Sunday
+      case PeriodEnum.MONTHLY:
+        return (
+          date.getDate() ===
+          new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+        ); // Last day of month
+      case PeriodEnum.YEARLY:
+        return date.getMonth() === 11 && date.getDate() === 31; // December 31st
+      default:
+        return false;
     }
   }
 }

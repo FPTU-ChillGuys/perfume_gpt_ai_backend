@@ -18,7 +18,7 @@ export class LogHelper {
     private readonly adminInstructionService: AdminInstructionService
   ) {}
 
-  async summarizeLogs(period: PeriodEnum) {
+  async summarizeLogsForAllUsers(period: PeriodEnum) {
     console.log('Running scheduled task to summarize user logs...');
 
     console.log('Fetching all user IDs from logs...');
@@ -81,9 +81,65 @@ export class LogHelper {
     console.log('Scheduled task completed: User logs summarized and saved.');
   }
 
+  async summarizeLogsForUser(userId: string, period: PeriodEnum) {
+    console.log('Running scheduled task to summarize user logs...');
+
+    console.log('Fetching all user IDs from logs...');
+
+    // Duyet tung userId de tong hop log va luu vao db
+    const userLogRequest: UserLogRequest = new UserLogRequest({
+      userId,
+      period: period,
+      endDate: new Date()
+    });
+
+    const response =
+      await this.userLogService.getReportAndPromptSummaryUserLogs(
+        userLogRequest
+      );
+
+    if (!response.success) {
+      console.log(`Failed to summarize logs for userId: ${userId}`);
+      return { success: false, error: 'Failed to summarize user logs' };
+    }
+
+    const logPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_LOG
+      );
+
+    // Summarize with AI
+    const aiResponse = await this.aiService.textGenerateFromPrompt(
+      response.data!.prompt,
+      logPrompt
+    );
+
+    // Lay ngay bat dau
+    const startDate =
+      convertToUTC(userLogRequest.startDate) ||
+      this.userLogService.getFirstDateOfPeriod(
+        userLogRequest.period!,
+        userLogRequest.endDate!
+      );
+
+    // Save summary to database
+    await this.userLogService.saveUserLogSummary(
+      userLogRequest.userId,
+      startDate,
+      userLogRequest.endDate!,
+      aiResponse.data || ''
+    );
+
+    if (!aiResponse.success) {
+      console.log(`Failed to get AI response for userId: ${userId}`);
+    }
+
+    console.log(`Successfully summarized logs for userId: ${userId}`);
+  }
+
   async summarizeLogsPerWeek() {
     try {
-      await this.summarizeLogs(PeriodEnum.WEEKLY);
+      await this.summarizeLogsForAllUsers(PeriodEnum.WEEKLY);
     } catch (error) {
       console.error('Error summarizing weekly logs:', error);
     }
@@ -91,7 +147,7 @@ export class LogHelper {
 
   async summarizeLogsPerMonth() {
     try {
-      await this.summarizeLogs(PeriodEnum.MONTHLY);
+      await this.summarizeLogsForAllUsers(PeriodEnum.MONTHLY);
     } catch (error) {
       console.error('Error summarizing monthly logs:', error);
     }
@@ -99,7 +155,33 @@ export class LogHelper {
 
   async summarizeLogsPerYear() {
     try {
-      await this.summarizeLogs(PeriodEnum.YEARLY);
+      await this.summarizeLogsForAllUsers(PeriodEnum.YEARLY);
+    } catch (error) {
+      console.error('Error summarizing yearly logs:', error);
+    }
+  }
+
+  async summarizeLogsPerWeekIfHasLog(userId: string) {
+    try {
+      if (!this.userLogService.isLogsFromLastWeek(userId)) {
+        await this.summarizeLogsForUser(userId, PeriodEnum.WEEKLY);
+      }
+    } catch (error) {
+      console.error('Error summarizing weekly logs:', error);
+    }
+  }
+
+  async summarizeLogsPerMonthIfHasLog(userId: string) {
+    try {
+      await this.summarizeLogsForUser(userId, PeriodEnum.MONTHLY);
+    } catch (error) {
+      console.error('Error summarizing monthly logs:', error);
+    }
+  }
+
+  async summarizeLogsPerYearIfHasLog(userId: string) {
+    try {
+      await this.summarizeLogsForUser(userId, PeriodEnum.YEARLY);
     } catch (error) {
       console.error('Error summarizing yearly logs:', error);
     }

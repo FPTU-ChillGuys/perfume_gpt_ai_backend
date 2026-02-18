@@ -13,7 +13,14 @@ import {
   AllUserLogRequest,
   UserLogRequest
 } from 'src/application/dtos/request/user-log.request';
-import { endOfDay, startOfDay } from 'date-fns';
+import {
+  endOfDay,
+  endOfMinute,
+  endOfMonth,
+  endOfWeek,
+  endOfYear,
+  startOfDay
+} from 'date-fns';
 import { convertToUTC } from '../utils/time-zone';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
@@ -183,7 +190,6 @@ export class UserLogService {
         const data = userLogSummaries.data
           .map((summary) => summary.logSummary)
           .join('\n');
-          
 
         // Tao report
         const report = `User Log Summary Report from ${startDate ? convertToUTC(startDate) : 'the beginning'} to ${
@@ -200,7 +206,9 @@ export class UserLogService {
   // Tong hop cac log cua user trong mot khoang thoi gian
   async getReportAndPromptSummaryUserLogs(
     userLogRequest: UserLogRequest
-  ): Promise<BaseResponse<{ prompt: string; response: string }>> {
+  ): Promise<
+    BaseResponse<{ prompt: string; response: string; count: number }>
+  > {
     return await funcHandlerAsync(
       async () => {
         // Xu ly neu khong co startDate thi lay theo period
@@ -285,7 +293,9 @@ export class UserLogService {
           endOfDay(convertToUTC(userLogRequest.endDate))
         );
 
-        return { success: true, data: { prompt, response } };
+        const count = searchLogs.length + messageLogs.length + quizLogs.length;
+
+        return { success: true, data: { prompt, response, count } };
       },
       'Failed to summarize user logs',
       true
@@ -485,5 +495,53 @@ export class UserLogService {
     } else {
       this.summaryCache.clear();
     }
+  }
+
+  /** Kiem tra neu co log trong tuan khong bat dau tu chu nhat luc 23:59 */
+  async isLogsFromLastWeek(userId: string): Promise<boolean> {
+    const response = await this.getReportAndPromptSummaryUserLogs(
+      new UserLogRequest({
+        userId,
+        period: PeriodEnum.WEEKLY,
+        endDate: endOfWeek(convertToUTC(new Date()))
+      })
+    );
+    if (!response.success) {
+      console.log(`Failed to get user logs for userId: ${userId}`);
+      return false;
+    }
+    return response.data?.count! > 0;
+  }
+
+  /** Kiem tra neu co log trong tuan khong bat dau tu chu nhat luc 23:59 */
+  async isLogsFromLastMonth(userId: string): Promise<boolean> {
+    const response = await this.getReportAndPromptSummaryUserLogs(
+      new UserLogRequest({
+        userId,
+        period: PeriodEnum.MONTHLY,
+        endDate: endOfMonth(convertToUTC(new Date()))
+      })
+    );
+    if (!response.success) {
+      console.log(`Failed to get user logs for userId: ${userId}`);
+      return false;
+    }
+    return response.data?.count! > 0;
+  }
+
+  /** Kiem tra neu co log trong tuan khong bat dau tu chu nhat luc 23:59 */
+  async isLogsFromLastYear(userId: string): Promise<boolean> {
+    const response = await this.getReportAndPromptSummaryUserLogs(
+      new UserLogRequest({
+        userId,
+        period: PeriodEnum.YEARLY,
+        endDate: endOfYear(convertToUTC(new Date()))
+      })
+    );
+    if (!response.success) {
+      console.log(`Failed to get user logs for userId: ${userId}`);
+      return false;
+    }
+    return response.data?.count! > 0;
   }
 }

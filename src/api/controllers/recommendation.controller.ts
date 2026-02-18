@@ -35,7 +35,11 @@ import {
 import { Cron } from '@nestjs/schedule';
 import { UserService } from 'src/infrastructure/servicies/user.service';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
-import { buildCombinedPromptV1, buildCombinedPromptV2 } from 'src/infrastructure/utils/prompt-builder';
+import {
+  buildCombinedPromptV1,
+  buildCombinedPromptV2
+} from 'src/infrastructure/utils/prompt-builder';
+import { EmailService } from 'src/infrastructure/servicies/mail.service';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -46,7 +50,8 @@ export class RecommendationController {
     private readonly userService: UserService,
     private readonly orderService: OrderService,
     private readonly profileService: ProfileService,
-    private readonly adminInstructionService: AdminInstructionService
+    private readonly adminInstructionService: AdminInstructionService,
+    private readonly emailService: EmailService
   ) {}
 
   /** Gợi ý mua lại V2 - Dùng log chi tiết từ user log service */
@@ -70,7 +75,6 @@ export class RecommendationController {
       userLogRequest.userId,
       process.env.PERFUME_GPT_API_TOKEN ?? ''
     );
-
 
     const recommendation = await this.generateRepurchaseRecommendation(
       combinedPromptResult.data?.combinedPrompt ?? '',
@@ -195,8 +199,7 @@ export class RecommendationController {
     const userLogPrompt = `Here is the summary of user logs:\n${summaryReport.data!}`;
 
     // Gọi AI với summary prompt wrapper
-    const { adminPrompt, systemPrompt } =
-      await this.getRecommendationPrompts();
+    const { adminPrompt, systemPrompt } = await this.getRecommendationPrompts();
 
     const recommendation = await this.callAI(
       aiRecommendationPrompt(userLogPrompt),
@@ -383,7 +386,12 @@ export class RecommendationController {
     const userIds = await this.userLogService.getAllUserIdsFromLogs();
     for (const userId of userIds) {
       try {
-        const email = await this.userService.getEmailById(userId);
+        const emailResponse = await this.userService.getEmailById(userId);
+        if (!emailResponse.success) {
+          console.error(`Failed to get email for user ${userId}`);
+          continue;
+        }
+        const email = emailResponse.payload!;
         // Gọi hàm tạo recommendation (có thể tái sử dụng hàm repurchaseRecommendationV2 hoặc aiRecommendationV1)
         // Sau đó gửi email cho user với recommendation
         // Ví dụ: await this.emailService.sendRecommendationEmail(email, recommendationData);
@@ -392,6 +400,19 @@ export class RecommendationController {
           startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Lấy log trong 7 ngày qua
           endDate: new Date()
         } as UserLogRequest);
+
+        if (!recommendationData.success) {
+          console.error(`Failed to generate recommendation for user ${userId}`);
+          continue;
+        }
+
+        const recommendationText = recommendationData.data ?? '';
+
+        await this.emailService.sendEmail(
+          email.toString(),
+          'Daily Recommendation',
+          recommendationText
+        );
       } catch (error) {
         // Log lỗi nếu có
         console.error(

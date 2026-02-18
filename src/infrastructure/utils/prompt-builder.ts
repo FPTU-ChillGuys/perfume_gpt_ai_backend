@@ -83,7 +83,8 @@ export async function buildCombinedPromptV1(
 
   const combinedPrompt = `${userLogPromptText}\n\n
     Order Report:\n${orderReportPrompt(orderReportData)}\n\n
-    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''}`;
+    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? 
+    `\n\nAdmin Instructions:\n${adminInstruction}` : ''}`;
 
   return {
     success: true,
@@ -159,7 +160,8 @@ export async function buildCombinedPromptV2(
 
   const combinedPrompt = `${userLogData}\n\n
     Order Report:\n${orderReportPrompt(orderReportData)}\n\n
-    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''}`;
+    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? 
+    `\n\nAdmin Instructions:\n${adminInstruction}` : ''}`;
 
   return {
     success: true,

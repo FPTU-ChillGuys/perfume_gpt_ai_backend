@@ -142,10 +142,7 @@ export class ConversationService {
           populate: ['messages']
         });
 
-        const response = ConversationMapper.toResponseList(
-          conversations,
-          true
-        );
+        const response = ConversationMapper.toResponseList(conversations, true);
 
         return { success: true, data: response };
       },
@@ -171,15 +168,13 @@ export class ConversationService {
           where.userId = request.userId;
         }
 
-        const [conversations, totalCount] = await this.unitOfWork.AIConversationRepo.findAndCount(
-          where,
-          {
+        const [conversations, totalCount] =
+          await this.unitOfWork.AIConversationRepo.findAndCount(where, {
             populate: ['messages'],
             limit: pageSize,
             offset: (pageNumber - 1) * pageSize,
             orderBy: { createdAt: 'DESC' }
-          }
-        );
+          });
 
         const items = ConversationMapper.toResponseList(conversations, true);
         const totalPages = Math.ceil(totalCount / pageSize);
@@ -197,5 +192,18 @@ export class ConversationService {
       'Failed to get paginated conversations',
       true
     );
+  }
+
+  public async saveOrUpdateConversation(
+    conversation: ConversationDto
+  ): Promise<void> {
+    if (!(await this.isExistConversation(conversation.id || ''))) {
+      await this.addConversation(conversation);
+    } else {
+      await this.updateMessageToConversation(
+        conversation.id!,
+        conversation.messages || []
+      );
+    }
   }
 }

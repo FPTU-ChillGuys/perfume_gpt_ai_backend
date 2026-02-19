@@ -60,6 +60,12 @@ import {
   buildCombinedPromptV1,
   buildCombinedPromptV2
 } from 'src/infrastructure/utils/prompt-builder';
+import { InjectQueue } from '@nestjs/bullmq';
+import {
+  ConversationJobName,
+  QueueName
+} from 'src/application/constant/processor';
+import { Queue } from 'bullmq';
 
 @ApiTags('Conversation')
 @Controller('conversation')
@@ -70,7 +76,9 @@ export class ConversationController {
     private logService: UserLogService,
     private orderService: OrderService,
     private profileService: ProfileService,
-    private adminInstructionService: AdminInstructionService
+    private adminInstructionService: AdminInstructionService,
+    @InjectQueue(QueueName.CONVERSATION_QUEUE)
+    private readonly conversationQueue: Queue
   ) {}
 
   /** Lấy tất cả cuộc hội thoại */
@@ -676,7 +684,9 @@ export class ConversationController {
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 
-    await this.saveOrUpdateConversation(responseConversation);
+    await this.conversationService.saveOrUpdateConversation(
+      responseConversation
+    );
 
     return Ok(responseConversation);
   }
@@ -755,7 +765,94 @@ export class ConversationController {
       addMessageToMessages(message.data || '', conversation.messages || [])
     );
 
-    await this.saveOrUpdateConversation(responseConversation);
+    await this.conversationService.saveOrUpdateConversation(
+      responseConversation
+    );
+
+    return Ok(responseConversation);
+  }
+
+  /**
+   * Chat V5 - Dựa trên V4 nhưng sử dụng nestjs/bull để xử lý log và AI response trong background job, tránh timeout cho user.
+   * Logic tương tự V2 nhưng sử dụng buildCombinedPromptV2 helper.
+   * @note userId được lấy từ JWT token. Guest (không có token) sẽ không lấy log/order/profile.
+   */
+  @Public()
+  @Post('chat/v5')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({
+    summary:
+      'Chat V5 - Common helper + log chi tiết (có token: userId+profile+order, guest: không lấy log)'
+  })
+  @ApiBaseResponse(ConversationRequestDto)
+  async conversationV5(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    const userId =
+      getTokenPayloadFromRequest(request)?.id ?? conversation.userId;
+    const convertedMessages: UIMessage[] = convertToMessages(
+      conversation.messages || []
+    );
+
+    // Dùng common helper thay vì code trùng lặp
+    const promptResult = await buildCombinedPromptV2(
+      INSTRUCTION_TYPE_CONVERSATION,
+      this.logService,
+      this.orderService,
+      this.profileService,
+      this.adminInstructionService,
+      userId,
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'PromptBuilder',
+          endpoint: 'chat/v4'
+        }
+      );
+    }
+
+    // Call AI service
+    const message = await this.aiService.textGenerateFromMessages(
+      convertedMessages,
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      ),
+      Output.object(searchOutput)
+    );
+
+    if (!message.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'AIService',
+          endpoint: 'chat/v4'
+        }
+      );
+    }
+
+    // Lưu conversation
+    const responseConversation = overrideMessagesToConversation(
+      conversation.id || '',
+      userId || '',
+      addMessageToMessages(message.data || '', conversation.messages || [])
+    );
+
+    await this.conversationQueue.add(
+      ConversationJobName.ADD_MESSAGE_AND_LOG,
+      responseConversation
+    );
+
+    // await this.conversationService.saveOrUpdateConversation(responseConversation);
 
     return Ok(responseConversation);
   }
@@ -890,26 +987,5 @@ export class ConversationController {
     }
 
     return Ok(message.data);
-  }
-
-  /**
-   * Helper: Lưu hoặc cập nhật conversation vào DB.
-   * Giảm code trùng lặp giữa các endpoint chat.
-   */
-  private async saveOrUpdateConversation(
-    conversation: ConversationDto
-  ): Promise<void> {
-    if (
-      !(await this.conversationService.isExistConversation(
-        conversation.id || ''
-      ))
-    ) {
-      await this.conversationService.addConversation(conversation);
-    } else {
-      await this.conversationService.updateMessageToConversation(
-        conversation.id!,
-        conversation.messages || []
-      );
-    }
   }
 }

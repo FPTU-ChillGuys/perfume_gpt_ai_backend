@@ -25,7 +25,8 @@
     "test:integration": "jest --config ./test/jest-integration.json --runInBand",
     "test:integration:watch": "jest --config ./test/jest-integration.json --runInBand --watch",
     "test:integration:cov": "jest --config ./test/jest-integration.json --runInBand --coverage",
-    "test:integration:setup": "node test/integration/helpers/create-test-db.js"
+    "test:integration:setup": "node test/integration/helpers/create-test-db.js",
+    "bullmq:delete-all-jobs": "ts-node scripts/bullScript.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.13",

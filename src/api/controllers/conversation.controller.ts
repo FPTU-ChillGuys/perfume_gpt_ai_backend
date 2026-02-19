@@ -849,7 +849,7 @@ export class ConversationController {
 
     await this.conversationQueue.add(
       ConversationJobName.ADD_MESSAGE_AND_LOG,
-      responseConversation
+      responseConversation  
     );
 
     // await this.conversationService.saveOrUpdateConversation(responseConversation);

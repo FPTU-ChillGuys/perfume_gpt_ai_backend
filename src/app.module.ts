@@ -44,7 +44,7 @@ import { BullModule } from '@nestjs/bullmq';
           algorithms: ['RS256'],
           issuer: config.get<string>('JWT_ISSUER'),
           audience: config.get<string>('JWT_AUDIENCE')
-        }
+        },
       })
     }),
     ScheduleModule.forRoot(),

@@ -36,6 +36,7 @@ export default async function mikroConfig(): Promise<PostgreSqlOptions> {
     migrations: {
       path: './dist/migrations',
       pathTs: './src/migrations'
-    }
+    },
+    allowGlobalContext: true
   };
 }

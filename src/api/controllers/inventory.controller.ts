@@ -21,7 +21,6 @@ import { inventoryReportPrompt, INSTRUCTION_TYPE_INVENTORY } from 'src/applicati
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
-@Public()
 @Role('admin')
 @ApiTags('Inventory')
 @ApiBearerAuth('jwt')

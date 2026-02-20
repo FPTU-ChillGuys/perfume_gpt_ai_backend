@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { Public } from 'src/application/common/Metadata';
+import { Public, Role } from 'src/application/common/Metadata';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import {
   AllUserLogRequest,
@@ -25,6 +25,7 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { LogHelper } from './helper/logHelper.controller';
 
+@Role('admin')
 @ApiTags('Logs')
 @Controller('logs')
 export class LogController extends LogHelper {
@@ -37,7 +38,6 @@ export class LogController extends LogHelper {
   }
 
   /** Lấy báo cáo log hoạt động người dùng */
-  @Public()
   @Get('report/activity')
   @ApiOperation({ summary: 'Lấy báo cáo log hoạt động người dùng' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
@@ -70,7 +70,6 @@ export class LogController extends LogHelper {
   }
 
   /** Tóm tắt log người dùng bằng AI */
-  @Public()
   @Get('summarize')
   @ApiOperation({ summary: 'Tóm tắt log người dùng bằng AI' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
@@ -145,7 +144,6 @@ export class LogController extends LogHelper {
   }
 
   /** Tóm tắt log của tất cả người dùng bằng AI (chú ý: có thể mất thời gian và không lưu vào DB) */
-  @Public()
   @Get('summarize/all')
   @ApiOperation({ summary: 'Tóm tắt log tất cả người dùng bằng AI' })
   @ApiQuery({
@@ -208,7 +206,6 @@ export class LogController extends LogHelper {
     return Ok('Scheduled task completed.');
   }
 
-  @Public()
   @Get('summarize/weekly/manual')
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tuần (thủ công)' })
   @ApiBaseResponse(String)
@@ -217,7 +214,6 @@ export class LogController extends LogHelper {
     return Ok('Manual log summarization completed.');
   }
 
-  @Public()
   @Get('summarize/month/manual')
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tháng (thủ công)' })
   @ApiBaseResponse(String)
@@ -226,8 +222,6 @@ export class LogController extends LogHelper {
     return Ok('Manual log summarization completed.');
   }
   
-
-  @Public()
   @Get('summarize/year/manual')
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng năm (thủ công)' })
   @ApiBaseResponse(String)
@@ -238,7 +232,6 @@ export class LogController extends LogHelper {
 
 
   /** Xem chi tiết các bản tóm tắt log người dùng */
-  @Public()
   @Get('summaries')
   @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng' })
   @ApiQuery({ name: 'userId', type: String })
@@ -259,7 +252,6 @@ export class LogController extends LogHelper {
   }
 
   /** Xem báo cáo tóm tắt log người dùng theo ID */
-  @Public()
   @Get('report/summary')
   @ApiOperation({ summary: 'Xem báo cáo tóm tắt log người dùng theo ID' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
@@ -280,7 +272,6 @@ export class LogController extends LogHelper {
   }
 
   /** Tạo bản tóm tắt log người dùng thủ công */
-  @Public()
   @Post()
   @ApiOperation({ summary: 'Tạo bản tóm tắt log người dùng thủ công' })
   @ApiBody({ type: UserLogSummaryRequest })

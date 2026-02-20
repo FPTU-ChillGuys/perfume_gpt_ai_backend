@@ -44,7 +44,9 @@ import {
 } from 'src/infrastructure/utils/insufficient-data';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { Role } from 'src/application/common/Metadata';
 
+@Role('admin')
 @ApiTags('Orders')
 @ApiBearerAuth('jwt')
 @ApiUnauthorizedResponse({

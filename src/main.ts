@@ -49,10 +49,10 @@ async function bootstrap() {
         `- Các endpoint **không có biểu tượng 🔒** là **public**, không cần token.\n` +
         `- Các endpoint **có biểu tượng 🔒** yêu cầu **Bearer JWT token** trong header \`Authorization\`.\n` +
         `- Một số endpoint yêu cầu role **admin** — sẽ trả về **403 Forbidden** nếu không đủ quyền.\n\n` +
-        `## Cách sử dụng\n` +
-        `1. Click nút **Authorize** (hoặc biểu tượng 🔒) ở trên.\n` +
-        `2. Nhập JWT token (không cần prefix "Bearer ").\n` +
-        `3. Các request sẽ tự động gửi kèm token.`
+        `## Cách xác thực trong Scalar\n` +
+        `1. Tìm phần **Authentication** ở đầu trang hoặc click biểu tượng 🔒 cạnh endpoint.\n` +
+        `2. Chọn scheme **Bearer Token** và nhập JWT token vào ô **Token**.\n` +
+        `3. Các request sẽ tự động gửi kèm header \`Authorization: Bearer <token>\`.`
     )
     .setVersion('1.0.0')
     .addBearerAuth(

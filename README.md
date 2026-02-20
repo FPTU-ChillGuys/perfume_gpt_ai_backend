@@ -1224,7 +1224,7 @@ curl -X POST -H "Authorization: Bearer <admin_token>" \
 
 5. **Admin Instructions:** Hầu hết các endpoint AI đều hỗ trợ Admin Instructions — cho phép admin tùy chỉnh hành vi AI qua API thay vì sửa code.
 
-6. **Swagger / API Reference:** Truy cập `http://localhost:3000/reference` để xem Scalar API docs với đầy đủ schema, parameters, response types.
+6. **API Reference (Scalar):** Truy cập `http://localhost:3000/reference` để xem Scalar API docs với đầy đủ schema, parameters, response types. Để xác thực, tìm phần **Bearer Token** trong trang và nhập JWT token vào ô **Token** — Scalar sẽ tự động gửi kèm header `Authorization: Bearer <token>` cho tất cả request sau đó.
 
 ---
 

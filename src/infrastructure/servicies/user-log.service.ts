@@ -238,7 +238,7 @@ export class UserLogService {
         });
 
         //Lay noi dung tim kiem
-        const searchContents = searchLogs.map((log) => log.content).join('; ');
+        const searchContents = "Search: " + searchLogs.map((log) => log.content).join(';\n');
 
         //Lay log tin nhan cua user trong khoang thoi gian
         const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
@@ -250,9 +250,9 @@ export class UserLogService {
         });
 
         // Lay noi dung tin nhan
-        const messageContents = messageLogs
+        const messageContents = "Messages: " + messageLogs
           .map((log) => log.message?.message)
-          .join('; ');
+          .join(';\n');
 
         // Lay log quiz cua user trong khoang thoi gian
         const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
@@ -331,7 +331,7 @@ export class UserLogService {
         });
 
         //Lay noi dung tim kiem
-        const searchContents = searchLogs.map((log) => log.content).join('; ');
+        const searchContents = "Search: " + searchLogs.map((log) => log.content).join(';\n');
 
         //Lay log tin nhan cua user trong khoang thoi gian
         const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
@@ -343,9 +343,9 @@ export class UserLogService {
         });
 
         // Lay noi dung tin nhan
-        const messageContents = messageLogs
+        const messageContents = "Messages: " + messageLogs
           .map((log) => log.message?.message)
-          .join('; ');
+          .join(';\n');
 
         // Lay log quiz cua user trong khoang thoi gian
         const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {

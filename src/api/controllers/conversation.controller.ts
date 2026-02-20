@@ -782,7 +782,7 @@ export class ConversationController {
   @ApiBearerAuth('jwt')
   @ApiOperation({
     summary:
-      'Chat V5 - Common helper + log chi tiết (có token: userId+profile+order, guest: không lấy log)'
+      'Chat V5 - Common helper + log tom tat (có token: userId+profile+order, guest: không lấy log)'
   })
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV5(

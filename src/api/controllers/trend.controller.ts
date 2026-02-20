@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Post } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
@@ -25,12 +25,12 @@ export class TrendController {
 
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
   @Public()
-  @Post('summary')
+  @Get('summary')
   @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
   @ApiBaseResponse(String)
   @ApiBody({ type: AllUserLogRequest })
   async summarizeLogs(
-    @Body() allUserLogRequest: AllUserLogRequest
+    @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<string>> {
     const reportAndPromptSummary =
       await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
@@ -87,12 +87,12 @@ export class TrendController {
    * Dự đoán xu hướng có cấu trúc - Trả về metadata bổ sung (thời gian xử lý, khoảng thời gian phân tích).
    */
   @Public()
-  @Post('summary/structured')
+  @Get('summary/structured')
   @ApiOperation({ summary: 'Dự đoán xu hướng có cấu trúc với metadata' })
   @ApiBaseResponse(AITrendForecastStructuredResponse)
   @ApiBody({ type: AllUserLogRequest })
   async summarizeLogsStructured(
-    @Body() allUserLogRequest: AllUserLogRequest
+    @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<AITrendForecastStructuredResponse>> {
     const startTime = Date.now();
 

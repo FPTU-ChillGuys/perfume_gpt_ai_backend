@@ -209,13 +209,33 @@ export class LogController extends LogHelper {
   }
 
   @Public()
-  @Get('summarize/weekly')
+  @Get('summarize/weekly/manual')
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tuần (thủ công)' })
   @ApiBaseResponse(String)
   async summaryLogsPerWeekManually(): Promise<BaseResponse<string>> {
     await this.summarizeLogsPerWeek();
     return Ok('Manual log summarization completed.');
   }
+
+  @Public()
+  @Get('summarize/month/manual')
+  @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tháng (thủ công)' })
+  @ApiBaseResponse(String)
+  async summaryLogsPerMonthManually(): Promise<BaseResponse<string>> {
+    await this.summarizeLogsPerMonth();
+    return Ok('Manual log summarization completed.');
+  }
+  
+
+  @Public()
+  @Get('summarize/year/manual')
+  @ApiOperation({ summary: 'Tóm tắt log người dùng hàng năm (thủ công)' })
+  @ApiBaseResponse(String)
+  async summaryLogsPerYearManually(): Promise<BaseResponse<string>> {
+    await this.summarizeLogsPerYear();
+    return Ok('Manual log summarization completed.');
+  }
+
 
   /** Xem chi tiết các bản tóm tắt log người dùng */
   @Public()

@@ -26,7 +26,7 @@ export class ConversationProcessor extends WorkerHost {
             console.log('Processing conversation job with data:', job.data);
             await this.conversationService.saveOrUpdateConversation(job.data.responseConversation);
             console.log('Conversation saved successfully for job:', job.id);
-            // await this.userLogService.overrideWeeklyLogSummaryByUserId(job.data.userId);
+            await this.userLogService.overrideWeeklyLogSummaryByUserId(job.data.userId);
             console.log('User log summary updated successfully for user:', job.data.userId);
             break;
         default:

@@ -33,6 +33,7 @@
   - [12. TrendController](#12-trendcontroller)
   - [13. RecommendationController](#13-recommendationcontroller)
   - [14. AIController](#14-aicontroller)
+  - [15. EmailController](#15-emailcontroller)
   - [Ghi chú chung về Controller](#ghi-chú-chung-về-controller)
 
 ---
@@ -278,7 +279,7 @@ Hệ thống **Admin Instructions** cho phép admin quản lý các chỉ thị 
 | `review`         | Hướng dẫn tóm tắt đánh giá sản phẩm        | `GET /reviews/summary/*`                 |
 | `order`          | Hướng dẫn phân tích đơn hàng                | `GET /orders/summary/ai*`                |
 | `inventory`      | Hướng dẫn báo cáo tồn kho                   | `GET /inventory/report/ai*`              |
-| `trend`          | Hướng dẫn dự đoán xu hướng                  | `POST /trends/summary*`                  |
+| `trend`          | Hướng dẫn dự đoán xu hướng                  | `GET /trends/summary*`                   |
 | `recommendation` | Hướng dẫn gợi ý sản phẩm                    | `POST /recommendation/*`                 |
 | `log`            | Hướng dẫn tóm tắt log hoạt động             | `GET /logs/summarize*`                   |
 | `conversation`   | Hướng dẫn chatbot tư vấn                    | `POST /conversation/*`                   |
@@ -487,14 +488,17 @@ Backend cung cấp các exception classes với support cho `detail` field:
 1. **Success responses:** Tất cả success cases đã được refactor để dùng `Ok()` helper thay vì manual object literals
 2. **Error responses:** Đang trong quá trình refactor từ `return { success: false, error: '...' }` sang `throw CustomException(...)`
 
-**Controllers đã áp dụng exception pattern:**
+**Tất cả controllers đã áp dụng exception pattern (47 conversions):**
 - ✅ **QuizController** - Tất cả errors throw exceptions với context detail
 - ✅ **LogController** - HTTP endpoints throw exceptions (cron jobs giữ nguyên return)
 - ✅ **AIController** - AI service failures throw `InternalServerErrorWithDetailsException`
 - ✅ **ProfileController** - External service failures throw exceptions
 - ✅ **InventoryController** - AI and service failures throw exceptions
-
-**Controllers còn lại:** ConversationController, TrendController, ReviewController, RecommendationController, OrderController đang sử dụng mix pattern (một số throw exceptions, một số return error objects).
+- ✅ **ConversationController** - 16 exceptions với context (userId, conversationId, service, endpoint)
+- ✅ **TrendController** - 6 exceptions với context (service, period, endpoint)
+- ✅ **ReviewController** - 6 exceptions với context (variantId, service, endpoint)
+- ✅ **RecommendationController** - 15 exceptions với context (userId, service, endpoint)
+- ✅ **OrderController** - 4 exceptions với context (userId, service, endpoint)
 
 **Best practices khi implement endpoints mới:**
 
@@ -549,7 +553,7 @@ Backend cung cấp các exception classes với support cho `detail` field:
 
 ## Chi tiết các Controller
 
-Hệ thống gồm **14 controller** chia thành 3 nhóm theo quyền truy cập:
+Hệ thống gồm **15 controller** chia thành 3 nhóm theo quyền truy cập:
 
 ### Bảng tổng quan
 
@@ -560,20 +564,23 @@ Hệ thống gồm **14 controller** chia thành 3 nhóm theo quyền truy cập
 | [AIAcceptanceController](#3-aiacceptancecontroller) | `/ai-acceptance` | 🔒 JWT | — | 5 |
 | [OrderController](#4-ordercontroller) | `/orders` | 🔒 JWT | — | 4 |
 | [InventoryController](#5-inventorycontroller) | `/inventory` | ⚠️ Public (xem lưu ý) | `admin` (không hoạt động) | 5 |
-| [ConversationController](#6-conversationcontroller) | `/conversation` | Hỗn hợp | `admin` (một số endpoint) | 13 |
+| [ConversationController](#6-conversationcontroller) | `/conversation` | Hỗn hợp | `admin` (một số endpoint) | 15 |
 | [ProductController](#7-productcontroller) | `/products` | 🌐 Public | — | 2 |
 | [ProfileController](#8-profilecontroller) | `/profile` | 🌐 Public | — | 2 |
 | [ReviewController](#9-reviewcontroller) | `/reviews` | 🌐 Public | — | 4 |
 | [QuizController](#10-quizcontroller) | `/quizzes` | 🌐 Public | — | 8 |
-| [LogController](#11-logcontroller) | `/logs` | 🌐 Public | — | 6 (+2 cron) |
-| [TrendController](#12-trendcontroller) | `/trends` | 🌐 Public | — | 2 |
+| [LogController](#11-logcontroller) | `/logs` | 🌐 Public | — | 9 (+3 cron) |
+| [TrendController](#12-trendcontroller) | `/trends` | 🔒 JWT | `admin` | 2 |
 | [RecommendationController](#13-recommendationcontroller) | `/recommendation` | 🌐 Public | — | 5 |
 | [AIController](#14-aicontroller) | `/ai` | 🌐 Public | — | 1 |
+| [EmailController](#15-emailcontroller) | `/email` | 🔒 JWT | `admin` | 1 |
 
 > **Ký hiệu:**
 > - 🔒 = Yêu cầu Bearer JWT token
 > - 🌐 = Truy cập tự do, không cần token
 > - ⚠️ = Có vấn đề cần lưu ý
+
+> **Lưu ý về số endpoint:** TrendController và EmailController yêu cầu role `admin` mặc dù được liệt kê trong nhóm protected.
 
 ---
 
@@ -791,8 +798,12 @@ Controller phức tạp nhất — quản lý chatbot AI tư vấn nước hoa. 
 | `POST` | `/conversation/chat/v2` | Chat V2 — dùng log chi tiết (chậm hơn, đầy đủ hơn) | 🌐 Public (JWT tùy chọn) |
 | `POST` | `/conversation/chat/v3` | Chat V3 — cải thiện V1, dùng common helper | 🌐 Public (JWT tùy chọn) |
 | `POST` | `/conversation/chat/v4` | Chat V4 — cải thiện V2, dùng common helper | 🌐 Public (JWT tùy chọn) |
+| `POST` | `/conversation/chat/v5` | Chat V5 — dùng bull queue + log tóm tắt (xử lý background) | 🌐 Public (JWT tùy chọn) |
+| `POST` | `/conversation/chat/v6` | Chat V6 — dùng bull queue + log chi tiết (xử lý background) | 🌐 Public (JWT tùy chọn) |
 
 > **Lưu ý về userId:** `userId` không cần truyền trong request body nữa — hệ thống tự động lấy từ JWT token (`getTokenPayloadFromRequest`). Guest (không có token) sẽ không được lấy log/order/profile.
+>
+> **V5/V6** sử dụng NestJS Bull queue để xử lý việc lưu conversation và log trong background job, giúp tránh timeout cho user. **Khuyến nghị:** Dùng V5 (log tóm tắt, nhanh) hoặc V6 (log chi tiết, đầy đủ hơn) trong production.
 
 #### Endpoint Test (Public, hỗ trợ JWT tùy chọn)
 
@@ -839,8 +850,9 @@ curl -X POST -H "Authorization: Bearer <user_token>" \
 | 500 | Backend .NET down (khi lấy profile/orders), AI service error (OpenAI API error), lỗi database | `{ "success": false, "error": "Internal server error", "statusCode": 500 }` |
 
 > **Lưu ý:**
-> - **V1/V3** dùng log tóm tắt (nhanh, phụ thuộc vào chất lượng tóm tắt). **V2/V4** dùng log chi tiết (chậm hơn, đầy đủ hơn).
-> - **V3/V4** là phiên bản cải thiện của V1/V2, dùng `buildCombinedPromptV1/V2` helper, giảm code trùng lặp. **Khuyến nghị sử dụng V3/V4.**
+> - **V1/V3/V5** dùng log tóm tắt (nhanh, phụ thuộc vào chất lượng tóm tắt). **V2/V4/V6** dùng log chi tiết (chậm hơn, đầy đủ hơn).
+> - **V3/V4** cải thiện V1/V2 bằng `buildCombinedPromptV1/V2` helper, giảm code trùng lặp.
+> - **V5/V6** cải thiện V3/V4 bằng Bull queue — lưu conversation và log trong background, tránh timeout. **Khuyến nghị sử dụng V5/V6 trong production.**
 > - `userId` **không cần truyền trong request** nữa — hệ thống tự động lấy từ JWT token. Nếu có **Bearer token** → AI lấy thêm profile + order history + user log. Nếu không có token (guest) → **không lấy log/order/profile** (vì guest không có log).
 > - **Guarded test endpoint** yêu cầu admin token. userId cũng được lấy từ token.
 > - Conversation được tự động lưu vào DB (tạo mới hoặc cập nhật nếu đã tồn tại).
@@ -1008,16 +1020,20 @@ Quản lý log hoạt động người dùng — thu thập, tóm tắt bằng A
 | `GET` | `/logs/report/activity` | Lấy báo cáo log hoạt động (raw text) | 🌐 Public |
 | `GET` | `/logs/summarize` | Tóm tắt log bằng AI và lưu vào DB | 🌐 Public |
 | `GET` | `/logs/summarize/all` | Tóm tắt log tất cả user bằng AI (không lưu DB) | 🌐 Public |
+| `GET` | `/logs/summarize/weekly/manual` | Trigger thủ công cron job tóm tắt tuần | 🌐 Public |
+| `GET` | `/logs/summarize/month/manual` | Trigger thủ công cron job tóm tắt tháng | 🌐 Public |
+| `GET` | `/logs/summarize/year/manual` | Trigger thủ công cron job tóm tắt năm | 🌐 Public |
 | `GET` | `/logs/summaries?userId=&startDate=&endDate=` | Xem các bản tóm tắt đã lưu | 🌐 Public |
 | `GET` | `/logs/report/summary?userId=&startDate=&endDate=` | Xem báo cáo tóm tắt theo userId | 🌐 Public |
 | `POST` | `/logs` | Tạo bản tóm tắt log thủ công | 🌐 Public |
 
 **Cron Jobs (tự động):**
 
-| Schedule | Mô tả |
-|----------|-------|
-| Mỗi tuần (`EVERY_WEEK`) | Tóm tắt log tất cả user theo tuần và lưu DB |
-| Mỗi ngày 10:00 AM (`EVERY_DAY_AT_10AM`) | Tóm tắt log tất cả user theo ngày và lưu DB |
+| Schedule | Endpoint thủ công | Mô tả |
+|----------|-------------------|-------|
+| Mỗi tuần (`EVERY_WEEK`) | `GET /logs/summarize/weekly/manual` | Tóm tắt log tất cả user theo tuần và lưu DB |
+| Mỗi tháng | `GET /logs/summarize/month/manual` | Tóm tắt log tất cả user theo tháng và lưu DB |
+| Mỗi năm | `GET /logs/summarize/year/manual` | Tóm tắt log tất cả user theo năm và lưu DB |
 
 **Cách sử dụng:**
 ```bash
@@ -1047,20 +1063,19 @@ curl "http://localhost:3000/logs/summaries?userId=<userId>&startDate=2025-01-01&
 
 ### 12. TrendController
 
-**Route:** `/trends` | **Auth:** 🌐 Public | **Tag Swagger:** `Trends`
+**Route:** `/trends` | **Auth:** 🔒 JWT + Role `admin` | **Tag Swagger:** `Trends`
 
 Dự đoán xu hướng nước hoa dựa trên tổng hợp log hoạt động của tất cả người dùng.
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| `POST` | `/trends/summary` | Dự đoán xu hướng bằng AI (text) | 🌐 Public |
-| `POST` | `/trends/summary/structured` | Dự đoán xu hướng AI có cấu trúc (JSON + metadata) | 🌐 Public |
+| `GET` | `/trends/summary` | Dự đoán xu hướng bằng AI (text) | 🔒 admin |
+| `GET` | `/trends/summary/structured` | Dự đoán xu hướng AI có cấu trúc (JSON + metadata) | 🔒 admin |
 
 **Cách sử dụng:**
 ```bash
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"period":"monthly","endDate":"2025-02-10"}' \
-  http://localhost:3000/trends/summary
+curl -H "Authorization: Bearer <admin_token>" \
+  "http://localhost:3000/trends/summary?period=monthly&endDate=2025-02-10"
 ```
 
 **HTTP Status Codes:**
@@ -1073,6 +1088,8 @@ curl -X POST -H "Content-Type: application/json" \
 | 500 | AI service error (OpenAI API error), lỗi database | `{ "success": false, "error": "Internal server error", "statusCode": 500 }` |
 
 > **Lưu ý:**
+> - **Yêu cầu role `admin`** — user thường sẽ bị 403 Forbidden.
+> - Query params truyền qua URL (`period`, `endDate`), không cần request body.
 > - Cần có dữ liệu log hoạt động trong DB. Nếu không có → trả về insufficient data message.
 > - AI xử lý 2 bước: (1) tóm tắt log → (2) dự đoán xu hướng dựa trên bản tóm tắt.
 > - Endpoint `/structured` trả thêm: `period`, `analyzedLogCount`, `processingTimeMs`, `generatedAt`.
@@ -1153,6 +1170,40 @@ curl -X POST "http://localhost:3000/ai/search?prompt=Nước hoa nào phù hợp
 > - Endpoint này gọi thẳng `aiService.textGenerateFromPrompt` mà **không có system prompt** hay admin instruction.
 > - Kết quả phụ thuộc hoàn toàn vào model AI mặc định (OpenAI GPT).
 > - Phù hợp cho việc test nhanh hoặc hỏi đáp tổng quát.
+
+---
+
+### 15. EmailController
+
+**Route:** `/email` | **Auth:** 🔒 JWT + Role `admin` | **Tag Swagger:** `Email`
+
+Gửi email văn bản cơ bản thông qua NodeMailer. Dành riêng cho admin.
+
+| Method | Endpoint | Mô tả | Auth |
+|--------|----------|-------|------|
+| `POST` | `/email/send` | Gửi email text đơn giản | 🔒 admin |
+
+**Cách sử dụng:**
+```bash
+curl -X POST -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"to":"user@example.com","subject":"Thông báo","text":"Nội dung email"}' \
+  http://localhost:3000/email/send
+```
+
+**HTTP Status Codes:**
+
+| Code | Khi nào | Response Body Example |
+|------|---------|----------------------|
+| 200 | Gửi email thành công | `{ "success": true, "data": "Email sent successfully" }` |
+| 400 | Body không hợp lệ, thiếu `to`/`subject`/`text` | `{ "success": false, "error": "Invalid request body", "statusCode": 400 }` |
+| 401 | Không có token hoặc token không hợp lệ | `{ "success": false, "error": "Unauthorized", "statusCode": 401 }` |
+| 403 | User không có role admin | `{ "success": false, "error": "Forbidden resource", "statusCode": 403 }` |
+| 500 | Lỗi NodeMailer, SMTP config sai, mạng bị ngắt | `{ "success": false, "error": "Internal server error", "statusCode": 500 }` |
+
+> **Lưu ý:**
+> - Cần cấu hình SMTP trong `.env` để email hoạt động (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM).
+> - Chỉ admin mới gửi được email — user thường sẽ bị 403 Forbidden.
 
 ---
 

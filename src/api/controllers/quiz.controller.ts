@@ -113,7 +113,9 @@ export class QuizController {
   }
 
   /** Cập nhật câu trả lời quiz */
-  @Public()
+
+
+
   @Put('questions/:id')
   @ApiOperation({ summary: 'Cập nhật câu trả lời quiz' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
@@ -137,7 +139,7 @@ export class QuizController {
     @Query('userId') userId: string,
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    // Lay cau hoi quiz va cau tra loi tuong ung
+   // Lay cau hoi quiz va cau tra loi tuong ung
     const questionIds = quizAnswers.map((qa) => qa.questionId);
     const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
     if (!quizQueses.success) {

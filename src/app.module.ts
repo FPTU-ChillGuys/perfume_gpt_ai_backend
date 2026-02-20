@@ -14,6 +14,7 @@ import { mikro } from '@automapper/mikro';
 import { CamelCaseNamingConvention } from '@automapper/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -43,7 +44,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
           algorithms: ['RS256'],
           issuer: config.get<string>('JWT_ISSUER'),
           audience: config.get<string>('JWT_AUDIENCE')
-        }
+        },
       })
     }),
     ScheduleModule.forRoot(),
@@ -64,6 +65,16 @@ import { MailerModule } from '@nestjs-modules/mailer';
           from: 'No reply <noreply@perfume.com>'
         },
         preview: true
+      })
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST'),
+          port: config.get<number>('REDIS_PORT'),
+        }
       })
     })
   ],

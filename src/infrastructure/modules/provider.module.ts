@@ -1,50 +1,29 @@
 import { Module } from '@nestjs/common';
-import { ConversationModule } from './conversation.module';
-import { UserLogModule } from './user-log.module';
-import { QuizModule } from './quiz.module';
-import { ProductModule } from './product.module';
 import { ProductController } from 'src/api/controllers/product.controller';
-import { ToolModule } from './tool.module';
 import { QuizController } from 'src/api/controllers/quiz.controller';
-import { MappingModule } from './mapping.module';
-import { AIModule } from './ai.module';
 import { AIController } from 'src/api/controllers/ai/ai.controller';
 import { LogController } from 'src/api/controllers/log.controller';
 import { ConversationController } from 'src/api/controllers/conversation.controller';
 import { TrendController } from 'src/api/controllers/trend.controller';
 import { ReviewController } from 'src/api/controllers/review.controller';
 import { RecommendationController } from 'src/api/controllers/recommendation.controller';
-import { ReviewModule } from './review.module';
-import { InventoryModule } from './inventory.module';
 import { InventoryController } from 'src/api/controllers/inventory.controller';
-import { OrderModule } from './order.module';
-import { AIAcceptanceModule } from './ai-acceptance.module';
 import { AIAcceptanceController } from 'src/api/controllers/ai-acceptance.controller';
-import { AdminInstructionModule } from './admin-instruction.module';
 import { AdminInstructionController } from 'src/api/controllers/admin-instruction.controller';
-import { ProfileModule } from './profile.module';
-import { EmailModule } from './email.module';
+import { OrderController } from 'src/api/controllers/order.controller';
+import { BullModule } from '@nestjs/bullmq';
+import { QueueName } from 'src/application/constant/processor';
+import { ProcessorModule } from './processor.module';
+import { modules } from './list/module';
 
-const modules = [
-  ConversationModule,
-  UserLogModule,
-  QuizModule,
-  ProductModule,
-  ToolModule,
-  MappingModule,
-  AIModule,
-  UserLogModule,
-  ReviewModule,
-  InventoryModule,
-  OrderModule,
-  AIAcceptanceModule,
-  AdminInstructionModule,
-  ProfileModule,
-  EmailModule
-];
+
+
+const registerQueue = BullModule.registerQueue({
+  name: QueueName.CONVERSATION_QUEUE
+});
 
 @Module({
-  imports: modules,
+  imports: [...modules, registerQueue, ProcessorModule],
   controllers: [
     ProductController,
     QuizController,
@@ -56,7 +35,8 @@ const modules = [
     RecommendationController,
     InventoryController,
     AIAcceptanceController,
-    AdminInstructionController
+    AdminInstructionController,
+    OrderController,
   ],
   exports: modules
 })

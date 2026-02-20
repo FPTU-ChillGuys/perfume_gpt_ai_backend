@@ -1,6 +1,6 @@
 import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { Public } from 'src/application/common/Metadata';
+import { Public, Role } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
 import { reviewSummaryPrompt, INSTRUCTION_TYPE_REVIEW } from 'src/application/constant/prompts';
@@ -18,7 +18,7 @@ import { isArrayEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/uti
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
-@Public()
+@Role('admin')
 @ApiTags('Reviews')
 @Controller('reviews')
 export class ReviewController {
@@ -36,6 +36,47 @@ export class ReviewController {
     async getReviews(@Query() request: GetPagedReviewRequest): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
         return await this.reviewService.getAllReviews(request);
     }
+
+     /** Tóm tắt đánh giá bằng AI cho tất cả variant */
+    @Get('summary/all')
+    @ApiBaseResponse(String)
+    @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
+    async getReviewSummaryFromAllVariant(@Query() request: GetPagedReviewRequest): Promise<BaseResponse<string>> {
+        const reviewsResponse = await this.reviewService.getAllReviews(request);
+
+        if (!reviewsResponse.success) {
+            throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
+                service: 'ReviewService',
+                endpoint: 'reviews/summary/all'
+            });
+        }
+
+        const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
+
+        if (isArrayEmpty(reviews)) {
+            return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
+        }
+
+        const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
+
+        // Lấy admin instruction cho domain review (nếu có)
+        const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
+
+        const summaryResponse = await this.aiService.textGenerateFromPrompt(
+            reviewSummaryPrompt(reviewsText),
+            adminPrompt
+        );
+
+        if (!summaryResponse.success) {
+            throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
+                service: 'AIService',
+                endpoint: 'reviews/summary/all'
+            });
+        }
+
+        return Ok(summaryResponse.data);
+    }
+
 
     /** Tóm tắt đánh giá bằng AI theo variant ID */
     @Get('summary/:variantId')
@@ -80,46 +121,7 @@ export class ReviewController {
         return Ok(summaryResponse.data);
     }
 
-    /** Tóm tắt đánh giá bằng AI cho tất cả variant */
-    @Get('summary/all')
-    @ApiBaseResponse(String)
-    @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
-    async getReviewSummaryFromAllVariant(request: GetPagedReviewRequest): Promise<BaseResponse<string>> {
-        const reviewsResponse = await this.reviewService.getAllReviews(request);
-
-        if (!reviewsResponse.success) {
-            throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
-                service: 'ReviewService',
-                endpoint: 'reviews/summary/all'
-            });
-        }
-
-        const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
-
-        if (isArrayEmpty(reviews)) {
-            return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
-        }
-
-        const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
-
-        // Lấy admin instruction cho domain review (nếu có)
-        const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
-
-        const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            reviewSummaryPrompt(reviewsText),
-            adminPrompt
-        );
-
-        if (!summaryResponse.success) {
-            throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
-                service: 'AIService',
-                endpoint: 'reviews/summary/all'
-            });
-        }
-
-        return Ok(summaryResponse.data);
-    }
-
+   
     /**
      * Tóm tắt đánh giá bằng AI theo variant ID - Phiên bản có cấu trúc.
      * Trả về response có metadata (thời gian xử lý, số review đã phân tích).

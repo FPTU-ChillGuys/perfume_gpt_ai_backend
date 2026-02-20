@@ -25,7 +25,8 @@
     "test:integration": "jest --config ./test/jest-integration.json --runInBand",
     "test:integration:watch": "jest --config ./test/jest-integration.json --runInBand --watch",
     "test:integration:cov": "jest --config ./test/jest-integration.json --runInBand --coverage",
-    "test:integration:setup": "node test/integration/helpers/create-test-db.js"
+    "test:integration:setup": "node test/integration/helpers/create-test-db.js",
+    "bullmq:delete-all-jobs": "ts-node scripts/deleteDataBullScript.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.13",
@@ -42,6 +43,7 @@
     "@mikro-orm/reflection": "6.6.4",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/axios": "^4.0.1",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -52,6 +54,7 @@
     "@scalar/nestjs-api-reference": "^1.0.18",
     "ai": "^6.0.42",
     "axios": "^1.13.5",
+    "bullmq": "^5.69.3",
     "class-validator": "^0.14.3",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",

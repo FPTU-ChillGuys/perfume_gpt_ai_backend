@@ -1,7 +1,7 @@
 import { Controller, Get, Req } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Request } from 'express';
-import { Public } from 'src/application/common/Metadata';
+import { Public, Role } from 'src/application/common/Metadata';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProfileResponse } from 'src/application/dtos/response/profile.response';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
@@ -11,13 +11,13 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
+@Role('admin')
 @ApiTags('Profile')
 @Controller('profile')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
   /** Lấy thông tin profile của người dùng hiện tại */
-  @Public()
   @Get('me')
   @ApiOperation({ summary: 'Lấy thông tin profile của người dùng hiện tại' })
   @ApiBaseResponse(ProfileResponse)
@@ -30,7 +30,6 @@ export class ProfileController {
   }
 
   /** Tạo báo cáo profile dưới dạng text */
-  @Public()
   @Get('report')
   @ApiOperation({ summary: 'Tạo báo cáo profile dưới dạng text' })
   @ApiBaseResponse(String)

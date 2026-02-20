@@ -1,5 +1,5 @@
 import { UnitOfWork } from '../repositories/unit-of-work';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectMapper } from '@automapper/nestjs';
 import { Mapper } from '@automapper/core';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -15,7 +15,6 @@ import {
 } from 'src/application/dtos/request/user-log.request';
 import {
   endOfDay,
-  endOfMinute,
   endOfMonth,
   endOfWeek,
   endOfYear,
@@ -29,18 +28,20 @@ import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
-import { generateSummaryPrompt } from 'src/application/constant/prompts';
+import { generateSummaryPrompt, INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
 import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
-import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
-import { QuizQuestionAnswerDetail } from 'src/domain/entities/quiz-question-answer-detail.entity';
 import { SimpleMemoryCache } from '../utils/simple-memory-cache';
+import { AIService } from './ai.service';
+import { AI_SERVICE } from '../modules/ai.module';
+import { INSUFFICIENT_DATA_MESSAGES, isDataEmpty } from '../utils/insufficient-data';
+import { AdminInstructionService } from './admin-instruction.service';
 
 @Injectable()
 export class UserLogService {
   /** Cache cho user log summary report (TTL = 5 phút) */
   private readonly summaryCache = new SimpleMemoryCache<string>(5 * 60 * 1000);
 
-  constructor(private unitOfWork: UnitOfWork) {}
+  constructor(private unitOfWork: UnitOfWork, @Inject(AI_SERVICE) private aiService: AIService, private adminInstructionService: AdminInstructionService) {}
 
   async getUserLogsByUserId(
     userId: string
@@ -676,10 +677,13 @@ export class UserLogService {
     const currentDate = new Date();
     const endDate = endOfWeek(convertToUTC(currentDate));
     const startDate = startOfWeek(convertToUTC(currentDate));
-    const summaryResponse = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
-    if (summaryResponse.success && summaryResponse.data) {
-      await this.saveUserLogSummary(userId, startDate, endDate, summaryResponse.data);
+    const logSumaryResponse = await this.createLogSummaryForPeriodByUsingAI(userId, PeriodEnum.WEEKLY);
+    if (!logSumaryResponse.success || !logSumaryResponse.data) {
+      console.log(`Failed to create log summary for userId: ${userId}`);
+      return;
     }
+    await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
+     
   }
 
   /** Ghi de log theo thang */
@@ -687,10 +691,12 @@ export class UserLogService {
     const currentDate = new Date();
     const endDate = endOfMonth(convertToUTC(currentDate));
     const startDate = startOfMonth(convertToUTC(currentDate));
-    const summaryResponse = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
-    if (summaryResponse.success && summaryResponse.data) {
-      await this.saveUserLogSummary(userId, startDate, endDate, summaryResponse.data);
+    const logSumaryResponse = await this.createLogSummaryForPeriodByUsingAI(userId, PeriodEnum.MONTHLY);
+    if (!logSumaryResponse.success || !logSumaryResponse.data) {
+      console.log(`Failed to create log summary for userId: ${userId}`);
+      return;
     }
+    await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
   }
 
   /** Ghi de log theo nam */
@@ -698,9 +704,53 @@ export class UserLogService {
     const currentDate = new Date();
     const endDate = endOfYear(convertToUTC(currentDate));
     const startDate = startOfYear(convertToUTC(currentDate));
-    const summaryResponse = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
-    if (summaryResponse.success && summaryResponse.data) {
-      await this.saveUserLogSummary(userId, startDate, endDate, summaryResponse.data);
+    const logSumaryResponse = await this.createLogSummaryForPeriodByUsingAI(userId, PeriodEnum.YEARLY);
+    if (!logSumaryResponse.success || !logSumaryResponse.data) {
+      console.log(`Failed to create log summary for userId: ${userId}`);
+      return;
     }
+    await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
   }
+
+async createLogSummaryForPeriodByUsingAI(userId: string, period: PeriodEnum): Promise<BaseResponse<string | null>> {
+  return await funcHandlerAsync(
+    async () => {
+      const userLogRequest = new UserLogRequest({
+        userId,
+        period,
+        endDate: new Date()
+      });
+
+      const response = await this.getReportAndPromptSummaryUserLogs(userLogRequest);
+
+      if (!response.success) {
+        return { success: false, error: 'Failed to get user logs' };
+      }
+
+      if (isDataEmpty(response.data?.prompt)) {
+        return { success: false, error: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
+      }
+
+      // Lấy admin instruction cho domain log (nếu có)
+      const adminPrompt =
+        await this.adminInstructionService.getSystemPromptForDomain(
+          INSTRUCTION_TYPE_LOG
+        );
+
+      // Summarize with AI
+      const aiResponse = await this.aiService.textGenerateFromPrompt(
+        response.data!.prompt,
+        adminPrompt
+      );
+
+      if (!aiResponse.success) {
+        return { success: false, error: 'Failed to generate summary with AI' };
+      }
+
+      return { success: true, data: aiResponse.data };
+    },
+    'Failed to create log summary with AI',
+    true
+  );
+}
 }

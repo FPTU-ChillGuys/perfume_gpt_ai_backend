@@ -1011,7 +1011,7 @@ export class ConversationController {
 
     await this.conversationQueue.add(
       ConversationJobName.ADD_MESSAGE_AND_LOG,
-      responseConversation  
+      { responseConversation, userId }
     );
 
     return Ok(responseConversation);

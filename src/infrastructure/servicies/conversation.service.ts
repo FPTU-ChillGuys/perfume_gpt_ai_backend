@@ -197,7 +197,7 @@ export class ConversationService {
   public async saveOrUpdateConversation(
     conversation: ConversationDto
   ): Promise<void> {
-    if (!(await this.isExistConversation(conversation.id || ''))) {
+    if (!(await this.isExistConversation(conversation?.id ?? ''))) {
       await this.addConversation(conversation);
     } else {
       await this.updateMessageToConversation(

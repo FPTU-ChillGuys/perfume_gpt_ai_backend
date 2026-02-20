@@ -635,7 +635,7 @@ export class ConversationController {
 
     await this.conversationQueue.add(
       ConversationJobName.ADD_MESSAGE_AND_LOG,
-      responseConversation  
+      { responseConversation, userId }
     );
 
     return Ok(responseConversation);
@@ -663,7 +663,8 @@ export class ConversationController {
     );
 
     // Dùng common helper thay vì code trùng lặp
-    const promptResult = await buildCombinedPromptV4(      INSTRUCTION_TYPE_CONVERSATION,
+    const promptResult = await buildCombinedPromptV4(      
+      INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.adminInstructionService,
       userId,

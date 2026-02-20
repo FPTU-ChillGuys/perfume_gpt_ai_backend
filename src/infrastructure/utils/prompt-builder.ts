@@ -271,7 +271,7 @@ export async function buildCombinedPromptV4(
       adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''
     }
     ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}
-    ${authToken ? '\n\n[Authenticated User - has auth token]' : '\n\n[Unauthenticated User - no auth token]'}`;
+    ${authToken ? '\n\n[Authenticated User - has auth token]' : '\n\n[No auth token]'}`;
 
   return {
     success: true,

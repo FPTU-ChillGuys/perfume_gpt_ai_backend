@@ -19,7 +19,10 @@ import {
   endOfMonth,
   endOfWeek,
   endOfYear,
-  startOfDay
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  startOfYear
 } from 'date-fns';
 import { convertToUTC } from '../utils/time-zone';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
@@ -131,6 +134,32 @@ export class UserLogService {
     );
   }
 
+  async updateUserLogSummary(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    summary: string
+  ): Promise<BaseResponse<string>> {
+    return await funcHandlerAsync(
+      async () => {
+        const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+          userId,
+          startDate,
+          endDate
+        });
+        if (!existingSummary) {
+          return { success: false, error: 'User log summary not found' };
+        }
+        existingSummary.logSummary = summary;
+        this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
+        return { success: true, data: existingSummary.logSummary };
+
+      },
+      'Failed to update user log summary',
+      true
+    );
+  }
+
   async getUserLogSummariesByUserId(
     userId: string,
     startDate?: Date,
@@ -238,7 +267,8 @@ export class UserLogService {
         });
 
         //Lay noi dung tim kiem
-        const searchContents = "Search: " + searchLogs.map((log) => log.content).join(';\n');
+        const searchContents =
+          'Search: ' + searchLogs.map((log) => log.content).join(';\n');
 
         //Lay log tin nhan cua user trong khoang thoi gian
         const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
@@ -250,9 +280,9 @@ export class UserLogService {
         });
 
         // Lay noi dung tin nhan
-        const messageContents = "Messages: " + messageLogs
-          .map((log) => log.message?.message)
-          .join(';\n');
+        const messageContents =
+          'Messages: ' +
+          messageLogs.map((log) => log.message?.message).join(';\n');
 
         // Lay log quiz cua user trong khoang thoi gian
         const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
@@ -331,7 +361,8 @@ export class UserLogService {
         });
 
         //Lay noi dung tim kiem
-        const searchContents = "Search: " + searchLogs.map((log) => log.content).join(';\n');
+        const searchContents =
+          'Search: ' + searchLogs.map((log) => log.content).join(';\n');
 
         //Lay log tin nhan cua user trong khoang thoi gian
         const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
@@ -343,9 +374,9 @@ export class UserLogService {
         });
 
         // Lay noi dung tin nhan
-        const messageContents = "Messages: " + messageLogs
-          .map((log) => log.message?.message)
-          .join(';\n');
+        const messageContents =
+          'Messages: ' +
+          messageLogs.map((log) => log.message?.message).join(';\n');
 
         // Lay log quiz cua user trong khoang thoi gian
         const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
@@ -543,5 +574,133 @@ export class UserLogService {
       return false;
     }
     return response.data?.count! > 0;
+  }
+
+  /** Lay log tu userId */
+  async getUserLogs(userId: string, endDate?: Date, startDate?: Date): Promise<BaseResponse<UserLog | null>> {
+    return funcHandlerAsync(
+      async () => {
+        const userLog = await this.unitOfWork.UserLogRepo.findOne(
+          {
+            userId,
+            updatedAt: {
+              $gte: startDate || startOfWeek(convertToUTC(new Date())),
+              $lte: endDate || endOfWeek(convertToUTC(new Date()))
+            }
+          },
+          { populate: ['userSearchLogs', 'userMessageLogs', 'userQuizLogs'] }
+        );
+        if (!userLog) {
+          return { success: false, error: 'User log not found', data: null };
+        }
+        return { success: true, data: userLog };
+      },
+      'Failed to get user logs',
+      true
+    );
+  }
+
+  /** Lay log tu userId theo tuan */
+  async getUserLogsByWeek(userId: string): Promise<BaseResponse<UserLog | null>> {
+    const endDate = endOfWeek(convertToUTC(new Date()));
+    const startDate = startOfWeek(convertToUTC(new Date()));
+    return this.getUserLogs(userId, endDate, startDate);
+  }
+
+  /** Lay log tu userId theo thang */
+  async getUserLogsByMonth(userId: string): Promise<BaseResponse<UserLog | null>> {
+    const endDate = endOfMonth(convertToUTC(new Date()));
+    const startDate = startOfMonth(convertToUTC(new Date(endDate)));
+    return this.getUserLogs(userId, endDate, startDate);
+  }
+
+  /** Lay log tu userId theo nam */
+  async getUserLogsByYear(userId: string): Promise<BaseResponse<UserLog | null>> {
+    const endDate = endOfYear(convertToUTC(new Date()));
+    const startDate = startOfYear(convertToUTC(new Date(endDate)));
+    return this.getUserLogs(userId, endDate, startDate);
+  }
+
+  /** Lay user log summary tu userId */
+  async getUserLogSummaryByUserId(userId: string, startDate?: Date, endDate?: Date): Promise<BaseResponse<UserLogSummary | null>> {
+    return funcHandlerAsync(
+      async () => {
+       const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+          userId: userId,
+          startDate: {
+            $gte: startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
+          },
+          endDate: {
+            $lte: endDate
+              ? endOfDay(convertToUTC(endDate))
+              : endOfDay(convertToUTC(new Date()))
+          }
+        });
+
+        if (!userLogSummary) {
+          return { success: false, error: 'User log summary not found', data: null };
+        }
+        return { success: true, data: userLogSummary };
+      },
+      'Failed to get user log summary',
+      true
+    );
+  }
+
+  /** Lay user summary theo tuan */
+  async getUserLogSummaryByWeek(userId: string): Promise<BaseResponse<UserLogSummary | null>> {
+    const currentDate = new Date();
+    const endDate = endOfWeek(convertToUTC(currentDate));
+    const startDate = startOfWeek(convertToUTC(currentDate));
+    return this.getUserLogSummaryByUserId(userId, startDate, endDate);
+  }
+
+  /** Lay user summary theo thang */
+  async getUserLogSummaryByMonth(userId: string): Promise<BaseResponse<UserLogSummary | null>> {
+    const currentDate = new Date();
+    const endDate = endOfMonth(convertToUTC(currentDate));
+    const startDate = startOfMonth(convertToUTC(currentDate));
+    return this.getUserLogSummaryByUserId(userId, startDate, endDate);
+  }
+
+  /** Lay user summary theo nam */
+  async getUserLogSummaryByYear(userId: string): Promise<BaseResponse<UserLogSummary | null>> {
+    const currentDate = new Date();
+    const endDate = endOfYear(convertToUTC(currentDate));
+    const startDate = startOfYear(convertToUTC(currentDate));
+    return this.getUserLogSummaryByUserId(userId, startDate, endDate);
+  }
+
+  /**Ghi de log theo tuan */
+  async overrideWeeklyLogSummaryByUserId(userId: string): Promise<void> {
+    const currentDate = new Date();
+    const endDate = endOfWeek(convertToUTC(currentDate));
+    const startDate = startOfWeek(convertToUTC(currentDate));
+    const summaryResponse = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
+    if (summaryResponse.success && summaryResponse.data) {
+      await this.saveUserLogSummary(userId, startDate, endDate, summaryResponse.data);
+    }
+  }
+
+  /** Ghi de log theo thang */
+  async overrideMonthlyLogSummaryByUserId(userId: string): Promise<void> {
+    const currentDate = new Date();
+    const endDate = endOfMonth(convertToUTC(currentDate));
+    const startDate = startOfMonth(convertToUTC(currentDate));
+    const summaryResponse = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
+    if (summaryResponse.success && summaryResponse.data) {
+      await this.saveUserLogSummary(userId, startDate, endDate, summaryResponse.data);
+    }
+  }
+
+  /** Ghi de log theo nam */
+  async overrideYearlyLogSummaryByUserId(userId: string): Promise<void> {
+    const currentDate = new Date();
+    const endDate = endOfYear(convertToUTC(currentDate));
+    const startDate = startOfYear(convertToUTC(currentDate));
+    const summaryResponse = await this.getUserLogSummaryReportByUserId(userId, startDate, endDate);
+    if (summaryResponse.success && summaryResponse.data) {
+      await this.saveUserLogSummary(userId, startDate, endDate, summaryResponse.data);
+    }
   }
 }

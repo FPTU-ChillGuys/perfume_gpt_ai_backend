@@ -796,7 +796,7 @@ export class ConversationController {
     );
 
     // Dùng common helper thay vì code trùng lặp
-    const promptResult = await buildCombinedPromptV2(
+    const promptResult = await buildCombinedPromptV1(
       INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.orderService,
@@ -852,7 +852,88 @@ export class ConversationController {
       responseConversation  
     );
 
-    // await this.conversationService.saveOrUpdateConversation(responseConversation);
+    return Ok(responseConversation);
+  }
+
+  /**
+   * Chat V6 - Dựa trên V4 nhưng sử dụng nestjs/bull để xử lý log và AI response trong background job, tránh timeout cho user.
+   * Logic tương tự V2 nhưng sử dụng buildCombinedPromptV2 helper.
+   * @note userId được lấy từ JWT token. Guest (không có token) sẽ không lấy log/order/profile.
+   */
+  @Public()
+  @Post('chat/v6')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({
+    summary:
+      'Chat V6 - Common helper + log chi tiết (có token: userId+profile+order, guest: không lấy log)'
+  })
+  @ApiBaseResponse(ConversationRequestDto)
+  async conversationV6(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    const userId =
+      getTokenPayloadFromRequest(request)?.id ?? conversation.userId;
+    const convertedMessages: UIMessage[] = convertToMessages(
+      conversation.messages || []
+    );
+
+    // Dùng common helper thay vì code trùng lặp
+    const promptResult = await buildCombinedPromptV2(
+      INSTRUCTION_TYPE_CONVERSATION,
+      this.logService,
+      this.orderService,
+      this.profileService,
+      this.adminInstructionService,
+      userId,
+      extractTokenFromHeader(request) ?? ''
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'PromptBuilder',
+          endpoint: 'chat/v4'
+        }
+      );
+    }
+
+    // Call AI service
+    const message = await this.aiService.textGenerateFromMessages(
+      convertedMessages,
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      ),
+      Output.object(searchOutput)
+    );
+
+    if (!message.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'AIService',
+          endpoint: 'chat/v4'
+        }
+      );
+    }
+
+    // Lưu conversation
+    const responseConversation = overrideMessagesToConversation(
+      conversation.id || '',
+      userId || '',
+      addMessageToMessages(message.data || '', conversation.messages || [])
+    );
+
+    await this.conversationQueue.add(
+      ConversationJobName.ADD_MESSAGE_AND_LOG,
+      responseConversation  
+    );
 
     return Ok(responseConversation);
   }

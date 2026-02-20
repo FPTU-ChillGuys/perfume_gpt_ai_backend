@@ -13,9 +13,9 @@ import { convertToUTC } from 'src/infrastructure/utils/time-zone';
 
 export class LogHelper {
   constructor(
-    private userLogService: UserLogService,
-    @Inject(AI_SERVICE) private aiService: AIService,
-    private readonly adminInstructionService: AdminInstructionService
+    protected userLogService: UserLogService,
+    @Inject(AI_SERVICE) protected aiService: AIService,
+    protected readonly adminInstructionService: AdminInstructionService
   ) {}
 
   async summarizeLogsForUser(userId: string, period: PeriodEnum) {

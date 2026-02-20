@@ -11,7 +11,10 @@ import {
 } from 'src/application/constant/prompts';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { convertToUTC } from 'src/infrastructure/utils/time-zone';
-import { isDataEmpty, buildDataAvailabilityNote } from 'src/infrastructure/utils/insufficient-data';
+import {
+  isDataEmpty,
+  buildDataAvailabilityNote
+} from 'src/infrastructure/utils/insufficient-data';
 
 /**
  * Kết quả xây dựng combined prompt từ user log + order report.
@@ -68,11 +71,14 @@ export async function buildCombinedPromptV1(
   // Profile chỉ lấy được khi có auth token
   if (authToken) {
     const profile = await profileService.getOwnProfile(authToken);
-    profileReport = await profileService.createSystemPromptFromProfile(profile.payload!) ?? '';
+    profileReport =
+      (await profileService.createSystemPromptFromProfile(profile.payload!)) ??
+      '';
   }
 
   // Lấy admin instruction cho conversation (nếu có)
-  const adminInstruction = await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
+  const adminInstruction =
+    await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
 
   // Kiểm tra dữ liệu và thêm ghi chú nếu thiếu
   const dataNote = buildDataAvailabilityNote({
@@ -145,11 +151,14 @@ export async function buildCombinedPromptV2(
   // Profile chỉ lấy được khi có auth token
   if (authToken) {
     const profile = await profileService.getOwnProfile(authToken);
-    profileReport = await profileService.createSystemPromptFromProfile(profile.payload!) ?? '';
+    profileReport =
+      (await profileService.createSystemPromptFromProfile(profile.payload!)) ??
+      '';
   }
 
   // Lấy admin instruction cho conversation (nếu có)
-  const adminInstruction = await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
+  const adminInstruction =
+    await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
 
   // Kiểm tra dữ liệu và thêm ghi chú nếu thiếu
   const dataNote = buildDataAvailabilityNote({
@@ -160,8 +169,9 @@ export async function buildCombinedPromptV2(
 
   const combinedPrompt = `${userLogData}\n\n
     Order Report:\n${orderReportData}\n\n
-    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? 
-    `\n\nAdmin Instructions:\n${adminInstruction}` : ''}`;
+    Profile:\n${profileReport ?? ''}${dataNote}${
+      adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''
+    }`;
 
   return {
     success: true,
@@ -170,6 +180,106 @@ export async function buildCombinedPromptV2(
       userLogData,
       orderReportData,
       profileReport: profileReport ?? '',
+      adminInstruction
+    }
+  };
+}
+
+/**
+ * Xây dựng combined prompt cho V3.
+ *
+ * @param typeOfInstruction - Loại instruction domain để lấy admin instruction tương ứng
+ * @param logService - UserLogService instance
+ * @param adminInstructionService - AdminInstructionService instance
+ * @param userId - ID người dùng
+ * @param authToken - Token xác thực để gọi Order API và Profile API
+ * @returns Combined prompt + dữ liệu thành phần
+ */
+export async function buildCombinedPromptV3(
+  typeOfInstruction: string,
+  logService: UserLogService,
+  adminInstructionService: AdminInstructionService,
+  userId: string | undefined,
+  authToken: string
+): Promise<BaseResponse<CombinedPromptResult>> {
+  let userLogData = '';
+
+  // Chỉ lấy log và order khi có userId (user đã đăng nhập)
+  if (userId) {
+    const userLogResponse = await logService.getReportAndPromptSummaryUserLogs({
+      userId,
+      period: PeriodEnum.MONTHLY,
+      endDate: convertToUTC(new Date()),
+      startDate: undefined
+    });
+    userLogData = userLogResponse.data ? userLogResponse.data.response : '';
+  }
+
+  // Lấy admin instruction cho conversation (nếu có)
+  const adminInstruction =
+    await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
+
+  const combinedPrompt = `${userLogData}\n\n
+  ${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''}
+    ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}
+    ${authToken ? '\n\n[Authenticated User - has auth token]' : '\n\n[Unauthenticated User - no auth token]'}`;
+
+  return {
+    success: true,
+    data: {
+      combinedPrompt,
+      userLogData,
+      orderReportData: '',
+      profileReport: '',
+      adminInstruction
+    }
+  };
+}
+
+/**
+ * Xây dựng combined prompt cho V4.
+ *
+ * @param typeOfInstruction - Loại instruction domain để lấy admin instruction tương ứng
+ * @param logService - UserLogService instance
+ * @param adminInstructionService - AdminInstructionService instance
+ * @param userId - ID người dùng
+ * @param authToken - Token xác thực để gọi Order API và Profile API
+ * @returns Combined prompt + dữ liệu thành phần
+ */
+export async function buildCombinedPromptV4(
+  typeOfInstruction: string,
+  logService: UserLogService,
+  adminInstructionService: AdminInstructionService,
+  userId: string | undefined,
+  authToken: string
+): Promise<BaseResponse<CombinedPromptResult>> {
+  let userLogData = '';
+  let userLogPromptText = '';
+  // Chỉ lấy log và order khi có userId (user đã đăng nhập)
+  if (userId) {
+    const userLog = await logService.getUserLogSummaryReportByUserId(userId);
+    userLogData = userLog.data ?? '';
+    userLogPromptText = userLogPrompt(userLogData);
+  }
+
+  // Lấy admin instruction cho conversation (nếu có)
+  const adminInstruction =
+    await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
+
+  const combinedPrompt = `${userLogData}\n\n
+    ${userLogPromptText}\n\n ${
+      adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''
+    }
+    ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}
+    ${authToken ? '\n\n[Authenticated User - has auth token]' : '\n\n[Unauthenticated User - no auth token]'}`;
+
+  return {
+    success: true,
+    data: {
+      combinedPrompt,
+      userLogData,
+      orderReportData: '',
+      profileReport: '',
       adminInstruction
     }
   };

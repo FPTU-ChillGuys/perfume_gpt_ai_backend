@@ -58,7 +58,8 @@ import { ProfileService } from 'src/infrastructure/servicies/profile.service';
 import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import {
   buildCombinedPromptV1,
-  buildCombinedPromptV2
+  buildCombinedPromptV2,
+  buildCombinedPromptV4
 } from 'src/infrastructure/utils/prompt-builder';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
@@ -960,11 +961,8 @@ export class ConversationController {
     );
 
     // Dùng common helper thay vì code trùng lặp
-    const promptResult = await buildCombinedPromptV2(
-      INSTRUCTION_TYPE_CONVERSATION,
+    const promptResult = await buildCombinedPromptV4(      INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
-      this.orderService,
-      this.profileService,
       this.adminInstructionService,
       userId,
       extractTokenFromHeader(request) ?? ''

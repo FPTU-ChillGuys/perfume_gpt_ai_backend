@@ -1,9 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsArray, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { MessageDto, MessageRequestDto } from './message.dto';
 import { CommonResponse } from '../response/common/common.response';
 
 /** DTO cuộc hội thoại (response) */
-export class ConversationDto extends CommonResponse{
+export class ConversationDto extends CommonResponse {
   /** ID người dùng sở hữu cuộc hội thoại */
   @ApiProperty({ description: 'ID người dùng', format: 'uuid', required: false })
   userId?: string;
@@ -13,28 +15,32 @@ export class ConversationDto extends CommonResponse{
   messages?: MessageDto[];
 
   constructor(init?: Partial<ConversationDto>) {
-    super()
+    super();
     Object.assign(this, init);
   }
 }
 
 /** DTO cuộc hội thoại (request) */
 export class ConversationRequestDto {
-
   /** ID cuộc hội thoại */
   @ApiProperty({ description: 'ID cuộc hội thoại', format: 'uuid' })
+  @IsString()
   id!: string;
 
   /** ID người dùng (tự động lấy từ JWT token, không cần truyền) */
   @ApiProperty({ description: 'ID người dùng (tự động lấy từ token, không cần truyền)', format: 'uuid', required: false })
+  @IsOptional()
+  @IsUUID()
   userId?: string;
 
   /** Danh sách tin nhắn */
   @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageRequestDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MessageRequestDto)
   messages!: MessageRequestDto[];
 
   constructor(init?: Partial<ConversationRequestDto>) {
     Object.assign(this, init);
   }
-
 }

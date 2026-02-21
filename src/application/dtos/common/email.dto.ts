@@ -4,6 +4,7 @@ import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 export class SendEmailRequestDto {
   @ApiProperty({ description: 'Email người nhận', example: 'user@example.com' })
   @IsEmail()
+  @IsNotEmpty()
   to!: string;
 
   @ApiProperty({ description: 'Tiêu đề email', example: 'Welcome to PerfumeGPT' })

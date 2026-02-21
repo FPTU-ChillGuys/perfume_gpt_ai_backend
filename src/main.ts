@@ -7,6 +7,7 @@ import { seedAdminInstructions } from './infrastructure/seed/admin-instruction.s
 import { execSync } from 'child_process';
 import { HttpExceptionFilter } from './application/filters/http-exception.filter';
 import { SuccessResponseInterceptor } from './application/common/interceptors/success-response.interceptor';
+import { ValidationPipe } from '@nestjs/common';
 
 /** Tạm thời: chạy migration bằng CLI trực tiếp */
 function runMigrationCLI(): void {
@@ -40,6 +41,15 @@ async function bootstrap() {
   } catch (error) {
     console.error('[MikroORM] Seed thất bại:', error);
   }
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+      skipMissingProperties: false, // Bắt buộc properties nếu dùng validation decorator
+    }),
+  );
 
   const config = new DocumentBuilder()
     .setTitle('PerfumeGPT AI Backend')

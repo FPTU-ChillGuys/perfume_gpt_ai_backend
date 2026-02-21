@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsDate, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { endOfDay } from 'date-fns';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 
@@ -6,21 +8,28 @@ import { PeriodEnum } from 'src/domain/enum/period.enum';
 export class UserLogRequest {
   /** ID người dùng */
   @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
+  @IsUUID()
   userId: string;
 
   /** Khoảng thời gian lọc (weekly, monthly, yearly) */
   @ApiProperty({ description: 'Khoảng thời gian lọc', enum: PeriodEnum })
+  @IsEnum(PeriodEnum)
   period: PeriodEnum;
 
   /** Ngày kết thúc */
   @ApiProperty({ description: 'Ngày kết thúc', default: endOfDay(new Date()) })
+  @IsDate()
+  @Type(() => Date)
   endDate: Date = endOfDay(new Date());
 
   /** Ngày bắt đầu (tùy chọn) */
   @ApiProperty({ description: 'Ngày bắt đầu', required: false })
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
   startDate?: Date;
 
-  constructor(init ?: Partial<UserLogRequest>) {
+  constructor(init?: Partial<UserLogRequest>) {
     Object.assign(this, init);
   }
 }
@@ -29,17 +38,23 @@ export class UserLogRequest {
 export class AllUserLogRequest {
   /** Khoảng thời gian lọc */
   @ApiProperty({ description: 'Khoảng thời gian lọc', enum: PeriodEnum })
+  @IsEnum(PeriodEnum)
   period: PeriodEnum;
 
   /** Ngày kết thúc */
   @ApiProperty({ description: 'Ngày kết thúc' })
+  @IsDate()
+  @Type(() => Date)
   endDate: Date;
 
   /** Ngày bắt đầu (tùy chọn) */
   @ApiProperty({ description: 'Ngày bắt đầu', required: false })
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
   startDate?: Date;
 
-  constructor(init ?: Partial<AllUserLogRequest>) {
+  constructor(init?: Partial<AllUserLogRequest>) {
     Object.assign(this, init);
   }
 }

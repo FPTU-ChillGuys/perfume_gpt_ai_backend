@@ -200,7 +200,8 @@ export async function buildCombinedPromptV3(
   logService: UserLogService,
   adminInstructionService: AdminInstructionService,
   userId: string | undefined,
-  authToken: string
+  authToken: string,
+  period: PeriodEnum = PeriodEnum.MONTHLY
 ): Promise<BaseResponse<CombinedPromptResult>> {
   let userLogData = '';
 
@@ -208,7 +209,7 @@ export async function buildCombinedPromptV3(
   if (userId) {
     const userLogResponse = await logService.getReportAndPromptSummaryUserLogs({
       userId,
-      period: PeriodEnum.MONTHLY,
+      period: period,
       endDate: convertToUTC(new Date()),
       startDate: undefined
     });

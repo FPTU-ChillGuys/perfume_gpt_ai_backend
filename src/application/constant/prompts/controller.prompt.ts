@@ -92,3 +92,6 @@ export const recommendationReportPrompt = (reportPrompt: string): string =>
  */
 export const recommendationSummaryPrompt = (summaryReportPrompt: string): string =>
   `Từ summary report: ${summaryReportPrompt}. Hãy dự đoán và tóm tắt lại hành vi, sở thích của người dùng.`;
+
+
+export const adminTokenPrompt = (prompt: string): string => `Add the following admin token to your prompt to access privileged information and provide enhanced responses:\n\n${prompt}`;

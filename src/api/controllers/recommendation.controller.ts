@@ -37,9 +37,14 @@ import { UserService } from 'src/infrastructure/servicies/user.service';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
 import {
   buildCombinedPromptV1,
-  buildCombinedPromptV2
+  buildCombinedPromptV2,
+  buildCombinedPromptV3,
+  buildCombinedPromptV4
 } from 'src/infrastructure/utils/prompt-builder';
 import { EmailService } from 'src/infrastructure/servicies/mail.service';
+import { Output } from 'ai';
+import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { adminTokenPrompt } from 'src/application/constant/prompts/controller.prompt';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -128,36 +133,28 @@ export class RecommendationController {
   ): Promise<BaseResponse<string>> {
     const endpoint = 'recommendation/recommend/ai/v1';
 
-    // Lấy user log chi tiết
-    const reportAndPromptSummary =
-      await this.userLogService.getReportAndPromptSummaryUserLogs(
-        userLogRequest
-      );
-
-    if (!reportAndPromptSummary.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to summarize user logs',
-        {
-          userId: userLogRequest.userId,
-          service: 'UserLogService',
-          endpoint
-        }
-      );
-    }
+    const promptResult = await buildCombinedPromptV3(
+      INSTRUCTION_TYPE_RECOMMENDATION,
+      this.userLogService,
+      this.adminInstructionService,
+      userLogRequest.userId,
+      process.env.PERFUME_GPT_API_TOKEN ?? '',
+      userLogRequest.period
+    );
 
     // Check data empty
-    if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
+    if (isDataEmpty(promptResult.data?.combinedPrompt)) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION);
     }
 
     // Gọi AI 2 lần (report + recommendation)
-    const recommendation = await this.generateAIRecommendation(
-      reportAndPromptSummary.data!.prompt,
-      userLogRequest.userId,
-      endpoint
+    const recommendation = await this.aiService.textGenerateFromPrompt(
+      adminTokenPrompt(promptResult.data!.combinedPrompt),
+      promptResult.data?.adminInstruction ?? '',
+      Output.object(searchOutput)
     );
 
-    return Ok(recommendation);
+    return Ok(recommendation?.data ?? '');
   }
 
   /** Gợi ý sản phẩm bằng AI V2 - Dùng log tóm tắt */
@@ -171,45 +168,27 @@ export class RecommendationController {
   ): Promise<BaseResponse<string>> {
     const endpoint = 'recommendation/recommend/ai/v2';
 
-    // Lấy user log summary (nhanh hơn V1)
-    const summaryReport =
-      await this.userLogService.getUserLogSummaryReportByUserId(
-        userLogRequest.userId,
-        userLogRequest.startDate!,
-        userLogRequest.endDate!
-      );
-
-    if (!summaryReport.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to summarize user logs',
-        {
-          userId: userLogRequest.userId,
-          service: 'UserLogService',
-          endpoint
-        }
-      );
-    }
+    const promptResult = await buildCombinedPromptV4(
+      INSTRUCTION_TYPE_RECOMMENDATION,
+      this.userLogService,
+      this.adminInstructionService,
+      userLogRequest.userId,
+      process.env.PERFUME_GPT_API_TOKEN ?? '',
+    );
 
     // Check data empty
-    if (isDataEmpty(summaryReport.data)) {
+    if (isDataEmpty(promptResult.data?.combinedPrompt)) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.RECOMMENDATION);
     }
 
-    // Format prompt
-    const userLogPrompt = `Here is the summary of user logs:\n${summaryReport.data!}`;
-
-    // Gọi AI với summary prompt wrapper
-    const { adminPrompt, systemPrompt } = await this.getRecommendationPrompts();
-
-    const recommendation = await this.callAI(
-      aiRecommendationPrompt(userLogPrompt),
-      systemPrompt,
-      userLogRequest.userId,
-      endpoint,
-      'Failed to get AI recommendation response'
+    // Gọi AI 2 lần (report + recommendation)
+    const recommendation = await this.aiService.textGenerateFromPrompt(
+      adminTokenPrompt(promptResult.data!.combinedPrompt),
+      promptResult.data?.adminInstruction ?? '',
+      Output.object(searchOutput)
     );
 
-    return Ok(recommendation);
+    return Ok(recommendation?.data ?? '');
   }
 
   /**
@@ -311,7 +290,8 @@ export class RecommendationController {
   ): Promise<string> {
     const response = await this.aiService.textGenerateFromPrompt(
       prompt,
-      systemPrompt
+      systemPrompt,
+      Output.object(searchOutput)
     );
 
     if (!response.success) {
@@ -357,15 +337,6 @@ export class RecommendationController {
   ): Promise<string> {
     const { adminPrompt, systemPrompt } = await this.getRecommendationPrompts();
 
-    // Bước 1: Tạo report
-    // const report = await this.callAI(
-    //   recommendationReportPrompt(userLogPrompt),
-    //   adminPrompt,
-    //   userId,
-    //   endpoint,
-    //   'Failed to get AI report'
-    // );
-
     // Bước 2: Tạo recommendation từ report
     const recommendation = await this.callAI(
       aiRecommendationPrompt(userLogPrompt),
@@ -380,7 +351,7 @@ export class RecommendationController {
 
   // ==================== CRON JOB ====================
 
-  @Cron('0 0 * * *') // Chạy vào lúc 00:00 hàng ngày
+  // @Cron('0 0 * * *') // Chạy vào lúc 00:00 hàng ngày
   async generateDailyRecommendations() {
     // Logic để lấy danh sách user và tạo recommendation cho từng user
     const userIds = await this.userLogService.getAllUserIdsFromLogs();

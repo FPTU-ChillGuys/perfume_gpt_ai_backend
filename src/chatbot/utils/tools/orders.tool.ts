@@ -14,36 +14,6 @@ import * as z from 'zod';
 export class OrderTool {
   constructor(private readonly orderService: OrderService) {}
 
-//   getAllOrders: Tool = tool({
-//     description:
-//       'Retrieve a list of all orders for the authenticated user with pagination and sorting.',
-//     inputSchema: z.object({
-//       pageNumber: z.number().min(1).optional().default(1),
-//       pageSize: z.number().min(1).max(100).optional().default(10),
-//       sortBy: z.string().optional(),
-//       sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
-//       isDescending: z.boolean().optional().default(false),
-//       authToken: z.string().describe('JWT authentication token')
-//     }),
-//     execute: async (input) => {
-//       return await funcHandlerAsync(
-//         async () => {
-//           const response = await this.orderService.getAllOrders(
-//             new OrderRequest(),
-//             input.authToken
-//           );
-//           console.log('OrderTool - getAllOrders response:', response.payload?.items);
-//           if (!response.success) {
-//             return { success: false, error: 'Failed to fetch orders.' };
-//           }
-//           return { success: true, data: response.payload?.items || [] };
-//         },
-//         'Error occurred while fetching orders.',
-//         true
-//       );
-//     }
-//   });
-
   getOrdersByUserId: Tool = tool({
     description: 'Get all orders for a specific user with pagination and sorting.',
     inputSchema: z.object({
@@ -79,7 +49,7 @@ export class OrderTool {
     description: 'Get detailed information about a specific order by its ID.',
     inputSchema: z.object({
       orderId: z.string().describe('The ID of the order'),
-      authToken: z.string().describe('JWT authentication token')
+      authToken: z.string().describe('JWT authentication token (Admin token required for privileged access)')
     }),
     execute: async (input) => {
       return await funcHandlerAsync(
@@ -105,7 +75,7 @@ export class OrderTool {
       'Get all detailed order information for a user including items, amounts, and status.',
     inputSchema: z.object({
       userId: z.string().describe('The ID of the user'),
-      authToken: z.string().describe('JWT authentication token')
+      authToken: z.string().describe('JWT authentication token (Admin token required for privileged access)')
     }),
     execute: async (input) => {
       return await funcHandlerAsync(
@@ -131,7 +101,7 @@ export class OrderTool {
       'Generate a text report of all orders for a user including order details, items, and totals.',
     inputSchema: z.object({
       userId: z.string().describe('The ID of the user'),
-      authToken: z.string().describe('JWT authentication token')
+      authToken: z.string().describe('JWT authentication token (Admin token required for privileged access)')
     }),
     execute: async (input) => {
       return await funcHandlerAsync(

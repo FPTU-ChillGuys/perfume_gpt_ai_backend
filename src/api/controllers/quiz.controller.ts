@@ -202,6 +202,80 @@ export class QuizController {
     return Ok(aiResponse.data);
   }
 
+  /** Trả lời quiz và nhận gợi ý nước hoa từ AI */
+  @Public()
+  @Post('user/v2')
+  @ApiOperation({ summary: 'Trả lời quiz và nhận gợi ý AI' })
+  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiBaseResponse(String)
+  @ApiBody({ type: [QuizQuesAnsDetailRequest] })
+  async chatQuizV2(
+    @Query('userId') userId: string,
+    @Body() quizAnswers: { questionId: string; answerId: string }[]
+  ): Promise<BaseResponse<string>> {
+   // Lay cau hoi quiz va cau tra loi tuong ung
+    const questionIds = quizAnswers.map((qa) => qa.questionId);
+    const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
+    if (!quizQueses.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get quiz question', { questionIds });
+    }
+
+    // Lay cau tra loi tuong ung    // Tim cau tra loi trong cau hoi
+    const quesAnses: Array<{ question: string; answer: string }> = [];
+    if (quizQueses.data) {
+      for (let i = 0; i < quizQueses.data.length; i++) {
+        const quizQues = quizQueses.data[i];
+        if (quizQues.answers && quizQues.question) {
+          const answer = quizQues.answers.find(
+            (ans) => ans.id === quizAnswers[i].answerId
+          );
+          if (answer && answer.answer) {
+            quesAnses.push({
+              question: quizQues.question,
+              answer: answer.answer
+            });
+          }
+        }
+      }
+    }
+
+    // Generate prompt
+    const prompt = quizPrompt(quesAnses);
+
+    // Them quiz question answer detail vao user log
+    const quizQuesAnsDetail = new QuizQuesAnwsRequest({
+      userId: userId,
+      details: quizAnswers
+    });
+
+    const savedQuizQuesAnsResponse =
+      await this.quizService.addQuizQuesAnws(quizQuesAnsDetail);
+
+    if (!savedQuizQuesAnsResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to save quiz question answers', { userId });
+    }
+
+    // Save user quiz log
+    await this.logService.addQuizQuesAnsDetailToUserLog(
+      userId,
+      savedQuizQuesAnsResponse.data?.id || ''
+    );
+
+    // Get AI response
+    const aiResponse = await this.aiService.textGenerateFromPrompt(
+      prompt,
+      QUIZ_SYSTEM_PROMPT,
+      Output.object(searchOutput)
+    );
+
+    // Return response
+    if (!aiResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response', { userId, service: 'AIService' });
+    }
+
+    return Ok(aiResponse.data);
+  }
+
   /** Lấy tất cả câu hỏi và câu trả lời quiz của người dùng */
   @Public()
   @Get('user/:userId')

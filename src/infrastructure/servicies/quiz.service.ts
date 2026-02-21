@@ -44,14 +44,14 @@ export class QuizService {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
         id
       });
+
       if (!quizQuestion) {
         return { success: false, error: 'Quiz question not found' };
       }
 
       const updatedQuizQuestion =
         await this.unitOfWork.AIQuizQuestionRepo.updateWithAnswers(
-          id,
-          quizQuestion.question,
+          quizQuestion,
           answers
         );
 
@@ -59,7 +59,7 @@ export class QuizService {
         success: true,
         data: QuizQuestionMapper.toResponse(updatedQuizQuestion)
       };
-    }, 'Failed to update quiz answer');
+    }, 'Failed to update quiz answer', true);
   }
 
   async getQuizQuesById(

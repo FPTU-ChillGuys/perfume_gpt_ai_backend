@@ -123,7 +123,6 @@ export class QuizController {
   }
 
   /** Cập nhật câu trả lời quiz */
-
   @Put('questions/:id')
   @ApiOperation({ summary: 'Cập nhật câu trả lời quiz' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })

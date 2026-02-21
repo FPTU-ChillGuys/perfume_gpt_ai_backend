@@ -14,12 +14,22 @@ export class QuizQuestion extends Common {
   question!: string;
 
   /** Danh sách câu trả lời của câu hỏi */
-  @ApiProperty({ description: 'Danh sách câu trả lời', type: () => QuizAnswer, isArray: true })
-  @OneToMany(() => QuizAnswer, (quizAns) => quizAns.question)
+  @ApiProperty({
+    description: 'Danh sách câu trả lời',
+    type: () => QuizAnswer,
+    isArray: true
+  })
+  @OneToMany(() => QuizAnswer, (quizAns) => quizAns.question, {
+    orphanRemoval: true
+  })
   answers = new Collection<QuizAnswer>(this);
 
   /** Danh sách chi tiết bài quiz liên quan */
-  @ApiProperty({ description: 'Danh sách chi tiết bài quiz', type: () => QuizQuestionAnswerDetail, isArray: true })
+  @ApiProperty({
+    description: 'Danh sách chi tiết bài quiz',
+    type: () => QuizQuestionAnswerDetail,
+    isArray: true
+  })
   @OneToMany(() => QuizQuestionAnswerDetail, (qqa) => qqa.question)
   quizQuestionAnswers = new Collection<QuizQuestionAnswerDetail>(this);
 

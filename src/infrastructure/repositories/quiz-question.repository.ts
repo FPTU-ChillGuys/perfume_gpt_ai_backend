@@ -30,17 +30,12 @@ export class QuizQuestionRepository extends SqlEntityRepository<QuizQuestion> {
   }
 
   async updateWithAnswers(
-    id: string,
-    question: string,
+    quizQuestion: QuizQuestion,
     answers: QuizAnswerRequest[]
   ): Promise<QuizQuestion> {
-    const quizQuestion = await this.findOneOrFail({ id });
+    const em = this.getEntityManager();
 
-    if (!quizQuestion) {
-      throw new Error('Quiz question not found');
-    }
-
-    quizQuestion.question = question;
+    quizQuestion.quizQuestionAnswers.removeAll(); // Remove existing answers
 
     quizQuestion.answers.set(
       answers.map(
@@ -52,7 +47,6 @@ export class QuizQuestionRepository extends SqlEntityRepository<QuizQuestion> {
       )
     );
 
-    const em = this.getEntityManager();
     em.persist(quizQuestion);
     await em.flush();
     return quizQuestion;

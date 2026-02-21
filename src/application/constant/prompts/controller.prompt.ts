@@ -54,10 +54,10 @@ export const reviewSummaryPrompt = (reviewsText: string): string =>
 // ==================== Recommendation Prompts ====================
 
 /**
- * Prompt gợi ý mua lại sản phẩm
+ * Prompt gợi ý mua lại sản phẩm - viết theo giọng email thân thiện, tự nhiên
  */
 export const repurchaseRecommendationPrompt = (summaryData: string): string =>
-  `Based on the following summarized user logs, provide personalized repurchase recommendations for products the users have shown interest in. Consider their preferences, past interactions, and any emerging trends that could influence their purchasing decisions:\n${summaryData}`;
+  `Dựa trên thông tin sau của người dùng:\n${summaryData}\n\nHãy viết gợi ý mua lại nước hoa theo phong cách tự nhiên, thân thiện như một người bạn am hiểu về nước hoa đang gửi email gợi ý cá nhân. Giới thiệu 3-5 sản phẩm phù hợp với lý do cụ thể, gần gũi, dễ đọc. KHÔNG hỏi câu hỏi ngược lại, KHÔNG đề nghị làm thêm quiz.`;
 
 /**
  * Prompt tạo tóm tắt đơn hàng bằng AI
@@ -66,10 +66,10 @@ export const orderSummaryPrompt = (orderDetails: string): string =>
   `Generate a comprehensive summary of the following order details, highlighting key insights such as purchasing patterns, frequently ordered items, and any notable trends that could inform future business strategies:\n\n${orderDetails}`;
 
 /**
- * Prompt gợi ý AI dựa trên log người dùng
+ * Prompt gợi ý AI dựa trên log người dùng - viết theo giọng tư vấn tự nhiên
  */
 export const aiRecommendationPrompt = (summaryData: string): string =>
-  `Based on the following summarized user logs, provide personalized AI-driven recommendations for products or services that align with the users' interests and preferences. Consider their past interactions, preferences, and any emerging trends that could enhance their experience:\n${summaryData}`;
+  `Dựa trên thông tin sau của người dùng:\n${summaryData}\n\nHãy đưa ra gợi ý nước hoa cá nhân hoá theo giọng văn tự nhiên, thân thiện như một chuyên gia tư vấn đang nói chuyện trực tiếp. Giải thích vì sao từng sản phẩm phù hợp với sở thích và phong cách của người dùng. KHÔNG hỏi câu hỏi ngược lại, KHÔNG đề nghị làm thêm quiz.`;
 
 // ==================== Inventory Prompts ====================
 
@@ -85,13 +85,13 @@ export const inventoryReportPrompt = (reportData: string): string =>
  * Prompt phân tích report để đưa ra đề xuất cho người dùng
  */
 export const recommendationReportPrompt = (reportPrompt: string): string =>
-  `Từ report: ${reportPrompt}, hãy đưa ra các đề xuất phù hợp cho người dùng dựa trên hành vi và sở thích của họ.`;
+  `Từ dữ liệu sau: ${reportPrompt}\n\nHãy đưa ra gợi ý nước hoa phù hợp theo giọng văn thân thiện, tự nhiên. Không dùng ngôn ngữ kỹ thuật, không hỏi ngược lại người dùng.`;
 
 /**
  * Prompt dự đoán và tóm tắt hành vi, sở thích người dùng từ summary report
  */
 export const recommendationSummaryPrompt = (summaryReportPrompt: string): string =>
-  `Từ summary report: ${summaryReportPrompt}. Hãy dự đoán và tóm tắt lại hành vi, sở thích của người dùng.`;
+  `Từ dữ liệu sau: ${summaryReportPrompt}\n\nHãy tóm tắt ngắn gọn sở thích và hành vi của người dùng theo ngôn ngữ tự nhiên, đơn giản. Dùng làm cơ sở để gợi ý nước hoa phù hợp.`;
 
 
-export const adminTokenPrompt = (prompt: string): string => `Add the following admin token to your prompt to access privileged information and provide enhanced responses:\n\n${prompt}`;
+export const adminTokenPrompt = (prompt: string): string => `${prompt}`;

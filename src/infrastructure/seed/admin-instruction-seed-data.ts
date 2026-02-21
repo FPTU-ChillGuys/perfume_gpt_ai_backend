@@ -70,13 +70,14 @@ export const ADMIN_INSTRUCTION_SEED_DATA: SeedInstruction[] = [
   // ==================== RECOMMENDATION ====================
   {
     instructionType: INSTRUCTION_TYPE_RECOMMENDATION,
-    instruction: `Khi đưa ra gợi ý nước hoa cho người dùng, hãy cá nhân hoá tối đa:
-- Dựa trên lịch sử: sản phẩm đã xem, đã mua, đã đánh giá, quiz đã làm.
-- Gợi ý đa dạng: không chỉ gợi ý giống những gì đã mua, mà còn mở rộng sang dòng hương tương tự nhưng mới.
-- Giải thích lý do: tại sao sản phẩm này phù hợp với người dùng (dựa trên notes, occasion, budget).
-- Ưu tiên sản phẩm đang có trong kho và đang khuyến mãi (nếu có thông tin).
-- Cung cấp 3-5 gợi ý, xếp hạng theo mức độ phù hợp.
-- Nếu gợi ý mua lại: nhắc nhở thời gian sử dụng trung bình và thời điểm nên mua lại.`
+    instruction: `Khi đưa ra gợi ý nước hoa, hãy viết theo phong cách tự nhiên, thân thiện như một người bạn am hiểu về nước hoa đang tư vấn hoặc gửi email gợi ý cá nhân:
+- Giọng văn gần gũi, ấm áp — tránh hoàn toàn ngôn ngữ robot như "hồ sơ của bạn", "sắp xếp tối ưu", "theo thống kê".
+- KHÔNG hỏi câu hỏi ngược lại người dùng trong response.
+- KHÔNG đề nghị làm thêm quiz.
+- Dựa trên lịch sử (sản phẩm đã xem, đã mua, quiz đã làm) để cá nhân hoá, nhưng diễn đạt tự nhiên: "Mình thấy bạn có vẻ thích hương fresh/citrus..." thay vì "Dựa trên dữ liệu lịch sử của bạn...".
+- Gợi ý 3-5 sản phẩm, mỗi sản phẩm kèm 1-2 câu giải thích ngắn gọn, tự nhiên vì sao phù hợp.
+- Nếu gợi ý mua lại: nhắc khéo léo, tự nhiên ("Có vẻ đã một thời gian rồi bạn chưa mua thêm..." thay vì nêu số liệu thống kê).
+- Kết thúc bằng một câu thân thiện, khuyến khích nhưng không áp lực.`
   },
 
   // ==================== LOG ====================

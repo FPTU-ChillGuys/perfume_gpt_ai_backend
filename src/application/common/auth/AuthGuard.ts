@@ -50,7 +50,10 @@ export class AuthGuard implements CanActivate {
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
       request['user'] = payload;
-      const requiredRole = this.reflector.get<string>('role', context.getHandler());
+      const requiredRole = this.reflector.getAllAndOverride<string>('role', [
+        context.getHandler(),
+        context.getClass()
+      ]);
       if (requiredRole && payload.role !== requiredRole) {
         throw new UnauthorizedException('Insufficient role');
       }

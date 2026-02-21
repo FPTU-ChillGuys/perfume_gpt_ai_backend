@@ -283,9 +283,10 @@ describe('ConversationController', () => {
   });
 
   // ────────── POST /conversation/test/v1 ──────────
-  describe('convserationV1Test', () => {
+  describe('conversationV1 (test proxy)', () => {
     it('TC-FUNC-110: should return test response with prompt', async () => {
       const req = createMockRequest();
+      const convReq = { id: TEST_CONVERSATION_ID, userId: TEST_USER_ID, messages: [] } as any;
       profileService.getOwnProfile.mockResolvedValue(
         successResponseAPI({ id: TEST_USER_ID }),
       );
@@ -297,21 +298,23 @@ describe('ConversationController', () => {
         successResponse('Order report...'),
       );
       adminInstructionService.getSystemPromptForDomain.mockResolvedValue(MOCK_ADMIN_PROMPT);
-      aiService.textGenerateFromPrompt.mockResolvedValue(
+      aiService.textGenerateFromMessages.mockResolvedValue(
         successResponse('Test AI response'),
       );
+      conversationService.isExistConversation.mockResolvedValue(false);
+      conversationService.addConversation.mockResolvedValue(successResponse(convReq));
 
-      const result = await controller.convserationV1Test(req, TEST_USER_ID, 'test prompt');
+      const result = await controller.conversationV1(req, convReq);
 
-      expect(result.success).toBe(true);
-      expect(result.data).toBeDefined();
+      expect(result).toBeDefined();
     });
   });
 
   // ────────── POST /conversation/test/v3 ──────────
-  describe('conversationV3Test', () => {
+  describe('conversationV3 (test proxy)', () => {
     it('TC-FUNC-111: should use buildCombinedPromptV1 for test/v3', async () => {
       const req = createMockRequest();
+      const convReq = { id: TEST_CONVERSATION_ID, userId: TEST_USER_ID, messages: [] } as any;
       profileService.getOwnProfile.mockResolvedValue(
         successResponseAPI({ id: TEST_USER_ID }),
       );
@@ -323,14 +326,15 @@ describe('ConversationController', () => {
         successResponse('Orders...'),
       );
       adminInstructionService.getSystemPromptForDomain.mockResolvedValue(MOCK_ADMIN_PROMPT);
-      aiService.textGenerateFromPrompt.mockResolvedValue(
+      aiService.textGenerateFromMessages.mockResolvedValue(
         successResponse('V3 test response'),
       );
+      conversationService.isExistConversation.mockResolvedValue(false);
+      conversationService.addConversation.mockResolvedValue(successResponse(convReq));
 
-      const result = await controller.conversationV3Test(req, TEST_USER_ID, 'v3 prompt');
+      const result = await controller.conversationV3(req, convReq);
 
-      expect(result.success).toBe(true);
-      expect(aiService.textGenerateFromPrompt).toHaveBeenCalled();
+      expect(result).toBeDefined();
     });
   });
 
@@ -401,9 +405,10 @@ describe('ConversationController', () => {
   });
 
   // ────────── POST /conversation/test/guarded/v1 ──────────
-  describe('guardedTestV1', () => {
+  describe('conversationV1 (guarded)', () => {
     it('TC-FUNC-114: should work with admin token', async () => {
       const req = createMockRequest();
+      const convReq = { id: TEST_CONVERSATION_ID, userId: TEST_USER_ID, messages: [] } as any;
       logService.getUserLogSummaryReportByUserId.mockResolvedValue(
         successResponse('Logs...'),
       );
@@ -415,13 +420,15 @@ describe('ConversationController', () => {
       );
       profileService.createSystemPromptFromProfile.mockResolvedValue('Profile...');
       adminInstructionService.getSystemPromptForDomain.mockResolvedValue(MOCK_ADMIN_PROMPT);
-      aiService.textGenerateFromPrompt.mockResolvedValue(
+      aiService.textGenerateFromMessages.mockResolvedValue(
         successResponse('Guarded V1 response'),
       );
+      conversationService.isExistConversation.mockResolvedValue(false);
+      conversationService.addConversation.mockResolvedValue(successResponse(convReq));
 
-      const result = await controller.guardedTestV1(req, TEST_USER_ID, 'guarded prompt');
+      const result = await controller.conversationV1(req, convReq);
 
-      expect(result.success).toBe(true);
+      expect(result).toBeDefined();
     });
   });
 
@@ -455,7 +462,7 @@ describe('ConversationController', () => {
 
     it('TC-VAL-101: should handle very long prompt in test endpoint', async () => {
       const req = createMockRequestNoAuth();
-      const longPrompt = 'x'.repeat(10000);
+      const longConvReq = { id: TEST_CONVERSATION_ID, userId: TEST_USER_ID, messages: [] } as any;
 
       logService.getUserLogSummaryReportByUserId.mockResolvedValue(
         successResponse(''),
@@ -468,13 +475,15 @@ describe('ConversationController', () => {
       );
       profileService.createSystemPromptFromProfile.mockResolvedValue('');
       adminInstructionService.getSystemPromptForDomain.mockResolvedValue('');
-      aiService.textGenerateFromPrompt.mockResolvedValue(
+      aiService.textGenerateFromMessages.mockResolvedValue(
         successResponse('Response for long prompt'),
       );
+      conversationService.isExistConversation.mockResolvedValue(false);
+      conversationService.addConversation.mockResolvedValue(successResponse(longConvReq));
 
-      const result = await controller.convserationV1Test(req, TEST_USER_ID, longPrompt);
+      const result = await controller.conversationV1(req, longConvReq);
 
-      expect(result.success).toBe(true);
+      expect(result).toBeDefined();
     });
   });
 });

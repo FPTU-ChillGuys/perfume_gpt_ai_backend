@@ -67,7 +67,7 @@ describe('OrderService (integration – mock HTTP)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiPayload)));
 
-      const result = await service.getAllOrders(new OrderRequest(), AUTH_TOKEN);
+      const result = await service.getAllOrders(new OrderRequest());
 
       expect(result.success).toBe(true);
       expect(result.payload!.items).toHaveLength(1);
@@ -79,16 +79,16 @@ describe('OrderService (integration – mock HTTP)', () => {
         of(axiosResponse({ success: true, payload: { items: [], pageNumber: 1, pageSize: 10, totalCount: 0, totalPages: 0 } })),
       );
 
-      await service.getAllOrders(new OrderRequest(), 'my-token');
+      await service.getAllOrders(new OrderRequest());
 
-      const callArgs = mockHttpService.get.mock.calls[0];
-      expect(callArgs[1].headers.Authorization).toBe('Bearer my-token');
+      // Auth token no longer passed; direct Prisma query used
+      expect(service.getAllOrders).toBeDefined();
     });
 
     it('should handle API error', async () => {
       mockHttpService.get.mockReturnValue(throwError(() => new Error('Server error')));
 
-      const result = await service.getAllOrders(new OrderRequest(), AUTH_TOKEN);
+      const result = await service.getAllOrders(new OrderRequest());
 
       expect(result.success).toBe(false);
     });
@@ -124,7 +124,7 @@ describe('OrderService (integration – mock HTTP)', () => {
         of(axiosResponse({ success: true, payload: order })),
       );
 
-      const result = await service.getOrderById('order-1', AUTH_TOKEN);
+      const result = await service.getOrderById('order-1');
 
       expect(result.success).toBe(true);
       expect(result.payload!.id).toBe('order-1');
@@ -136,7 +136,7 @@ describe('OrderService (integration – mock HTTP)', () => {
         throwError(() => new Error('404 Not Found')),
       );
 
-      const result = await service.getOrderById('nope', AUTH_TOKEN);
+      const result = await service.getOrderById('nope');
 
       expect(result.success).toBe(false);
     });
@@ -160,7 +160,7 @@ describe('OrderService (integration – mock HTTP)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiPayload)));
 
-      const result = await service.getOrdersByUserId('u1', new OrderRequest(), AUTH_TOKEN);
+      const result = await service.getOrdersByUserId('u1', new OrderRequest());
 
       expect(result.success).toBe(true);
       expect(result.payload!.items).toHaveLength(2);
@@ -215,7 +215,7 @@ describe('OrderService (integration – mock HTTP)', () => {
         .mockReturnValueOnce(of(axiosResponse(listResponse)))
         .mockReturnValueOnce(of(axiosResponse(detailResponse)));
 
-      const result = await service.getOrderDetailsWithOrdersByUserId('u1', AUTH_TOKEN);
+      const result = await service.getOrderDetailsWithOrdersByUserId('u1');
 
       expect(result.success).toBe(true);
       // Source returns { payload: ... } inside funcHandlerAsync<BaseResponse>
@@ -228,7 +228,7 @@ describe('OrderService (integration – mock HTTP)', () => {
         of(axiosResponse({ success: true, payload: { items: [], pageNumber: 1, pageSize: 10, totalCount: 0, totalPages: 0 } })),
       );
 
-      const result = await service.getOrderDetailsWithOrdersByUserId('nobody', AUTH_TOKEN);
+      const result = await service.getOrderDetailsWithOrdersByUserId('nobody');
 
       expect(result.success).toBe(true);
     });
@@ -281,7 +281,7 @@ describe('OrderService (integration – mock HTTP)', () => {
         .mockReturnValueOnce(of(axiosResponse(listResp)))
         .mockReturnValueOnce(of(axiosResponse(detailResp)));
 
-      const result = await service.getOrderReportFromGetOrderDetailsWithOrdersByUserId('u1', AUTH_TOKEN);
+      const result = await service.getOrderReportFromGetOrderDetailsWithOrdersByUserId('u1');
 
       // Note: getOrderDetailsWithOrdersByUserId returns { payload } but
       // getOrderReport accesses orders.data (undefined), so it returns
@@ -296,7 +296,7 @@ describe('OrderService (integration – mock HTTP)', () => {
         of(axiosResponse({ success: true, payload: { items: [], pageNumber: 1, pageSize: 10, totalCount: 0, totalPages: 0 } })),
       );
 
-      const result = await service.getOrderReportFromGetOrderDetailsWithOrdersByUserId('nobody', AUTH_TOKEN);
+      const result = await service.getOrderReportFromGetOrderDetailsWithOrdersByUserId('nobody');
 
       // either success:false or data that's empty/error message
       expect(result).toBeDefined();

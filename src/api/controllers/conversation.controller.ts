@@ -145,12 +145,11 @@ export class ConversationController {
 
       const orderReport =
         await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-          userId,
-          extractTokenFromHeader(request) ?? ''
+          userId
         );
 
       const profile = await this.profileService.getOwnProfile(
-        extractTokenFromHeader(request) ?? ''
+        userId
       );
 
       const profileReport =
@@ -247,12 +246,11 @@ export class ConversationController {
 
       const orderReport =
         await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-          userId,
-          extractTokenFromHeader(request) ?? ''
+          userId
         );
 
       const profile = await this.profileService.getOwnProfile(
-        extractTokenFromHeader(request) ?? ''
+        userId
       );
 
       const profileReport =
@@ -424,7 +422,6 @@ export class ConversationController {
       this.profileService,
       this.adminInstructionService,
       userId,
-      extractTokenFromHeader(request) ?? ''
     );
 
     if (!promptResult.success || !promptResult.data) {
@@ -589,7 +586,6 @@ export class ConversationController {
       this.profileService,
       this.adminInstructionService,
       userId,
-      extractTokenFromHeader(request) ?? ''
     );
 
     if (!promptResult.success || !promptResult.data) {
@@ -668,7 +664,6 @@ export class ConversationController {
       this.logService,
       this.adminInstructionService,
       userId,
-      extractTokenFromHeader(request) ?? ''
     );
 
     if (!promptResult.success || !promptResult.data) {

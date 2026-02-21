@@ -1,25 +1,24 @@
-import { HttpService } from '@nestjs/axios';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { funcHandlerAsync } from '../utils/error-handler';
-import { firstValueFrom } from 'rxjs';
-import ApiUrl from '../api/api_url';
-import { id } from 'zod/v4/locales';
 
+@Injectable()
 export class UserService {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async getEmailById(userId: string): Promise<BaseResponseAPI<String>> {
+  async getEmailById(userId: string): Promise<BaseResponseAPI<string>> {
     return await funcHandlerAsync(
       async () => {
-        const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<String>>(
-            ApiUrl().USER_URL('email/' + userId)
-          )
-        );
-        return data;
+        const user = await this.prisma.aspNetUsers.findUnique({
+          where: { Id: userId },
+          select: { Email: true },
+        });
+        return { success: true, payload: user?.Email ?? null };
       },
       'Failed to fetch user email',
       true
     );
   }
 }
+

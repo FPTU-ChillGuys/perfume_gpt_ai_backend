@@ -80,7 +80,7 @@ describe('OrderController (Integration)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
-      const result = await controller.getAllOrders(mockRequest(), {} as any);
+      const result = await controller.getAllOrders({} as any);
 
       expect(result.success).toBe(true);
       expect(result.payload).toBeDefined();
@@ -89,7 +89,7 @@ describe('OrderController (Integration)', () => {
     it('should handle API failure', async () => {
       mockHttpService.get.mockReturnValue(throwError(() => new Error('Error')));
 
-      const result = await controller.getAllOrders(mockRequest(), {} as any);
+      const result = await controller.getAllOrders({} as any);
 
       expect(result.success).toBe(false);
     });
@@ -106,7 +106,7 @@ describe('OrderController (Integration)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
-      const result = await controller.getOrdersByUserId(mockRequest(), userId, {} as any);
+      const result = await controller.getOrdersByUserId(userId, {} as any);
 
       expect(result.success).toBe(true);
     });
@@ -120,7 +120,7 @@ describe('OrderController (Integration)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
-      const result = await controller.getAIOrderSummary(mockRequest(), userId);
+      const result = await controller.getAIOrderSummary(userId);
 
       // Known source bug: getOrderDetailsWithOrdersByUserId returns {payload}
       // but getOrderReport accesses orders.data (always undefined)
@@ -145,7 +145,7 @@ describe('OrderController (Integration)', () => {
         data: 'AI order summary',
       });
 
-      const result = await controller.getAIOrderSummary(mockRequest(), userId);
+      const result = await controller.getAIOrderSummary(userId);
 
       // Due to source bug: getOrderDetailsWithOrdersByUserId returns {payload}
       // but getOrderReport accesses orders.data (always undefined)
@@ -166,7 +166,7 @@ describe('OrderController (Integration)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
-      const result = await controller.getStructuredAIOrderSummary(mockRequest(), userId);
+      const result = await controller.getStructuredAIOrderSummary(userId);
 
       // Due to known source bug, order report is always error
       expect(result).toBeDefined();

@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AIController } from 'src/api/controllers/ai/ai.controller';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
-import { createMockAIService } from '../../helpers/mock-factories';
-import { successResponse, errorResponse } from '../../helpers/test-constants';
+import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { createMockAIService, createMockUserLogService } from '../../helpers/mock-factories';
+import { successResponse, errorResponse, createMockRequest } from '../../helpers/test-constants';
 
 describe('AIController', () => {
   let controller: AIController;
@@ -10,10 +11,14 @@ describe('AIController', () => {
 
   beforeEach(async () => {
     aiService = createMockAIService();
+    const userLogService = createMockUserLogService();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AIController],
-      providers: [{ provide: AI_SERVICE, useValue: aiService }],
+      providers: [
+        { provide: AI_SERVICE, useValue: aiService },
+        { provide: UserLogService, useValue: userLogService },
+      ],
     }).compile();
 
     controller = module.get<AIController>(AIController);
@@ -31,7 +36,7 @@ describe('AIController', () => {
         successResponse('Nước hoa citrus phù hợp mùa hè...'),
       );
 
-      const result = await controller.searchProductWithAI(prompt);
+      const result = await controller.searchProductWithAI(createMockRequest(), prompt);
 
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
@@ -43,7 +48,7 @@ describe('AIController', () => {
         successResponse(''),
       );
 
-      const result = await controller.searchProductWithAI('');
+      const result = await controller.searchProductWithAI(createMockRequest(), '');
 
       expect(result.success).toBe(true);
       expect(aiService.textGenerateFromPrompt).toHaveBeenCalled();
@@ -54,7 +59,7 @@ describe('AIController', () => {
         errorResponse('AI service unavailable'),
       );
 
-      const result = await controller.searchProductWithAI('test query');
+      const result = await controller.searchProductWithAI(createMockRequest(), 'test query');
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -65,7 +70,7 @@ describe('AIController', () => {
         new Error('Connection timeout'),
       );
 
-      await expect(controller.searchProductWithAI('test'))
+      await expect(controller.searchProductWithAI(createMockRequest(), 'test'))
         .rejects.toThrow('Connection timeout');
     });
 
@@ -75,7 +80,7 @@ describe('AIController', () => {
         successResponse('Dior Sauvage là...'),
       );
 
-      await controller.searchProductWithAI(prompt);
+      await controller.searchProductWithAI(createMockRequest(), prompt);
 
       expect(aiService.textGenerateFromPrompt).toHaveBeenCalledTimes(1);
       const calledPrompt = aiService.textGenerateFromPrompt.mock.calls[0][0];

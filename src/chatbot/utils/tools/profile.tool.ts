@@ -13,12 +13,12 @@ export class ProfileTool {
     description:
       'Retrieve the profile information of the authenticated user, including preferences, budget range, and favorite notes.',
     inputSchema: z.object({
-      authToken: z.string().describe('JWT authentication token')
+      userId: z.string().describe('The ID of the user'),
     }),
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
-          const response = await this.profileService.getOwnProfile(input.authToken);
+          const response = await this.profileService.getOwnProfile(input.userId);
           console.log('ProfileTool - getOwnProfile response:', response.payload);
           if (!response.success) {
             return { success: false, error: 'Failed to fetch profile.' };

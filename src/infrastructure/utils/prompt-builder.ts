@@ -62,15 +62,11 @@ export async function buildCombinedPromptV1(
 
     const orderReport =
       await orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userId,
-        authToken
+        userId
       );
     orderReportData = orderReport.data ?? '';
-  }
 
-  // Profile chỉ lấy được khi có auth token
-  if (authToken) {
-    const profile = await profileService.getOwnProfile(authToken);
+    const profile = await profileService.getOwnProfile(userId!);
     profileReport =
       (await profileService.createSystemPromptFromProfile(profile.payload!)) ??
       '';
@@ -124,7 +120,6 @@ export async function buildCombinedPromptV2(
   profileService: ProfileService,
   adminInstructionService: AdminInstructionService,
   userId: string | undefined,
-  authToken: string
 ): Promise<BaseResponse<CombinedPromptResult>> {
   let userLogData = '';
   let orderReportData = '';
@@ -142,15 +137,11 @@ export async function buildCombinedPromptV2(
 
     const orderReport =
       await orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userId,
-        authToken
+        userId
       );
     orderReportData = orderReport.data ?? '';
-  }
 
-  // Profile chỉ lấy được khi có auth token
-  if (authToken) {
-    const profile = await profileService.getOwnProfile(authToken);
+    const profile = await profileService.getOwnProfile(userId!);
     profileReport =
       (await profileService.createSystemPromptFromProfile(profile.payload!)) ??
       '';
@@ -200,7 +191,6 @@ export async function buildCombinedPromptV3(
   logService: UserLogService,
   adminInstructionService: AdminInstructionService,
   userId: string | undefined,
-  authToken: string,
   period: PeriodEnum = PeriodEnum.MONTHLY
 ): Promise<BaseResponse<CombinedPromptResult>> {
   let userLogData = '';
@@ -222,8 +212,7 @@ export async function buildCombinedPromptV3(
 
   const combinedPrompt = `${userLogData}\n\n
   ${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''}
-    ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}
-    ${authToken ? '\n\n[Authenticated User - has auth token]' : '\n\n[Unauthenticated User - no auth token]'}`;
+    ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}`;
 
   return {
     success: true,
@@ -252,7 +241,6 @@ export async function buildCombinedPromptV4(
   logService: UserLogService,
   adminInstructionService: AdminInstructionService,
   userId: string | undefined,
-  authToken: string
 ): Promise<BaseResponse<CombinedPromptResult>> {
   let userLogData = '';
   let userLogPromptText = '';
@@ -271,8 +259,7 @@ export async function buildCombinedPromptV4(
     ${userLogPromptText}\n\n ${
       adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''
     }
-    ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}
-    ${authToken ? '\n\n[Authenticated User - has auth token]' : '\n\n[No auth token]'}`;
+    ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}`;
 
   return {
     success: true,

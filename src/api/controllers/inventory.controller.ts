@@ -1,7 +1,6 @@
-import { Controller, Get, Inject, Query, Req } from '@nestjs/common';
+import { Controller, Get, Inject, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { Request } from 'express';
-import { Public, Role } from 'src/application/common/Metadata';
+import { Role } from 'src/application/common/Metadata';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
@@ -14,7 +13,6 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
 import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
 import { AIInventoryReportStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 import { inventoryReportPrompt, INSTRUCTION_TYPE_INVENTORY } from 'src/application/constant/prompts';
@@ -39,24 +37,17 @@ export class InventoryController {
   @ApiOperation({ summary: 'Lấy thông tin tồn kho' })
   @ApiBaseResponse(PagedResult<InventoryStockResponse>)
   async getInventoryStock(
-    @Req() request: Request,
     @Query() inventoryStockRequest: InventoryStockRequest
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
-    return this.inventoryService.getInventoryStock(
-      inventoryStockRequest,
-      extractTokenFromHeader(request!) ?? ''
-    );
+    return this.inventoryService.getInventoryStock(inventoryStockRequest);
   }
 
   /** Lấy danh sách batch */
   @Get('batches')
   @ApiOperation({ summary: 'Lấy danh sách batch' })
   @ApiBaseResponse(PagedResult<BatchResponse>)
-  async getBatch(@Req() request: Request, @Query() batchRequest: BatchRequest): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
-    return this.inventoryService.getBatch(
-      batchRequest,
-      extractTokenFromHeader(request!) ?? ''
-    );
+  async getBatch(@Query() batchRequest: BatchRequest): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
+    return this.inventoryService.getBatch(batchRequest);
   }
 
   /** Lấy báo cáo tồn kho */
@@ -64,14 +55,10 @@ export class InventoryController {
 
   @ApiOperation({ summary: 'Lấy báo cáo tồn kho' })
   @ApiBaseResponse(String)
-  async getInventoryReport(
-    @Req() request: Request,
-  ): Promise<BaseResponse<string>> {
-    const authHeader = extractTokenFromHeader(request!) ?? '';
-
+  async getInventoryReport(): Promise<BaseResponse<string>> {
     // Fetch stock and batch data
     const report =
-      await this.inventoryService.createReportFromBatchAndStock(authHeader);
+      await this.inventoryService.createReportFromBatchAndStock();
 
     return Ok(report.toString());
   }
@@ -80,14 +67,10 @@ export class InventoryController {
   @Get('report/ai')
   @ApiOperation({ summary: 'Tạo báo cáo tồn kho bằng AI' })
   @ApiBaseResponse(String)
-  async getAIInventoryReport(
-    @Req() request: Request,
-  ): Promise<BaseResponse<string>> {
-    const authHeader = extractTokenFromHeader(request!) ?? '';
-
+  async getAIInventoryReport(): Promise<BaseResponse<string>> {
     // Fetch stock and batch data
     const report =
-      await this.inventoryService.createReportFromBatchAndStock(authHeader);
+      await this.inventoryService.createReportFromBatchAndStock();
 
     if (isDataEmpty(report?.toString())) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
@@ -116,14 +99,11 @@ export class InventoryController {
   @Get('report/ai/structured')
   @ApiOperation({ summary: 'Tạo báo cáo tồn kho AI có cấu trúc' })
   @ApiBaseResponse(AIInventoryReportStructuredResponse)
-  async getStructuredAIInventoryReport(
-    @Req() request: Request,
-  ): Promise<BaseResponse<AIInventoryReportStructuredResponse>> {
+  async getStructuredAIInventoryReport(): Promise<BaseResponse<AIInventoryReportStructuredResponse>> {
     const startTime = Date.now();
-    const authHeader = extractTokenFromHeader(request!) ?? '';
 
     const report =
-      await this.inventoryService.createReportFromBatchAndStock(authHeader);
+      await this.inventoryService.createReportFromBatchAndStock();
 
     if (isDataEmpty(report?.toString())) {
       const processingTimeMs = Date.now() - startTime;

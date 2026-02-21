@@ -1,95 +1,175 @@
-import { HttpService } from '@nestjs/axios';
+import { Injectable } from '@nestjs/common';
+import { Prisma } from 'generated/prisma/client';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
 import { funcHandlerAsync } from '../utils/error-handler';
-import ApiUrl from '../api/api_url';
-import { firstValueFrom } from 'rxjs';
-import { authorizationHeader } from '../utils/header';
-import { Injectable } from '@nestjs/common';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  //Get inventory methods here
   async getInventoryStock(
-    request: InventoryStockRequest,
-    authHeader: string
+    request: InventoryStockRequest
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const { data } = await firstValueFrom(
-          this.httpService.get<
-            BaseResponseAPI<PagedResult<InventoryStockResponse>>
-          >(ApiUrl().INVENTORY_URL('stock'), {
-            params: {
-              variantId: request.VariantId,
-              searchTerm: request.SearchTerm,
-              isLowStock: request.IsLowStock,
-              pageNumber: request.PageNumber ?? 1,
-              pageSize: request.PageSize ?? 10,
-              sortBy: request.SortBy ?? '',
-              sortOrder: request.SortOrder ?? 'asc',
-              isDescending: request.IsDescending ?? false
+        const skip = (request.PageNumber - 1) * request.PageSize;
+        const take = request.PageSize;
+
+        const where: Prisma.StocksWhereInput = {
+          ...(request.VariantId ? { VariantId: request.VariantId } : {}),
+          ...(request.SearchTerm
+            ? {
+                ProductVariants: {
+                  Products: { Name: { contains: request.SearchTerm } },
+                },
+              }
+            : {}),
+          ...(request.IsLowStock != null
+            ? {
+                ProductVariants: {
+                  Stocks: request.IsLowStock
+                    ? { isNot: null }
+                    : undefined,
+                },
+              }
+            : {}),
+        };
+
+        const [stocks, totalCount] = await Promise.all([
+          this.prisma.stocks.findMany({
+            where,
+            skip,
+            take,
+            include: {
+              ProductVariants: {
+                include: {
+                  Products: true,
+                  Concentrations: true,
+                },
+              },
             },
-            headers: {
-              Authorization: authorizationHeader(authHeader)
-            }
-          })
-        );
-        return data;
+          }),
+          this.prisma.stocks.count({ where }),
+        ]);
+
+        const items: InventoryStockResponse[] = stocks.map((s) => {
+          const isLowStock = s.TotalQuantity <= s.LowStockThreshold;
+          return new InventoryStockResponse({
+            id: s.Id,
+            variantId: s.VariantId,
+            variantSku: s.ProductVariants.Sku,
+            productName: s.ProductVariants.Products.Name,
+            concentrationName: s.ProductVariants.Concentrations.Name,
+            volumeMl: s.ProductVariants.VolumeMl,
+            totalQuantity: s.TotalQuantity,
+            lowStockThreshold: s.LowStockThreshold,
+            isLowStock,
+          });
+        });
+
+        const result = new PagedResult<InventoryStockResponse>({
+          items,
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / request.PageSize),
+        });
+        return { success: true, payload: result };
       },
       'Failed to fetch inventory stock',
       true
     );
   }
 
-  //Get batch methods here
   async getBatch(
-    request: BatchRequest,
-    authHeader: string
+    request: BatchRequest
   ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<PagedResult<BatchResponse>>>(
-            ApiUrl().INVENTORY_URL('batches'),
-            {
-              params: {
-                ...request
-              },
-              headers: {
-                Authorization: authorizationHeader(authHeader)
+        const skip = (request.PageNumber - 1) * request.PageSize;
+        const take = request.PageSize;
+
+        const where: Prisma.BatchesWhereInput = {
+          ...(request.id ? { Id: request.id } : {}),
+          ...(request.variantId ? { VariantId: request.variantId } : {}),
+          ...(request.batchCode ? { BatchCode: { contains: request.batchCode } } : {}),
+          ...(request.manufactureDate ? { ManufactureDate: { gte: new Date(request.manufactureDate) } } : {}),
+          ...(request.expiryDate ? { ExpiryDate: { lte: new Date(request.expiryDate) } } : {}),
+          ...(request.importQuantity ? { ImportQuantity: { gte: request.importQuantity } } : {}),
+          ...(request.remainingQuantity ? { RemainingQuantity: { gte: request.remainingQuantity } } : {}),
+          ...(request.isExpired != null
+            ? { ExpiryDate: request.isExpired ? { lt: new Date() } : { gte: new Date() } }
+            : {}),
+          ...((request.variantSku || request.productName || request.volumeMl || request.concentrationName)
+            ? {
+                ProductVariants: {
+                  ...(request.variantSku ? { Sku: { contains: request.variantSku } } : {}),
+                  ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
+                  ...(request.productName
+                    ? { Products: { Name: { contains: request.productName } } }
+                    : {}),
+                  ...(request.concentrationName
+                    ? { Concentrations: { Name: { contains: request.concentrationName } } }
+                    : {}),
+                },
               }
-            }
-          )
+            : {}),
+        };
+
+        const [batches, totalCount] = await Promise.all([
+          this.prisma.batches.findMany({
+            where,
+            skip,
+            take,
+            include: {
+              ProductVariants: {
+                include: { Products: true, Concentrations: true },
+              },
+            },
+          }),
+          this.prisma.batches.count({ where }),
+        ]);
+
+        const items: BatchResponse[] = batches.map(
+          (b) =>
+            new BatchResponse({
+              id: b.Id,
+              batchCode: b.BatchCode,
+              importQuantity: b.ImportQuantity,
+              remainingQuantity: b.RemainingQuantity,
+              manufactureDate: b.ManufactureDate.toISOString(),
+              expiryDate: b.ExpiryDate.toISOString(),
+              createdAt: b.CreatedAt.toISOString(),
+            })
         );
-        return data;
+
+        const result = new PagedResult<BatchResponse>({
+          items,
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / request.PageSize),
+        });
+        return { success: true, payload: result };
       },
-      'Failed to fetch inventory stock',
+      'Failed to fetch batches',
       true
     );
   }
 
-  /**
-   * Tao report tu batch va stock (Lay du lieu tu 2 API tren)
-   * @param authHeader 
-   * @returns 
-   */
-  async createReportFromBatchAndStock(authHeader: string): Promise<String> {
-    // Implementation for creating report from batch and stock
+  async createReportFromBatchAndStock(): Promise<String> {
     const stockResponse = await this.getInventoryStock(
-      new InventoryStockRequest({ PageNumber: 1, PageSize: 1000 }),
-      authHeader
+      new InventoryStockRequest({ PageNumber: 1, PageSize: 1000 })
     );
 
     const batchResponse = await this.getBatch(
-      new BatchRequest({ PageNumber: 1, PageSize: 1000 }),
-      authHeader
+      new BatchRequest({ PageNumber: 1, PageSize: 1000 })
     );
 
     const report = this.createBatchAndStockReport(
@@ -101,7 +181,6 @@ export class InventoryService {
   }
 
   createBatchReport(batchResponse: BatchResponse[]): String {
-    // Implementation for creating batch report
     const batchReport = batchResponse.map((batch) => {
       return `Batch ID: ${batch.id}, Batch Code: ${batch.batchCode}, Import Quantity: ${batch.importQuantity}, Remaining Quantity: ${batch.remainingQuantity}, Manufacture Date: ${batch.manufactureDate}, Expiry Date: ${batch.expiryDate}, Created At: ${batch.createdAt}`;
     });
@@ -109,7 +188,6 @@ export class InventoryService {
   }
 
   createStockReport(stockResponse: InventoryStockResponse[]): String {
-    // Implementation for creating stock report
     const stockReport = stockResponse.map((stock) => {
       return `Variant ID: ${stock.variantId}, Variant SKU: ${stock.variantSku}, Product Name: ${stock.productName}, Concentration: ${stock.concentrationName}, Volume: ${stock.volumeMl}ml, Stock Quantity: ${stock.totalQuantity}, Low Stock Threshold: ${stock.lowStockThreshold}, Is Low Stock: ${stock.isLowStock}`;
     });
@@ -120,7 +198,6 @@ export class InventoryService {
     stockResponse: InventoryStockResponse[],
     batchResponse: BatchResponse[]
   ) {
-    // Implementation for creating inventory report
     const batchAndStockReport = [
       '--- Inventory Stock Report ---',
       this.createStockReport(stockResponse),
@@ -130,3 +207,4 @@ export class InventoryService {
     return batchAndStockReport;
   }
 }
+

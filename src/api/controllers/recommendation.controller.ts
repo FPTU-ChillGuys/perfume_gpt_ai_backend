@@ -78,7 +78,6 @@ export class RecommendationController {
       this.profileService,
       this.adminInstructionService,
       userLogRequest.userId,
-      process.env.PERFUME_GPT_API_TOKEN ?? ''
     );
 
     const recommendation = await this.generateRepurchaseRecommendation(
@@ -138,7 +137,6 @@ export class RecommendationController {
       this.userLogService,
       this.adminInstructionService,
       userLogRequest.userId,
-      process.env.PERFUME_GPT_API_TOKEN ?? '',
       userLogRequest.period
     );
 
@@ -173,7 +171,6 @@ export class RecommendationController {
       this.userLogService,
       this.adminInstructionService,
       userLogRequest.userId,
-      process.env.PERFUME_GPT_API_TOKEN ?? '',
     );
 
     // Check data empty
@@ -411,7 +408,6 @@ export class RecommendationController {
       this.profileService,
       this.adminInstructionService,
       userLogRequest.userId,
-      process.env.PERFUME_GPT_API_TOKEN ?? ''
     );
 
     if (!combinedPromptResult.success || !combinedPromptResult.data) {

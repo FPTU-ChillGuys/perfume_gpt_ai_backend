@@ -30,7 +30,7 @@ export class QuizQuestion extends Common {
     type: () => QuizQuestionAnswerDetail,
     isArray: true
   })
-  @OneToMany(() => QuizQuestionAnswerDetail, (qqa) => qqa.question)
+  @OneToMany(() => QuizQuestionAnswerDetail, (qqa) => qqa.question, { orphanRemoval: true })
   quizQuestionAnswers = new Collection<QuizQuestionAnswerDetail>(this);
 
   constructor(init?: Partial<QuizQuestion>) {

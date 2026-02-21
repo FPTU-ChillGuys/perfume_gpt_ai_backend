@@ -14,7 +14,7 @@ export class QuizQuestionAnswer extends Common {
 
   /** Danh sách chi tiết câu hỏi - câu trả lời */
   @ApiProperty({ description: 'Danh sách chi tiết câu hỏi - câu trả lời', type: () => QuizQuestionAnswerDetail, isArray: true })
-  @OneToMany(() => QuizQuestionAnswerDetail, (detail) => detail.quesAns)
+  @OneToMany(() => QuizQuestionAnswerDetail, (detail) => detail.quesAns, { orphanRemoval: true })
   details = new Collection<QuizQuestionAnswerDetail>(this);
 
   constructor(init?: Partial<QuizQuestionAnswer>) {

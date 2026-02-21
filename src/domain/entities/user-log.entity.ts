@@ -23,17 +23,17 @@ export class UserLog extends Common {
 
   /** Danh sách log tin nhắn của người dùng */
   @ApiProperty({ description: 'Log tin nhắn', type: () => UserMessageLog, isArray: true, nullable: true })
-  @OneToMany(() => UserMessageLog, (userMessageLog) => userMessageLog.userLog, { nullable: true })
+  @OneToMany(() => UserMessageLog, (userMessageLog) => userMessageLog.userLog, { nullable: true, orphanRemoval: true })
   userMessageLogs = new Collection<UserMessageLog>(this);
 
   /** Danh sách log quiz của người dùng */
   @ApiProperty({ description: 'Log quiz', type: () => UserQuizLog, isArray: true, nullable: true })
-  @OneToMany(() => UserQuizLog, (userQuizLog) => userQuizLog.userLog, { nullable: true })
+  @OneToMany(() => UserQuizLog, (userQuizLog) => userQuizLog.userLog, { nullable: true, orphanRemoval: true })
   userQuizLogs = new Collection<UserQuizLog>(this);
 
   /** Danh sách log tìm kiếm của người dùng */
   @ApiProperty({ description: 'Log tìm kiếm', type: () => UserSearchLog, isArray: true, nullable: true })
-  @OneToMany(() => UserSearchLog, (userSearchLog) => userSearchLog.userLog, { nullable: true })
+  @OneToMany(() => UserSearchLog, (userSearchLog) => userSearchLog.userLog, { nullable: true, orphanRemoval: true })
   userSearchLogs = new Collection<UserSearchLog>(this);
 
   constructor(init?: Partial<UserLog>) {

@@ -35,7 +35,7 @@ export class QuizQuestionAnswerDetail extends Common {
 
   /** Log quiz của người dùng (nếu có) */
   @ApiProperty({ description: 'Log quiz của người dùng', type: () => UserQuizLog, nullable: true })
-  @OneToMany(() => UserQuizLog, userQuizLog => userQuizLog.quizQuesAnsDetail)
+  @OneToMany(() => UserQuizLog, userQuizLog => userQuizLog.quizQuesAnsDetail, { orphanRemoval: true })
   userQuizLog? = new Collection<UserQuizLog>(this);
 
   constructor(init?: Partial<QuizQuestionAnswerDetail>) {

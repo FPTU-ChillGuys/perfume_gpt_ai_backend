@@ -14,7 +14,7 @@ export class Conversation extends Common {
 
   /** Danh sách tin nhắn trong cuộc hội thoại */
   @ApiProperty({ description: 'Danh sách tin nhắn', type: () => Message, isArray: true })
-  @OneToMany(() => Message, (message) => message.conversation)
+  @OneToMany(() => Message, (message) => message.conversation, { orphanRemoval: true })
   messages = new Collection<Message>(this);
 
   constructor(init?: Partial<Conversation>) {

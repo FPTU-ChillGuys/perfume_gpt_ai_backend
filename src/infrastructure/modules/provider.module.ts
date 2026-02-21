@@ -16,11 +16,9 @@ import { QueueName } from 'src/application/constant/processor';
 import { ProcessorModule } from './processor.module';
 import { modules } from './list/module';
 
-
-
-const registerQueue = BullModule.registerQueue({
-  name: QueueName.CONVERSATION_QUEUE
-});
+const registerQueue = BullModule.registerQueue(
+  ...Object.values(QueueName).map((value) => ({ name: value }))
+);
 
 @Module({
   imports: [...modules, registerQueue, ProcessorModule],
@@ -36,7 +34,7 @@ const registerQueue = BullModule.registerQueue({
     InventoryController,
     AIAcceptanceController,
     AdminInstructionController,
-    OrderController,
+    OrderController
   ],
   exports: modules
 })

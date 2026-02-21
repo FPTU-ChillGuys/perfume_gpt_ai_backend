@@ -15,9 +15,11 @@ import { CamelCaseNamingConvention } from '@automapper/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { BullModule } from '@nestjs/bullmq';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
+    PrismaModule,
     ConfigModule.forRoot({ isGlobal: true }),
     AutomapperModule.forRoot({
       strategyInitializer: mikro(),

@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
 import { ProductController } from 'src/api/controllers/product.controller';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
+import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 
 function axiosResponse<T>(data: T): AxiosResponse<T> {
@@ -31,7 +32,8 @@ describe('ProductController (Integration – mock HTTP)', () => {
       ],
     }).compile();
     service = module.get(ProductService);
-    controller = new ProductController(service);
+    const mockUserLogService = { addSearchLogToUserLog: jest.fn() } as unknown as UserLogService;
+    controller = new ProductController(service, mockUserLogService);
   });
 
   describe('getAllProducts', () => {
@@ -74,7 +76,8 @@ describe('ProductController (Integration – mock HTTP)', () => {
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
       const request = new PagedAndSortedRequest();
-      const result = await controller.getProductsBySemanticSearch('rose', request);
+      const mockReq = { headers: {} } as any;
+      const result = await controller.getProductsBySemanticSearch(mockReq, 'rose', request);
 
       expect(result.success).toBe(true);
     });
@@ -87,7 +90,8 @@ describe('ProductController (Integration – mock HTTP)', () => {
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
       const request = new PagedAndSortedRequest();
-      const result = await controller.getProductsBySemanticSearch('nonexistent', request);
+      const mockReq = { headers: {} } as any;
+      const result = await controller.getProductsBySemanticSearch(mockReq, 'nonexistent', request);
 
       expect(result.success).toBe(true);
     });

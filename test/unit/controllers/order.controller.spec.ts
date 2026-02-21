@@ -56,7 +56,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getAllOrders(req, {} as any);
+      const result = await controller.getAllOrders({} as any);
 
       expect(result.success).toBe(true);
       expect(result.payload).toBeDefined();
@@ -68,7 +68,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      await controller.getAllOrders(req, {} as any);
+      await controller.getAllOrders({} as any);
 
       expect(orderService.getAllOrders).toHaveBeenCalledTimes(1);
     });
@@ -86,7 +86,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getOrdersByUserId(req, TEST_USER_ID, {} as any);
+      const result = await controller.getOrdersByUserId(TEST_USER_ID, {} as any);
 
       expect(result.success).toBe(true);
       expect(result.payload).toBeDefined();
@@ -98,7 +98,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getOrdersByUserId(req, 'no-orders-user', {} as any);
+      const result = await controller.getOrdersByUserId('no-orders-user', {} as any);
 
       expect(result.success).toBe(true);
       expect(result.payload!.items).toHaveLength(0);
@@ -117,7 +117,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getAIOrderSummary(req, TEST_USER_ID);
+      const result = await controller.getAIOrderSummary(TEST_USER_ID);
 
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
@@ -129,7 +129,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getAIOrderSummary(req, TEST_USER_ID);
+      const result = await controller.getAIOrderSummary(TEST_USER_ID);
 
       expect(result.success).toBe(true);
       // Should return insufficient data message
@@ -146,7 +146,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getAIOrderSummary(req, TEST_USER_ID);
+      const result = await controller.getAIOrderSummary(TEST_USER_ID);
 
       expect(result.success).toBe(false);
     });
@@ -164,7 +164,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getStructuredAIOrderSummary(req, TEST_USER_ID);
+      const result = await controller.getStructuredAIOrderSummary(TEST_USER_ID);
 
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
@@ -176,7 +176,7 @@ describe('OrderController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getStructuredAIOrderSummary(req, TEST_USER_ID);
+      const result = await controller.getStructuredAIOrderSummary(TEST_USER_ID);
 
       expect(result.success).toBe(true);
       expect(aiService.textGenerateFromPrompt).not.toHaveBeenCalled();

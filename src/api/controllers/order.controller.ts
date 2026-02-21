@@ -4,8 +4,7 @@ import {
   Get,
   Inject,
   Param,
-  Query,
-  Req
+  Query
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,7 +14,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { Request } from 'express';
 import { OrderRequest } from 'src/application/dtos/request/order.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
@@ -33,7 +31,7 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
+
 import {
   AIOrderSummaryStructuredResponse,
   AIResponseMetadata
@@ -73,10 +71,7 @@ export class OrderController {
   async getAllOrders(
     @Query() orderRequest: OrderRequest
   ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
-    return await this.orderService.getAllOrders(
-      orderRequest,
-      process.env.PERFUME_GPT_API_TOKEN ?? ''
-    );
+    return await this.orderService.getAllOrders(orderRequest);
   }
 
   /** Lấy danh sách đơn hàng theo userId */
@@ -91,15 +86,10 @@ export class OrderController {
   })
   @ApiBaseResponse(PagedResult<OrderResponse>)
   async getOrdersByUserId(
-    @Req() request: Request,
     @Param('userId') userId: string,
     @Query() orderRequest: OrderRequest
   ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
-    return await this.orderService.getOrdersByUserId(
-      userId,
-      orderRequest,
-      extractTokenFromHeader(request!) ?? ''
-    );
+    return await this.orderService.getOrdersByUserId(userId, orderRequest);
   }
 
   /** Tạo báo cáo tóm tắt đơn hàng bằng AI */
@@ -108,14 +98,12 @@ export class OrderController {
   @ApiQuery({ name: 'userId', description: 'ID của người dùng' })
   @ApiBaseResponse(String)
   async getAIOrderSummary(
-    @Req() request: Request,
     @Query('userId') userId: string
   ): Promise<BaseResponse<string>> {
     // Lay tat ca don hang cua user
     const ordersResponse =
       await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userId,
-        extractTokenFromHeader(request!) ?? ''
+        userId
       );
 
     if (!ordersResponse.success) {
@@ -167,15 +155,13 @@ export class OrderController {
   @ApiQuery({ name: 'userId', description: 'ID của người dùng' })
   @ApiBaseResponse(AIOrderSummaryStructuredResponse)
   async getStructuredAIOrderSummary(
-    @Req() request: Request,
     @Query('userId') userId: string
   ): Promise<BaseResponse<AIOrderSummaryStructuredResponse>> {
     const startTime = Date.now();
 
     const ordersResponse =
       await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userId,
-        extractTokenFromHeader(request!) ?? ''
+        userId
       );
 
     if (!ordersResponse.success) {

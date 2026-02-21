@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProductController } from 'src/api/controllers/product.controller';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
 import { createMockProductService } from '../../helpers/mock-factories';
-import { successResponseAPI, errorResponseAPI } from '../../helpers/test-constants';
+import { successResponseAPI, errorResponseAPI, createMockRequest } from '../../helpers/test-constants';
 
 describe('ProductController', () => {
   let controller: ProductController;
@@ -82,7 +82,7 @@ describe('ProductController', () => {
       );
 
       const result = await controller.getProductsBySemanticSearch(
-        'Chanel', pagedRequest,
+        createMockRequest(), 'Chanel', pagedRequest,
       );
 
       expect(result.success).toBe(true);
@@ -97,7 +97,7 @@ describe('ProductController', () => {
       );
 
       const result = await controller.getProductsBySemanticSearch(
-        'xyz-nonexistent', pagedRequest,
+        createMockRequest(), 'xyz-nonexistent', pagedRequest,
       );
 
       expect(result.success).toBe(true);
@@ -110,7 +110,7 @@ describe('ProductController', () => {
       );
 
       const result = await controller.getProductsBySemanticSearch(
-        '<script>alert("xss")</script>', pagedRequest,
+        createMockRequest(), '<script>alert("xss")</script>', pagedRequest,
       );
 
       expect(result.success).toBe(true);

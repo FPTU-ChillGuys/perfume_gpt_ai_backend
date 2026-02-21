@@ -1,12 +1,12 @@
 import { Controller, Get, Req } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Request } from 'express';
-import { Public, Role } from 'src/application/common/Metadata';
+import { Role } from 'src/application/common/Metadata';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProfileResponse } from 'src/application/dtos/response/profile.response';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
+import { getTokenPayloadFromRequest } from 'src/infrastructure/utils/extract-token';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
@@ -24,9 +24,8 @@ export class ProfileController {
   async getOwnProfile(
     @Req() request: Request
   ): Promise<BaseResponseAPI<ProfileResponse>> {
-    return await this.profileService.getOwnProfile(
-      extractTokenFromHeader(request) ?? ''
-    );
+    const userId = getTokenPayloadFromRequest(request)?.id ?? getTokenPayloadFromRequest(request)?.sub ?? '';
+    return await this.profileService.getOwnProfile(userId);
   }
 
   /** Tạo báo cáo profile dưới dạng text */
@@ -36,9 +35,8 @@ export class ProfileController {
   async getProfileReport(
     @Req() request: Request
   ): Promise<BaseResponse<string>> {
-    const profile = await this.profileService.getOwnProfile(
-      extractTokenFromHeader(request) ?? ''
-    );
+    const userId = getTokenPayloadFromRequest(request)?.id ?? getTokenPayloadFromRequest(request)?.sub ?? '';
+    const profile = await this.profileService.getOwnProfile(userId);
 
     if (!profile.success) {
       throw new InternalServerErrorWithDetailsException('Failed to fetch profile', { service: 'ProfileService' });

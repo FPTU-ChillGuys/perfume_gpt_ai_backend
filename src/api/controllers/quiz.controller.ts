@@ -15,14 +15,17 @@ import {
   ApiQuery,
   ApiTags
 } from '@nestjs/swagger';
-import { Public } from 'src/application/common/Metadata';
+import { Public, Role } from 'src/application/common/Metadata';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
 import { QuizQuesAnsDetailRequest } from 'src/application/dtos/request/quiz-ques-ans-detail.request';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
-import { QUIZ_SYSTEM_PROMPT, quizPrompt } from 'src/application/constant/prompts';
+import {
+  QUIZ_SYSTEM_PROMPT,
+  quizPrompt
+} from 'src/application/constant/prompts';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
@@ -34,15 +37,19 @@ import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { QueueName, QuizJobName } from 'src/application/constant/processor';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
 
-@Public()
 @ApiTags('Quizzes')
 @Controller('quizzes')
 export class QuizController {
   constructor(
     @Inject(AI_SERVICE) private aiService: AIService,
     private quizService: QuizService,
-    private logService: UserLogService
+    private logService: UserLogService,
+    @InjectQueue(QueueName.QUIZ_QUEUE)
+    private readonly quizQueue: Queue
   ) {}
 
   /** Lấy tất cả câu hỏi quiz */
@@ -54,7 +61,10 @@ export class QuizController {
     const quizQues = await this.quizService.getAllQuizQues();
 
     if (!quizQues.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get quiz questions', { service: 'QuizService' });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get quiz questions',
+        { service: 'QuizService' }
+      );
     }
 
     return Ok(quizQues.data);
@@ -73,7 +83,7 @@ export class QuizController {
   }
 
   /** Tạo câu hỏi quiz mới */
-  @Public()
+  @Role('admin')
   @Post('questions')
   @ApiOperation({ summary: 'Tạo câu hỏi quiz mới' })
   @ApiBaseResponse(String)
@@ -114,8 +124,6 @@ export class QuizController {
 
   /** Cập nhật câu trả lời quiz */
 
-
-
   @Put('questions/:id')
   @ApiOperation({ summary: 'Cập nhật câu trả lời quiz' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
@@ -139,11 +147,14 @@ export class QuizController {
     @Query('userId') userId: string,
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-   // Lay cau hoi quiz va cau tra loi tuong ung
+    // Lay cau hoi quiz va cau tra loi tuong ung
     const questionIds = quizAnswers.map((qa) => qa.questionId);
     const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
     if (!quizQueses.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get quiz question', { questionIds });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get quiz question',
+        { questionIds }
+      );
     }
 
     // Lay cau tra loi tuong ung    // Tim cau tra loi trong cau hoi
@@ -178,7 +189,10 @@ export class QuizController {
       await this.quizService.addQuizQuesAnws(quizQuesAnsDetail);
 
     if (!savedQuizQuesAnsResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to save quiz question answers', { userId });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to save quiz question answers',
+        { userId }
+      );
     }
 
     // Save user quiz log
@@ -196,7 +210,10 @@ export class QuizController {
 
     // Return response
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', { userId, service: 'AIService' });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        { userId, service: 'AIService' }
+      );
     }
 
     return Ok(aiResponse.data);
@@ -213,11 +230,14 @@ export class QuizController {
     @Query('userId') userId: string,
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-   // Lay cau hoi quiz va cau tra loi tuong ung
+    // Lay cau hoi quiz va cau tra loi tuong ung
     const questionIds = quizAnswers.map((qa) => qa.questionId);
     const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
     if (!quizQueses.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get quiz question', { questionIds });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get quiz question',
+        { questionIds }
+      );
     }
 
     // Lay cau tra loi tuong ung    // Tim cau tra loi trong cau hoi
@@ -242,24 +262,11 @@ export class QuizController {
     // Generate prompt
     const prompt = quizPrompt(quesAnses);
 
-    // Them quiz question answer detail vao user log
-    const quizQuesAnsDetail = new QuizQuesAnwsRequest({
-      userId: userId,
+    // Add job to queue
+    await this.quizQueue.add(QuizJobName.ADD_QUIZ_QUESTION_AND_ANSWER, {
+      userId,
       details: quizAnswers
     });
-
-    const savedQuizQuesAnsResponse =
-      await this.quizService.addQuizQuesAnws(quizQuesAnsDetail);
-
-    if (!savedQuizQuesAnsResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to save quiz question answers', { userId });
-    }
-
-    // Save user quiz log
-    await this.logService.addQuizQuesAnsDetailToUserLog(
-      userId,
-      savedQuizQuesAnsResponse.data?.id || ''
-    );
 
     // Get AI response
     const aiResponse = await this.aiService.textGenerateFromPrompt(
@@ -270,7 +277,10 @@ export class QuizController {
 
     // Return response
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', { userId, service: 'AIService' });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        { userId, service: 'AIService' }
+      );
     }
 
     return Ok(aiResponse.data);

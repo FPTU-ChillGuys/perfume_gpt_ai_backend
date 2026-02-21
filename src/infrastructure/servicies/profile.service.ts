@@ -1,35 +1,38 @@
-import { HttpService } from '@nestjs/axios';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
-import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ProfileResponse } from 'src/application/dtos/response/profile.response';
 import { funcHandlerAsync } from '../utils/error-handler';
-import ApiUrl from '../api/api_url';
-import { firstValueFrom } from 'rxjs';
-import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getOwnProfile(
-    authHeader: string
+    userId: string
   ): Promise<BaseResponseAPI<ProfileResponse>> {
     return await funcHandlerAsync(
       async () => {
-        console.log(ApiUrl().PROFILE_URL('me'));
-        const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<ProfileResponse>>(
-            ApiUrl().PROFILE_URL('me'),
-            {
-              headers: {
-                Authorization: `Bearer ${authHeader}`
-              }
-            }
-          )
-        );
-        return data;
+        const profile = await this.prisma.customerProfiles.findUnique({
+          where: { UserId: userId },
+        });
+        if (!profile) {
+          return { success: false, error: 'Profile not found' };
+        }
+        const response = new ProfileResponse({
+          id: profile.Id,
+          userId: profile.UserId,
+          scentPreference: profile.ScentPreference ?? null,
+          minBudget: profile.MinBudget ? Number(profile.MinBudget) : null,
+          maxBudget: profile.MaxBudget ? Number(profile.MaxBudget) : null,
+          preferredStyle: profile.PreferredStyle ?? null,
+          favoriteNotes: profile.FavoriteNotes ?? null,
+          createdAt: profile.CreatedAt.toISOString(),
+          updatedAt: profile.UpdatedAt ? profile.UpdatedAt.toISOString() : null,
+        });
+        return { success: true, payload: response };
       },
-      'Failed to fetch profile',
+      'Failed to fetch profile'
     );
   }
 
@@ -56,3 +59,4 @@ export class ProfileService {
     return systemPrompt;
   }
 }
+

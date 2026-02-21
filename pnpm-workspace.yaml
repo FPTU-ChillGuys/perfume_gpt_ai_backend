@@ -1,5 +1,7 @@
 onlyBuiltDependencies:
   - '@nestjs/core'
+  - '@prisma/engines'
   - '@scarf/scarf'
   - '@swc/core'
   - better-sqlite3
+  - prisma

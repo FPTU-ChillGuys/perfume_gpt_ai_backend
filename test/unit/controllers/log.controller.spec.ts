@@ -233,7 +233,7 @@ describe('LogController', () => {
       );
       userLogService.saveUserLogSummary.mockResolvedValue(successResponse('Saved'));
 
-      const result = await controller.summarizeLogsPerDay();
+      const result = await controller.summarizeLogsPerYear();
 
       expect(userLogService.getAllUserIdsFromLogs).toHaveBeenCalled();
     });

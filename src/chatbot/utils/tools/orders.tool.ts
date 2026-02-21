@@ -23,15 +23,13 @@ export class OrderTool {
       sortBy: z.string().optional(),
       sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
       isDescending: z.boolean().optional().default(false),
-      authToken: z.string().describe('JWT authentication token')
     }),
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
           const response = await this.orderService.getOrdersByUserId(
             input.userId,
-            new OrderRequest(),
-            input.authToken
+            new OrderRequest()
           );
           console.log('OrderTool - getOrdersByUserId response:', response.payload?.items);
           if (!response.success) {
@@ -49,15 +47,11 @@ export class OrderTool {
     description: 'Get detailed information about a specific order by its ID.',
     inputSchema: z.object({
       orderId: z.string().describe('The ID of the order'),
-      authToken: z.string().describe('JWT authentication token (Admin token required for privileged access)')
     }),
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
-          const response = await this.orderService.getOrderById(
-            input.orderId,
-            input.authToken
-          );
+          const response = await this.orderService.getOrderById(input.orderId);
           console.log('OrderTool - getOrderById response:', response.payload);
           if (!response.success) {
             return { success: false, error: `Failed to fetch order ${input.orderId}.` };
@@ -75,14 +69,12 @@ export class OrderTool {
       'Get all detailed order information for a user including items, amounts, and status.',
     inputSchema: z.object({
       userId: z.string().describe('The ID of the user'),
-      authToken: z.string().describe('JWT authentication token (Admin token required for privileged access)')
     }),
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
           const response = await this.orderService.getOrderDetailsWithOrdersByUserId(
-            input.userId,
-            input.authToken
+            input.userId
           );
           console.log('OrderTool - getOrderDetailsWithOrdersByUserId response:', response.data);
           if (!response.success) {
@@ -101,14 +93,12 @@ export class OrderTool {
       'Generate a text report of all orders for a user including order details, items, and totals.',
     inputSchema: z.object({
       userId: z.string().describe('The ID of the user'),
-      authToken: z.string().describe('JWT authentication token (Admin token required for privileged access)')
     }),
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
           const response = await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-            input.userId,
-            input.authToken
+            input.userId
           );
           console.log('OrderTool - getOrderReport response:', response.data);
           if (!response.success) {

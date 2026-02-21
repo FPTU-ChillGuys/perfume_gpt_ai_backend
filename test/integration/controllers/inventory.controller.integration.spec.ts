@@ -75,7 +75,7 @@ describe('InventoryController (Integration)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
-      const result = await controller.getInventoryStock(mockRequest(), {} as any);
+      const result = await controller.getInventoryStock({} as any);
 
       expect(result.success).toBe(true);
       expect(result.payload).toBeDefined();
@@ -84,7 +84,7 @@ describe('InventoryController (Integration)', () => {
     it('should handle API failure', async () => {
       mockHttpService.get.mockReturnValue(throwError(() => new Error('API Error')));
 
-      const result = await controller.getInventoryStock(mockRequest(), {} as any);
+      const result = await controller.getInventoryStock({} as any);
 
       expect(result.success).toBe(false);
     });
@@ -101,7 +101,7 @@ describe('InventoryController (Integration)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
-      const result = await controller.getBatch(mockRequest(), {} as any);
+      const result = await controller.getBatch({} as any);
 
       expect(result.success).toBe(true);
     });
@@ -115,7 +115,7 @@ describe('InventoryController (Integration)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(stockData)));
 
-      const result = await controller.getInventoryReport(mockRequest());
+      const result = await controller.getInventoryReport();
 
       expect(result.success).toBe(true);
       expect(typeof result.data).toBe('string');
@@ -137,7 +137,7 @@ describe('InventoryController (Integration)', () => {
         data: 'AI inventory analysis: No stock data available',
       });
 
-      const result = await controller.getAIInventoryReport(mockRequest());
+      const result = await controller.getAIInventoryReport();
 
       expect(result.success).toBe(true);
     });
@@ -167,7 +167,7 @@ describe('InventoryController (Integration)', () => {
         data: 'AI inventory report analysis',
       });
 
-      const result = await controller.getAIInventoryReport(mockRequest());
+      const result = await controller.getAIInventoryReport();
 
       expect(result).toBeDefined();
     });
@@ -181,7 +181,7 @@ describe('InventoryController (Integration)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(stockData)));
 
-      const result = await controller.getStructuredAIInventoryReport(mockRequest());
+      const result = await controller.getStructuredAIInventoryReport();
 
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();

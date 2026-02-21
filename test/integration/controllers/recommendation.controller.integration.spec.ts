@@ -62,11 +62,17 @@ describe('RecommendationController (Integration)', () => {
     }).compile();
     orderService = httpModule.get(OrderService);
 
+    const mockUserService = { getEmailById: jest.fn() } as any;
+    const mockProfileService = { getOwnProfile: jest.fn(), createSystemPromptFromProfile: jest.fn() } as any;
+    const mockEmailService = { sendEmail: jest.fn() } as any;
     controller = new RecommendationController(
       userLogService,
-      orderService,
       mockAIService,
+      mockUserService,
+      orderService,
+      mockProfileService,
       adminInstructionService,
+      mockEmailService,
     );
   });
 

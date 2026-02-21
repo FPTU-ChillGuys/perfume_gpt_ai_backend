@@ -55,7 +55,7 @@ describe('InventoryController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getInventoryStock(req, {} as any);
+      const result = await controller.getInventoryStock({} as any);
 
       expect(result.success).toBe(true);
       expect(result.payload).toBeDefined();
@@ -74,7 +74,7 @@ describe('InventoryController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getBatch(req, {} as any);
+      const result = await controller.getBatch({} as any);
 
       expect(result.success).toBe(true);
       expect(result.payload).toBeDefined();
@@ -89,7 +89,7 @@ describe('InventoryController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getInventoryReport(req);
+      const result = await controller.getInventoryReport();
 
       expect(result.success).toBe(true);
       expect(result.data).toContain('Stock');
@@ -99,7 +99,7 @@ describe('InventoryController', () => {
       inventoryService.createReportFromBatchAndStock.mockResolvedValue('');
 
       const req = createMockRequest();
-      const result = await controller.getInventoryReport(req);
+      const result = await controller.getInventoryReport();
 
       expect(result.success).toBe(true);
     });
@@ -117,7 +117,7 @@ describe('InventoryController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getAIInventoryReport(req);
+      const result = await controller.getAIInventoryReport();
 
       expect(result.success).toBe(true);
       expect(result.data).toContain('restocking');
@@ -127,7 +127,7 @@ describe('InventoryController', () => {
       inventoryService.createReportFromBatchAndStock.mockResolvedValue('');
 
       const req = createMockRequest();
-      const result = await controller.getAIInventoryReport(req);
+      const result = await controller.getAIInventoryReport();
 
       expect(result.success).toBe(true);
       // Should not call AI when no data
@@ -142,7 +142,7 @@ describe('InventoryController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getAIInventoryReport(req);
+      const result = await controller.getAIInventoryReport();
 
       expect(result.success).toBe(false);
     });
@@ -162,7 +162,7 @@ describe('InventoryController', () => {
       );
 
       const req = createMockRequest();
-      const result = await controller.getStructuredAIInventoryReport(req);
+      const result = await controller.getStructuredAIInventoryReport();
 
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();

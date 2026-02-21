@@ -1,6 +1,6 @@
 # Perfume GPT AI Backend
 
-> AI Chatbot backend cho hệ thống PerfumeGPT - được xây dựng bằng NestJS, MikroORM và PostgreSQL.
+> AI Chatbot backend cho hệ thống PerfumeGPT - được xây dựng bằng NestJS, MikroORM (PostgreSQL), Prisma (SQL Server), BullMQ (Redis) và OpenAI.
 
 ## Mục lục
 
@@ -8,6 +8,7 @@
 - [Cài đặt từng bước](#cài-đặt-từng-bước)
   - [Bước 1: Clone repository & cài đặt dependencies](#bước-1-clone-repository--cài-đặt-dependencies)
   - [Bước 2: Cài đặt PostgreSQL (Docker)](#bước-2-cài-đặt-postgresql-docker)
+  - [Bước 2b: Cài đặt Redis (Docker)](#bước-2b-cài-đặt-redis-docker)
   - [Bước 3: Cấu hình file môi trường (.env)](#bước-3-cấu-hình-file-môi-trường-env)
   - [Bước 4: Cấu hình kết nối database (host-config.mjs)](#bước-4-cấu-hình-kết-nối-database-host-configmjs)
   - [Bước 5: Cấu hình RSA Keys (public_key.pem)](#bước-5-cấu-hình-rsa-keys-public_keypem)
@@ -16,6 +17,8 @@
   - [Bước 8: Seed dữ liệu mặc định](#bước-8-seed-dữ-liệu-mặc-định)
   - [Bước 9: Chạy project](#bước-9-chạy-project)
 - [Admin Instructions (Chỉ thị AI)](#admin-instructions-chỉ-thị-ai)
+- [BullMQ — Job Queue (Redis)](#bullmq--job-queue-redis)
+- [Prisma — Kết nối SQL Server (.NET DB)](#prisma--kết-nối-sql-server-net-db)
 - [Cài đặt Backend chính (.NET)](#cài-đặt-backend-chính-net)
 - [Tổng quan kiến trúc](#tổng-quan-kiến-trúc)
 - [Chi tiết các Controller](#chi-tiết-các-controller)
@@ -40,13 +43,15 @@
 
 ## Yêu cầu hệ thống
 
-| Tool          | Phiên bản tối thiểu | Ghi chú                          |
-| ------------- | -------------------- | -------------------------------- |
-| **Node.js**   | >= 18                |                                  |
-| **pnpm**      | >= 8                 | **Sử dụng pnpm, KHÔNG dùng npm** |
-| **Docker**    | Latest               | Để chạy PostgreSQL               |
-| **PostgreSQL**| >= 14                | Chạy qua Docker                  |
-| **.NET SDK**  | >= 8.0               | Cho backend chính (perfume-gpt-backend) |
+| Tool           | Phiên bản tối thiểu | Ghi chú                                          |
+| -------------- | -------------------- | ------------------------------------------------ |
+| **Node.js**    | >= 18                |                                                  |
+| **pnpm**       | >= 8                 | **Sử dụng pnpm, KHÔNG dùng npm**                 |
+| **Docker**     | Latest               | Để chạy PostgreSQL và Redis                      |
+| **PostgreSQL** | >= 14                | AI DB — chạy qua Docker, quản lý bởi MikroORM   |
+| **Redis**      | >= 7                 | Job queue cho BullMQ — chạy qua Docker           |
+| **SQL Server** | >= 2019              | Main DB của .NET backend — truy cập qua Prisma   |
+| **.NET SDK**   | >= 8.0               | Cho backend chính (perfume-gpt-backend)          |
 
 ---
 
@@ -90,6 +95,32 @@ docker ps
 
 ---
 
+### Bước 2b: Cài đặt Redis (Docker)
+
+BullMQ sử dụng **Redis** làm backend lưu trữ job queue. Cài Redis qua Docker:
+
+```bash
+docker run --name perfume-gpt-redis \
+  -p 6379:6379 \
+  -d redis:7
+```
+
+Kiểm tra Redis đang chạy:
+
+```bash
+docker ps
+# hoặc kiểm tra kết nối
+docker exec -it perfume-gpt-redis redis-cli ping
+# OUTPUT: PONG
+```
+
+> **Lưu ý:**
+> - Redis mặc định chạy trên port `6379`, host `localhost`.
+> - Không cần mật khẩu khi chạy local. Nếu triển khai production, nên thêm xác thực Redis.
+> - Nếu Redis không chạy, các endpoint chat **V5/V6** sẽ báo lỗi connection.
+
+---
+
 ### Bước 3: Cấu hình file môi trường (.env)
 
 Tạo file `.env` tại thư mục gốc của project với nội dung sau:
@@ -107,12 +138,27 @@ JWT_AUDIENCE=PerfumeGPT
 
 # OpenAI API Key
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+
+# Redis (BullMQ job queue)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# SQL Server — Prisma kết nối trực tiếp vào DB của .NET backend
+# Định dạng: sqlserver://<host>:<port>;database=<db>;user=<user>;password=<pass>;trustServerCertificate=true
+SQL_SERVER_DATABASE_URL=sqlserver://localhost:1433;database=PerfumeGPT;user=sa;password=your_mssql_password;trustServerCertificate=true
+
+# Google Gmail — NodeMailer gửi email qua SMTP
+GOOGLE_EMAIL=your_gmail@gmail.com
+GOOGLE_APP_PASSWORD=your_app_password
 ```
 
 > **Lưu ý:**
 > - `BASE_URL` trỏ tới backend .NET (`perfume-gpt-backend`). Mặc định là `https://localhost:7011/api`.
 > - `JWT_ISSUER` và `JWT_AUDIENCE` phải **trùng khớp** với cấu hình JWT bên repo `perfume-gpt-backend`.
 > - `OPENAI_API_KEY` là API key từ OpenAI để sử dụng các tính năng AI.
+> - `REDIS_HOST` / `REDIS_PORT` là địa chỉ Redis dùng cho BullMQ job queue (mặc định `localhost:6379`).
+> - `SQL_SERVER_DATABASE_URL` là connection string Prisma để kết nối **SQL Server của .NET backend** — dùng để AI đọc trực tiếp dữ liệu sản phẩm, đơn hàng, v.v. khi cần.
+> - `GOOGLE_EMAIL` / `GOOGLE_APP_PASSWORD` dùng để gửi email qua Gmail SMTP. Cần tạo [App Password](https://support.google.com/accounts/answer/185833) trong Google Account nếu dùng 2FA.
 
 ---
 
@@ -328,6 +374,124 @@ src/application/constant/prompts/
 
 ---
 
+## BullMQ — Job Queue (Redis)
+
+Project sử dụng **BullMQ** với **Redis** để xử lý các tác vụ nặng (lưu conversation, log) trong background, giúp giảm thời gian chờ cho người dùng.
+
+### Tại sao cần BullMQ?
+
+Khi user gửi chat, nếu server phải **đợi lưu DB xong** mới trả về → latency cao. BullMQ cho phép:
+1. AI trả lời ngay cho user
+2. Việc lưu conversation + user log được đẩy vào **queue** và xử lý background
+
+### Queues và Processors
+
+| Queue | Processor | Trigger | Nhiệm vụ |
+|-------|-----------|---------|---------|
+| `conversation-queue` | `ConversationProcessor` | Chat V5/V6 | Lưu conversation + messages vào PostgreSQL |
+| `quiz-queue` | `QuizProcessor` | Quiz submit | Lưu quiz answer, log quiz vào PostgreSQL |
+
+### Luồng hoạt động (Chat V5/V6)
+
+```
+User POST /conversation/chat/v5
+        ↓
+Controller gọi AI → nhận response ngay
+        ↓
+Push job vào conversation-queue (Redis)
+        ↓
+Trả về AI response cho user NGAY LẬP TỨC
+        ↓ (background)
+ConversationProcessor: lưu conversation + messages + user log vào DB
+```
+
+### Cấu hình
+
+BullMQ đọc Redis connection từ `.env`:
+
+```env
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+### Quản lý jobs
+
+Xóa toàn bộ jobs trong queue (dùng khi debug):
+
+```bash
+pnpm run bullmq:delete-all-jobs
+```
+
+> **Lưu ý:**
+> - Nếu Redis không chạy, các endpoint **V5/V6** sẽ báo lỗi kết nối. Các endpoint V1–V4 vẫn hoạt động bình thường.
+> - Jobs failed sẽ được retry tự động theo cấu hình mặc định của BullMQ.
+> - Trong development, dùng [Bull Board](https://github.com/felixmosh/bull-board) để visualize jobs (chưa tích hợp sẵn — có thể thêm nếu cần).
+
+---
+
+## Prisma — Kết nối SQL Server (.NET DB)
+
+Project sử dụng **Prisma** để kết nối trực tiếp vào **SQL Server database của .NET backend** (`perfume-gpt-backend`). Điều này cho phép AI đọc dữ liệu sản phẩm, đơn hàng, inventory, v.v. **mà không cần gọi HTTP API** — nhanh hơn và phù hợp cho batch processing.
+
+### Khi nào Prisma được dùng?
+
+| Tình huống | Dùng Axios (HTTP) | Dùng Prisma (direct DB) |
+|-----------|-------------------|------------------------|
+| Chatbot real-time cần dữ liệu nhanh | ✅ | — |
+| Cron job xử lý nhiều user cùng lúc | — | ✅ |
+| Recommendation batch | — | ✅ |
+| Tìm kiếm sản phẩm với filter phức tạp | — | ✅ |
+
+### Schema
+
+Prisma schema được generated từ SQL Server schema của `.NET backend`:
+
+```
+prisma/
+└── schema.prisma     ← Schema ánh xạ từ SQL Server (auto-generated)
+
+generated/
+└── prisma/
+    ├── client.ts     ← Prisma Client (type-safe)
+    ├── models.ts     ← TypeScript types
+    └── enums.ts      ← Enums
+```
+
+### Cấu hình
+
+Prisma đọc connection string từ `.env`:
+
+```env
+SQL_SERVER_DATABASE_URL=sqlserver://localhost:1433;database=PerfumeGPT;user=sa;password=your_mssql_password;trustServerCertificate=true
+```
+
+> **Quan trọng:** `trustServerCertificate=true` cần thiết khi SQL Server dùng self-signed certificate (phổ biến khi chạy local).
+
+### Sử dụng trong code
+
+Prisma được inject qua `PrismaModule` và `PrismaService`:
+
+```typescript
+// Inject vào service
+constructor(private readonly prisma: PrismaService) {}
+
+// Query ví dụ
+const products = await this.prisma.products.findMany({
+  where: { IsActive: true },
+  take: 10
+});
+```
+
+### Regenerate Prisma Client (khi .NET DB thay đổi schema)
+
+```bash
+npx prisma generate --config prisma.config.ts
+```
+
+> **Lưu ý:** Prisma trong project này chỉ **đọc** (read-only) từ SQL Server. Mọi thay đổi dữ liệu phải thực hiện qua .NET backend. Không chạy `prisma migrate` vào SQL Server này.
+
+---
+
 ## Cài đặt Backend chính (.NET)
 
 Project AI Backend này gọi API tới backend chính [perfume-gpt-backend](https://github.com/FPTU-ChillGuys/perfume-gpt-backend) (xây dựng bằng .NET) để sử dụng các chức năng như: **Product, Order, Inventory, Review**, v.v.
@@ -389,16 +553,38 @@ Project AI Backend này gọi API tới backend chính [perfume-gpt-backend](htt
 │  - Quiz             │                     │   - Inventory API        │
 │  - Conversations    │                     │   - Reviews API          │
 │  - Trend Analysis   │                     │   - Auth (JWT RS256)     │
-│                     │                     │                          │
-└────────┬────────────┘                     └────────┬─────────────────┘
-         │                                           │
-         │ MikroORM                                  │ EF Core
-         ▼                                           ▼
-   ┌───────────┐                              ┌───────────┐
-   │PostgreSQL │                              │SQL Server │
-   │(AI Data)  │                              │(Main Data)│
-   └───────────┘                              └───────────┘
+│  - BullMQ Jobs      │                     │                          │
+└──┬──────────┬───────┘                     └────────────┬─────────────┘
+   │          │                                          │
+   │ MikroORM │ Prisma (read-only)                      │ EF Core
+   │          └──────────────────────────────────────┐  │
+   ▼                                                  ▼  ▼
+┌───────────┐      BullMQ         ┌───────┐    ┌───────────────┐
+│PostgreSQL │    (job queue)      │ Redis │    │  SQL Server   │
+│(AI Data)  │ <──────────────┐   │ :6379 │    │  (Main Data)  │
+└───────────┘                │   └───────┘    └───────────────┘
+                              │       │
+                    ConversationProcessor
+                    QuizProcessor
+                    (background jobs)
 ```
+
+### Tech Stack
+
+| Layer | Technology | Mục đích |
+|-------|-----------|---------|
+| **Framework** | NestJS 11 | HTTP server, DI, module system |
+| **AI** | AI SDK + OpenAI GPT | Text generation, structured output |
+| **ORM chính** | MikroORM 6 | Quản lý AI DB (PostgreSQL) |
+| **ORM phụ** | Prisma 7 | Đọc dữ liệu từ SQL Server (.NET DB) |
+| **Job Queue** | BullMQ 5 + @nestjs/bullmq | Background jobs (lưu conversation, log) |
+| **Job Store** | Redis 7 | Backend lưu trữ BullMQ jobs |
+| **Email** | NodeMailer + @nestjs-modules/mailer | Gửi email gợi ý qua Gmail SMTP |
+| **HTTP Client** | @nestjs/axios | Gọi API tới .NET backend |
+| **Auth** | JWT RS256 | Verify token từ .NET backend |
+| **API Docs** | @scalar/nestjs-api-reference | API Reference tại `/reference` |
+| **Mapping** | @automapper | DTO ↔ Entity mapping |
+| **Scheduler** | @nestjs/schedule | Cron jobs (log summarize, recommendation) |
 
 ---
 
@@ -1220,26 +1406,29 @@ curl -X POST -H "Authorization: Bearer <admin_token>" \
 
 3. **Insufficient data:** Khi không đủ dữ liệu để phân tích, AI không được gọi. Thay vào đó trả về message mặc định → tiết kiệm token OpenAI.
 
-4. **Backend .NET dependency:** Các controller Products, Orders, Inventory, Reviews, Profile đều gọi API tới backend .NET. **Cần backend .NET chạy song song** (mặc định `https://localhost:7011/api`).
+4. **Backend .NET dependency:** Các controller Products, Orders, Inventory, Reviews, Profile đều gọi API tới backend .NET. **Cần backend .NET chạy song song** (mặc định `https://localhost:7011/api`). Một số service còn dùng **Prisma** để đọc trực tiếp từ SQL Server (không qua HTTP).
 
 5. **Admin Instructions:** Hầu hết các endpoint AI đều hỗ trợ Admin Instructions — cho phép admin tùy chỉnh hành vi AI qua API thay vì sửa code.
 
-6. **API Reference (Scalar):** Truy cập `http://localhost:3000/reference` để xem Scalar API docs với đầy đủ schema, parameters, response types. Để xác thực, tìm phần **Bearer Token** trong trang và nhập JWT token vào ô **Token** — Scalar sẽ tự động gửi kèm header `Authorization: Bearer <token>` cho tất cả request sau đó.
+6. **BullMQ Queue Endpoints (V5/V6):** Các endpoint chat V5/V6 sử dụng BullMQ + Redis để lưu conversation/log trong background. Yêu cầu **Redis đang chạy** (`REDIS_HOST`, `REDIS_PORT` trong `.env`). Các endpoint V1–V4 không dùng queue, vẫn hoạt động khi Redis không có.
+
+7. **API Reference (Scalar):** Truy cập `http://localhost:3000/reference` để xem Scalar API docs với đầy đủ schema, parameters, response types. Để xác thực, tìm phần **Bearer Token** trong trang và nhập JWT token vào ô **Token** — Scalar sẽ tự động gửi kèm header `Authorization: Bearer <token>` cho tất cả request sau đó.
 
 ---
 
 ## Tóm tắt nhanh
 
-| Bước | Lệnh / Hành động                              | Mô tả                                     |
-| ---- | ---------------------------------------------- | ------------------------------------------ |
-| 1    | `pnpm install`                                 | Cài đặt dependencies (dùng pnpm)           |
-| 2    | `docker run ... postgres:16`                   | Chạy PostgreSQL bằng Docker                |
-| 3    | Tạo file `.env`                                | Cấu hình biến môi trường                   |
-| 4    | `cp host-config.mjs.example host-config.mjs`   | Cấu hình kết nối database                  |
-| 5    | Copy `public_key.pem` vào thư mục gốc         | Cấu hình RSA public key cho JWT            |
-| 6    | `npx mikro-orm debug`                          | Kiểm tra kết nối database                  |
-| 7    | `npx mikro-orm migration:up`                   | Chạy migration tạo bảng                    |
-| 8    | `pnpm run seed`                                | Seed dữ liệu Admin Instructions mặc định   |
-| 9    | `pnpm run start:dev`                           | Khởi chạy server development               |
+| Bước | Lệnh / Hành động                                                      | Mô tả                                             |
+| ---- | ---------------------------------------------------------------------- | ------------------------------------------------- |
+| 1    | `pnpm install`                                                         | Cài đặt dependencies (dùng pnpm)                  |
+| 2    | `docker run ... postgres:16`                                           | Chạy PostgreSQL (AI DB) bằng Docker               |
+| 2b   | `docker run ... redis:7`                                               | Chạy Redis (BullMQ job queue) bằng Docker         |
+| 3    | Tạo file `.env`                                                        | Cấu hình biến môi trường (bao gồm Redis, Prisma)  |
+| 4    | `cp host-config.mjs.example host-config.mjs`                          | Cấu hình kết nối PostgreSQL cho MikroORM          |
+| 5    | Copy `public_key.pem` vào thư mục gốc                                 | Cấu hình RSA public key cho JWT                   |
+| 6    | `npx mikro-orm debug`                                                  | Kiểm tra kết nối PostgreSQL                       |
+| 7    | `npx mikro-orm migration:up`                                           | Chạy migration tạo bảng trên PostgreSQL            |
+| 8    | `pnpm run seed`                                                        | Seed dữ liệu Admin Instructions mặc định          |
+| 9    | `pnpm run start:dev`                                                   | Khởi chạy server development                      |
 
-> **Nhớ:** Cần chạy [perfume-gpt-backend](https://github.com/FPTU-ChillGuys/perfume-gpt-backend) (.NET) song song để sử dụng đầy đủ các chức năng (Product, Order, Inventory, Review, ...).
+> **Nhớ:** Cần chạy [perfume-gpt-backend](https://github.com/FPTU-ChillGuys/perfume-gpt-backend) (.NET) song song để sử dụng đầy đủ các chức năng (Product, Order, Inventory, Review, ...). SQL Server của .NET backend cũng cần chạy để Prisma kết nối được (`SQL_SERVER_DATABASE_URL`).

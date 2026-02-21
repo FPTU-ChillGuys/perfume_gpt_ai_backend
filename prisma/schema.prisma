@@ -430,7 +430,7 @@ model Products {
   DeletedAt         DateTime?
   IsDeleted         Boolean             @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Products__IsDele__4C6B5938")
   UpdatedAt         DateTime?
-  Embedding         Bytes?              @db.VarBinary(4104)
+//  Embedding         Bytes?              @db.VarBinary(Max)
   Media             Media[]
   ProductAttributes ProductAttributes[]
   Brands            Brands              @relation(fields: [BrandId], references: [Id], onUpdate: NoAction, map: "FK_Products_Brands_BrandId")

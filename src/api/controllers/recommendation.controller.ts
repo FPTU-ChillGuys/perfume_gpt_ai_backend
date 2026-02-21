@@ -66,7 +66,6 @@ export class RecommendationController {
   @ApiBaseResponse(String)
   @ApiBody({ type: UserLogRequest })
   async repurchaseRecommendationV2(
-    @Req() request: Request,
     @Body() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
     const endpoint = 'recommendation/repurchase/v2';
@@ -398,7 +397,6 @@ export class RecommendationController {
   private async repurchaseRecommendationV2NonApi(
     userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
-    const endpoint = 'recommendation/repurchase/v2/cron';
 
     // Build combined prompt từ user logs + orders + profile
     const combinedPromptResult = await buildCombinedPromptV2(
@@ -416,7 +414,7 @@ export class RecommendationController {
         {
           userId: userLogRequest.userId,
           service: 'PromptBuilder',
-          endpoint
+          endpoint: 'repurchaseRecommendationV2NonApi'
         }
       );
     }
@@ -425,7 +423,7 @@ export class RecommendationController {
       combinedPromptResult.data.combinedPrompt,
       combinedPromptResult.data.adminInstruction ?? '',
       userLogRequest.userId,
-      endpoint,
+      'repurchaseRecommendationV2NonApi',
       'Failed to get AI recommendation response'
     );
 

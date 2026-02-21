@@ -13,6 +13,8 @@ import { AITrendForecastStructuredResponse, AIResponseMetadata } from 'src/appli
 import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { Output } from 'ai';
+import { searchOutput } from 'src/chatbot/utils/output/search.output';
 
 @Role('admin')
 @ApiTags('Trends')
@@ -69,7 +71,8 @@ export class TrendController {
     
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,
-      trendSystemPrompt
+      trendSystemPrompt,
+      Output.object(searchOutput)
     );
 
     if (!trendResponse.success) {

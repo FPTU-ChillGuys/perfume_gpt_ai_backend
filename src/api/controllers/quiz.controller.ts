@@ -36,7 +36,7 @@ import { Output } from 'ai';
 import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { QueueName, QuizJobName } from 'src/application/constant/processor';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -129,7 +129,7 @@ export class QuizController {
   @ApiBody({ type: [QuizAnswerRequest] })
   @ApiBaseResponse(QuizQuestionResponse)
   async updateQuizAnswer(
-    @Param('id') id: string,
+    @Param() id: string,
     @Body() quizAnswerRequest: QuizAnswerRequest[]
   ): Promise<BaseResponse<QuizQuestionResponse>> {
     return this.quizService.updateAnswer(id, quizAnswerRequest);

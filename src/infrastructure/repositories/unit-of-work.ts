@@ -3,10 +3,13 @@ import { AdminInstructionRepository } from './admin-instruction.repository';
 import { ConversationRepository } from './conversation.repository';
 import { QuizQuestionAnswerRepository } from './quiz-question-answer.repository';
 import { QuizQuestionRepository } from './quiz-question.repository';
-import { AIReviewSummaryRepository } from './review-summary.repository';
 import { UserLogRepository } from './user-log.repository';
 import { UserLogSummaryRepository } from './user-log-summary.repository';
 import { AIAcceptanceRepository } from './ai-acceptance.repository';
+import { ReviewSummaryLogRepository } from './review-summary.repository';
+import { EntityRepository } from '@mikro-orm/postgresql';
+import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
+import { InjectRepository } from '@mikro-orm/nestjs';
 
 @Injectable()
 export class UnitOfWork {
@@ -15,10 +18,11 @@ export class UnitOfWork {
     private readonly aiQuizQuestionRepository: QuizQuestionRepository,
     private readonly aiQuizQuestionAnswerRepository: QuizQuestionAnswerRepository,
     private readonly userLogRepository: UserLogRepository,
-    private readonly aiReviewSummaryRepository: AIReviewSummaryRepository,
+    private readonly reviewSummaryLogRepository: ReviewSummaryLogRepository,
     private readonly userLogSummaryRepository: UserLogSummaryRepository,
     private readonly aiAcceptanceRepository: AIAcceptanceRepository,
-    private readonly adminInstructionRepository: AdminInstructionRepository
+    private readonly adminInstructionRepository: AdminInstructionRepository,
+    @InjectRepository(InventoryLog) private readonly inventoryLogRepository: EntityRepository<InventoryLog>
   ) {}
 
   get AIConversationRepo(): ConversationRepository {
@@ -33,11 +37,15 @@ export class UnitOfWork {
   get UserLogRepo(): UserLogRepository {
     return this.userLogRepository;
   }
-  get AIReviewSummaryRepo(): AIReviewSummaryRepository {
-    return this.aiReviewSummaryRepository;
+  get ReviewSummaryLogRepo(): ReviewSummaryLogRepository {
+    return this.reviewSummaryLogRepository;
   }
   get UserLogSummaryRepo(): UserLogSummaryRepository {
     return this.userLogSummaryRepository;
+  }
+
+  get InventoryLogRepo(): EntityRepository<InventoryLog> {
+    return this.inventoryLogRepository;
   }
 
   get AIAcceptanceRepo(): AIAcceptanceRepository {

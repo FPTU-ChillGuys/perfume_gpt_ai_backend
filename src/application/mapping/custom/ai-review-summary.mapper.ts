@@ -1,9 +1,9 @@
-import { AIReviewSummary } from 'src/domain/entities/ai-review-summary.entity';
+import { ReviewSummaryLog } from 'src/domain/entities/review-summary-log.entity';
 import { AIReviewSummaryResponse } from '../../dtos/response/ai-review-summary.response';
 import { ReviewSumaryRequest } from 'src/application/dtos/request/review-sumary.request';
 
-export class AIReviewSummaryMapper {
-  static toResponse(entity: AIReviewSummary): AIReviewSummaryResponse {
+export class ReviewSummaryLogMapper {
+  static toResponse(entity: ReviewSummaryLog): AIReviewSummaryResponse {
     return new AIReviewSummaryResponse({
       id: entity.id,
       productId: entity.productId,
@@ -15,12 +15,12 @@ export class AIReviewSummaryMapper {
     });
   }
 
-  static toResponseList(entities: AIReviewSummary[]): AIReviewSummaryResponse[] {
+  static toResponseList(entities: ReviewSummaryLog[]): AIReviewSummaryResponse[] {
     return entities.map((entity) => this.toResponse(entity));
   }
 
-    static toEntity(request: ReviewSumaryRequest): AIReviewSummary {
-    return new AIReviewSummary({
+    static toEntity(request: ReviewSumaryRequest): ReviewSummaryLog {
+    return new ReviewSummaryLog({
       productId: request.productId,
       summary: request.summary,
       sentiment: request.sentiment,
@@ -28,7 +28,7 @@ export class AIReviewSummaryMapper {
     });
   }
 
-  static toEntityList(requests: ReviewSumaryRequest[]): AIReviewSummary[] {
+  static toEntityList(requests: ReviewSumaryRequest[]): ReviewSummaryLog[] {
     return requests.map((request) => this.toEntity(request));
   }
 }

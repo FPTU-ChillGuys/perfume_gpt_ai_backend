@@ -8,10 +8,16 @@ import { InventoryStockResponse } from 'src/application/dtos/response/inventory-
 import { funcHandlerAsync } from '../utils/error-handler';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
+import { UnitOfWork } from '../repositories/unit-of-work';
+import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly unitOfWork: UnitOfWork
+  ) {}
 
   async getInventoryStock(
     request: InventoryStockRequest
@@ -26,19 +32,17 @@ export class InventoryService {
           ...(request.SearchTerm
             ? {
                 ProductVariants: {
-                  Products: { Name: { contains: request.SearchTerm } },
-                },
+                  Products: { Name: { contains: request.SearchTerm } }
+                }
               }
             : {}),
           ...(request.IsLowStock != null
             ? {
                 ProductVariants: {
-                  Stocks: request.IsLowStock
-                    ? { isNot: null }
-                    : undefined,
-                },
+                  Stocks: request.IsLowStock ? { isNot: null } : undefined
+                }
               }
-            : {}),
+            : {})
         };
 
         const [stocks, totalCount] = await Promise.all([
@@ -50,12 +54,12 @@ export class InventoryService {
               ProductVariants: {
                 include: {
                   Products: true,
-                  Concentrations: true,
-                },
-              },
-            },
+                  Concentrations: true
+                }
+              }
+            }
           }),
-          this.prisma.stocks.count({ where }),
+          this.prisma.stocks.count({ where })
         ]);
 
         const items: InventoryStockResponse[] = stocks.map((s) => {
@@ -69,7 +73,7 @@ export class InventoryService {
             volumeMl: s.ProductVariants.VolumeMl,
             totalQuantity: s.TotalQuantity,
             lowStockThreshold: s.LowStockThreshold,
-            isLowStock,
+            isLowStock
           });
         });
 
@@ -78,7 +82,7 @@ export class InventoryService {
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize),
+          totalPages: Math.ceil(totalCount / request.PageSize)
         });
         return { success: true, payload: result };
       },
@@ -98,28 +102,51 @@ export class InventoryService {
         const where: Prisma.BatchesWhereInput = {
           ...(request.id ? { Id: request.id } : {}),
           ...(request.variantId ? { VariantId: request.variantId } : {}),
-          ...(request.batchCode ? { BatchCode: { contains: request.batchCode } } : {}),
-          ...(request.manufactureDate ? { ManufactureDate: { gte: new Date(request.manufactureDate) } } : {}),
-          ...(request.expiryDate ? { ExpiryDate: { lte: new Date(request.expiryDate) } } : {}),
-          ...(request.importQuantity ? { ImportQuantity: { gte: request.importQuantity } } : {}),
-          ...(request.remainingQuantity ? { RemainingQuantity: { gte: request.remainingQuantity } } : {}),
-          ...(request.isExpired != null
-            ? { ExpiryDate: request.isExpired ? { lt: new Date() } : { gte: new Date() } }
+          ...(request.batchCode
+            ? { BatchCode: { contains: request.batchCode } }
             : {}),
-          ...((request.variantSku || request.productName || request.volumeMl || request.concentrationName)
+          ...(request.manufactureDate
+            ? { ManufactureDate: { gte: new Date(request.manufactureDate) } }
+            : {}),
+          ...(request.expiryDate
+            ? { ExpiryDate: { lte: new Date(request.expiryDate) } }
+            : {}),
+          ...(request.importQuantity
+            ? { ImportQuantity: { gte: request.importQuantity } }
+            : {}),
+          ...(request.remainingQuantity
+            ? { RemainingQuantity: { gte: request.remainingQuantity } }
+            : {}),
+          ...(request.isExpired != null
+            ? {
+                ExpiryDate: request.isExpired
+                  ? { lt: new Date() }
+                  : { gte: new Date() }
+              }
+            : {}),
+          ...(request.variantSku ||
+          request.productName ||
+          request.volumeMl ||
+          request.concentrationName
             ? {
                 ProductVariants: {
-                  ...(request.variantSku ? { Sku: { contains: request.variantSku } } : {}),
+                  ...(request.variantSku
+                    ? { Sku: { contains: request.variantSku } }
+                    : {}),
                   ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
                   ...(request.productName
                     ? { Products: { Name: { contains: request.productName } } }
                     : {}),
                   ...(request.concentrationName
-                    ? { Concentrations: { Name: { contains: request.concentrationName } } }
-                    : {}),
-                },
+                    ? {
+                        Concentrations: {
+                          Name: { contains: request.concentrationName }
+                        }
+                      }
+                    : {})
+                }
               }
-            : {}),
+            : {})
         };
 
         const [batches, totalCount] = await Promise.all([
@@ -129,11 +156,11 @@ export class InventoryService {
             take,
             include: {
               ProductVariants: {
-                include: { Products: true, Concentrations: true },
-              },
-            },
+                include: { Products: true, Concentrations: true }
+              }
+            }
           }),
-          this.prisma.batches.count({ where }),
+          this.prisma.batches.count({ where })
         ]);
 
         const items: BatchResponse[] = batches.map(
@@ -145,7 +172,7 @@ export class InventoryService {
               remainingQuantity: b.RemainingQuantity,
               manufactureDate: b.ManufactureDate.toISOString(),
               expiryDate: b.ExpiryDate.toISOString(),
-              createdAt: b.CreatedAt.toISOString(),
+              createdAt: b.CreatedAt.toISOString()
             })
         );
 
@@ -154,7 +181,7 @@ export class InventoryService {
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize),
+          totalPages: Math.ceil(totalCount / request.PageSize)
         });
         return { success: true, payload: result };
       },
@@ -206,5 +233,33 @@ export class InventoryService {
     ].join('\n\n');
     return batchAndStockReport;
   }
-}
 
+  async createInventoryLog(
+    report: string
+  ): Promise<BaseResponseAPI<InventoryLog>> {
+    return funcHandlerAsync(
+      async () => {
+        const logEntry = await this.unitOfWork.InventoryLogRepo.insert(
+          new InventoryLog({
+            inventoryLog: report
+          })
+        );
+        // No need to await or return anything, just fire and forget
+        return { success: true, data: logEntry };
+      },
+      'Failed to create inventory log',
+      true
+    );
+  }
+
+  async getInventoryLogs(): Promise<BaseResponse<InventoryLog[]>> {
+    return funcHandlerAsync(
+      async () => {
+        const logs = await this.unitOfWork.InventoryLogRepo.findAll();
+        return { success: true, data: logs };
+      },
+      'Failed to fetch inventory logs',
+      true
+    );
+  }
+}

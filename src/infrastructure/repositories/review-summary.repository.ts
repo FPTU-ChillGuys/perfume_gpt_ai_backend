@@ -1,6 +1,6 @@
 import { SqlEntityRepository } from '@mikro-orm/postgresql';
 import { Injectable } from '@nestjs/common';
-import { AIReviewSummary } from 'src/domain/entities/ai-review-summary.entity';
+import { ReviewSummaryLog } from 'src/domain/entities/review-summary-log.entity';
 
 @Injectable()
-export class AIReviewSummaryRepository extends SqlEntityRepository<AIReviewSummary> {}
+export class ReviewSummaryLogRepository extends SqlEntityRepository<ReviewSummaryLog> {}

@@ -18,6 +18,7 @@ import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/util
 import { inventoryReportPrompt, INSTRUCTION_TYPE_INVENTORY } from 'src/application/constant/prompts';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 
 @Role('admin')
 @ApiTags('Inventory')
@@ -52,7 +53,6 @@ export class InventoryController {
 
   /** Lấy báo cáo tồn kho */
   @Get('report')
-
   @ApiOperation({ summary: 'Lấy báo cáo tồn kho' })
   @ApiBaseResponse(String)
   async getInventoryReport(): Promise<BaseResponse<string>> {
@@ -88,6 +88,9 @@ export class InventoryController {
     if (!aiResponse.success) {
       throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', { service: 'AIService' });
     }
+
+    // Create inventory log
+    await this.inventoryService.createInventoryLog(aiResponse.data ?? 'No report generated');
 
     return Ok(aiResponse.data);
   }
@@ -139,4 +142,16 @@ export class InventoryController {
 
     return Ok(structuredResponse);
   }
+
+  @Get('report/logs') 
+  @ApiOperation({ summary: 'Lấy lịch sử báo cáo tồn kho' })
+  @ApiBaseResponse(PagedResult<String>)
+  async getInventoryReportLogs(): Promise<BaseResponseAPI<PagedResult<String>>> {
+    const logs = await this.inventoryService.getInventoryLogs();
+    return Ok(new PagedResult<InventoryLog>({
+      items: logs?.data ?? [],
+      totalCount: logs?.data?.length ?? 0
+    }));
+  }
+
 }

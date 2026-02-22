@@ -1,12 +1,12 @@
-import { AIReviewSummaryRepository } from 'src/infrastructure/repositories/review-summary.repository';
+import { ReviewSummaryLogRepository } from 'src/infrastructure/repositories/review-summary.repository';
 import { Sentiment } from '../enum/sentiment.enum';
 import { Common } from './common/common.entities';
 import { Entity, Enum, Property } from '@mikro-orm/core';
 import { ApiProperty } from '@nestjs/swagger';
 
 /** Entity lưu bản tóm tắt đánh giá sản phẩm do AI tạo */
-@Entity({ repository: () => AIReviewSummaryRepository })
-export class AIReviewSummary extends Common {
+@Entity({ repository: () => ReviewSummaryLogRepository })
+export class ReviewSummaryLog extends Common {
 
   /** ID sản phẩm được tóm tắt */
   @ApiProperty({ description: 'ID sản phẩm', format: 'uuid' })
@@ -28,7 +28,7 @@ export class AIReviewSummary extends Common {
   @Property()
   reviewCount!: number;
   
-  constructor(init?: Partial<AIReviewSummary>) {
+  constructor(init?: Partial<ReviewSummaryLog>) {
     super();
     Object.assign(this, init);
   }

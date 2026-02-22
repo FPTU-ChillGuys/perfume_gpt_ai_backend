@@ -1,6 +1,6 @@
 import { AdminInstruction } from 'src/domain/entities/admin-instruction.entity';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
-import { AIReviewSummary } from 'src/domain/entities/ai-review-summary.entity';
+import { ReviewSummaryLog } from 'src/domain/entities/review-summary-log.entity';
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { Message } from 'src/domain/entities/message.entity';
 import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
@@ -11,12 +11,13 @@ import { UserLog } from 'src/domain/entities/user-log.entity';
 import { UserMessageLog } from 'src/domain/entities/user-message-log.entity';
 import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
 import { UserSearchLog } from 'src/domain/entities/user-search.log.entity';
+import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 
 export const entities = [
   Conversation,
   QuizQuestion,
   QuizQuestionAnswer,
-  AIReviewSummary,
+  ReviewSummaryLog,
   AdminInstruction,
   Message,
   QuizAnswer,
@@ -25,5 +26,6 @@ export const entities = [
   UserMessageLog,
   UserQuizLog,
   UserSearchLog,
-  AIAcceptance
+  AIAcceptance,
+  InventoryLog
 ];

@@ -23,7 +23,7 @@ import { InternalServerErrorWithDetailsException } from 'src/application/common/
 @ApiTags('Inventory')
 @ApiBearerAuth('jwt')
 @ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
-@ApiForbiddenResponse({ description: 'Yêu cầu role: admin (⚠️ hiện tại @Public() ở class-level khiến AuthGuard skip)' })
+@ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
 @Controller('inventory')
 export class InventoryController {
   constructor(

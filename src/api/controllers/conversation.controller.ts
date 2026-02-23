@@ -21,7 +21,8 @@ import { Public, Role } from 'src/application/common/Metadata';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import {
   ConversationDto,
-  ConversationRequestDto
+  ConversationRequestDto,
+  ConversationRequestDtoV2
 } from 'src/application/dtos/common/conversation.dto';
 import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -67,6 +68,7 @@ import {
   QueueName
 } from 'src/application/constant/processor';
 import { Queue } from 'bullmq';
+import { v4 as uuid } from 'uuid';
 
 @ApiTags('Conversation')
 @Controller('conversation')
@@ -80,7 +82,7 @@ export class ConversationController {
     private adminInstructionService: AdminInstructionService,
     @InjectQueue(QueueName.CONVERSATION_QUEUE)
     private readonly conversationQueue: Queue
-  ) {}
+  ) { }
 
   /** Lấy tất cả cuộc hội thoại */
   @Role('admin')
@@ -549,7 +551,7 @@ export class ConversationController {
 
     await this.conversationQueue.add(
       ConversationJobName.ADD_MESSAGE_AND_LOG,
-      responseConversation  
+      responseConversation
     );
 
     return Ok(responseConversation);
@@ -650,16 +652,16 @@ export class ConversationController {
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV7(
     @Req() request: Request,
-    @Body() conversation: ConversationRequestDto
+    @Body() conversation: ConversationRequestDtoV2
   ): Promise<BaseResponse<ConversationDto>> {
     const userId =
-      getTokenPayloadFromRequest(request)?.id ?? conversation.userId;
+      getTokenPayloadFromRequest(request)?.id ?? uuid();
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []
     );
 
     // Dùng common helper thay vì code trùng lặp
-    const promptResult = await buildCombinedPromptV4(      
+    const promptResult = await buildCombinedPromptV4(
       INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
       this.adminInstructionService,

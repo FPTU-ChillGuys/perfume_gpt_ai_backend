@@ -160,8 +160,7 @@ export async function buildCombinedPromptV2(
 
   const combinedPrompt = `${userLogData}\n\n
     Order Report:\n${orderReportData}\n\n
-    Profile:\n${profileReport ?? ''}${dataNote}${
-      adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''
+    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''
     }`;
 
   return {
@@ -256,8 +255,9 @@ export async function buildCombinedPromptV4(
     await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
 
   const combinedPrompt = `${userLogData}\n\n
-    ${userLogPromptText}\n\n ${
-      adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''
+    ${userLogPromptText}\n\n 
+    ${adminInstruction ? `\n\n
+      Admin Instructions:\n${adminInstruction}` : ''
     }
     ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}`;
 

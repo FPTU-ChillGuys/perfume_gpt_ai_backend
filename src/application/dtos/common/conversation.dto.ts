@@ -44,3 +44,24 @@ export class ConversationRequestDto {
     Object.assign(this, init);
   }
 }
+
+
+/** DTO cuộc hội thoại (request) */
+export class ConversationRequestDtoV2 {
+  /** ID cuộc hội thoại */
+  @ApiProperty({ description: 'ID cuộc hội thoại', format: 'uuid' })
+  @IsString()
+  id!: string;
+
+  /** Danh sách tin nhắn */
+  @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageRequestDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MessageRequestDto)
+  messages!: MessageRequestDto[];
+
+  constructor(init?: Partial<ConversationRequestDtoV2>) {
+    Object.assign(this, init);
+  }
+
+}

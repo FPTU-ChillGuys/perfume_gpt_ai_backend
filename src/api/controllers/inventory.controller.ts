@@ -1,5 +1,11 @@
 import { Controller, Get, Inject, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse
+} from '@nestjs/swagger';
 import { Role } from 'src/application/common/Metadata';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
@@ -13,9 +19,18 @@ import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
 import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { AIInventoryReportStructuredResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
-import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
-import { inventoryReportPrompt, INSTRUCTION_TYPE_INVENTORY } from 'src/application/constant/prompts';
+import {
+  AIInventoryReportStructuredResponse,
+  AIResponseMetadata
+} from 'src/application/dtos/response/ai-structured.response';
+import {
+  isDataEmpty,
+  INSUFFICIENT_DATA_MESSAGES
+} from 'src/infrastructure/utils/insufficient-data';
+import {
+  inventoryReportPrompt,
+  INSTRUCTION_TYPE_INVENTORY
+} from 'src/application/constant/prompts';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
@@ -23,7 +38,9 @@ import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 @Role('admin')
 @ApiTags('Inventory')
 @ApiBearerAuth('jwt')
-@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+@ApiUnauthorizedResponse({
+  description: 'Token JWT không hợp lệ hoặc không được cung cấp'
+})
 @ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
 @Controller('inventory')
 export class InventoryController {
@@ -47,7 +64,9 @@ export class InventoryController {
   @Get('batches')
   @ApiOperation({ summary: 'Lấy danh sách batch' })
   @ApiBaseResponse(PagedResult<BatchResponse>)
-  async getBatch(@Query() batchRequest: BatchRequest): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
+  async getBatch(
+    @Query() batchRequest: BatchRequest
+  ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
     return this.inventoryService.getBatch(batchRequest);
   }
 
@@ -57,8 +76,7 @@ export class InventoryController {
   @ApiBaseResponse(String)
   async getInventoryReport(): Promise<BaseResponse<string>> {
     // Fetch stock and batch data
-    const report =
-      await this.inventoryService.createReportFromBatchAndStock();
+    const report = await this.inventoryService.createReportFromBatchAndStock();
 
     return Ok(report.toString());
   }
@@ -69,15 +87,17 @@ export class InventoryController {
   @ApiBaseResponse(String)
   async getAIInventoryReport(): Promise<BaseResponse<string>> {
     // Fetch stock and batch data
-    const report =
-      await this.inventoryService.createReportFromBatchAndStock();
+    const report = await this.inventoryService.createReportFromBatchAndStock();
 
     if (isDataEmpty(report?.toString())) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
     }
 
     // Lấy admin instruction cho domain inventory (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_INVENTORY
+      );
 
     // Generate AI summary
     const aiResponse = await this.aiService.textGenerateFromPrompt(
@@ -86,11 +106,16 @@ export class InventoryController {
     );
 
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', { service: 'AIService' });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI inventory report',
+        { service: 'AIService' }
+      );
     }
 
     // Create inventory log
-    await this.inventoryService.createInventoryLog(aiResponse.data ?? 'No report generated');
+    await this.inventoryService.createInventoryLog(
+      aiResponse.data ?? 'No report generated'
+    );
 
     return Ok(aiResponse.data);
   }
@@ -102,11 +127,12 @@ export class InventoryController {
   @Get('report/ai/structured')
   @ApiOperation({ summary: 'Tạo báo cáo tồn kho AI có cấu trúc' })
   @ApiBaseResponse(AIInventoryReportStructuredResponse)
-  async getStructuredAIInventoryReport(): Promise<BaseResponse<AIInventoryReportStructuredResponse>> {
+  async getStructuredAIInventoryReport(): Promise<
+    BaseResponse<AIInventoryReportStructuredResponse>
+  > {
     const startTime = Date.now();
 
-    const report =
-      await this.inventoryService.createReportFromBatchAndStock();
+    const report = await this.inventoryService.createReportFromBatchAndStock();
 
     if (isDataEmpty(report?.toString())) {
       const processingTimeMs = Date.now() - startTime;
@@ -121,7 +147,10 @@ export class InventoryController {
     }
 
     // Lấy admin instruction cho domain inventory (nếu có)
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_INVENTORY
+      );
 
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       inventoryReportPrompt(report.toString()),
@@ -129,7 +158,10 @@ export class InventoryController {
     );
 
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', { service: 'AIService' });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI inventory report',
+        { service: 'AIService' }
+      );
     }
 
     const processingTimeMs = Date.now() - startTime;
@@ -143,15 +175,27 @@ export class InventoryController {
     return Ok(structuredResponse);
   }
 
-  @Get('report/logs') 
+  @Get('report/logs')
   @ApiOperation({ summary: 'Lấy lịch sử báo cáo tồn kho' })
   @ApiBaseResponse(PagedResult<String>)
-  async getInventoryReportLogs(): Promise<BaseResponseAPI<PagedResult<String>>> {
-    const logs = await this.inventoryService.getInventoryLogs();
-    return Ok(new PagedResult<InventoryLog>({
-      items: logs?.data ?? [],
-      totalCount: logs?.data?.length ?? 0
-    }));
+  async getInventoryReportLogs(): Promise<
+    BaseResponseAPI<PagedResult<String>>
+  > {
+    const logs = await this.inventoryService.getAllInventoryLogs();
+    return Ok(
+      new PagedResult<InventoryLog>({
+        items: logs?.data ?? [],
+        totalCount: logs?.data?.length ?? 0
+      })
+    );
   }
-
+  
+  @Get('report/logs/:id')
+  @ApiOperation({ summary: 'Lấy chi tiết báo cáo tồn kho theo ID' })
+  @ApiBaseResponse(InventoryLog)
+  async getInventoryLogById(
+    @Query('id') id: string
+  ): Promise<BaseResponse<InventoryLog>> {
+    return this.inventoryService.getInventoryLogById(id);
+  }
 }

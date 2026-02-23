@@ -252,7 +252,7 @@ export class InventoryService {
     );
   }
 
-  async getInventoryLogs(): Promise<BaseResponse<InventoryLog[]>> {
+  async getAllInventoryLogs(): Promise<BaseResponse<InventoryLog[]>> {
     return funcHandlerAsync(
       async () => {
         const logs = await this.unitOfWork.InventoryLogRepo.findAll();
@@ -261,5 +261,15 @@ export class InventoryService {
       'Failed to fetch inventory logs',
       true
     );
+  }
+
+  async getInventoryLogById(id: string): Promise<BaseResponse<InventoryLog>> {
+    return funcHandlerAsync(async () => {
+      const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
+      if (!log) {
+        return { success: false, error: 'Inventory log not found' };
+      }
+      return { success: true, data: log };
+    }, 'Failed to fetch inventory log');
   }
 }

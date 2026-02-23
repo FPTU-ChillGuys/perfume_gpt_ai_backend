@@ -5,31 +5,36 @@ import {
   ReviewListItemResponse,
   ReviewResponse,
   ReviewStatisticsResponse,
-  MediaResponse,
+  MediaResponse
 } from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import { UnitOfWork } from '../repositories/unit-of-work';
+import { ReviewLog } from 'src/domain/entities/review-log.entity';
+import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
 
 const reviewInclude = {
   AspNetUsers_Reviews_UserIdToAspNetUsers: {
-    include: { Media: true },
+    include: { Media: true }
   },
   OrderDetails: {
     include: {
       ProductVariants: {
         include: {
           Products: true,
-          Concentrations: true,
-        },
-      },
-    },
+          Concentrations: true
+        }
+      }
+    }
   },
-  Media: true,
+  Media: true
 } satisfies Prisma.ReviewsInclude;
 
-type ReviewWithRelations = Prisma.ReviewsGetPayload<{ include: typeof reviewInclude }>;
+type ReviewWithRelations = Prisma.ReviewsGetPayload<{
+  include: typeof reviewInclude;
+}>;
 
 function buildVariantName(review: ReviewWithRelations): string {
   const v = review.OrderDetails.ProductVariants;
@@ -57,15 +62,17 @@ function mapToReviewResponse(review: ReviewWithRelations): ReviewResponse {
         displayOrder: m.DisplayOrder,
         isPrimary: m.IsPrimary,
         fileSize: m.FileSize != null ? Number(m.FileSize) : null,
-        mimeType: m.MimeType ?? null,
+        mimeType: m.MimeType ?? null
       })
     ),
     createdAt: review.CreatedAt.toISOString(),
-    updatedAt: review.UpdatedAt?.toISOString() ?? null,
+    updatedAt: review.UpdatedAt?.toISOString() ?? null
   };
 }
 
-function mapToReviewListItemResponse(review: ReviewWithRelations): ReviewListItemResponse {
+function mapToReviewListItemResponse(
+  review: ReviewWithRelations
+): ReviewListItemResponse {
   return {
     id: review.Id,
     userId: review.UserId,
@@ -78,13 +85,16 @@ function mapToReviewListItemResponse(review: ReviewWithRelations): ReviewListIte
     status: review.Status as 'Pending' | 'Approved' | 'Rejected',
     commentPreview: review.Comment.substring(0, 100),
     imageCount: review.Media.length,
-    createdAt: review.CreatedAt.toISOString(),
+    createdAt: review.CreatedAt.toISOString()
   };
 }
 
 @Injectable()
 export class ReviewService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly unitOfWork: UnitOfWork
+  ) {}
 
   async getAllReviews(
     request: GetPagedReviewRequest
@@ -100,20 +110,25 @@ export class ReviewService {
             : {}),
           ...(request.UserId ? { UserId: request.UserId } : {}),
           ...(request.Status ? { Status: request.Status } : {}),
-          ...((request.MinRating || request.MaxRating)
+          ...(request.MinRating || request.MaxRating
             ? {
                 Rating: {
                   ...(request.MinRating ? { gte: request.MinRating } : {}),
-                  ...(request.MaxRating ? { lte: request.MaxRating } : {}),
-                },
+                  ...(request.MaxRating ? { lte: request.MaxRating } : {})
+                }
               }
             : {}),
-          ...(request.HasImages ? { Media: { some: {} } } : {}),
+          ...(request.HasImages ? { Media: { some: {} } } : {})
         };
 
         const [reviews, totalCount] = await Promise.all([
-          this.prisma.reviews.findMany({ where, skip, take, include: reviewInclude }),
-          this.prisma.reviews.count({ where }),
+          this.prisma.reviews.findMany({
+            where,
+            skip,
+            take,
+            include: reviewInclude
+          }),
+          this.prisma.reviews.count({ where })
         ]);
 
         const result = new PagedResult<ReviewListItemResponse>({
@@ -121,7 +136,7 @@ export class ReviewService {
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize),
+          totalPages: Math.ceil(totalCount / request.PageSize)
         });
         return { success: true, payload: result };
       },
@@ -137,7 +152,7 @@ export class ReviewService {
       async () => {
         const reviews = await this.prisma.reviews.findMany({
           where: { OrderDetails: { VariantId: variantId } },
-          include: reviewInclude,
+          include: reviewInclude
         });
         return { success: true, payload: reviews.map(mapToReviewResponse) };
       },
@@ -153,7 +168,7 @@ export class ReviewService {
       async () => {
         const reviews = await this.prisma.reviews.findMany({
           where: { OrderDetails: { VariantId: variantId } },
-          select: { Rating: true },
+          select: { Rating: true }
         });
 
         const totalReviews = reviews.length;
@@ -178,7 +193,7 @@ export class ReviewService {
           fourStarCount: countByRating[4] ?? 0,
           threeStarCount: countByRating[3] ?? 0,
           twoStarCount: countByRating[2] ?? 0,
-          oneStarCount: countByRating[1] ?? 0,
+          oneStarCount: countByRating[1] ?? 0
         };
         return { success: true, payload: stats };
       },
@@ -186,5 +201,62 @@ export class ReviewService {
       true
     );
   }
-}
 
+  async addReviewLog(
+    type: ReviewTypeEnum,
+    variantId: string,
+    reviewLog: string
+  ): Promise<BaseResponseAPI<ReviewLog>> {
+    return await funcHandlerAsync(
+      async () => {
+        const log = new ReviewLog({
+          typeReview: type,
+          variantId,
+          reviewLog
+        });
+        const result = await this.unitOfWork.ReviewLogRepo.insert(log);
+        return { success: true, payload: result };
+      },
+      'Failed to add review log',
+      true
+    );
+  }
+
+  async getReviewLogsByVariantId(
+    variantId: string
+  ): Promise<BaseResponseAPI<ReviewLog[]>> {
+    return await funcHandlerAsync(
+      async () => {
+        const logs = await this.unitOfWork.ReviewLogRepo.find({ variantId });
+        return { success: true, payload: logs };
+      },
+      'Failed to fetch review logs',
+      true
+    );
+  }
+
+  async getReviewLogById(id: string): Promise<BaseResponseAPI<ReviewLog>> {
+    return await funcHandlerAsync(
+      async () => {
+        const log = await this.unitOfWork.ReviewLogRepo.findOne({ id });
+        if (!log) {
+          return { success: false, error: 'Review log not found' };
+        }
+        return { success: true, payload: log };
+      },
+      'Failed to fetch review log',
+      true
+    );
+  }
+
+  async getAllReviewLogs(): Promise<BaseResponseAPI<ReviewLog[]>> {
+    return await funcHandlerAsync(
+      async () => {
+        const result = await this.unitOfWork.ReviewLogRepo.findAll();
+        return { success: true, payload: result };
+      },
+      'Failed to fetch review logs',
+      true
+    );
+  }
+}

@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
@@ -17,6 +17,8 @@ import { AIResponseMetadata } from 'src/application/dtos/response/ai-structured.
 import { isArrayEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { ReviewLog } from 'src/domain/entities/review-log.entity';
+import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
 
 @Role('admin')
 @ApiTags('Reviews')
@@ -186,5 +188,43 @@ export class ReviewController {
         });
 
         return Ok(structuredResponse);
+    }
+
+    /** Thêm review log */
+    @Post('logs')
+    @ApiBaseResponse(ReviewLog)
+    @ApiOperation({ summary: 'Thêm review log' })
+    async addReviewLog(@Body() request: {
+        type: ReviewTypeEnum,
+        variantId: string,
+        reviewLog: string
+    }): Promise<BaseResponseAPI<ReviewLog>> {
+        return await this.reviewService.addReviewLog(request.type, request.variantId, request.reviewLog);
+    }
+
+    /** Lấy review logs theo variant ID */
+    @Get('logs/variant/:variantId')
+    @ApiBaseResponse(ReviewLog)
+    @ApiOperation({ summary: 'Lấy review logs theo variant ID' })
+    @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
+    async getReviewLogsByVariantId(@Param('variantId') variantId: string): Promise<BaseResponseAPI<ReviewLog[]>> {
+        return await this.reviewService.getReviewLogsByVariantId(variantId);
+    }
+
+    /** Lấy review log theo ID */
+    @Get('logs/:id')
+    @ApiBaseResponse(ReviewLog)
+    @ApiOperation({ summary: 'Lấy review log theo ID' })
+    @ApiParam({ name: 'id', description: 'ID của review log' })
+    async getReviewLogById(@Param('id') id: string): Promise<BaseResponseAPI<ReviewLog>> {
+        return await this.reviewService.getReviewLogById(id);
+    }
+
+    /** Lấy tất cả review logs */
+    @Get('logs')
+    @ApiBaseResponse(ReviewLog)
+    @ApiOperation({ summary: 'Lấy tất cả review logs' })
+    async getAllReviewLogs(): Promise<BaseResponseAPI<ReviewLog[]>> {
+        return await this.reviewService.getAllReviewLogs();
     }
 }

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import {
@@ -24,8 +24,11 @@ import { INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { LogHelper } from './helper/logHelper.controller';
+import { UserLog } from 'src/domain/entities/user-log.entity';
+import { CacheTTL } from '@nestjs/cache-manager';
 
 @Role('admin')
+@ApiBearerAuth("jwt")
 @ApiTags('Logs')
 @Controller('logs')
 export class LogController extends LogHelper {
@@ -37,8 +40,42 @@ export class LogController extends LogHelper {
     super(userLogService, aiService, adminInstructionService);
   }
 
+  /** Lấy báo cáo tất cả log hoạt động người dùng */
+  @CacheTTL(1)
+  @Public()
+  @Get('report/activity/alls')
+  @ApiOperation({ summary: 'Lấy báo cáo tất cả log hoạt động người dùng' })
+  @ApiQuery({
+    name: 'period',
+    enum: PeriodEnum,
+    description: 'Khoảng thời gian lọc'
+  })
+  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
+  @ApiQuery({
+    name: 'startDate',
+    type: Date,
+    required: false,
+    description: 'Ngày bắt đầu (tùy chọn)'
+  })
+  @ApiBaseResponse(String)
+  async getReportFromAllLogs(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<string>> {
+    // Lay va tom tat log nguoi dung
+    try {
+      const response = await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
+
+      return {
+        success: response.success,
+        data: response.data?.response
+      };
+    } catch (error) {
+      throw new InternalServerErrorWithDetailsException(error);
+    }
+  }
+
   /** Lấy báo cáo log hoạt động người dùng */
-  @Get('report/activity')
+  @Get('report/activity/user')
   @ApiOperation({ summary: 'Lấy báo cáo log hoạt động người dùng' })
   @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
   @ApiQuery({
@@ -66,6 +103,50 @@ export class LogController extends LogHelper {
     return {
       success: response.success,
       data: response.data?.response
+    };
+  }
+
+
+
+  /** Lấy tất cả log hoạt động người dùng */
+  @CacheTTL(0)
+  @Get("all")
+  @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng' })
+  @ApiBaseResponse(Array<UserLog>)
+  async getAllUserLogs(
+  ): Promise<BaseResponse<UserLog[]>> {
+    const response = await this.userLogService.getAllLogs();
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Lấy tất cả log hoạt động người dùng theo khoảng thời gian */
+  @Get("all/period")
+  @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng theo khoảng thời gian' })
+  @ApiQuery({
+    name: 'period',
+    enum: PeriodEnum,
+    description: 'Khoảng thời gian lọc'
+  })
+  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
+  @ApiQuery({
+    name: 'startDate',
+    type: Date,
+    required: false,
+    description: 'Ngày bắt đầu (tùy chọn)'
+  })
+  @ApiBaseResponse(Array<UserLog>)
+  async getUserLogsWithPeriod(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<UserLog[]>> {
+    const response = await this.userLogService.getUserLogsWithPeriod(allUserLogRequest);
+
+    return {
+      success: response.success,
+      data: response.data
     };
   }
 
@@ -221,7 +302,7 @@ export class LogController extends LogHelper {
     await this.summarizeLogsPerMonth();
     return Ok('Manual log summarization completed.');
   }
-  
+
   @Get('summarize/year/manual')
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng năm (thủ công)' })
   @ApiBaseResponse(String)

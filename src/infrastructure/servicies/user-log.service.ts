@@ -1,7 +1,5 @@
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { Inject, Injectable } from '@nestjs/common';
-import { InjectMapper } from '@automapper/nestjs';
-import { Mapper } from '@automapper/core';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { UserLog } from 'src/domain/entities/user-log.entity';
@@ -27,10 +25,8 @@ import { convertToUTC } from '../utils/time-zone';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
-import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import { generateSummaryPrompt, INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
 import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
-import { SimpleMemoryCache } from '../utils/simple-memory-cache';
 import { AIService } from './ai.service';
 import { AI_SERVICE } from '../modules/ai.module';
 import { INSUFFICIENT_DATA_MESSAGES, isDataEmpty } from '../utils/insufficient-data';
@@ -41,6 +37,47 @@ export class UserLogService {
   /** Cache cho user log summary report (TTL = 5 phút) */
   constructor(private unitOfWork: UnitOfWork, @Inject(AI_SERVICE) private aiService: AIService, private adminInstructionService: AdminInstructionService) { }
 
+  /** Lay tat ca log */
+  async getAllLogs(): Promise<BaseResponse<UserLog[]>> {
+    return await funcHandlerAsync(
+      async () => {
+        const userLogs = await this.unitOfWork.UserLogRepo.getAllUserLogs();
+        return { success: true, data: userLogs };
+      },
+      'Failed to get all user logs',
+      true
+    );
+  }
+
+  /** Lay tat ca log */
+  async getUserLogsWithPeriod(allUserLogRequest: AllUserLogRequest): Promise<BaseResponse<UserLog[]>> {
+    return await funcHandlerAsync(
+      async () => {
+
+        if (!allUserLogRequest.startDate) {
+          allUserLogRequest.startDate = this.getFirstDateOfPeriod(
+            allUserLogRequest.period,
+            convertToUTC(allUserLogRequest.endDate)
+          );
+        }
+
+        const request = new AllUserLogRequest({
+          startDate: convertToUTC(startOfDay(allUserLogRequest.startDate)),
+          endDate: convertToUTC(endOfDay(allUserLogRequest.endDate)),
+          period: allUserLogRequest.period,
+        });
+
+        const userLogs = await this.unitOfWork.UserLogRepo.getUserLogsWithPeriod(request);
+        return { success: true, data: userLogs };
+      },
+      'Failed to get all user logs',
+      true
+    );
+  }
+
+
+
+  /** Lay log tu userId */
   async getUserLogsByUserId(
     userId: string
   ): Promise<BaseResponse<UserLog | null>> {
@@ -159,6 +196,7 @@ export class UserLogService {
     );
   }
 
+  /** Lay summary tu userId */
   async getUserLogSummariesByUserId(
     userId: string,
     startDate?: Date,
@@ -254,7 +292,7 @@ export class UserLogService {
         }
 
         // Lay log tim kiem cua user trong khoang thoi gian
-        const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
+        const searchLogs = userLog.userSearchLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
             startOfDay(convertToUTC(userLogRequest.startDate!)) &&
@@ -267,7 +305,7 @@ export class UserLogService {
           'Search: ' + searchLogs.map((log) => log.content).join(';\n');
 
         //Lay log tin nhan cua user trong khoang thoi gian
-        const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
+        const messageLogs = userLog.userMessageLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
             startOfDay(convertToUTC(userLogRequest.startDate!)) &&
@@ -281,7 +319,7 @@ export class UserLogService {
           messageLogs.map((log) => log.message?.message).join(';\n');
 
         // Lay log quiz cua user trong khoang thoi gian
-        const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
+        const quizLogs = await userLog.userQuizLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
             startOfDay(convertToUTC(userLogRequest.startDate!)) &&
@@ -340,6 +378,10 @@ export class UserLogService {
         );
       }
 
+      console.log(`Period: ${allUserLogRequest.period}`);
+      console.log(`Start Date: ${allUserLogRequest.startDate}`);
+      console.log(`End Date: ${allUserLogRequest.endDate}`);
+
       // Lay log cua user trong khoang thoi gian
       const userLogs = await this.unitOfWork.UserLogRepo.getAllUserLogs();
 
@@ -348,7 +390,7 @@ export class UserLogService {
 
       for (const userLog of userLogs) {
         // Lay log tim kiem cua user trong khoang thoi gian
-        const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
+        const searchLogs = userLog.userSearchLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
             startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
@@ -361,7 +403,7 @@ export class UserLogService {
           'Search: ' + searchLogs.map((log) => log.content).join(';\n');
 
         //Lay log tin nhan cua user trong khoang thoi gian
-        const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
+        const messageLogs = userLog.userMessageLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
             startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
@@ -375,7 +417,7 @@ export class UserLogService {
           messageLogs.map((log) => log.message?.message).join(';\n');
 
         // Lay log quiz cua user trong khoang thoi gian
-        const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
+        const quizLogs = await userLog.userQuizLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
             startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
@@ -405,7 +447,7 @@ export class UserLogService {
             endOfDay(convertToUTC(allUserLogRequest.endDate))
           ) + '\n';
 
-        response =
+        response +=
           this.convertUserLogsToReport(
             searchContents,
             messageContents,
@@ -416,7 +458,7 @@ export class UserLogService {
       }
 
       return { success: true, data: { prompt, response } };
-    }, 'Failed to summarize user logs');
+    }, 'Failed to summarize user logs', true);
   }
 
   // Tam thoi lay tat ca userId tu log
@@ -645,6 +687,7 @@ export class UserLogService {
     await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
   }
 
+  /** Tạo summary cho period */
   async createLogSummaryForPeriodByUsingAI(userId: string, period: PeriodEnum): Promise<BaseResponse<string | null>> {
     return await funcHandlerAsync(
       async () => {

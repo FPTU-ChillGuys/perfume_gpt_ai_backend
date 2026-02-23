@@ -20,6 +20,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheableMemory, Keyv } from 'cacheable';
 import KeyvRedis from '@keyv/redis';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { CacheableModule } from '../cacheable/cacheable.module';
 
 const registerQueue = BullModule.registerQueue(
   ...Object.values(QueueName).map((value) => ({ name: value }))
@@ -55,13 +56,14 @@ const registerQueue = BullModule.registerQueue(
     InventoryController,
     AIAcceptanceController,
     AdminInstructionController,
-    OrderController
+    OrderController,
   ],
   providers: [
     {
       provide: APP_INTERCEPTOR,
       useClass: CacheInterceptor
-    }
+    },
+    CacheableModule
   ],
   exports: modules
 })

@@ -9,13 +9,13 @@
  * Prompt chứa log hoạt động của người dùng để AI tham khảo
  */
 export const userLogPrompt = (data: string): string =>
-  `Here are some of your recent activity logs that might be relevant to our conversation:\n${data}\nUse this information to provide more accurate and personalized responses. If the logs are not relevant, you can ignore them.`;
+  `Dưới đây là một số nhật ký hoạt động gần đây của bạn có thể liên quan đến cuộc trò chuyện của chúng ta:\n${data}\nHãy sử dụng thông tin này để đưa ra phản hồi chính xác và cá nhân hoá hơn. Nếu nhật ký không liên quan, bạn có thể bỏ qua.`;
 
 /**
  * Prompt kết hợp system prompt, user log và order report cho conversation test
  */
 export const orderReportPrompt = (orderReport: string): string =>
-  `Additionally, here is a summary of your recent orders that might be relevant to our conversation:\n${orderReport}\n Use this information to provide more accurate and personalized responses. If the order information is not relevant, you can ignore it.`;
+  `Ngoài ra, dưới đây là tóm tắt các đơn hàng gần đây của bạn có thể liên quan đến cuộc trò chuyện:\n${orderReport}\nHãy sử dụng thông tin này để đưa ra phản hồi chính xác và cá nhân hoá hơn. Nếu thông tin đơn hàng không liên quan, bạn có thể bỏ qua.`;
 
 /**
  * Prompt kết hợp system prompt với cac prompt khac
@@ -41,7 +41,7 @@ export const conversationTestSystemPrompt = (
  * Prompt dự đoán xu hướng dựa trên tóm tắt log người dùng
  */
 export const trendForecastingPrompt = (summaryData: string): string =>
-  `Based on the following summarized user logs, identify emerging trends and patterns that could inform future product development and marketing strategies. Provide insights into user behavior, preferences, and potential market opportunities:\n${summaryData}`;
+  `Dựa trên nhật ký hoạt động người dùng được tóm tắt dưới đây, hãy xác định các xu hướng và mô hình nổi bật có thể định hướng cho chiến lược phát triển sản phẩm và marketing trong tương lai. Cung cấp những nhận định về hành vi người dùng, sở thích và các cơ hội thị trường tiềm năng:\n${summaryData}`;
 
 // ==================== Review Prompts ====================
 
@@ -49,7 +49,7 @@ export const trendForecastingPrompt = (summaryData: string): string =>
  * Prompt tóm tắt đánh giá sản phẩm
  */
 export const reviewSummaryPrompt = (reviewsText: string): string =>
-  `Summarize the following product reviews, highlighting key points such as common praises, frequent complaints, and overall sentiment. Provide insights that could help improve the product or inform potential buyers:\n${reviewsText}`;
+  `Hãy tóm tắt các đánh giá sản phẩm sau đây, làm nổi bật các điểm quan trọng như những lời khen phổ biến, khiếu nại thường gặp và cảm nhận chung. Cung cấp nhận định có thể giúp cải thiện sản phẩm hoặc hỗ trợ người mua tiềm năng:\n${reviewsText}`;
 
 // ==================== Recommendation Prompts ====================
 
@@ -63,7 +63,7 @@ export const repurchaseRecommendationPrompt = (summaryData: string): string =>
  * Prompt tạo tóm tắt đơn hàng bằng AI
  */
 export const orderSummaryPrompt = (orderDetails: string): string =>
-  `Generate a comprehensive summary of the following order details, highlighting key insights such as purchasing patterns, frequently ordered items, and any notable trends that could inform future business strategies:\n\n${orderDetails}`;
+  `Hãy tạo một bản tóm tắt toàn diện về thông tin đơn hàng sau đây, làm nổi bật các nhận định quan trọng như mô hình mua sắm, sản phẩm được đặt thường xuyên và các xu hướng đáng chú ý có thể định hướng cho chiến lược kinh doanh trong tương lai:\n\n${orderDetails}`;
 
 /**
  * Prompt gợi ý AI dựa trên log người dùng - viết theo giọng tư vấn tự nhiên
@@ -77,7 +77,7 @@ export const aiRecommendationPrompt = (summaryData: string): string =>
  * Prompt tạo báo cáo tồn kho bằng AI
  */
 export const inventoryReportPrompt = (reportData: string): string =>
-  `Generate a concise inventory report based on the following data:\n\n${reportData}`;
+  `Hãy tạo một báo cáo tồn kho ngắn gọn dựa trên dữ liệu sau:\n\n${reportData}`;
 
 // ==================== Recommendation Inline Prompts ====================
 

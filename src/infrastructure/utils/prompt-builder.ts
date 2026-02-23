@@ -84,9 +84,9 @@ export async function buildCombinedPromptV1(
   });
 
   const combinedPrompt = `${userLogPromptText}\n\n
-    Order Report:\n${orderReportData}\n\n
-    Profile:\n${profileReport ?? ''}${dataNote}
-    ${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''}`;
+    Báo cáo đơn hàng:\n${orderReportData}\n\n
+    Hồ sơ người dùng:\n${profileReport ?? ''}${dataNote}
+    ${adminInstruction ? `\n\nHướng dẫn quản trị viên:\n${adminInstruction}` : ''}`;
 
   return {
     success: true,
@@ -159,8 +159,8 @@ export async function buildCombinedPromptV2(
   });
 
   const combinedPrompt = `${userLogData}\n\n
-    Order Report:\n${orderReportData}\n\n
-    Profile:\n${profileReport ?? ''}${dataNote}${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''
+    Báo cáo đơn hàng:\n${orderReportData}\n\n
+    Hồ sơ người dùng:\n${profileReport ?? ''}${dataNote}${adminInstruction ? `\n\nHướng dẫn quản trị viên:\n${adminInstruction}` : ''
     }`;
 
   return {
@@ -210,8 +210,8 @@ export async function buildCombinedPromptV3(
     await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
 
   const combinedPrompt = `${userLogData}\n\n
-  ${adminInstruction ? `\n\nAdmin Instructions:\n${adminInstruction}` : ''}
-    ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}`;
+  ${adminInstruction ? `\n\nHướng dẫn quản trị viên:\n${adminInstruction}` : ''}
+    ${userId ? `\n\n[ID người dùng: ${userId}]` : '\n\n[Khách vãng lai - không có ID]'}`;
 
   return {
     success: true,
@@ -257,9 +257,9 @@ export async function buildCombinedPromptV4(
   const combinedPrompt = `${userLogData}\n\n
     ${userLogPromptText}\n\n 
     ${adminInstruction ? `\n\n
-      Admin Instructions:\n${adminInstruction}` : ''
+      Hướng dẫn quản trị viên:\n${adminInstruction}` : ''
     }
-    ${userId ? `\n\n[User ID: ${userId}]` : '\n\n[Guest User - no user ID]'}`;
+    ${userId ? `\n\n[ID người dùng: ${userId}]` : '\n\n[Khách vãng lai - không có ID]'}`;
 
   return {
     success: true,

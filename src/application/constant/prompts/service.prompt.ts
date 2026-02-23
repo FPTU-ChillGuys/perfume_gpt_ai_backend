@@ -15,17 +15,17 @@ export const generateSummaryPrompt = (
   startDate: Date,
   endDate: Date
 ): string => {
-  let prompt = `Summarize the user's activities from ${startDate.toDateString()} to ${new Date(endDate).toDateString()}.\n`;
+  let prompt = `Tóm tắt các hoạt động của người dùng từ ngày ${startDate.toDateString()} đến ngày ${new Date(endDate).toDateString()}.\n`;
   if (searchContents) {
-    prompt += `Search activities: ${searchContents}\n`;
+    prompt += `Hoạt động tìm kiếm: ${searchContents}\n`;
   }
   if (messageContents) {
-    prompt += `Messages: ${messageContents}\n`;
+    prompt += `Tin nhắn: ${messageContents}\n`;
   }
   if (quizContents) {
-    prompt += `Quiz answers: ${quizContents}\n`;
+    prompt += `Câu trả lời quiz: ${quizContents}\n`;
   }
-  prompt += `Provide a concise summary of the user's activities during this period.`;
+  prompt += `Hãy cung cấp một bản tóm tắt ngắn gọn về các hoạt động của người dùng trong giai đoạn này.`;
   return prompt;
 };
 

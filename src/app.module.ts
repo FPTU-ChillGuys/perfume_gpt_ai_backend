@@ -16,6 +16,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
+import { CacheModule } from '@nestjs/cache-manager';
+import KeyvRedis, { Keyv } from '@keyv/redis';
+import { CacheableMemory } from 'cacheable';
 
 @Module({
   imports: [
@@ -78,7 +81,24 @@ import { PrismaModule } from './prisma/prisma.module';
           port: config.get<number>('REDIS_PORT'),
         }
       })
-    })
+    }),
+    CacheModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => {
+        return {
+          stores: [
+            new Keyv({
+              store: new CacheableMemory({
+                ttl: config.get<number>('CACHE_TTL') ?? 60000,
+                lruSize: config.get<number>('CACHE_LRU_SIZE') ?? 5000
+              }),
+            }),
+            new KeyvRedis(`redis://${config.get<string>('REDIS_HOST') ?? 'localhost'}:${config.get<number>('REDIS_PORT') ?? 6379}`),
+          ],
+        };
+      },
+    }),
   ],
   controllers: [AppController],
   providers: [
@@ -89,4 +109,4 @@ import { PrismaModule } from './prisma/prisma.module';
     }
   ]
 })
-export class AppModule {}
+export class AppModule { }

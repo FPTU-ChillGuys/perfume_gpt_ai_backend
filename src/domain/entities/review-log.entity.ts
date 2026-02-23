@@ -1,8 +1,9 @@
-import { Enum, Property } from '@mikro-orm/core';
+import { Entity, Enum, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
 import { ReviewTypeEnum } from '../enum/review-log-type.enum';
 import { ApiProperty } from '@nestjs/swagger';
 
+@Entity()
 export class ReviewLog extends Common {
   @ApiProperty({ description: 'Nội dung log đánh giá' })
   @Enum(() => ReviewTypeEnum)

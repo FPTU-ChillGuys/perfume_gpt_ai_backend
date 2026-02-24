@@ -27,14 +27,23 @@ export const searchOutput = {
 
 export const searchOutputSchema = searchOutput.schema;
 
-export const convertSearchOutputToProductResponse = (output: string) => {
-  const parsedOutput = searchOutputSchema.parse(JSON.parse(output));
-  return parsedOutput.products.map((product) => ({
-    id: product.id,
-    name: product.name,
-    description: product.description,
-    brandName: product.brandName,
-    categoryName: product.categoryName,
-    primaryImage: product.primaryImage,
-  })) as ProductResponse[]
+export const convertSearchOutputToProductResponse = (output: string): ProductResponse[] => {
+  try {
+    const parsedOutput = searchOutputSchema.parse(JSON.parse(output));
+    if (!parsedOutput.products || parsedOutput.products.length === 0) {
+      console.warn('[TrendProduct] AI trả về mảng products rỗng - không tìm thấy sản phẩm phù hợp.');
+      return [];
+    }
+    return parsedOutput.products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      brandName: product.brandName,
+      categoryName: product.categoryName,
+      primaryImage: product.primaryImage,
+    })) as ProductResponse[];
+  } catch (error) {
+    console.error('[TrendProduct] Lỗi parse structured output:', error);
+    return [];
+  }
 };

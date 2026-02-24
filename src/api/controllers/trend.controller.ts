@@ -88,14 +88,6 @@ export class TrendController {
     return Ok(trendResponse.data);
   }
 
-  /** Lấy product từ xu hướng người dùng */
-  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
-  @CacheTTL(1)
-  @Public()
-  @Get("product")
-  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
-  @ApiBaseResponse(ProductResponse)
-  @ApiBody({ type: AllUserLogRequest })
   async getProductFromTrend(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<ProductResponse[]>> {
@@ -114,6 +106,38 @@ export class TrendController {
     const trendResponse = trendResult.data;
     const products = convertSearchOutputToProductResponse(trendResponse ?? '');
     return Ok(products)
+  }
+
+
+  /** Lấy product từ xu hướng người dùng */
+  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
+  @CacheTTL(1)
+  @Public()
+  @Get("product")
+  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
+  @ApiBaseResponse(ProductResponse)
+  @ApiBody({ type: AllUserLogRequest })
+  async getProductNoCaching(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<ProductResponse[]>> {
+    const trendResult = await this.getProductFromTrend(allUserLogRequest)
+    return trendResult
+  }
+
+
+  /** Lấy product từ xu hướng người dùng (caching) */
+  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
+  @CacheTTL(60 * 60 * 24)
+  @Public()
+  @Get("product/caching")
+  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng (caching)' })
+  @ApiBaseResponse(ProductResponse)
+  @ApiBody({ type: AllUserLogRequest })
+  async getProductFromTrendCaching(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<ProductResponse[]>> {
+    const trendResult = await this.getProductFromTrend(allUserLogRequest)
+    return trendResult
   }
 
   /**

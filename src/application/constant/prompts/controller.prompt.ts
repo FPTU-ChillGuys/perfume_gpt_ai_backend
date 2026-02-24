@@ -1,130 +1,120 @@
 /**
  * Controller-level prompt functions
- * Các prompt được sử dụng trong controller layer
+ * Các prompt được sử dụng trong controller layer.
+ *
+ * NGUYÊN TẮC THIẾT KẾ:
+ * - Controller prompt CHỈ đóng gói DỮ LIỆU (data wrapper / context provider).
+ * - Mọi hướng dẫn hành vi, format, quy tắc phải đặt trong Admin Instruction (DB).
+ * - Khi admin thay đổi instruction trong DB → AI thay đổi hành vi ngay, không cần deploy lại.
  */
 
 // ==================== Conversation Prompts ====================
 
 /**
- * Prompt chứa log hoạt động của người dùng để AI tham khảo
+ * Cung cấp context: nhật ký hoạt động gần đây của người dùng
  */
 export const userLogPrompt = (data: string): string =>
-  `Dưới đây là một số nhật ký hoạt động gần đây của bạn có thể liên quan đến cuộc trò chuyện của chúng ta:\n${data}\nHãy sử dụng thông tin này để đưa ra phản hồi chính xác và cá nhân hoá hơn. Nếu nhật ký không liên quan, bạn có thể bỏ qua.`;
+  `[DỮ LIỆU NHẬT KÝ HOẠT ĐỘNG NGƯỜI DÙNG]\n${data}`;
 
 /**
- * Prompt kết hợp system prompt, user log và order report cho conversation test
+ * Cung cấp context: tóm tắt đơn hàng gần đây của người dùng
  */
 export const orderReportPrompt = (orderReport: string): string =>
-  `Ngoài ra, dưới đây là tóm tắt các đơn hàng gần đây của bạn có thể liên quan đến cuộc trò chuyện:\n${orderReport}\nHãy sử dụng thông tin này để đưa ra phản hồi chính xác và cá nhân hoá hơn. Nếu thông tin đơn hàng không liên quan, bạn có thể bỏ qua.`;
+  `[DỮ LIỆU ĐƠN HÀNG GẦN ĐÂY]\n${orderReport}`;
 
 /**
- * Prompt kết hợp system prompt với cac prompt khac
+ * Kết hợp system prompt với các context prompt khác
  */
 export const conversationSystemPrompt = (
   systemPrompt: string,
   otherPrompts: string
-): string => `${systemPrompt} \n ${otherPrompts}`;
+): string => `${systemPrompt}\n${otherPrompts}`;
 
 /**
- * Prompt kết hợp system prompt, user log và order report
+ * Kết hợp system prompt, user log context và order context cho conversation
  */
 export const conversationTestSystemPrompt = (
   systemPrompt: string,
   userLogPromptText: string,
   orderReportText: string
 ): string =>
-  `${systemPrompt} \n ${userLogPromptText} \n ${orderReportText}`;
+  `${systemPrompt}\n${userLogPromptText}\n${orderReportText}`;
 
 // ==================== Trend Prompts ====================
 
 /**
- * Prompt dự đoán xu hướng dựa trên tóm tắt log người dùng
- * Yêu cầu AI trả về báo cáo xu hướng chuyên nghiệp kèm danh sách sản phẩm trending
+ * Cung cấp context: dữ liệu tóm tắt log người dùng để phân tích xu hướng.
+ *
+ * Hành vi phân tích, format báo cáo, quy tắc sử dụng tools được điều khiển
+ * hoàn toàn bởi Admin Instruction domain "trend" trong DB.
  */
 export const trendForecastingPrompt = (summaryData: string): string =>
-  `BẠN LÀ CHUYÊN GIA PHÂN TÍCH XU HƯỚNG THỊ TRƯỜNG NƯỚC HOA. Dựa trên dữ liệu nhật ký hoạt động người dùng bên dưới, hãy tạo BÁO CÁO XU HƯỚNG CHUYÊN NGHIỆP với cấu trúc sau:
-
-📊 DỮ LIỆU PHÂN TÍCH:
+  `[DỮ LIỆU NHẬT KÝ NGƯỜI DÙNG ĐỂ PHÂN TÍCH XU HƯỚNG]
 ${summaryData}
 
-📋 YÊU CẦU BÁO CÁO (BẮT BUỘC tuân theo):
-
-1. **TỔNG QUAN XU HƯỚNG**: Tóm tắt ngắn gọn (3-5 câu) về xu hướng nổi bật nhất từ dữ liệu người dùng.
-
-2. **TOP SẢN PHẨM TRENDING**: Liệt kê 5-10 sản phẩm nước hoa đang được quan tâm nhiều nhất dựa trên dữ liệu tìm kiếm, xem, mua, và tương tác. Với mỗi sản phẩm:
-   - Tên sản phẩm và thương hiệu
-   - Lý do trending (được tìm kiếm nhiều / mua nhiều / đánh giá cao)
-   - Mức độ phổ biến (cao / trung bình / đang tăng)
-
-3. **PHÂN TÍCH THEO NHÓM HƯƠNG**: Xác định nhóm mùi hương (floral, woody, citrus, oriental...) nào đang được ưa chuộng nhất và xu hướng chuyển đổi.
-
-4. **PHÂN KHÚC NGƯỜI DÙNG**: Nhóm người dùng nào (giới tính, độ tuổi, phong cách) đang tìm kiếm loại nước hoa nào.
-
-5. **XU HƯỚNG THEO MÙA/THỜI TIẾT**: Liên hệ xu hướng hiện tại với mùa vụ và thời tiết để đưa ra dự đoán.
-
-6. **ĐỀ XUẤT CHIẾN LƯỢC**:
-   - Sản phẩm nên đẩy mạnh marketing
-   - Sản phẩm nên nhập thêm hàng
-   - Cơ hội cross-sell / up-sell
-   - Dự đoán xu hướng 1-3 tháng tới
-
-⚠️ QUAN TRỌNG:
-- KHÔNG hỏi câu hỏi ngược lại người dùng.
-- KHÔNG đưa ra các lựa chọn hoặc menu cho người dùng chọn.
-- Hãy TRỰC TIẾP phân tích và đưa ra kết quả báo cáo.
-- Trả lời dứt khoát, chuyên nghiệp như một báo cáo phân tích thị trường thực sự.
-- Sử dụng dữ liệu cụ thể từ log để minh chứng cho các nhận định.
-- Phải đề cập đến sản phẩm CỤ THỂ, KHÔNG nói chung chung.`;
+[YÊU CẦU]
+Dựa trên dữ liệu trên, hãy thực hiện phân tích xu hướng theo đúng hướng dẫn trong system prompt.
+Bắt buộc sử dụng tool searchProduct hoặc getAllProducts để tìm sản phẩm thực tế từ DB và điền vào mảng "products".
+Nếu không tìm được sản phẩm, trả products rỗng và ghi rõ trong "message".`;
 
 // ==================== Review Prompts ====================
 
 /**
- * Prompt tóm tắt đánh giá sản phẩm
+ * Cung cấp context: nội dung các đánh giá sản phẩm cần tóm tắt.
+ * Hành vi tóm tắt được điều khiển bởi Admin Instruction domain "review".
  */
 export const reviewSummaryPrompt = (reviewsText: string): string =>
-  `Hãy tóm tắt các đánh giá sản phẩm sau đây, làm nổi bật các điểm quan trọng như những lời khen phổ biến, khiếu nại thường gặp và cảm nhận chung. Cung cấp nhận định có thể giúp cải thiện sản phẩm hoặc hỗ trợ người mua tiềm năng:\n${reviewsText}`;
+  `[DỮ LIỆU ĐÁNH GIÁ SẢN PHẨM]\n${reviewsText}`;
 
 // ==================== Recommendation Prompts ====================
 
 /**
- * Prompt gợi ý mua lại sản phẩm - viết theo giọng email thân thiện, tự nhiên
+ * Cung cấp context: thông tin người dùng để gợi ý mua lại.
+ * Hành vi gợi ý được điều khiển bởi Admin Instruction domain "recommendation".
  */
 export const repurchaseRecommendationPrompt = (summaryData: string): string =>
-  `Dựa trên thông tin sau của người dùng:\n${summaryData}\n\nHãy viết gợi ý mua lại nước hoa theo phong cách tự nhiên, thân thiện như một người bạn am hiểu về nước hoa đang gửi email gợi ý cá nhân. Giới thiệu 3-5 sản phẩm phù hợp với lý do cụ thể, gần gũi, dễ đọc. KHÔNG hỏi câu hỏi ngược lại, KHÔNG đề nghị làm thêm quiz.`;
+  `[DỮ LIỆU NGƯỜI DÙNG ĐỂ GỢI Ý MUA LẠI]\n${summaryData}`;
 
 /**
- * Prompt tạo tóm tắt đơn hàng bằng AI
+ * Cung cấp context: tóm tắt đơn hàng để tạo báo cáo AI.
+ * Hành vi phân tích được điều khiển bởi Admin Instruction domain "order".
  */
 export const orderSummaryPrompt = (orderDetails: string): string =>
-  `Hãy tạo một bản tóm tắt toàn diện về thông tin đơn hàng sau đây, làm nổi bật các nhận định quan trọng như mô hình mua sắm, sản phẩm được đặt thường xuyên và các xu hướng đáng chú ý có thể định hướng cho chiến lược kinh doanh trong tương lai:\n\n${orderDetails}`;
+  `[DỮ LIỆU ĐƠN HÀNG CẦN PHÂN TÍCH]\n${orderDetails}`;
 
 /**
- * Prompt gợi ý AI dựa trên log người dùng - viết theo giọng tư vấn tự nhiên
+ * Cung cấp context: thông tin người dùng để gợi ý sản phẩm AI.
+ * Hành vi gợi ý được điều khiển bởi Admin Instruction domain "recommendation".
  */
 export const aiRecommendationPrompt = (summaryData: string): string =>
-  `Dựa trên thông tin sau của người dùng:\n${summaryData}\n\nHãy đưa ra gợi ý nước hoa cá nhân hoá theo giọng văn tự nhiên, thân thiện như một chuyên gia tư vấn đang nói chuyện trực tiếp. Giải thích vì sao từng sản phẩm phù hợp với sở thích và phong cách của người dùng. KHÔNG hỏi câu hỏi ngược lại, KHÔNG đề nghị làm thêm quiz.`;
+  `[DỮ LIỆU NGƯỜI DÙNG ĐỂ GỢI Ý SẢN PHẨM]\n${summaryData}`;
 
 // ==================== Inventory Prompts ====================
 
 /**
- * Prompt tạo báo cáo tồn kho bằng AI
+ * Cung cấp context: dữ liệu tồn kho để tạo báo cáo AI.
+ * Hành vi báo cáo được điều khiển bởi Admin Instruction domain "inventory".
  */
 export const inventoryReportPrompt = (reportData: string): string =>
-  `Hãy tạo một báo cáo tồn kho ngắn gọn dựa trên dữ liệu sau:\n\n${reportData}`;
+  `[DỮ LIỆU TỒN KHO CẦN BÁO CÁO]\n${reportData}`;
 
 // ==================== Recommendation Inline Prompts ====================
 
 /**
- * Prompt phân tích report để đưa ra đề xuất cho người dùng
+ * Cung cấp context: report data để AI đưa ra gợi ý sản phẩm inline.
+ * Hành vi được điều khiển bởi Admin Instruction domain "recommendation".
  */
 export const recommendationReportPrompt = (reportPrompt: string): string =>
-  `Từ dữ liệu sau: ${reportPrompt}\n\nHãy đưa ra gợi ý nước hoa phù hợp theo giọng văn thân thiện, tự nhiên. Không dùng ngôn ngữ kỹ thuật, không hỏi ngược lại người dùng.`;
+  `[DỮ LIỆU REPORT ĐỂ GỢI Ý SẢN PHẨM]\n${reportPrompt}`;
 
 /**
- * Prompt dự đoán và tóm tắt hành vi, sở thích người dùng từ summary report
+ * Cung cấp context: summary report để tóm tắt sở thích người dùng.
+ * Hành vi được điều khiển bởi Admin Instruction domain "recommendation".
  */
 export const recommendationSummaryPrompt = (summaryReportPrompt: string): string =>
-  `Từ dữ liệu sau: ${summaryReportPrompt}\n\nHãy tóm tắt ngắn gọn sở thích và hành vi của người dùng theo ngôn ngữ tự nhiên, đơn giản. Dùng làm cơ sở để gợi ý nước hoa phù hợp.`;
+  `[DỮ LIỆU TÓM TẮT HÀNH VI NGƯỜI DÙNG]\n${summaryReportPrompt}`;
 
-
+/**
+ * Pass-through: trả về chính prompt đã được build sẵn từ prompt-builder.
+ */
 export const adminTokenPrompt = (prompt: string): string => `${prompt}`;

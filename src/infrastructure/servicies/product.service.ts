@@ -1,10 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, Query } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import {
   ProductAttributeResponse,
   ProductResponse
 } from 'src/application/dtos/response/product.response';
+import {
+  ConcentrationResponse,
+  ProductVariantResponse,
+  ProductWithVariantsResponse,
+  VariantMediaResponse,
+  VariantStockResponse
+} from 'src/application/dtos/response/product-with-variants.response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -12,6 +19,7 @@ import { Prisma } from 'generated/prisma/client';
 import ApiUrl from '../api/api_url';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 
 const productInclude = {
   Brands: true,
@@ -25,6 +33,101 @@ const productInclude = {
 type ProductWithRelations = Prisma.ProductsGetPayload<{
   include: typeof productInclude;
 }>;
+
+// ─── include dùng cho getProductWithVariants ───────────────────────────────
+const productWithVariantsInclude = {
+  Brands: true,
+  Categories: true,
+  Media: { where: { IsPrimary: true } },
+  ProductAttributes: {
+    include: { Attributes: true, AttributeValues: true }
+  },
+  ProductVariants: {
+    where: { IsDeleted: false },
+    include: {
+      Concentrations: true,
+      Stocks: true,
+      Media: true,
+      ProductAttributes: {
+        include: { Attributes: true, AttributeValues: true }
+      }
+    }
+  }
+} satisfies Prisma.ProductsInclude;
+
+type ProductWithVariantsRelations = Prisma.ProductsGetPayload<{
+  include: typeof productWithVariantsInclude;
+}>;
+
+function mapProductWithVariants(p: ProductWithVariantsRelations): ProductWithVariantsResponse {
+  return {
+    id: p.Id,
+    name: p.Name,
+    brandId: p.BrandId,
+    brandName: p.Brands.Name,
+    categoryId: p.CategoryId,
+    categoryName: p.Categories.Name,
+    description: p.Description ?? '',
+    primaryImage: p.Media[0]?.Url ?? null,
+    createdAt: p.CreatedAt.toISOString(),
+    updatedAt: p.UpdatedAt?.toISOString() ?? null,
+    attributes: p.ProductAttributes.map(
+      (attr): ProductAttributeResponse => ({
+        id: attr.Id,
+        attributeId: attr.AttributeId,
+        valueId: attr.ValueId,
+        attribute: attr.Attributes.Name,
+        description: attr.Attributes.Description,
+        value: attr.AttributeValues.Value
+      })
+    ),
+    variants: p.ProductVariants.map(
+      (v): ProductVariantResponse => ({
+        id: v.Id,
+        productId: v.ProductId,
+        sku: v.Sku,
+        barcode: v.Barcode,
+        volumeMl: v.VolumeMl,
+        type: v.Type,
+        basePrice: Number(v.BasePrice),
+        status: v.Status,
+        concentrationId: v.ConcentrationId,
+        concentration: v.Concentrations
+          ? ({ id: v.Concentrations.Id, name: v.Concentrations.Name } satisfies ConcentrationResponse)
+          : null,
+        stock: v.Stocks
+          ? ({
+            id: v.Stocks.Id,
+            totalQuantity: v.Stocks.TotalQuantity,
+            reservedQuantity: v.Stocks.ReservedQuantity,
+            lowStockThreshold: v.Stocks.LowStockThreshold
+          } satisfies VariantStockResponse)
+          : null,
+        media: v.Media.map(
+          (m): VariantMediaResponse => ({
+            id: m.Id,
+            url: m.Url,
+            altText: m.AltText ?? null,
+            isPrimary: m.IsPrimary,
+            displayOrder: m.DisplayOrder
+          })
+        ),
+        attributes: v.ProductAttributes.map(
+          (attr): ProductAttributeResponse => ({
+            id: attr.Id,
+            attributeId: attr.AttributeId,
+            valueId: attr.ValueId,
+            attribute: attr.Attributes.Name,
+            description: attr.Attributes.Description,
+            value: attr.AttributeValues.Value
+          })
+        ),
+        createdAt: v.CreatedAt.toISOString(),
+        updatedAt: v.UpdatedAt?.toISOString() ?? null
+      })
+    )
+  };
+}
 
 function mapProduct(p: ProductWithRelations): ProductResponse {
   return {
@@ -54,7 +157,7 @@ export class ProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService
-  ) {}
+  ) { }
 
   async getAllProducts(
     request: PagedAndSortedRequest
@@ -112,6 +215,146 @@ export class ProductService {
         return data;
       },
       'Failed to fetch products',
+      true
+    );
+  }
+
+  /**
+   * Semantic search sản phẩm, trả về kèm toàn bộ variants.
+   * Gọi external API để lấy danh sách ID đã rank → query Prisma enrich variants.
+   */
+  async getProductsUsingSemanticSearchWithVariants(
+    searchText: string,
+    request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
+    return await funcHandlerAsync(
+      async () => {
+        // Bước 1: Gọi external semantic search API để lấy danh sách sản phẩm đã được rank
+        const { data: searchResult } = await firstValueFrom(
+          this.httpService.get<BaseResponseAPI<PagedResult<ProductResponse>>>(
+            ApiUrl().PRODUCT_URL('search/semantic'),
+            {
+              params: {
+                searchText: searchText,
+                pageNumber: request.PageNumber ?? 1,
+                pageSize: request.PageSize ?? 10,
+                sortBy: request.SortBy ?? '',
+                sortOrder: request.SortOrder ?? 'asc',
+                isDescending: request.IsDescending ?? false
+              }
+            }
+          )
+        );
+
+        const rankedItems = searchResult?.payload?.items ?? [];
+        const totalCount = searchResult?.payload?.totalCount ?? 0;
+        const totalPages = searchResult?.payload?.totalPages ?? 0;
+
+        if (rankedItems.length === 0) {
+          return {
+            success: true,
+            data: new PagedResult<ProductWithVariantsResponse>({
+              items: [],
+              pageNumber: request.PageNumber ?? 1,
+              pageSize: request.PageSize ?? 10,
+              totalCount: 0,
+              totalPages: 0
+            })
+          };
+        }
+
+        // Bước 2: Lấy danh sách ID theo thứ tự ranking
+        const rankedIds = rankedItems.map((p) => p.id);
+
+        // Bước 3: Query Prisma để enrich variants (không quan tâm thứ tự DB trả về)
+        const products = await this.prisma.products.findMany({
+          where: { Id: { in: rankedIds }, IsDeleted: false },
+          include: productWithVariantsInclude
+        });
+
+        // Bước 4: Sắp xếp lại theo đúng thứ tự ranking của semantic search
+        const productMap = new Map(products.map((p) => [p.Id, p]));
+        const orderedProducts = rankedIds
+          .map((id) => productMap.get(id))
+          .filter((p): p is NonNullable<typeof p> => p !== undefined);
+
+        return {
+          success: true,
+          data: new PagedResult<ProductWithVariantsResponse>({
+            items: orderedProducts.map(mapProductWithVariants),
+            pageNumber: request.PageNumber ?? 1,
+            pageSize: request.PageSize ?? 10,
+            totalCount,
+            totalPages
+          })
+        };
+      },
+      'Failed to fetch products with variants using semantic search',
+      true
+    );
+  }
+
+  /** Lấy chi tiết một sản phẩm kèm toàn bộ variants */
+  async getProductWithVariants(
+    @Query("id") id: string
+  ): Promise<BaseResponse<ProductWithVariantsResponse>> {
+    return await funcHandlerAsync(
+      async () => {
+        const product = await this.prisma.products.findFirst({
+          where: { Id: id, IsDeleted: false },
+          include: productWithVariantsInclude
+        });
+
+        if (!product) {
+          throw new NotFoundException(`Không tìm thấy sản phẩm với id: ${id}`);
+        }
+
+        return { success: true, data: mapProductWithVariants(product) };
+      },
+      'Failed to fetch product with variants',
+      true
+    );
+  }
+
+  /** Lấy chi tiết một sản phẩm kèm toàn bộ variants */
+  async getAllProductsWithVariants(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
+    return await funcHandlerAsync(
+      async () => {
+        const skip = (request.PageNumber - 1) * request.PageSize;
+        const take = request.PageSize;
+
+        const [products, totalCount] = await Promise.all([
+          this.prisma.products.findMany({
+            where: { IsDeleted: false },
+            include: productWithVariantsInclude,
+            skip,
+            take,
+            orderBy: {
+              CreatedAt: request.SortOrder === 'asc' ? 'asc' : 'desc'
+            }
+          }),
+          this.prisma.products.count({
+            where: { IsDeleted: false }
+          })
+        ]);
+
+        if (!products) {
+          throw new NotFoundException(`Không tìm thấy sản phẩm`);
+        }
+
+        return {
+          success: true, data: new PagedResult<ProductWithVariantsResponse>({
+            items: products.map(mapProductWithVariants),
+            pageNumber: request.PageNumber,
+            pageSize: request.PageSize,
+            totalCount,
+            totalPages: Math.ceil(totalCount / request.PageSize)
+          })
+        };
+      },
+      'Failed to fetch product with variants',
       true
     );
   }

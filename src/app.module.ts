@@ -78,7 +78,7 @@ import { PrismaModule } from './prisma/prisma.module';
           port: config.get<number>('REDIS_PORT'),
         }
       })
-    })
+    }),
   ],
   controllers: [AppController],
   providers: [
@@ -89,4 +89,4 @@ import { PrismaModule } from './prisma/prisma.module';
     }
   ]
 })
-export class AppModule {}
+export class AppModule { }

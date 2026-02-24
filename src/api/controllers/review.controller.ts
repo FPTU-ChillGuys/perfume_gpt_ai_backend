@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
@@ -20,6 +20,7 @@ import { InternalServerErrorWithDetailsException } from 'src/application/common/
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
 
+@ApiBearerAuth('jwt')
 @Role('admin')
 @ApiTags('Reviews')
 @Controller('reviews')
@@ -29,7 +30,7 @@ export class ReviewController {
         private readonly reviewService: ReviewService,
         @Inject(AI_SERVICE) private aiService: AIService,
         private readonly adminInstructionService: AdminInstructionService
-    ) {}
+    ) { }
 
     /** Lấy danh sách đánh giá */
     @Get()
@@ -39,7 +40,7 @@ export class ReviewController {
         return await this.reviewService.getAllReviews(request);
     }
 
-     /** Tóm tắt đánh giá bằng AI cho tất cả variant */
+    /** Tóm tắt đánh giá bằng AI cho tất cả variant */
     @Get('summary/all')
     @ApiBaseResponse(String)
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
@@ -123,7 +124,7 @@ export class ReviewController {
         return Ok(summaryResponse.data);
     }
 
-   
+
     /**
      * Tóm tắt đánh giá bằng AI theo variant ID - Phiên bản có cấu trúc.
      * Trả về response có metadata (thời gian xử lý, số review đã phân tích).

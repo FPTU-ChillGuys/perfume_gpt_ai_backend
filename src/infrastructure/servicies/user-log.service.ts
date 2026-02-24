@@ -1,7 +1,5 @@
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { Inject, Injectable } from '@nestjs/common';
-import { InjectMapper } from '@automapper/nestjs';
-import { Mapper } from '@automapper/core';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { UserLog } from 'src/domain/entities/user-log.entity';
@@ -27,10 +25,8 @@ import { convertToUTC } from '../utils/time-zone';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
-import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import { generateSummaryPrompt, INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
 import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
-import { SimpleMemoryCache } from '../utils/simple-memory-cache';
 import { AIService } from './ai.service';
 import { AI_SERVICE } from '../modules/ai.module';
 import { INSUFFICIENT_DATA_MESSAGES, isDataEmpty } from '../utils/insufficient-data';
@@ -39,10 +35,49 @@ import { AdminInstructionService } from './admin-instruction.service';
 @Injectable()
 export class UserLogService {
   /** Cache cho user log summary report (TTL = 5 phút) */
-  private readonly summaryCache = new SimpleMemoryCache<string>(5 * 60 * 1000);
+  constructor(private unitOfWork: UnitOfWork, @Inject(AI_SERVICE) private aiService: AIService, private adminInstructionService: AdminInstructionService) { }
 
-  constructor(private unitOfWork: UnitOfWork, @Inject(AI_SERVICE) private aiService: AIService, private adminInstructionService: AdminInstructionService) {}
+  /** Lay tat ca log */
+  async getAllLogs(): Promise<BaseResponse<UserLog[]>> {
+    return await funcHandlerAsync(
+      async () => {
+        const userLogs = await this.unitOfWork.UserLogRepo.getAllUserLogs();
+        return { success: true, data: userLogs };
+      },
+      'Failed to get all user logs',
+      true
+    );
+  }
 
+  /** Lay tat ca log */
+  async getUserLogsWithPeriod(allUserLogRequest: AllUserLogRequest): Promise<BaseResponse<UserLog[]>> {
+    return await funcHandlerAsync(
+      async () => {
+
+        if (!allUserLogRequest.startDate) {
+          allUserLogRequest.startDate = this.getFirstDateOfPeriod(
+            allUserLogRequest.period,
+            convertToUTC(allUserLogRequest.endDate)
+          );
+        }
+
+        const request = new AllUserLogRequest({
+          startDate: convertToUTC(startOfDay(allUserLogRequest.startDate)),
+          endDate: convertToUTC(endOfDay(allUserLogRequest.endDate)),
+          period: allUserLogRequest.period,
+        });
+
+        const userLogs = await this.unitOfWork.UserLogRepo.getUserLogsWithPeriod(request);
+        return { success: true, data: userLogs };
+      },
+      'Failed to get all user logs',
+      true
+    );
+  }
+
+
+
+  /** Lay log tu userId */
   async getUserLogsByUserId(
     userId: string
   ): Promise<BaseResponse<UserLog | null>> {
@@ -161,6 +196,7 @@ export class UserLogService {
     );
   }
 
+  /** Lay summary tu userId */
   async getUserLogSummariesByUserId(
     userId: string,
     startDate?: Date,
@@ -169,10 +205,8 @@ export class UserLogService {
     return await funcHandlerAsync(
       async () => {
         console.log(
-          `Start Date: ${
-            startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
-          }, End Date: ${
-            endDate ? endOfDay(convertToUTC(endDate)) : endOfDay(new Date())
+          `Start Date: ${startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
+          }, End Date: ${endDate ? endOfDay(convertToUTC(endDate)) : endOfDay(new Date())
           }`
         );
 
@@ -222,9 +256,8 @@ export class UserLogService {
           .join('\n');
 
         // Tao report
-        const report = `User Log Summary Report from ${startDate ? convertToUTC(startDate) : 'the beginning'} to ${
-          endDate ? convertToUTC(endDate) : new Date().toISOString()
-        }:\n${data}`;
+        const report = `User Log Summary Report from ${startDate ? convertToUTC(startDate) : 'the beginning'} to ${endDate ? convertToUTC(endDate) : new Date().toISOString()
+          }:\n${data}`;
 
         return { success: true, data: report };
       },
@@ -259,10 +292,10 @@ export class UserLogService {
         }
 
         // Lay log tim kiem cua user trong khoang thoi gian
-        const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
+        const searchLogs = userLog.userSearchLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
-              startOfDay(convertToUTC(userLogRequest.startDate!)) &&
+            startOfDay(convertToUTC(userLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
@@ -272,10 +305,10 @@ export class UserLogService {
           'Search: ' + searchLogs.map((log) => log.content).join(';\n');
 
         //Lay log tin nhan cua user trong khoang thoi gian
-        const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
+        const messageLogs = userLog.userMessageLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
-              startOfDay(convertToUTC(userLogRequest.startDate!)) &&
+            startOfDay(convertToUTC(userLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
@@ -286,10 +319,10 @@ export class UserLogService {
           messageLogs.map((log) => log.message?.message).join(';\n');
 
         // Lay log quiz cua user trong khoang thoi gian
-        const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
+        const quizLogs = await userLog.userQuizLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
-              startOfDay(convertToUTC(userLogRequest.startDate!)) &&
+            startOfDay(convertToUTC(userLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(userLogRequest.endDate))
           );
         });
@@ -345,6 +378,10 @@ export class UserLogService {
         );
       }
 
+      console.log(`Period: ${allUserLogRequest.period}`);
+      console.log(`Start Date: ${allUserLogRequest.startDate}`);
+      console.log(`End Date: ${allUserLogRequest.endDate}`);
+
       // Lay log cua user trong khoang thoi gian
       const userLogs = await this.unitOfWork.UserLogRepo.getAllUserLogs();
 
@@ -353,10 +390,10 @@ export class UserLogService {
 
       for (const userLog of userLogs) {
         // Lay log tim kiem cua user trong khoang thoi gian
-        const searchLogs = userLog.userSearchLogs.getItems().filter((log) => {
+        const searchLogs = userLog.userSearchLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
-              startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
+            startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(allUserLogRequest.endDate))
           );
         });
@@ -366,10 +403,10 @@ export class UserLogService {
           'Search: ' + searchLogs.map((log) => log.content).join(';\n');
 
         //Lay log tin nhan cua user trong khoang thoi gian
-        const messageLogs = userLog.userMessageLogs.getItems().filter((log) => {
+        const messageLogs = userLog.userMessageLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
-              startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
+            startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(allUserLogRequest.endDate))
           );
         });
@@ -380,10 +417,10 @@ export class UserLogService {
           messageLogs.map((log) => log.message?.message).join(';\n');
 
         // Lay log quiz cua user trong khoang thoi gian
-        const quizLogs = await userLog.userQuizLogs.getItems().filter((log) => {
+        const quizLogs = await userLog.userQuizLogs?.getItems().filter((log) => {
           return (
             log.createdAt >=
-              startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
+            startOfDay(convertToUTC(allUserLogRequest.startDate!)) &&
             log.createdAt <= endOfDay(convertToUTC(allUserLogRequest.endDate))
           );
         });
@@ -410,7 +447,7 @@ export class UserLogService {
             endOfDay(convertToUTC(allUserLogRequest.endDate))
           ) + '\n';
 
-        response =
+        response +=
           this.convertUserLogsToReport(
             searchContents,
             messageContents,
@@ -421,7 +458,7 @@ export class UserLogService {
       }
 
       return { success: true, data: { prompt, response } };
-    }, 'Failed to summarize user logs');
+    }, 'Failed to summarize user logs', true);
   }
 
   // Tam thoi lay tat ca userId tu log
@@ -466,68 +503,6 @@ export class UserLogService {
     return response;
   }
 
-  /**
-   * Phiên bản có cache của getUserLogSummaryReportByUserId.
-   * Cache theo userId với TTL = 5 phút, tránh query + tổng hợp lặp lại cho cùng user.
-   */
-  async getCachedUserLogSummaryReportByUserId(
-    userId: string,
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<BaseResponse<string>> {
-    const cacheKey = `summary:${userId}:${startDate?.toISOString() ?? '0'}:${endDate?.toISOString() ?? 'now'}`;
-
-    const cached = this.summaryCache.get(cacheKey);
-    if (cached) {
-      return { success: true, data: cached };
-    }
-
-    const result = await this.getUserLogSummaryReportByUserId(
-      userId,
-      startDate,
-      endDate
-    );
-
-    if (result.success && result.data) {
-      this.summaryCache.set(cacheKey, result.data);
-    }
-
-    return result;
-  }
-
-  /**
-   * Phiên bản có cache của getReportAndPromptSummaryUserLogs.
-   * Cache theo userId + period với TTL = 5 phút.
-   */
-  async getCachedReportAndPromptSummaryUserLogs(
-    userLogRequest: UserLogRequest
-  ): Promise<BaseResponse<{ prompt: string; response: string }>> {
-    const cacheKey = `report:${userLogRequest.userId}:${userLogRequest.period}:${userLogRequest.endDate?.toISOString() ?? 'now'}`;
-
-    const cached = this.summaryCache.get(cacheKey);
-    if (cached) {
-      // Giả lập cấu trúc response từ cache
-      return { success: true, data: { prompt: cached, response: cached } };
-    }
-
-    const result = await this.getReportAndPromptSummaryUserLogs(userLogRequest);
-
-    if (result.success && result.data) {
-      this.summaryCache.set(cacheKey, result.data.response);
-    }
-
-    return result;
-  }
-
-  /** Xóa cache summary cho một userId cụ thể hoặc toàn bộ. */
-  clearSummaryCache(userId?: string): void {
-    if (userId) {
-      // Xóa tất cả cache liên quan đến userId
-      this.summaryCache.cleanup();
-    } else {
-      this.summaryCache.clear();
-    }
-  }
 
   /** Kiem tra neu co log trong tuan khong bat dau tu chu nhat luc 23:59 */
   async isLogsFromLastWeek(userId: string): Promise<boolean> {
@@ -626,7 +601,7 @@ export class UserLogService {
   async getUserLogSummaryByUserId(userId: string, startDate?: Date, endDate?: Date): Promise<BaseResponse<UserLogSummary | null>> {
     return funcHandlerAsync(
       async () => {
-       const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
           userId: userId,
           startDate: {
             $gte: startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
@@ -683,7 +658,7 @@ export class UserLogService {
       return;
     }
     await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
-     
+
   }
 
   /** Ghi de log theo thang */
@@ -712,45 +687,46 @@ export class UserLogService {
     await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
   }
 
-async createLogSummaryForPeriodByUsingAI(userId: string, period: PeriodEnum): Promise<BaseResponse<string | null>> {
-  return await funcHandlerAsync(
-    async () => {
-      const userLogRequest = new UserLogRequest({
-        userId,
-        period,
-        endDate: new Date()
-      });
+  /** Tạo summary cho period */
+  async createLogSummaryForPeriodByUsingAI(userId: string, period: PeriodEnum): Promise<BaseResponse<string | null>> {
+    return await funcHandlerAsync(
+      async () => {
+        const userLogRequest = new UserLogRequest({
+          userId,
+          period,
+          endDate: new Date()
+        });
 
-      const response = await this.getReportAndPromptSummaryUserLogs(userLogRequest);
+        const response = await this.getReportAndPromptSummaryUserLogs(userLogRequest);
 
-      if (!response.success) {
-        return { success: false, error: 'Failed to get user logs' };
-      }
+        if (!response.success) {
+          return { success: false, error: 'Failed to get user logs' };
+        }
 
-      if (isDataEmpty(response.data?.prompt)) {
-        return { success: false, error: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
-      }
+        if (isDataEmpty(response.data?.prompt)) {
+          return { success: false, error: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
+        }
 
-      // Lấy admin instruction cho domain log (nếu có)
-      const adminPrompt =
-        await this.adminInstructionService.getSystemPromptForDomain(
-          INSTRUCTION_TYPE_LOG
+        // Lấy admin instruction cho domain log (nếu có)
+        const adminPrompt =
+          await this.adminInstructionService.getSystemPromptForDomain(
+            INSTRUCTION_TYPE_LOG
+          );
+
+        // Summarize with AI
+        const aiResponse = await this.aiService.textGenerateFromPrompt(
+          response.data!.prompt,
+          adminPrompt
         );
 
-      // Summarize with AI
-      const aiResponse = await this.aiService.textGenerateFromPrompt(
-        response.data!.prompt,
-        adminPrompt
-      );
+        if (!aiResponse.success) {
+          return { success: false, error: 'Failed to generate summary with AI' };
+        }
 
-      if (!aiResponse.success) {
-        return { success: false, error: 'Failed to generate summary with AI' };
-      }
-
-      return { success: true, data: aiResponse.data };
-    },
-    'Failed to create log summary with AI',
-    true
-  );
-}
+        return { success: true, data: aiResponse.data };
+      },
+      'Failed to create log summary with AI',
+      true
+    );
+  }
 }

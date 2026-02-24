@@ -7,6 +7,8 @@ import { UserLog } from 'src/domain/entities/user-log.entity';
 import { UserMessageLog } from 'src/domain/entities/user-message-log.entity';
 import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
 import { UserSearchLog } from 'src/domain/entities/user-search.log.entity';
+import { AllUserLogRequest } from 'src/application/dtos/request/user-log.request';
+import { endOfDay, startOfDay } from 'date-fns';
 
 @Injectable()
 export class UserLogRepository extends SqlEntityRepository<UserLog> {
@@ -76,6 +78,26 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
         'userQuizLogs.quizQuesAnsDetail.answer',
         'userSearchLogs'
       ]
+    });
+  }
+
+  async getUserLogsWithPeriod(allUserLogRequest: AllUserLogRequest): Promise<UserLog[]> {
+    return this.findAll({
+      populate: [
+        'userMessageLogs',
+        'userMessageLogs.message',
+        'userQuizLogs',
+        'userQuizLogs.quizQuesAnsDetail',
+        'userQuizLogs.quizQuesAnsDetail.question',
+        'userQuizLogs.quizQuesAnsDetail.answer',
+        'userSearchLogs'
+      ],
+      where: {
+        createdAt: {
+          $gte: startOfDay(allUserLogRequest.startDate!),
+          $lte: endOfDay(allUserLogRequest.endDate)
+        }
+      }
     });
   }
 

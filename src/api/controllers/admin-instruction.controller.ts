@@ -1,3 +1,4 @@
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import {
   Body,
   Controller,
@@ -6,7 +7,8 @@ import {
   Param,
   Post,
   Put,
-  Query
+  Query,
+  UseInterceptors
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiForbiddenResponse, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Role } from 'src/application/common/Metadata';
@@ -31,7 +33,7 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 export class AdminInstructionController {
   constructor(
     private readonly adminInstructionService: AdminInstructionService
-  ) {}
+  ) { }
 
   /** Lấy tất cả chỉ thị admin */
   @Get()

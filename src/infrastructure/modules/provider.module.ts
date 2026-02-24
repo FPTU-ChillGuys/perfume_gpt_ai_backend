@@ -15,13 +15,35 @@ import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from 'src/application/constant/processor';
 import { ProcessorModule } from './processor.module';
 import { modules } from './list/module';
+import { CacheInterceptor, CacheModule } from '@nestjs/cache-manager';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { CacheableMemory, Keyv } from 'cacheable';
+import KeyvRedis from '@keyv/redis';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { CacheableModule } from '../cacheable/cacheable.module';
 
 const registerQueue = BullModule.registerQueue(
   ...Object.values(QueueName).map((value) => ({ name: value }))
 );
 
 @Module({
-  imports: [...modules, registerQueue, ProcessorModule],
+  imports: [...modules, registerQueue, ProcessorModule, CacheModule.registerAsync({
+    imports: [ConfigModule],
+    inject: [ConfigService],
+    useFactory: async (config: ConfigService) => {
+      return {
+        stores: [
+          new Keyv({
+            store: new CacheableMemory({
+              ttl: config.get<number>('CACHE_TTL') ?? 60000,
+              lruSize: config.get<number>('CACHE_LRU_SIZE') ?? 5000
+            }),
+          }),
+          new KeyvRedis(`redis://${config.get<string>('REDIS_HOST') ?? 'localhost'}:${config.get<number>('REDIS_PORT') ?? 6379}`),
+        ],
+      };
+    },
+  }),],
   controllers: [
     ProductController,
     QuizController,
@@ -34,8 +56,15 @@ const registerQueue = BullModule.registerQueue(
     InventoryController,
     AIAcceptanceController,
     AdminInstructionController,
-    OrderController
+    OrderController,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: CacheInterceptor
+    },
+    CacheableModule
   ],
   exports: modules
 })
-export class ProviderModule {}
+export class ProviderModule { }

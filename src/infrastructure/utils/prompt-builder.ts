@@ -15,6 +15,7 @@ import {
   isDataEmpty,
   buildDataAvailabilityNote
 } from 'src/infrastructure/utils/insufficient-data';
+import { subWeeks } from 'date-fns';
 
 /**
  * Kết quả xây dựng combined prompt từ user log + order report.
@@ -245,7 +246,7 @@ export async function buildCombinedPromptV4(
   let userLogPromptText = '';
   // Chỉ lấy log và order khi có userId (user đã đăng nhập)
   if (userId) {
-    const userLog = await logService.getUserLogSummaryReportByUserId(userId);
+    const userLog = await logService.getUserLogSummaryReportByUserId(userId, subWeeks(convertToUTC(new Date()), 1), convertToUTC(new Date()));
     userLogData = userLog.data ?? '';
     userLogPromptText = userLogPrompt(userLogData);
   }

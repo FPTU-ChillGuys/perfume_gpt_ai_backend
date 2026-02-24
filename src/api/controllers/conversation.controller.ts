@@ -60,7 +60,8 @@ import { AdminInstructionService } from 'src/infrastructure/servicies/admin-inst
 import {
   buildCombinedPromptV1,
   buildCombinedPromptV2,
-  buildCombinedPromptV4
+  buildCombinedPromptV4,
+  buildCombinedPromptV5
 } from 'src/infrastructure/utils/prompt-builder';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
@@ -664,6 +665,83 @@ export class ConversationController {
     const promptResult = await buildCombinedPromptV4(
       INSTRUCTION_TYPE_CONVERSATION,
       this.logService,
+      this.adminInstructionService,
+      userId,
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'PromptBuilder',
+          endpoint: 'chat/v4'
+        }
+      );
+    }
+
+    // Call AI service
+    const message = await this.aiService.textGenerateFromMessages(
+      convertedMessages,
+      conversationSystemPrompt(
+        ADVANCED_MATCHING_SYSTEM_PROMPT,
+        promptResult.data.combinedPrompt
+      ),
+      Output.object(searchOutput)
+    );
+
+    if (!message.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'AIService',
+          endpoint: 'chat/v4'
+        }
+      );
+    }
+
+    // Lưu conversation
+    const responseConversation = overrideMessagesToConversation(
+      conversation.id || '',
+      userId || '',
+      addMessageToMessages(message.data || '', conversation.messages || [])
+    );
+
+    await this.conversationQueue.add(
+      ConversationJobName.ADD_MESSAGE_AND_LOG,
+      { responseConversation, userId }
+    );
+
+    return Ok(responseConversation);
+  }
+
+  /**
+  * Chat V8.
+ */
+  @Public()
+  @Post('chat/v8')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({
+    summary:
+      'Chat V8'
+  })
+  @ApiBaseResponse(ConversationRequestDto)
+  async conversationV8(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDtoV2
+  ): Promise<BaseResponse<ConversationDto>> {
+    const userId =
+      getTokenPayloadFromRequest(request)?.id ?? uuid();
+    const convertedMessages: UIMessage[] = convertToMessages(
+      conversation.messages || []
+    );
+
+    // Dùng common helper thay vì code trùng lặp
+    const promptResult = await buildCombinedPromptV5(
+      INSTRUCTION_TYPE_CONVERSATION,
       this.adminInstructionService,
       userId,
     );

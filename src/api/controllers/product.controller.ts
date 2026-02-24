@@ -11,11 +11,13 @@ import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { Request } from 'express';
 import { getTokenPayloadFromRequest } from 'src/infrastructure/utils/extract-token';
 import { v4 as uuidv4 } from 'uuid';
+import { CacheTTL } from '@nestjs/cache-manager';
+import { SearchRequest } from 'src/application/dtos/request/search.request';
 
 @ApiTags('Products')
 @Controller('products')
 export class ProductController {
-  constructor(private productService: ProductService, private userLog: UserLogService) {}
+  constructor(private productService: ProductService, private userLog: UserLogService) { }
 
   /** Lấy danh sách tất cả sản phẩm */
   @Public()
@@ -27,24 +29,24 @@ export class ProductController {
   }
 
   /** Tìm kiếm sản phẩm bằng semantic search */
+  @CacheTTL(1)
   @Public()
   @Get('search')
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search' })
-  @ApiQuery({ name: 'searchText', description: 'Từ khóa tìm kiếm' })
   @ExtendApiBaseResponse(PagedResult<ProductResponse>)
-  async getProductsBySemanticSearch(@Req() req : Request, @Query('searchText') searchText: string, @Query() request: PagedAndSortedRequest): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
-    const result = await this.productService.getProductsUsingSemanticSearch(searchText, request);
+  async getProductsBySemanticSearch(@Req() req: Request, @Query() request: SearchRequest): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
+    const result = await this.productService.getProductsUsingSemanticSearch(request.searchText, request);
     // Ghi log tìm kiếm của người dùng
     // Lay userId tu token
     const userId = getTokenPayloadFromRequest(req)?.id;
     if (userId) {
-      await this.userLog.addSearchLogToUserLog(userId, searchText);
+      await this.userLog.addSearchLogToUserLog(userId, request.searchText);
     } else {
       // Tu tao moi uuid de luu log cho nguoi dung khong xac dinh
       const anonymousUserId = uuidv4();
-      await this.userLog.addSearchLogToUserLog(anonymousUserId, searchText);
+      await this.userLog.addSearchLogToUserLog(anonymousUserId, request.searchText);
     }
-    await this.userLog.addSearchLogToUserLog(searchText, 'product');
+    await this.userLog.addSearchLogToUserLog(userId!, request.searchText);
     return result;
   }
 

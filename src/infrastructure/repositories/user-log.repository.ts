@@ -175,6 +175,7 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     if (!userLog) {
       userLog = this.createUserLog(userId);
     }
+    userLog.userSearchLogs.load();
     userLog.userSearchLogs.add(
       new UserSearchLog({ content: searchLog, userLog })
     );

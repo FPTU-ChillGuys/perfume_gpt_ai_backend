@@ -24,3 +24,17 @@ export const searchOutput = {
     )
   })
 };
+
+export const searchOutputSchema = searchOutput.schema;
+
+export const convertSearchOutputToProductResponse = (output: string) => {
+  const parsedOutput = searchOutputSchema.parse(JSON.parse(output));
+  return parsedOutput.products.map((product) => ({
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    brandName: product.brandName,
+    categoryName: product.categoryName,
+    primaryImage: product.primaryImage,
+  })) as ProductResponse[]
+};

@@ -43,7 +43,7 @@ export class LogController extends LogHelper {
   /** Lấy báo cáo tất cả log hoạt động người dùng */
   @CacheTTL(1)
   @Public()
-  @Get('report/activity/alls')
+  @Get('report/activity/all')
   @ApiOperation({ summary: 'Lấy báo cáo tất cả log hoạt động người dùng' })
   @ApiQuery({
     name: 'period',

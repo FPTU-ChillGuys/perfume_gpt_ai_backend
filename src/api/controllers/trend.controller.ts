@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query, UseInterceptors } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
@@ -14,7 +14,9 @@ import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/util
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Output } from 'ai';
-import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { convertSearchOutputToProductResponse, searchOutput } from 'src/chatbot/utils/output/search.output';
+import { ProductResponse } from 'src/application/dtos/response/product.response';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 
 @Role('admin')
 @ApiTags('Trends')
@@ -24,7 +26,7 @@ export class TrendController {
     private userLogService: UserLogService,
     @Inject(AI_SERVICE) private aiService: AIService,
     private readonly adminInstructionService: AdminInstructionService
-  ) {}
+  ) { }
 
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
   @Get('summary')
@@ -51,9 +53,9 @@ export class TrendController {
 
     // Summarize with AI
     const reportResponse = await this.aiService.textGenerateFromPrompt(
-       `${reportAndPromptSummary.data!.prompt}`
+      `${reportAndPromptSummary.data!.prompt}`
     );
-    
+
     if (!reportResponse.success) {
       throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
         service: 'AIService',
@@ -68,7 +70,7 @@ export class TrendController {
     // Lấy admin instruction cho domain trend (nếu có)
     const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_TREND);
     const trendSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
-    
+
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,
       trendSystemPrompt,
@@ -84,6 +86,34 @@ export class TrendController {
     }
 
     return Ok(trendResponse.data);
+  }
+
+  /** Lấy product từ xu hướng người dùng */
+  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
+  @CacheTTL(1)
+  @Public()
+  @Get("product")
+  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
+  @ApiBaseResponse(ProductResponse)
+  @ApiBody({ type: AllUserLogRequest })
+  async getProductFromTrend(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<ProductResponse[]>> {
+    const trendResult = await this.summarizeLogs(allUserLogRequest);
+    if (!trendResult.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI trend response', {
+        service: 'AIService',
+        period: allUserLogRequest.period,
+        endpoint: 'trends/product'
+      });
+    }
+
+    console.log(trendResult.data);
+
+    /** Lay product tu trend data */
+    const trendResponse = trendResult.data;
+    const products = convertSearchOutputToProductResponse(trendResponse ?? '');
+    return Ok(products)
   }
 
   /**

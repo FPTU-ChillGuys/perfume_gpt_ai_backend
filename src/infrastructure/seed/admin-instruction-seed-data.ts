@@ -58,13 +58,29 @@ export const ADMIN_INSTRUCTION_SEED_DATA: SeedInstruction[] = [
   // ==================== TREND ====================
   {
     instructionType: INSTRUCTION_TYPE_TREND,
-    instruction: `Khi dự đoán xu hướng nước hoa, hãy phân tích:
+    instruction: `Khi dự đoán xu hướng nước hoa, BẮT BUỘC tuân theo các nguyên tắc sau:
+
+FORMAT BÁO CÁO:
+- Trả về dạng BÁO CÁO PHÂN TÍCH CHUYÊN NGHIỆP có cấu trúc rõ ràng với tiêu đề, mục lục, và bullet points.
+- Mỗi phần phải có tiêu đề rõ ràng: Tổng Quan, Top Sản Phẩm Trending, Phân Tích Nhóm Hương, Phân Khúc Người Dùng, Xu Hướng Mùa Vụ, Đề Xuất Chiến Lược.
+
+NỘI DUNG BẮT BUỘC:
 - Xu hướng tìm kiếm: loại nước hoa, notes, thương hiệu được tìm nhiều nhất.
+- TOP SẢN PHẨM CỤ THỂ đang trending: liệt kê tên, thương hiệu, lý do trending, mức độ phổ biến.
 - Xu hướng theo mùa: mùi hương phù hợp với thời tiết/mùa sắp tới.
-- So sánh với xu hướng toàn cầu: nếu có thể liên hệ với trend thế giới.
+- So sánh với xu hướng toàn cầu nếu có thể.
 - Phân khúc người dùng: nhóm tuổi nào quan tâm đến loại nào.
-- Dự đoán cụ thể: top 5 sản phẩm/dòng hương có tiềm năng tăng trưởng trong 1-3 tháng tới.
-- Đề xuất chiến lược marketing và nhập hàng dựa trên xu hướng.`
+- Dự đoán cụ thể: top 5-10 sản phẩm/dòng hương có tiềm năng tăng trưởng trong 1-3 tháng tới.
+- Đề xuất chiến lược marketing, nhập hàng, cross-sell/up-sell.
+
+QUY TẮC NGHIÊM NGẶT:
+- TUYỆT ĐỐI KHÔNG hỏi câu hỏi ngược lại người dùng.
+- TUYỆT ĐỐI KHÔNG đưa ra menu lựa chọn hoặc options cho người dùng.
+- TUYỆT ĐỐI KHÔNG viết kiểu "Bạn muốn mình..." hoặc "Bạn có 2 lựa chọn...".
+- Phải TRỰC TIẾP phân tích và đưa ra kết quả, không đợi input thêm.
+- Sử dụng dữ liệu cụ thể từ log để minh chứng cho mọi nhận định.
+- Phải đề cập đến sản phẩm CỤ THỂ từ dữ liệu, KHÔNG nói chung chung.
+- Giọng văn chuyên nghiệp, như một báo cáo phân tích thị trường dành cho ban giám đốc.`
   },
 
   // ==================== RECOMMENDATION ====================

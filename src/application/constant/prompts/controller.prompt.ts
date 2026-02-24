@@ -39,9 +39,42 @@ export const conversationTestSystemPrompt = (
 
 /**
  * Prompt dự đoán xu hướng dựa trên tóm tắt log người dùng
+ * Yêu cầu AI trả về báo cáo xu hướng chuyên nghiệp kèm danh sách sản phẩm trending
  */
 export const trendForecastingPrompt = (summaryData: string): string =>
-  `Dựa trên nhật ký hoạt động người dùng được tóm tắt dưới đây, hãy xác định các xu hướng và mô hình nổi bật có thể định hướng cho chiến lược phát triển sản phẩm và marketing trong tương lai. Cung cấp những nhận định về hành vi người dùng, sở thích và các cơ hội thị trường tiềm năng:\n${summaryData}`;
+  `BẠN LÀ CHUYÊN GIA PHÂN TÍCH XU HƯỚNG THỊ TRƯỜNG NƯỚC HOA. Dựa trên dữ liệu nhật ký hoạt động người dùng bên dưới, hãy tạo BÁO CÁO XU HƯỚNG CHUYÊN NGHIỆP với cấu trúc sau:
+
+📊 DỮ LIỆU PHÂN TÍCH:
+${summaryData}
+
+📋 YÊU CẦU BÁO CÁO (BẮT BUỘC tuân theo):
+
+1. **TỔNG QUAN XU HƯỚNG**: Tóm tắt ngắn gọn (3-5 câu) về xu hướng nổi bật nhất từ dữ liệu người dùng.
+
+2. **TOP SẢN PHẨM TRENDING**: Liệt kê 5-10 sản phẩm nước hoa đang được quan tâm nhiều nhất dựa trên dữ liệu tìm kiếm, xem, mua, và tương tác. Với mỗi sản phẩm:
+   - Tên sản phẩm và thương hiệu
+   - Lý do trending (được tìm kiếm nhiều / mua nhiều / đánh giá cao)
+   - Mức độ phổ biến (cao / trung bình / đang tăng)
+
+3. **PHÂN TÍCH THEO NHÓM HƯƠNG**: Xác định nhóm mùi hương (floral, woody, citrus, oriental...) nào đang được ưa chuộng nhất và xu hướng chuyển đổi.
+
+4. **PHÂN KHÚC NGƯỜI DÙNG**: Nhóm người dùng nào (giới tính, độ tuổi, phong cách) đang tìm kiếm loại nước hoa nào.
+
+5. **XU HƯỚNG THEO MÙA/THỜI TIẾT**: Liên hệ xu hướng hiện tại với mùa vụ và thời tiết để đưa ra dự đoán.
+
+6. **ĐỀ XUẤT CHIẾN LƯỢC**:
+   - Sản phẩm nên đẩy mạnh marketing
+   - Sản phẩm nên nhập thêm hàng
+   - Cơ hội cross-sell / up-sell
+   - Dự đoán xu hướng 1-3 tháng tới
+
+⚠️ QUAN TRỌNG:
+- KHÔNG hỏi câu hỏi ngược lại người dùng.
+- KHÔNG đưa ra các lựa chọn hoặc menu cho người dùng chọn.
+- Hãy TRỰC TIẾP phân tích và đưa ra kết quả báo cáo.
+- Trả lời dứt khoát, chuyên nghiệp như một báo cáo phân tích thị trường thực sự.
+- Sử dụng dữ liệu cụ thể từ log để minh chứng cho các nhận định.
+- Phải đề cập đến sản phẩm CỤ THỂ, KHÔNG nói chung chung.`;
 
 // ==================== Review Prompts ====================
 

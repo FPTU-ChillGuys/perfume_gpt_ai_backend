@@ -31,15 +31,14 @@ const registerQueue = BullModule.registerQueue(
     imports: [ConfigModule],
     inject: [ConfigService],
     useFactory: async (config: ConfigService) => {
+      const redisUrl = `redis://${config.get<string>('REDIS_HOST') ?? 'localhost'}:${config.get<number>('REDIS_PORT') ?? 6379}`;
       return {
+        ttl: config.get<number>('CACHE_TTL') ?? 60000,
+        lruSize: config.get<number>('CACHE_LRU_SIZE') ?? 5000,
         stores: [
           new Keyv({
-            store: new CacheableMemory({
-              ttl: config.get<number>('CACHE_TTL') ?? 60000,
-              lruSize: config.get<number>('CACHE_LRU_SIZE') ?? 5000
-            }),
+            store: new KeyvRedis(redisUrl),
           }),
-          new KeyvRedis(`redis://${config.get<string>('REDIS_HOST') ?? 'localhost'}:${config.get<number>('REDIS_PORT') ?? 6379}`),
         ],
       };
     },

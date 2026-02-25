@@ -30,17 +30,18 @@ export class QuizProcessor extends WorkerHost {
           const savedQuizQuesAnsResponse =
             await this.quizService.addQuizQuesAnws(quizQuesAnsDetail);
 
-          if (!savedQuizQuesAnsResponse.success) {
+          if (!savedQuizQuesAnsResponse.success || !savedQuizQuesAnsResponse.data?.id) {
             console.error(
               'Failed to add quiz question and answer for job:',
               job.id
             );
+            break;
           }
 
           // Save user quiz log
           await this.logService.addQuizQuesAnsDetailToUserLog(
             job.data.userId,
-            savedQuizQuesAnsResponse.data?.id || ''
+            savedQuizQuesAnsResponse.data.id
           );
 
           console.log(

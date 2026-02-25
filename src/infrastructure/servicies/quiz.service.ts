@@ -200,15 +200,16 @@ export class QuizService {
   ): Promise<QuizQuestionAnswer> {
     const details = await Promise.all(
       request.details.map(async (item) => {
-        const question = await this.unitOfWork.AIQuizQuestionRepo.findOne({
-          id: item.questionId
-        });
-        const answer = await question?.answers.find(
-          (ans) => ans.id === item.answerId
+        const question = await this.unitOfWork.AIQuizQuestionRepo.findOne(
+          { id: item.questionId },
+          { populate: ['answers'] }
         );
         if (!question) {
           throw new Error(`Quiz question with id ${item.questionId} not found`);
         }
+        const answer = question.answers.find(
+          (ans) => ans.id === item.answerId
+        );
         return {
           question,
           answer: answer!

@@ -50,7 +50,7 @@ export class QuizController {
     private logService: UserLogService,
     @InjectQueue(QueueName.QUIZ_QUEUE)
     private readonly quizQueue: Queue
-  ) {}
+  ) { }
 
   /** Lấy tất cả câu hỏi quiz */
   @Public()
@@ -83,7 +83,7 @@ export class QuizController {
   }
 
   /** Tạo câu hỏi quiz mới */
-  @Role('admin')
+  @Role(['admin'])
   @Post('questions')
   @ApiOperation({ summary: 'Tạo câu hỏi quiz mới' })
   @ApiBaseResponse(String)

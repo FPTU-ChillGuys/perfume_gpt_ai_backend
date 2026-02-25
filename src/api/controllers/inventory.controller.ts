@@ -35,7 +35,7 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 
-@Role('admin')
+@Role(['admin'])
 @ApiTags('Inventory')
 @ApiBearerAuth('jwt')
 @ApiUnauthorizedResponse({
@@ -48,7 +48,7 @@ export class InventoryController {
     private readonly inventoryService: InventoryService,
     @Inject(AI_SERVICE) private readonly aiService: AIService,
     private readonly adminInstructionService: AdminInstructionService
-  ) {}
+  ) { }
 
   /** Lấy thông tin tồn kho */
   @Get('stock')
@@ -189,7 +189,7 @@ export class InventoryController {
       })
     );
   }
-  
+
   @Get('report/logs/:id')
   @ApiOperation({ summary: 'Lấy chi tiết báo cáo tồn kho theo ID' })
   @ApiBaseResponse(InventoryLog)

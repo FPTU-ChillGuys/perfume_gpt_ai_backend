@@ -27,7 +27,7 @@ import { LogHelper } from './helper/logHelper.controller';
 import { UserLog } from 'src/domain/entities/user-log.entity';
 import { CacheTTL } from '@nestjs/cache-manager';
 
-@Role('admin')
+@Role(['admin'])
 @ApiBearerAuth("jwt")
 @ApiTags('Logs')
 @Controller('logs')

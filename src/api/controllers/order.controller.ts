@@ -44,7 +44,7 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Role } from 'src/application/common/Metadata';
 
-@Role('admin')
+@Role(['admin'])
 @ApiTags('Orders')
 @ApiBearerAuth('jwt')
 @ApiUnauthorizedResponse({
@@ -56,7 +56,7 @@ export class OrderController {
     private orderService: OrderService,
     @Inject(AI_SERVICE) private aiService: AIService,
     private readonly adminInstructionService: AdminInstructionService
-  ) {}
+  ) { }
 
   /** Lấy danh sách tất cả đơn hàng */
   @Get()

@@ -37,7 +37,7 @@ export class AdminInstructionController {
 
   /** Lấy tất cả chỉ thị admin */
   @Get()
-  @Role('admin')
+  @Role(['admin', 'user'])
   @ApiOperation({ summary: 'Lấy tất cả chỉ thị admin' })
   @ApiBaseResponse(AdminInstructionResponse, true)
   async getAllInstructions(): Promise<BaseResponse<AdminInstructionResponse[]>> {
@@ -46,7 +46,7 @@ export class AdminInstructionController {
 
   /** Lấy chỉ thị theo ID */
   @Get(':id')
-  @Role('admin')
+  @Role(['admin'])
   @ApiOperation({ summary: 'Lấy chỉ thị admin theo ID' })
   @ApiParam({ name: 'id', description: 'ID của chỉ thị' })
   @ApiBaseResponse(AdminInstructionResponse)
@@ -58,7 +58,7 @@ export class AdminInstructionController {
 
   /** Lấy chỉ thị theo loại */
   @Get('type/:type')
-  @Role('admin')
+  @Role(['admin'])
   @ApiOperation({ summary: 'Lấy chỉ thị theo loại (system | prompt | rule)' })
   @ApiParam({ name: 'type', description: 'Loại chỉ thị' })
   @ApiBaseResponse(AdminInstructionResponse, true)
@@ -70,7 +70,7 @@ export class AdminInstructionController {
 
   /** Gộp chỉ thị theo loại thành chuỗi prompt cho AI */
   @Get('combined/:type')
-  @Role('admin')
+  @Role(['admin'])
   @ApiOperation({ summary: 'Gộp chỉ thị theo loại thành prompt cho AI' })
   @ApiParam({ name: 'type', description: 'Loại chỉ thị cần gộp' })
   @ApiBaseResponse(String)
@@ -82,7 +82,7 @@ export class AdminInstructionController {
 
   /** Tạo chỉ thị mới */
   @Post()
-  @Role('admin')
+  @Role(['admin'])
   @ApiOperation({ summary: 'Tạo chỉ thị admin mới' })
   @ApiBody({ type: CreateAdminInstructionRequest })
   @ApiBaseResponse(AdminInstructionResponse)
@@ -94,7 +94,7 @@ export class AdminInstructionController {
 
   /** Cập nhật chỉ thị */
   @Put(':id')
-  @Role('admin')
+  @Role(['admin'])
   @ApiOperation({ summary: 'Cập nhật chỉ thị admin' })
   @ApiParam({ name: 'id', description: 'ID của chỉ thị cần cập nhật' })
   @ApiBody({ type: UpdateAdminInstructionRequest })
@@ -108,7 +108,7 @@ export class AdminInstructionController {
 
   /** Xóa chỉ thị */
   @Delete(':id')
-  @Role('admin')
+  @Role(['admin'])
   @ApiOperation({ summary: 'Xóa chỉ thị admin' })
   @ApiParam({ name: 'id', description: 'ID của chỉ thị cần xóa' })
   @ApiBaseResponse(Boolean)

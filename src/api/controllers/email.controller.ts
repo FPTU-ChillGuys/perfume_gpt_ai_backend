@@ -20,11 +20,11 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 
-@Role('admin')
+@Role(['admin'])
 @ApiTags('Email')
 @Controller('email')
 export class EmailController {
-  constructor(private readonly emailService: EmailService) {}
+  constructor(private readonly emailService: EmailService) { }
 
   @Post('send')
   @ApiOperation({ summary: 'Gửi email text cơ bản' })
@@ -42,7 +42,7 @@ export class EmailController {
     );
 
     if (!result.success) {
-      throw new InternalServerErrorException(result.error); 
+      throw new InternalServerErrorException(result.error);
     }
 
     return Ok('Email sent successfully');

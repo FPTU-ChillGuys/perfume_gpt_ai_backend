@@ -18,7 +18,7 @@ import { convertSearchOutputToProductResponse, searchOutput } from 'src/chatbot/
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 
-@Role('admin')
+@Role(['admin', 'user'])
 @ApiTags('Trends')
 @Controller('trends')
 export class TrendController {

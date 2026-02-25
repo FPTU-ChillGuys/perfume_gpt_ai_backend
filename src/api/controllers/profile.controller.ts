@@ -11,11 +11,11 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
-@Role('admin')
+@Role(['admin', 'user'])
 @ApiTags('Profile')
 @Controller('profile')
 export class ProfileController {
-  constructor(private readonly profileService: ProfileService) {}
+  constructor(private readonly profileService: ProfileService) { }
 
   /** Lấy thông tin profile của người dùng hiện tại */
   @Get('me')

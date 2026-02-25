@@ -26,7 +26,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private jwtService: JwtService,
     private reflector: Reflector
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -50,11 +50,11 @@ export class AuthGuard implements CanActivate {
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
       request['user'] = payload;
-      const requiredRole = this.reflector.getAllAndOverride<string>('role', [
+      const requiredRole = this.reflector.getAllAndOverride<string[]>('roles', [
         context.getHandler(),
         context.getClass()
       ]);
-      if (requiredRole && payload.role !== requiredRole) {
+      if (requiredRole && !requiredRole.includes(payload.role)) {
         throw new UnauthorizedException('Insufficient role');
       }
     } catch (error) {

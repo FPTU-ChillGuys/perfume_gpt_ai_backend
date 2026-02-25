@@ -20,7 +20,7 @@ export class QuizService {
   constructor(
     private unitOfWork: UnitOfWork,
     @InjectMapper() private mapper: Mapper
-  ) {}
+  ) { }
 
   async addQuizQues(
     question: QuizQuestionRequest
@@ -186,7 +186,7 @@ export class QuizService {
         data: QuizQuestionAnswerMapper.toResponse(quizQuestionAnswer, true)
       };
     }
-    , 'Failed to get quiz question answer by user id');
+      , 'Failed to get quiz question answer by user id');
   }
 
   async checkExistQuizQuesAnwsByUserId(userId: string): Promise<boolean> {

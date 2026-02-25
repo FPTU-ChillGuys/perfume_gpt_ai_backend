@@ -60,4 +60,4 @@ Dựa vào các thông tin trên:
 - Nếu có, gợi ý nồng độ (EDT / EDP / Parfum)
 - Viết bằng tiếng Việt hoặc tiếng anh, giọng tư vấn thân thiện, dễ hiểu
 
-Lưu ý, hãy sử dụng tool getAllProducts để tham khảo danh sách nước hoa hiện có trước khi đề xuất.`;
+Lưu ý, hãy sử dụng tool để tham khảo danh sách nước hoa hiện có trước khi đề xuất.`;

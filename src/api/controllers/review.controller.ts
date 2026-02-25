@@ -21,7 +21,7 @@ import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
 
 @ApiBearerAuth('jwt')
-@Role('admin')
+@Role(['admin'])
 @ApiTags('Reviews')
 @Controller('reviews')
 export class ReviewController {

@@ -86,7 +86,7 @@ export class ConversationController {
   ) { }
 
   /** Lấy tất cả cuộc hội thoại */
-  @Role('admin')
+  @Role(['admin'])
   @Get()
   @ApiOperation({ summary: 'Lấy tất cả cuộc hội thoại' })
   @ApiBaseResponse(ConversationDto)
@@ -95,7 +95,7 @@ export class ConversationController {
   }
 
   /** Lấy cuộc hội thoại theo ID */
-  @Role('admin')
+  @Role(['admin'])
   @Get(':id')
   @ApiOperation({ summary: 'Lấy cuộc hội thoại theo ID' })
   @ApiQuery({ name: 'id', type: String })
@@ -106,7 +106,7 @@ export class ConversationController {
   }
 
   /** Lấy danh sách cuộc hội thoại có phân trang (cải thiện so với getAllConversations) */
-  @Role('admin')
+  @Role(['admin'])
   @Get('list/paged')
   @ApiOperation({ summary: 'Lấy danh sách cuộc hội thoại có phân trang' })
   @ApiBaseResponse(PagedResult<ConversationDto>)

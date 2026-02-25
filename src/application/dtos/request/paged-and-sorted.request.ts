@@ -21,11 +21,11 @@ export class PagedAndSortedRequest {
   @Type(() => Number)
   PageSize: number = 10;
 
-  /** Trường sắp xếp */
-  @ApiProperty({ description: 'Tên trường sắp xếp', default: '' })
-  @IsOptional()
-  @IsString()
-  SortBy: string = '';
+  // /** Trường sắp xếp */
+  // @ApiProperty({ description: 'Tên trường sắp xếp', default: '' })
+  // @IsOptional()
+  // @IsString()
+  // SortBy: string = '';
 
   /** Thứ tự sắp xếp */
   @ApiProperty({ description: 'Thứ tự sắp xếp', enum: ['asc', 'desc'], default: 'asc' })

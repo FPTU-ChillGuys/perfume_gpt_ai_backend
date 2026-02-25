@@ -205,7 +205,7 @@ export class ProductService {
                 searchText: searchText,
                 pageNumber: request.PageNumber ?? 1,
                 pageSize: request.PageSize ?? 10,
-                sortBy: request.SortBy ?? '',
+                // sortBy: request.SortBy ?? '',
                 sortOrder: request.SortOrder ?? 'asc',
                 isDescending: request.IsDescending ?? false
               }
@@ -238,7 +238,7 @@ export class ProductService {
                 searchText: searchText,
                 pageNumber: request.PageNumber ?? 1,
                 pageSize: request.PageSize ?? 10,
-                sortBy: request.SortBy ?? '',
+                // sortBy: request.SortBy ?? '',
                 sortOrder: request.SortOrder ?? 'asc',
                 isDescending: request.IsDescending ?? false
               }

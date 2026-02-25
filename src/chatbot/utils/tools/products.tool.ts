@@ -7,7 +7,7 @@ import * as z from 'zod';
 
 @Injectable()
 export class ProductTool {
-  constructor(private readonly productService: ProductService) {}
+  constructor(private readonly productService: ProductService) { }
 
   getAllProducts: Tool = tool({
     description: 'Get a list of all products available in the store.',
@@ -24,7 +24,7 @@ export class ProductTool {
           const response = await this.productService.getAllProducts({
             PageNumber: input.pageNumber,
             PageSize: input.pageSize,
-            SortBy: input.sortBy || '',
+            // SortBy: input.sortBy || '',
             SortOrder: input.sortOrder,
             IsDescending: input.isDescending
           });
@@ -58,8 +58,8 @@ export class ProductTool {
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
-            // Tạo array search để search nhiều từ khóa đê tổng hợp 
-          let results : ProductResponse[] = [];
+          // Tạo array search để search nhiều từ khóa đê tổng hợp 
+          let results: ProductResponse[] = [];
 
           for (const item of input.searches) {
             const response = await this.productService.getProductsUsingSemanticSearch(
@@ -67,7 +67,7 @@ export class ProductTool {
               {
                 PageNumber: item.pageNumber,
                 PageSize: item.pageSize,
-                SortBy: item.sortBy || '',
+                // SortBy: item.sortBy || '',
                 SortOrder: item.sortOrder,
                 IsDescending: item.isDescending
               }

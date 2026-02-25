@@ -47,17 +47,20 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
   }
 
   async addMessageLogToUserLog(userId: string, message: Message) {
-    let userLog = await this.findOne({ userId });
-    if (!userLog) {
-      userLog = this.createUserLog(userId);
+    const existing = await this.findOne({ userId });
+    if (!existing) {
+      this.createUserLog(userId);
+      await this.em.flush();
     }
-    userLog.userMessageLogs.add(new UserMessageLog({ message, userLog }));
+
+    const userLog = await this.findOne(
+      { userId },
+      { populate: ['userMessageLogs', 'userMessageLogs.message'] }
+    );
+
+    userLog!.userMessageLogs.add(new UserMessageLog({ message, userLog: userLog! }));
     await this.em.flush();
-    const messageLogs =
-      (
-        await this.getUserLogsWithMessages(userId)
-      )?.userMessageLogs.getItems() || [];
-    return messageLogs;
+    return userLog!.userMessageLogs.getItems();
   }
 
   async getUserLogsWithMessages(userId: string): Promise<UserLog | null> {
@@ -105,10 +108,16 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
     userId: string,
     quizQuesAnsDetails: QuizQuestionAnswerDetail[]
   ) {
-    let userLog = await this.findOne({ userId });
-    if (!userLog) {
-      userLog = this.createUserLog(userId);
+    const existing = await this.findOne({ userId });
+    if (!existing) {
+      this.createUserLog(userId);
+      await this.em.flush();
     }
+
+    const userLog = await this.findOne(
+      { userId },
+      { populate: ['userQuizLogs'] }
+    );
 
     for (const quizQuesAnsDetail of quizQuesAnsDetails) {
       const existingQuizLog = await this.em.findOne(UserQuizLog, {
@@ -116,23 +125,28 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
       });
 
       if (!existingQuizLog) {
-        userLog.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog }));
+        userLog!.userQuizLogs.add(new UserQuizLog({ quizQuesAnsDetail, userLog: userLog! }));
         await this.em.flush();
       }
     }
 
-    await userLog.userQuizLogs.init();
-    return userLog.userQuizLogs.getItems();
+    return userLog!.userQuizLogs.getItems();
   }
 
   async addQuizQuesAnsDetailsLogToUserLog(
     userId: string,
     quizQuesAnsDetails: QuizQuestionAnswerDetail[]
   ) {
-    let userLog = await this.findOne({ userId });
-    if (!userLog) {
-      userLog = this.createUserLog(userId);
+    const existing = await this.findOne({ userId });
+    if (!existing) {
+      this.createUserLog(userId);
+      await this.em.flush();
     }
+
+    const userLog = await this.findOne(
+      { userId },
+      { populate: ['userQuizLogs'] }
+    );
 
     const detailIds = quizQuesAnsDetails.map((item) => item.id);
     const existingQuizLogs = await this.em.find(UserQuizLog, {
@@ -148,8 +162,8 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
         !existingDetailIds.has(quizQuesAnsDetail.id) &&
         !addedInRequest.has(quizQuesAnsDetail.id)
       ) {
-        userLog.userQuizLogs.add(
-          new UserQuizLog({ quizQuesAnsDetail, userLog })
+        userLog!.userQuizLogs.add(
+          new UserQuizLog({ quizQuesAnsDetail, userLog: userLog! })
         );
         addedInRequest.add(quizQuesAnsDetail.id);
       }
@@ -159,8 +173,7 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
       await this.em.flush();
     }
 
-    await userLog.userQuizLogs.init();
-    return userLog.userQuizLogs.getItems();
+    return userLog!.userQuizLogs.getItems();
   }
 
   async getUserLogsWithQuizDetails(userId: string): Promise<UserLog | null> {
@@ -171,16 +184,27 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
   }
 
   async addSearchLogToUserLog(userId: string, searchLog: string) {
-    let userLog = await this.findOne({ userId });
-    if (!userLog) {
-      userLog = this.createUserLog(userId);
-    }
-    userLog.userSearchLogs.load();
-    userLog.userSearchLogs.add(
-      new UserSearchLog({ content: searchLog, userLog })
+    const existing = await this.findOne(
+      { userId },
+      { populate: ['userSearchLogs'] }
     );
+
+    if (!existing) {
+      this.createUserLog(userId);
+      await this.em.flush();
+    }
+
+    const userLog = await this.findOne(
+      { userId },
+      { populate: ['userSearchLogs'] }
+    );
+
+    userLog!.userSearchLogs.add(
+      new UserSearchLog({ content: searchLog, userLog: userLog! })
+    );
+
     await this.em.flush();
-    return userLog.userSearchLogs.getItems();
+    return userLog!.userSearchLogs.getItems();
   }
 
   async getUserLogsWithSearchLogs(userId: string): Promise<UserLog | null> {

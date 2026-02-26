@@ -44,8 +44,8 @@ export class ReviewController {
     @Get('summary/all')
     @ApiBaseResponse(String)
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
-    async getReviewSummaryFromAllVariant(@Query() request: GetPagedReviewRequest): Promise<BaseResponse<string>> {
-        const reviewsResponse = await this.reviewService.getAllReviews(request);
+    async getReviewSummaryFromAllVariant(): Promise<BaseResponse<string>> {
+        const reviewsResponse = await this.reviewService.getAllReviews(new GetPagedReviewRequest());
 
         if (!reviewsResponse.success) {
             throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {

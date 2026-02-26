@@ -156,16 +156,16 @@ export class QuizController {
       );
     }
 
-    // Lay cau tra loi tuong ung    // Tim cau tra loi trong cau hoi
+    // Map từng quizAnswer (questionId + answerId) sang cặp (question text + answer text)
     const quesAnses: Array<{ question: string; answer: string }> = [];
     if (quizQueses.data) {
-      for (let i = 0; i < quizQueses.data.length; i++) {
-        const quizQues = quizQueses.data[i];
-        if (quizQues.answers && quizQues.question) {
+      for (const quizAnswer of quizAnswers) {
+        const quizQues = quizQueses.data.find((q) => q.id === quizAnswer.questionId);
+        if (quizQues?.answers && quizQues.question) {
           const answer = quizQues.answers.find(
-            (ans) => ans.id === quizAnswers[i].answerId
+            (ans) => ans.id === quizAnswer.answerId
           );
-          if (answer && answer.answer) {
+          if (answer?.answer) {
             quesAnses.push({
               question: quizQues.question,
               answer: answer.answer
@@ -187,7 +187,7 @@ export class QuizController {
     const savedQuizQuesAnsResponse =
       await this.quizService.addQuizQuesAnws(quizQuesAnsDetail);
 
-    if (!savedQuizQuesAnsResponse.success) {
+    if (!savedQuizQuesAnsResponse.success || !savedQuizQuesAnsResponse.data?.id) {
       throw new InternalServerErrorWithDetailsException(
         'Failed to save quiz question answers',
         { userId }
@@ -197,7 +197,7 @@ export class QuizController {
     // Save user quiz log
     await this.logService.addQuizQuesAnsDetailToUserLog(
       userId,
-      savedQuizQuesAnsResponse.data?.id || ''
+      savedQuizQuesAnsResponse.data.id
     );
 
     // Get AI response
@@ -239,16 +239,16 @@ export class QuizController {
       );
     }
 
-    // Lay cau tra loi tuong ung    // Tim cau tra loi trong cau hoi
+    // Map từng quizAnswer (questionId + answerId) sang cặp (question text + answer text)
     const quesAnses: Array<{ question: string; answer: string }> = [];
     if (quizQueses.data) {
-      for (let i = 0; i < quizQueses.data.length; i++) {
-        const quizQues = quizQueses.data[i];
-        if (quizQues.answers && quizQues.question) {
+      for (const quizAnswer of quizAnswers) {
+        const quizQues = quizQueses.data.find((q) => q.id === quizAnswer.questionId);
+        if (quizQues?.answers && quizQues.question) {
           const answer = quizQues.answers.find(
-            (ans) => ans.id === quizAnswers[i].answerId
+            (ans) => ans.id === quizAnswer.answerId
           );
-          if (answer && answer.answer) {
+          if (answer?.answer) {
             quesAnses.push({
               question: quizQues.question,
               answer: answer.answer

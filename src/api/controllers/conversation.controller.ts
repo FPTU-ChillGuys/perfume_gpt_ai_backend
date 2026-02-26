@@ -167,10 +167,17 @@ export class ConversationController {
     // Guest: không lấy log, order, profile
     //-------------------------------------------------------------
 
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const adminSystemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
+    const systemPrompt = conversationSystemPrompt(
+      adminSystemPrompt || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      combinedPrompt
+    );
+
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt),
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -268,10 +275,17 @@ export class ConversationController {
     // Guest: không lấy log, order, profile
     //-------------------------------------------------------------
 
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const adminSystemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
+    const systemPrompt = conversationSystemPrompt(
+      adminSystemPrompt || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      combinedPrompt
+    );
+
     // Call AI service to get response
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      conversationSystemPrompt(ADVANCED_MATCHING_SYSTEM_PROMPT, combinedPrompt),
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -359,13 +373,16 @@ export class ConversationController {
       );
     }
 
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const systemPrompt = conversationSystemPrompt(
+      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      promptResult.data.combinedPrompt
+    );
+
     // Call AI service
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      conversationSystemPrompt(
-        ADVANCED_MATCHING_SYSTEM_PROMPT,
-        promptResult.data.combinedPrompt
-      ),
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -439,13 +456,16 @@ export class ConversationController {
       );
     }
 
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const systemPrompt = conversationSystemPrompt(
+      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      promptResult.data.combinedPrompt
+    );
+
     // Call AI service
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      conversationSystemPrompt(
-        ADVANCED_MATCHING_SYSTEM_PROMPT,
-        promptResult.data.combinedPrompt
-      ),
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -521,13 +541,16 @@ export class ConversationController {
       );
     }
 
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const systemPrompt = conversationSystemPrompt(
+      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      promptResult.data.combinedPrompt
+    );
+
     // Call AI service
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      conversationSystemPrompt(
-        ADVANCED_MATCHING_SYSTEM_PROMPT,
-        promptResult.data.combinedPrompt
-      ),
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -603,13 +626,16 @@ export class ConversationController {
       );
     }
 
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const systemPrompt = conversationSystemPrompt(
+      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      promptResult.data.combinedPrompt
+    );
+
     // Call AI service
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      conversationSystemPrompt(
-        ADVANCED_MATCHING_SYSTEM_PROMPT,
-        promptResult.data.combinedPrompt
-      ),
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -681,15 +707,19 @@ export class ConversationController {
       );
     }
 
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const systemPrompt = conversationSystemPrompt(
+      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      promptResult.data.combinedPrompt
+    );
+
     // Call AI service
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      conversationSystemPrompt(
-        ADVANCED_MATCHING_SYSTEM_PROMPT,
-        promptResult.data.combinedPrompt
-      ),
+      systemPrompt,
       Output.object(searchOutput)
     );
+
 
     if (!message.success) {
       throw new InternalServerErrorWithDetailsException(
@@ -758,13 +788,16 @@ export class ConversationController {
       );
     }
 
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const systemPrompt = conversationSystemPrompt(
+      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      promptResult.data.combinedPrompt
+    );
+
     // Call AI service
     const message = await this.aiService.textGenerateFromMessages(
       convertedMessages,
-      conversationSystemPrompt(
-        ADVANCED_MATCHING_SYSTEM_PROMPT,
-        promptResult.data.combinedPrompt
-      ),
+      systemPrompt,
       Output.object(searchOutput)
     );
 

@@ -35,7 +35,7 @@ import { AdminInstructionService } from './admin-instruction.service';
 @Injectable()
 export class UserLogService {
   /** Cache cho user log summary report (TTL = 5 phút) */
-  constructor(private unitOfWork: UnitOfWork, @Inject(AI_SERVICE) private aiService: AIService, private adminInstructionService: AdminInstructionService) { }
+  constructor(protected unitOfWork: UnitOfWork, protected adminInstructionService: AdminInstructionService) { }
 
   /** Lay tat ca log */
   async getAllLogs(): Promise<BaseResponse<UserLog[]>> {
@@ -647,86 +647,5 @@ export class UserLogService {
     return this.getUserLogSummaryByUserId(userId, startDate, endDate);
   }
 
-  /**Ghi de log theo tuan */
-  async overrideWeeklyLogSummaryByUserId(userId: string): Promise<void> {
-    const currentDate = new Date();
-    const endDate = endOfWeek(convertToUTC(currentDate));
-    const startDate = startOfWeek(convertToUTC(currentDate));
-    const logSumaryResponse = await this.createLogSummaryForPeriodByUsingAI(userId, PeriodEnum.WEEKLY);
-    if (!logSumaryResponse.success || !logSumaryResponse.data) {
-      console.log(`Failed to create log summary for userId: ${userId}`);
-      return;
-    }
-    await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
 
-  }
-
-  /** Ghi de log theo thang */
-  async overrideMonthlyLogSummaryByUserId(userId: string): Promise<void> {
-    const currentDate = new Date();
-    const endDate = endOfMonth(convertToUTC(currentDate));
-    const startDate = startOfMonth(convertToUTC(currentDate));
-    const logSumaryResponse = await this.createLogSummaryForPeriodByUsingAI(userId, PeriodEnum.MONTHLY);
-    if (!logSumaryResponse.success || !logSumaryResponse.data) {
-      console.log(`Failed to create log summary for userId: ${userId}`);
-      return;
-    }
-    await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
-  }
-
-  /** Ghi de log theo nam */
-  async overrideYearlyLogSummaryByUserId(userId: string): Promise<void> {
-    const currentDate = new Date();
-    const endDate = endOfYear(convertToUTC(currentDate));
-    const startDate = startOfYear(convertToUTC(currentDate));
-    const logSumaryResponse = await this.createLogSummaryForPeriodByUsingAI(userId, PeriodEnum.YEARLY);
-    if (!logSumaryResponse.success || !logSumaryResponse.data) {
-      console.log(`Failed to create log summary for userId: ${userId}`);
-      return;
-    }
-    await this.saveUserLogSummary(userId, startDate, endDate, logSumaryResponse.data);
-  }
-
-  /** Tạo summary cho period */
-  async createLogSummaryForPeriodByUsingAI(userId: string, period: PeriodEnum): Promise<BaseResponse<string | null>> {
-    return await funcHandlerAsync(
-      async () => {
-        const userLogRequest = new UserLogRequest({
-          userId,
-          period,
-          endDate: new Date()
-        });
-
-        const response = await this.getReportAndPromptSummaryUserLogs(userLogRequest);
-
-        if (!response.success) {
-          return { success: false, error: 'Failed to get user logs' };
-        }
-
-        if (isDataEmpty(response.data?.prompt)) {
-          return { success: false, error: INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE };
-        }
-
-        // Lấy admin instruction cho domain log (nếu có)
-        const adminPrompt =
-          await this.adminInstructionService.getSystemPromptForDomain(
-            INSTRUCTION_TYPE_LOG
-          );
-
-        // Summarize with AI
-        const aiResponse = await this.aiService.textGenerateFromPrompt(
-          response.data!.prompt,
-          adminPrompt
-        );
-
-        if (!aiResponse.success) {
-          return { success: false, error: 'Failed to generate summary with AI' };
-        }
-
-        return { success: true, data: aiResponse.data };
-      },
-      'Failed to create log summary with AI',
-      true
-    );
-  }
 }

@@ -5,15 +5,13 @@ import {
 } from 'src/application/constant/processor';
 import { ConversationService } from '../servicies/conversation.service';
 import { Job } from 'bullmq';
-import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
-import { Scope } from '@nestjs/common';
-import { UserLogService } from '../servicies/user-log.service';
+import { UserLogHelper } from './helper/user-log.helper';
 
 @Processor({
-    name: QueueName.CONVERSATION_QUEUE,
+  name: QueueName.CONVERSATION_QUEUE,
 })
 export class ConversationProcessor extends WorkerHost {
-  constructor(private conversationService: ConversationService, private userLogService: UserLogService) {
+  constructor(private conversationService: ConversationService, private userLogHelper: UserLogHelper) {
     super();
   }
 
@@ -23,12 +21,12 @@ export class ConversationProcessor extends WorkerHost {
       switch (job.name) {
         case ConversationJobName.ADD_MESSAGE_AND_LOG.toString():
           //Check type cua conversationDto
-            console.log('Processing conversation job with data:', job.data);
-            await this.conversationService.saveOrUpdateConversation(job.data.responseConversation);
-            console.log('Conversation saved successfully for job:', job.id);
-            await this.userLogService.overrideWeeklyLogSummaryByUserId(job.data.userId);
-            console.log('User log summary updated successfully for user:', job.data.userId);
-            break;
+          console.log('Processing conversation job with data:', job.data);
+          await this.conversationService.saveOrUpdateConversation(job.data.responseConversation);
+          console.log('Conversation saved successfully for job:', job.id);
+          await this.userLogHelper.overrideWeeklyLogSummaryByUserId(job.data.userId);
+          console.log('User log summary updated successfully for user:', job.data.userId);
+          break;
         default:
           throw new Error(`Unknown job name: ${job.name}`);
       }

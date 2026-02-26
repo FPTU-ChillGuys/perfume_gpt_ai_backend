@@ -1,3 +1,4 @@
+import { forwardRef } from "@nestjs/common";
 import { AdminInstructionModule } from "../admin-instruction.module";
 import { AIAcceptanceModule } from "../ai-acceptance.module";
 import { AIModule } from "../ai.module";
@@ -16,7 +17,6 @@ import { UserModule } from "../user.module";
 
 export const modules = [
   ConversationModule,
-  UserLogModule,
   QuizModule,
   ProductModule,
   ToolModule,

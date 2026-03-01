@@ -28,9 +28,15 @@ export class Tools {
       // Profile tools
       getOwnProfile: this.profileTool.getOwnProfile,
       // Log tools
-      getUserActivityReport: this.logTool.getUserActivityReport,
-      getUserLogSummaryReport: this.logTool.getUserLogSummaryReport,
-      getUserLogSummaries: this.logTool.getUserLogSummaries,
+      getUserActivityReportPerWeek: this.logTool.getUserActivityReportPerWeek,
+      getUserActivityReportPerMonth: this.logTool.getUserActivityReportPerMonth,
+      getUserActivityReportPerYear: this.logTool.getUserActivityReportPerYear,
+      getUserLogSummaryReportPerWeek: this.logTool.getUserLogSummaryReportPerWeek,
+      getUserLogSummaryReportPerMonth: this.logTool.getUserLogSummaryReportPerMonth,
+      getUserLogSummaryReportPerYear: this.logTool.getUserLogSummaryReportPerYear,
+      getUserLogSummariesPerWeek: this.logTool.getUserLogSummariesPerWeek,
+      getUserLogSummariesPerMonth: this.logTool.getUserLogSummariesPerMonth,
+      getUserLogSummariesPerYear: this.logTool.getUserLogSummariesPerYear,
     };
   }
 }

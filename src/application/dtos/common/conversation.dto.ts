@@ -63,5 +63,18 @@ export class ConversationRequestDtoV2 {
   constructor(init?: Partial<ConversationRequestDtoV2>) {
     Object.assign(this, init);
   }
+}
 
+/** Convert từ stringify sang MessageRequestDto */
+export function convertStringifyToMessageRequestDto(messages: string): ConversationRequestDtoV2 {
+  let result: any = messages
+
+  // Nếu là chuỗi JSON chứa chuỗi JSON, parse lần đầu
+  if (typeof result === 'string' && result.trim().startsWith('"')) {
+    result = JSON.parse(result)
+  }
+
+  // Lần parse thứ 2 để ra object
+  const obj = JSON.parse(result)
+  return obj as ConversationRequestDtoV2
 }

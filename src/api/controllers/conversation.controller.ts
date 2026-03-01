@@ -5,7 +5,9 @@ import {
   Inject,
   Post,
   Query,
-  Req
+  Req,
+  Res,
+  Sse
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,14 +17,15 @@ import {
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { Output, UIMessage } from 'ai';
+import { createUIMessageStreamResponse, Output, pipeUIMessageStreamToResponse, UIMessage } from 'ai';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import {
   ConversationDto,
   ConversationRequestDto,
-  ConversationRequestDtoV2
+  ConversationRequestDtoV2,
+  convertStringifyToMessageRequestDto
 } from 'src/application/dtos/common/conversation.dto';
 import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -70,6 +73,7 @@ import {
 } from 'src/application/constant/processor';
 import { Queue } from 'bullmq';
 import { v4 as uuid } from 'uuid';
+import { ServerResponse } from 'node:http';
 
 @ApiTags('Conversation')
 @Controller('conversation')
@@ -826,6 +830,93 @@ export class ConversationController {
     );
 
     return Ok(responseConversation);
+  }
+
+  /**
+ * Chat V9.
+*/
+  @Public()
+  @Post('chat/v9')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({
+    summary:
+      'Chat V9 - SSE stream'
+  })
+  @ApiBaseResponse(ConversationRequestDto)
+  async conversationV9(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDtoV2,
+    @Res() response: ServerResponse
+  ): Promise<any> {
+    const userId =
+      getTokenPayloadFromRequest(request)?.id ?? uuid();
+
+    const convertedMessages: UIMessage[] = convertToMessages(
+      conversation.messages || []
+    );
+
+    // Dùng common helper thay vì code trùng lặp
+    const promptResult = await buildCombinedPromptV5(
+      INSTRUCTION_TYPE_CONVERSATION,
+      this.adminInstructionService,
+      userId,
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'PromptBuilder',
+          endpoint: 'chat/v4'
+        }
+      );
+    }
+
+    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
+    const systemPrompt = conversationSystemPrompt(
+      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      promptResult.data.combinedPrompt
+    );
+
+    // Call AI service
+    const stream = this.aiService.textGenerateStreamFromMessages(
+      convertedMessages,
+      systemPrompt,
+      Output.object(searchOutput)
+    );
+
+    // Lưu conversation
+    // const responseConversation = overrideMessagesToConversation(
+    //   conversation.id || '',
+    //   userId || '',
+    //   addMessageToMessages(message.data || '', conversation.messages || [])
+    // );
+
+    // await this.conversationQueue.add(
+    //   ConversationJobName.ADD_MESSAGE_AND_LOG,
+    //   { responseConversation, userId }
+    // );
+
+    // return Ok(responseConversation);
+    return pipeUIMessageStreamToResponse(
+      {
+        response: response,
+        status: 200,
+        statusText: 'OK',
+        stream: stream,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+        consumeSseStream: ({ stream }) => {
+          // Optional: consume the SSE stream independently
+          console.log('Consuming SSE stream:', stream);
+        },
+      }
+    )
   }
 
 }

@@ -17,7 +17,7 @@ export class AIService {
     private systemPrompt?: string,
     private tools?: ToolSet,
     private stopWhen?: number
-  ) {}
+  ) { }
 
   async textGenerateFromPrompt(
     prompt: string,
@@ -61,8 +61,8 @@ export class AIService {
 
   textGenerateStreamFromPrompt(
     prompt: string,
-    output?: any,
     additionalSystemPrompt?: string,
+    output?: any,
     errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
@@ -79,23 +79,23 @@ export class AIService {
     }, 'Failed to generate text stream from messages');
   }
 
-  TextGenerateStreamFromMessages(
+  textGenerateStreamFromMessages(
     messages: UIMessage[],
-    output?: any,
     additionalSystemPrompt?: string,
+    output?: any,
     errorMessage?: string
-  ): BaseResponse<ReadableStream<any>> {
-    return funcHandler(() => {
-      const stream = streamTextGenerationFromMessagesToResultWithErrorHandler(
-        gpt5nano,
-        messages,
-        this.systemPrompt + (additionalSystemPrompt ?? ''),
-        this.tools,
-        this.stopWhen,
-        errorMessage,
-        output
-      );
-      return { success: true, data: stream };
-    }, 'Failed to generate text stream from messages');
+  ): ReadableStream<any> {
+    const stream = streamTextGenerationFromMessagesToResultWithErrorHandler(
+      gpt5nano,
+      messages,
+      this.systemPrompt + (additionalSystemPrompt ?? ''),
+      this.tools,
+      this.stopWhen,
+      errorMessage,
+      output
+    );
+
+    return stream;
+
   }
 }

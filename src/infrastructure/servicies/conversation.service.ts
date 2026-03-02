@@ -54,7 +54,7 @@ export class ConversationService {
         if (conversation.userId) {
           await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
             conversation.userId,
-            conversation.messages.getItems()[conversation.messages.getItems().length - 1]
+            conversation.messages.getItems()[conversation.messages.getItems().length - 2]
           );
         }
 

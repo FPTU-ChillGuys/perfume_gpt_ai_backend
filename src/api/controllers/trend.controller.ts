@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Inject, Post, Query, UseInterceptors } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -29,6 +29,7 @@ export class TrendController {
   ) { }
 
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
+  @ApiBearerAuth("jwt")
   @Get('summary')
   @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
   @ApiBaseResponse(String)
@@ -36,10 +37,10 @@ export class TrendController {
   async summarizeLogs(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<string>> {
-    const reportAndPromptSummary =
-      await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
+    const summaries =
+      await this.userLogService.getAllUserLogSummaryReport(allUserLogRequest);
 
-    if (!reportAndPromptSummary.success) {
+    if (!summaries.success) {
       throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
         service: 'UserLogService',
         period: allUserLogRequest.period,
@@ -47,29 +48,12 @@ export class TrendController {
       });
     }
 
-    if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
-      return Ok(INSUFFICIENT_DATA_MESSAGES.TREND_FORECAST);
-    }
-
-    // Summarize with AI
-    const reportResponse = await this.aiService.textGenerateFromPrompt(
-      `${reportAndPromptSummary.data!.prompt}`
-    );
-
-    if (!reportResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        service: 'AIService',
-        period: allUserLogRequest.period,
-        endpoint: 'trends/summary'
-      });
-    }
-
     //Trend forecasting prompt base on summary response
-    const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
+    const trendPrompt = trendForecastingPrompt(summaries.data ?? '');
 
     // Lấy admin instruction cho domain trend (nếu có)
     const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_TREND);
-    const trendSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
+    const trendSystemPrompt = `${adminPrompt}`;
 
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,

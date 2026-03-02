@@ -623,6 +623,47 @@ export class UserLogService {
     );
   }
 
+  async getAllUserLogSummary(allUserLogRequest: AllUserLogRequest): Promise<BaseResponse<UserLogSummary[] | null>> {
+    return funcHandlerAsync(
+      async () => {
+        const startDate = allUserLogRequest.startDate ?? this.getFirstDateOfPeriod(allUserLogRequest.period, allUserLogRequest.endDate);
+
+        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({
+          startDate: {
+            $gte: startDate
+          },
+          endDate: {
+            $lte: endOfDay(convertToUTC(allUserLogRequest.endDate))
+          }
+        });
+
+        if (!userLogSummary) {
+          return { success: false, error: 'User log summary not found', data: null };
+        }
+        return { success: true, data: userLogSummary };
+      },
+      'Failed to get user log summary',
+      true
+    );
+  }
+
+  async getAllUserLogSummaryReport(allUserLogRequest: AllUserLogRequest): Promise<BaseResponse<string | null>> {
+    return funcHandlerAsync(
+      async () => {
+        const summaries = await this.getAllUserLogSummary(allUserLogRequest);
+        if (!summaries.success) {
+          return { success: false, error: 'User log summary not found', data: null };
+        }
+
+        const report = summaries.data?.map(summary => summary.logSummary).join('\n');
+        return { success: true, data: report };
+      },
+      'Failed to get user log summary report',
+      true
+    );
+  }
+
+
   /** Lay user summary theo tuan */
   async getUserLogSummaryByWeek(userId: string): Promise<BaseResponse<UserLogSummary | null>> {
     const currentDate = new Date();

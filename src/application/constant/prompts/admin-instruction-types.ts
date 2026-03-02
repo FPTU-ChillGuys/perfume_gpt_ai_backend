@@ -20,8 +20,11 @@ export const INSTRUCTION_TYPE_INVENTORY = 'inventory';
 /** Loại instruction cho dự đoán xu hướng */
 export const INSTRUCTION_TYPE_TREND = 'trend';
 
-/** Loại instruction cho gợi ý sản phẩm / mua lại */
+/** Loại instruction cho gợi ý sản phẩm AI (aiRecommendationV1, aiRecommendationV2, aiRecommendationStructured) */
 export const INSTRUCTION_TYPE_RECOMMENDATION = 'recommendation';
+
+/** Loại instruction cho gợi ý mua lại (repurchaseRecommendationV1, repurchaseRecommendationV2) */
+export const INSTRUCTION_TYPE_REPURCHASE = 'repurchase';
 
 /** Loại instruction cho tóm tắt log người dùng */
 export const INSTRUCTION_TYPE_LOG = 'log';
@@ -36,6 +39,7 @@ export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_INVENTORY,
   INSTRUCTION_TYPE_TREND,
   INSTRUCTION_TYPE_RECOMMENDATION,
+  INSTRUCTION_TYPE_REPURCHASE,
   INSTRUCTION_TYPE_LOG,
   INSTRUCTION_TYPE_CONVERSATION,
 ] as const;

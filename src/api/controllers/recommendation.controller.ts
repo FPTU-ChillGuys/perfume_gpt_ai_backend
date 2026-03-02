@@ -9,7 +9,8 @@ import {
   aiRecommendationPrompt,
   recommendationReportPrompt,
   recommendationSummaryPrompt,
-  INSTRUCTION_TYPE_RECOMMENDATION
+  INSTRUCTION_TYPE_RECOMMENDATION,
+  INSTRUCTION_TYPE_REPURCHASE
 } from 'src/application/constant/prompts';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
@@ -57,7 +58,7 @@ export class RecommendationController {
     private readonly profileService: ProfileService,
     private readonly adminInstructionService: AdminInstructionService,
     private readonly emailService: EmailService
-  ) {}
+  ) { }
 
   /** Gợi ý mua lại V2 - Dùng log chi tiết từ user log service */
   @Public()
@@ -70,11 +71,9 @@ export class RecommendationController {
   ): Promise<BaseResponse<string>> {
     const endpoint = 'recommendation/repurchase/v2';
 
-    const combinedPromptResult = await buildCombinedPromptV2(
-      INSTRUCTION_TYPE_RECOMMENDATION,
+    const combinedPromptResult = await buildCombinedPromptV3(
+      INSTRUCTION_TYPE_REPURCHASE,
       this.userLogService,
-      this.orderService,
-      this.profileService,
       this.adminInstructionService,
       userLogRequest.userId,
     );
@@ -101,7 +100,7 @@ export class RecommendationController {
     const endpoint = 'recommendation/repurchase/v1';
 
     const combinedPromptResult = await buildCombinedPromptV1(
-      INSTRUCTION_TYPE_RECOMMENDATION,
+      INSTRUCTION_TYPE_REPURCHASE,
       this.userLogService,
       this.orderService,
       this.profileService,
@@ -146,7 +145,7 @@ export class RecommendationController {
 
     // Gọi AI 2 lần (report + recommendation)
     const recommendation = await this.aiService.textGenerateFromPrompt(
-      adminTokenPrompt(promptResult.data!.combinedPrompt),
+      "",
       promptResult.data?.adminInstruction ?? '',
       Output.object(searchOutput)
     );
@@ -260,7 +259,7 @@ export class RecommendationController {
   // ==================== PRIVATE HELPER METHODS ====================
 
   /**
-   * Lấy admin instruction và build recommendation system prompt
+   * Lấy admin instruction cho recommendation (gợi ý AI)
    */
   private async getRecommendationPrompts(): Promise<{
     adminPrompt: string;
@@ -272,6 +271,19 @@ export class RecommendationController {
       );
     const systemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
     return { adminPrompt, systemPrompt };
+  }
+
+  /**
+   * Lấy admin instruction cho repurchase (gợi ý mua lại)
+   */
+  private async getRepurchasePrompts(): Promise<{
+    adminPrompt: string;
+  }> {
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_REPURCHASE
+      );
+    return { adminPrompt };
   }
 
   /**
@@ -302,14 +314,14 @@ export class RecommendationController {
   }
 
   /**
-   * Logic chung: Gọi AI 2 lần (summary -> recommendation) cho repurchase
+   * Logic chung: Gọi AI (summary -> recommendation) cho repurchase
    */
   private async generateRepurchaseRecommendation(
     combinedPrompt: string,
     userId: string,
     endpoint: string
   ): Promise<string> {
-    const { adminPrompt } = await this.getRecommendationPrompts();
+    const { adminPrompt } = await this.getRepurchasePrompts();
 
     // Tạo recommendation từ summary
     const recommendation = await this.callAI(
@@ -317,7 +329,7 @@ export class RecommendationController {
       adminPrompt,
       userId,
       endpoint,
-      'Failed to get AI recommendation response'
+      'Failed to get AI repurchase recommendation response'
     );
 
     return recommendation;
@@ -400,7 +412,7 @@ export class RecommendationController {
 
     // Build combined prompt từ user logs + orders + profile
     const combinedPromptResult = await buildCombinedPromptV2(
-      INSTRUCTION_TYPE_RECOMMENDATION,
+      INSTRUCTION_TYPE_REPURCHASE,
       this.userLogService,
       this.orderService,
       this.profileService,

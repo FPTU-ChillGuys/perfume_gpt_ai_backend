@@ -765,9 +765,9 @@ export class ConversationController {
   @ApiBaseResponse(ConversationRequestDto)
   async conversationV8(
     @Req() request: Request,
-    @Body() conversation: ConversationRequestDtoV2
+    @Body() conversation: ConversationRequestDto
   ): Promise<BaseResponse<ConversationDto>> {
-    const userId =
+    const userId = conversation.userId ??
       getTokenPayloadFromRequest(request)?.id ?? uuid();
     const convertedMessages: UIMessage[] = convertToMessages(
       conversation.messages || []

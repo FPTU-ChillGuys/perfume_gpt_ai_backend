@@ -59,7 +59,7 @@ export class LogTool {
             'Get a text activity report for a specific user within a week. ' +
             'Returns a summary of their searches, messages, and quiz answers. ' +
             'Use this to personalize recommendations or understand user behavior.' +
-            'Nên dùng cho chatbot và recommendation để hiểu user đã làm gì gần đây.',
+            'Tốt nhất là dùng cho phần tích trend.',
         inputSchema: z.object({
             userId: z.string().describe('The ID of the user'),
             endDate: z
@@ -96,7 +96,7 @@ export class LogTool {
             'Get a text activity report for a specific user within a month. ' +
             'Returns a summary of their searches, messages, and quiz answers. ' +
             'Use this to personalize recommendations or understand user behavior.' +
-            'Có thể dùng cho chatbot nhưng không khuyến khích, tốt nhất là dùng cho phần tích trend.',
+            'Tốt nhất là dùng cho phần tích trend.',
         inputSchema: z.object({
             userId: z.string().describe('The ID of the user'),
             endDate: z

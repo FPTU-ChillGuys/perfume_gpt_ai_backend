@@ -21,7 +21,7 @@ export class ConversationService {
   constructor(
     private unitOfWork: UnitOfWork,
     @InjectMapper() private mapper: Mapper
-  ) {}
+  ) { }
 
   async addConversation(
     conversationRequest: ConversationDto
@@ -54,7 +54,7 @@ export class ConversationService {
         if (conversation.userId) {
           await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
             conversation.userId,
-            conversation.messages.getItems()[0]
+            conversation.messages.getItems()[conversation.messages.getItems().length - 1]
           );
         }
 
@@ -94,7 +94,7 @@ export class ConversationService {
         if (conversation.userId) {
           await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
             conversation.userId,
-            messages[messages.length - 1]
+            messages[messages.length - 2]
           );
         }
 

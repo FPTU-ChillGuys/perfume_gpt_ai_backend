@@ -30,12 +30,31 @@ export const ADMIN_INSTRUCTION_SEED_DATA: SeedInstruction[] = [
   // ==================== REVIEW ====================
   {
     instructionType: INSTRUCTION_TYPE_REVIEW,
-    instruction: `Khi tóm tắt đánh giá sản phẩm nước hoa, hãy tuân theo các nguyên tắc sau:
-- Phân loại đánh giá theo: mùi hương (notes), độ lưu hương (longevity), độ toả hương (sillage), thiết kế chai, giá trị so với giá tiền.
-- Tóm tắt sentiment tổng thể: tích cực / trung lập / tiêu cực, kèm tỷ lệ phần trăm nếu có thể.
-- Nêu bật 3 điểm khen nhiều nhất và 3 điểm chê nhiều nhất.
-- Đề xuất đối tượng phù hợp nhất với sản phẩm (giới tính, độ tuổi, phong cách).
-- Trả lời bằng tiếng Việt nếu đánh giá bằng tiếng Việt, tiếng Anh nếu bằng tiếng Anh.`
+    instruction: `# BƯỚC 1: LẤY DỮ LIỆU BẰNG TOOL
+- BẮT BUỘC gọi Tool/API để lấy dữ liệu. TUYỆT ĐỐI KHÔNG yêu cầu người dùng cung cấp.
+
+# BƯỚC 2: QUY TẮC HIỂN THỊ ĐỘC TÔN (STRICT RENDERING RULES)
+- KHÔNG giao tiếp lề mề: KHÔNG chào hỏi, KHÔNG cảm ơn, KHÔNG trích dẫn lại data. In ngay ra báo cáo.
+- CHỈ HIỂN THỊ NHỮNG GÌ CÓ TRONG DATA: 
+  + Nếu review KHÔNG nhắc đến một yếu tố (VD: mùi hương, lưu hương, thiết kế...), BẮT BUỘC ẨN / XÓA BỎ dòng đó khỏi báo cáo. TUYỆT ĐỐI KHÔNG in ra các câu như "Không đề cập", "Không có thông tin".
+  + Chỉ liệt kê đúng số lượng Điểm khen/Điểm chê thực tế có trong review. TUYỆT ĐỐI KHÔNG tự chia nhỏ 1 ý thành nhiều ý để ép cho đủ số lượng 3.
+  + MỤC "ĐỐI TƯỢNG ĐỀ XUẤT": CHỈ được phép sinh ra nếu review có miêu tả về tính chất mùi hương (sang trọng, trẻ trung, ngọt...). Nếu review chỉ nói về giao hàng/đóng gói, BẮT BUỘC ẨN MỤC NÀY. TUYỆT ĐỐI KHÔNG suy luận đối tượng dựa trên dịch vụ vận chuyển.
+- KHÔNG CÂU HỎI MỞ: Kết thúc báo cáo bằng dấu chấm hết. Tuyệt đối không hỏi "Bạn có cần thêm...", "Bạn có data khác không...".
+
+# BƯỚC 3: CẤU TRÚC BÁO CÁO CHUẨN (Tự động ẩn các mục không có data)
+1. Tổng quan Cảm xúc: [Tích cực / Trung lập / Tiêu cực]
+
+2. Đánh giá Chi tiết (Chỉ hiện các yếu tố CÓ data):
+   - Mùi hương: ...
+   - Độ bám tỏa (Lưu/Toả hương): ...
+   - Thiết kế / Đóng gói: ...
+   - Giá trị / Dịch vụ: ...
+
+3. Điểm Nổi Bật:
+   - Ưu điểm: (Liệt kê ý thực tế)
+   - Nhược điểm: (Nếu không ai chê, ghi "Chưa ghi nhận đánh giá tiêu cực")
+
+4. Đối tượng Đề xuất: (Chỉ xuất hiện nếu có data về mùi/phong cách)`
   },
 
   // ==================== ORDER ====================

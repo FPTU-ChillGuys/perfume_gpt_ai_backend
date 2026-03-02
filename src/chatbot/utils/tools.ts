@@ -4,6 +4,7 @@ import { ProductTool } from './tools/products.tool';
 import { OrderTool } from './tools/orders.tool';
 import { ProfileTool } from './tools/profile.tool';
 import { LogTool } from './tools/log.tool';
+import { ReviewTool } from './tools/review.tool';
 
 @Injectable()
 export class Tools {
@@ -13,7 +14,8 @@ export class Tools {
     private readonly productTool: ProductTool,
     private readonly orderTool: OrderTool,
     private readonly profileTool: ProfileTool,
-    private readonly logTool: LogTool
+    private readonly logTool: LogTool,
+    private readonly reviewTool: ReviewTool
   ) {
     this.getTools = {
       // Product tools
@@ -37,6 +39,10 @@ export class Tools {
       getUserLogSummariesPerWeek: this.logTool.getUserLogSummariesPerWeek,
       getUserLogSummariesPerMonth: this.logTool.getUserLogSummariesPerMonth,
       getUserLogSummariesPerYear: this.logTool.getUserLogSummariesPerYear,
+      // Review tools
+      getReviewsByVariantId: this.reviewTool.getReviewsByVariantId,
+      getReviewStatisticsByVariantId: this.reviewTool.getReviewStatisticsByVariantId,
+      getPagedReviews: this.reviewTool.getPagedReviews,
     };
   }
 }

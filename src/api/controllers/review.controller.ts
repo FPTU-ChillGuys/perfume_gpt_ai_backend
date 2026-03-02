@@ -45,28 +45,28 @@ export class ReviewController {
     @ApiBaseResponse(String)
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
     async getReviewSummaryFromAllVariant(): Promise<BaseResponse<string>> {
-        const reviewsResponse = await this.reviewService.getAllReviews(new GetPagedReviewRequest());
+        // const reviewsResponse = await this.reviewService.getAllReviews(new GetPagedReviewRequest());
 
-        if (!reviewsResponse.success) {
-            throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
-                service: 'ReviewService',
-                endpoint: 'reviews/summary/all'
-            });
-        }
+        // if (!reviewsResponse.success) {
+        //     throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
+        //         service: 'ReviewService',
+        //         endpoint: 'reviews/summary/all'
+        //     });
+        // }
 
-        const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
+        // const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
 
-        if (isArrayEmpty(reviews)) {
-            return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
-        }
+        // if (isArrayEmpty(reviews)) {
+        //     return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
+        // }
 
-        const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
+        // const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
 
         // Lấy admin instruction cho domain review (nếu có)
         const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
 
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            reviewSummaryPrompt(reviewsText),
+            "",
             adminPrompt
         );
 
@@ -87,29 +87,29 @@ export class ReviewController {
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI theo variant ID' })
     @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
     async getReviewSummaryByVariantId(@Param('variantId') variantId: string): Promise<BaseResponse<string>> {
-        const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
+        // const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
 
-        if (!reviewsResponse.success) {
-            throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
-                variantId,
-                service: 'ReviewService',
-                endpoint: 'reviews/summary/:variantId'
-            });
-        }
+        // if (!reviewsResponse.success) {
+        //     throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
+        //         variantId,
+        //         service: 'ReviewService',
+        //         endpoint: 'reviews/summary/:variantId'
+        //     });
+        // }
 
-        const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
+        // const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
 
-        if (isArrayEmpty(reviews)) {
-            return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
-        }
+        // if (isArrayEmpty(reviews)) {
+        //     return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
+        // }
 
-        const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
+        // const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
 
         // Lấy admin instruction cho domain review (nếu có)
         const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
 
         const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            reviewSummaryPrompt(reviewsText),
+            "ID variant: " + variantId,
             adminPrompt
         );
 

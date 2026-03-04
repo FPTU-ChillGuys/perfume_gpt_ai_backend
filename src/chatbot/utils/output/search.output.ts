@@ -38,7 +38,7 @@ export const searchOutput = {
               lowStockThreshold: z.number()
             }).nullable()
           })
-        ).optional().default([])
+        )
       })
     )
   })

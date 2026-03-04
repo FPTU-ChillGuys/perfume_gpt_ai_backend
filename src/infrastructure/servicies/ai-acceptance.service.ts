@@ -1,9 +1,11 @@
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
+import { Injectable } from '@nestjs/common';
 
+@Injectable()
 export class AIAcceptanceService {
-  constructor(private unitOfWork: UnitOfWork) {}
+  constructor(private unitOfWork: UnitOfWork) { }
 
   async updateAIAcceptanceStatusById(
     id: string,

@@ -1,16 +1,17 @@
 import { Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
+import { Public } from "src/application/common/Metadata";
 import { BaseResponse } from "src/application/dtos/response/common/base-response";
 import { AIAcceptance } from "src/domain/entities/ai-acceptance.entities";
 import { AIAcceptanceService } from "src/infrastructure/servicies/ai-acceptance.service";
 import { ApiBaseResponse } from "src/infrastructure/utils/api-response-decorator";
 
 @ApiTags('AI Acceptance')
-@ApiBearerAuth('jwt')
+@Public()
 @ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
 @Controller('ai-acceptance')
 export class AIAcceptanceController {
-  constructor(private readonly aiAcceptanceService: AIAcceptanceService) {}
+  constructor(private readonly aiAcceptanceService: AIAcceptanceService) { }
 
   /** Cập nhật trạng thái chấp nhận AI theo ID */
   @Post(':id')
@@ -18,7 +19,7 @@ export class AIAcceptanceController {
   @ApiParam({ name: 'id', description: 'ID bản ghi AI acceptance' })
   @ApiQuery({ name: 'status', description: 'Trạng thái (true/false)' })
   @ApiBaseResponse(AIAcceptance)
-  async updateAIAcceptanceData(@Param('id') id: string, @Query('status') status: string) : Promise<BaseResponse<AIAcceptance>> {
+  async updateAIAcceptanceData(@Param('id') id: string, @Query('status') status: string): Promise<BaseResponse<AIAcceptance>> {
     return this.aiAcceptanceService.updateAIAcceptanceStatusById(id, status === 'true');
   }
 

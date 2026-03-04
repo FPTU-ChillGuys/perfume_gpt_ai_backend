@@ -18,4 +18,8 @@ export class Common {
   @ApiProperty({ description: 'Ngày cập nhật gần nhất' })
   @Property({ onUpdate: () => new Date() })
   updatedAt: Date = new Date();
+
+  @ApiProperty({ description: 'Trạng thái hoạt động' })
+  @Property({ default: true })
+  isActive: boolean = true;
 }

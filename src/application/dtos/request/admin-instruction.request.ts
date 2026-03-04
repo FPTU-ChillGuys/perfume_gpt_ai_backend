@@ -1,10 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-const VALID_INSTRUCTION_TYPES = [
-  'review', 'order', 'inventory', 'trend',
-  'recommendation', 'log', 'conversation'
-] as const;
+import { ALL_INSTRUCTION_TYPES } from '../../constant/prompts/admin-instruction-types';
 
 /** Request tạo chỉ thị admin mới */
 export class CreateAdminInstructionRequest {
@@ -17,11 +14,11 @@ export class CreateAdminInstructionRequest {
   /** Loại chỉ thị */
   @ApiProperty({
     description: 'Loại chỉ thị',
-    enum: VALID_INSTRUCTION_TYPES
+    enum: ALL_INSTRUCTION_TYPES
   })
   @IsString()
-  @IsIn(VALID_INSTRUCTION_TYPES, {
-    message: `instructionType phải là một trong: ${VALID_INSTRUCTION_TYPES.join(', ')}`
+  @IsIn(ALL_INSTRUCTION_TYPES, {
+    message: `instructionType phải là một trong: ${ALL_INSTRUCTION_TYPES.join(', ')}`
   })
   instructionType: string;
 
@@ -41,13 +38,13 @@ export class UpdateAdminInstructionRequest {
 
   /** Loại chỉ thị (tùy chọn) */
   @ApiPropertyOptional({
-    description: 'Loại chỉ thị mới',
-    enum: VALID_INSTRUCTION_TYPES
+    description: 'Loại chỉ thị',
+    enum: ALL_INSTRUCTION_TYPES
   })
   @IsOptional()
   @IsString()
-  @IsIn(VALID_INSTRUCTION_TYPES, {
-    message: `instructionType phải là một trong: ${VALID_INSTRUCTION_TYPES.join(', ')}`
+  @IsIn(ALL_INSTRUCTION_TYPES, {
+    message: `instructionType phải là một trong: ${ALL_INSTRUCTION_TYPES.join(', ')}`
   })
   instructionType?: string;
 

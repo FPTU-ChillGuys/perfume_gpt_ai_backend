@@ -28,15 +28,9 @@ export const searchOutput = {
             type: z.string(),
             basePrice: z.number(),
             status: z.string(),
-            concentration: z.object({
-              id: z.number(),
-              name: z.string()
-            }).nullable(),
-            stock: z.object({
-              totalQuantity: z.number(),
-              reservedQuantity: z.number(),
-              lowStockThreshold: z.number()
-            }).nullable()
+            concentrationName: z.string().nullable(),
+            totalQuantity: z.number().nullable(),
+            reservedQuantity: z.number().nullable()
           })
         )
       })

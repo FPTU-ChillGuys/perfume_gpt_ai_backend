@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { tool, Tool } from 'ai';
+import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
@@ -59,7 +60,7 @@ export class ProductTool {
       return await funcHandlerAsync(
         async () => {
           // Tạo array search để search nhiều từ khóa đê tổng hợp 
-          let results: ProductResponse[] = [];
+          let results: ProductWithVariantsResponse[] = [];
 
           for (const item of input.searches) {
             const response = await this.productService.getProductsUsingSemanticSearch(

@@ -19,7 +19,26 @@ export const searchOutput = {
             value: z.string(),
             desciption: z.string().nullable()
           })
-        )
+        ),
+        variants: z.array(
+          z.object({
+            id: z.string(),
+            sku: z.string(),
+            volumeMl: z.number(),
+            type: z.string(),
+            basePrice: z.number(),
+            status: z.string(),
+            concentration: z.object({
+              id: z.number(),
+              name: z.string()
+            }).nullable(),
+            stock: z.object({
+              totalQuantity: z.number(),
+              reservedQuantity: z.number(),
+              lowStockThreshold: z.number()
+            }).nullable()
+          })
+        ).optional().default([])
       })
     )
   })

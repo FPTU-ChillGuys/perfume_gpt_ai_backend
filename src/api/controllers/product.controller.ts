@@ -33,8 +33,8 @@ export class ProductController {
   @Public()
   @Get('search')
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search' })
-  @ExtendApiBaseResponse(PagedResult<ProductResponse>)
-  async getProductsBySemanticSearch(@Req() req: Request, @Query() request: SearchRequest): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
+  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  async getProductsBySemanticSearch(@Req() req: Request, @Query() request: SearchRequest): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     const result = await this.productService.getProductsUsingSemanticSearch(request.searchText, request);
     // Ghi log tìm kiếm của người dùng
     // Lay userId tu token

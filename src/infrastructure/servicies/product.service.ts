@@ -193,12 +193,12 @@ export class ProductService {
   async getProductsUsingSemanticSearch(
     searchText: string,
     request: PagedAndSortedRequest
-  ): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
+  ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(
       async () => {
         console.log(ApiUrl().PRODUCT_URL('search/semantic'));
         const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<PagedResult<ProductResponse>>>(
+          this.httpService.get<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>>(
             ApiUrl().PRODUCT_URL('search/semantic'),
             {
               params: {

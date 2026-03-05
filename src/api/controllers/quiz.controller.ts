@@ -24,10 +24,9 @@ import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
-import {
-  QUIZ_SYSTEM_PROMPT,
-  quizPrompt
-} from 'src/application/constant/prompts';
+import { quizPrompt } from 'src/application/constant/prompts';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+import { INSTRUCTION_TYPE_QUIZ } from 'src/application/constant/prompts/admin-instruction-types';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
@@ -52,7 +51,8 @@ export class QuizController {
     private quizService: QuizService,
     private logService: UserLogService,
     @InjectQueue(QueueName.QUIZ_QUEUE)
-    private readonly quizQueue: Queue
+    private readonly quizQueue: Queue,
+    private readonly adminInstructionService: AdminInstructionService
   ) { }
 
   /** Lấy tất cả câu hỏi quiz */
@@ -208,10 +208,13 @@ export class QuizController {
       savedQuizQuesAnsResponse.data.id
     );
 
+    // Get system prompt
+    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_QUIZ);
+
     // Get AI response
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       prompt,
-      QUIZ_SYSTEM_PROMPT,
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -275,10 +278,13 @@ export class QuizController {
       details: quizAnswers
     });
 
+    // Get system prompt
+    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_QUIZ);
+
     // Get AI response
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       prompt,
-      QUIZ_SYSTEM_PROMPT,
+      systemPrompt,
       Output.object(searchOutput)
     );
 

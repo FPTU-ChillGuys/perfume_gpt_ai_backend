@@ -7,7 +7,9 @@ import {
   createMockQuizService,
   createMockUserLogService,
   createMockAIService,
+  createMockAdminInstructionService,
 } from '../../helpers/mock-factories';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import {
   successResponse,
   errorResponse,
@@ -20,11 +22,13 @@ describe('QuizController', () => {
   let quizService: ReturnType<typeof createMockQuizService>;
   let logService: ReturnType<typeof createMockUserLogService>;
   let aiService: ReturnType<typeof createMockAIService>;
+  let adminInstructionService: ReturnType<typeof createMockAdminInstructionService>;
 
   beforeEach(async () => {
     quizService = createMockQuizService();
     logService = createMockUserLogService();
     aiService = createMockAIService();
+    adminInstructionService = createMockAdminInstructionService();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [QuizController],
@@ -32,6 +36,8 @@ describe('QuizController', () => {
         { provide: QuizService, useValue: quizService },
         { provide: UserLogService, useValue: logService },
         { provide: AI_SERVICE, useValue: aiService },
+        { provide: 'BullQueue_quiz', useValue: { add: jest.fn() } }, // Mock Queue if needed
+        { provide: AdminInstructionService, useValue: adminInstructionService },
       ],
     }).compile();
 

@@ -9,6 +9,7 @@ import { UnitOfWork } from 'src/infrastructure/repositories/unit-of-work';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 import { v4 as uuidv4 } from 'uuid';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 
 describe('QuizController (Integration)', () => {
   let module: TestingModule;
@@ -29,6 +30,10 @@ describe('QuizController (Integration)', () => {
     add: jest.fn(),
   } as any;
 
+  const mockAdminInstructionService = {
+    getSystemPromptForDomain: jest.fn().mockResolvedValue('MOCK SYSTEM PROMPT'),
+  } as unknown as AdminInstructionService;
+
   beforeAll(async () => {
     module = await createIntegrationTestingModule([
       QuizService,
@@ -39,7 +44,13 @@ describe('QuizController (Integration)', () => {
     quizService = module.get(QuizService);
     userLogService = module.get(UserLogService);
     unitOfWork = module.get(UnitOfWork);
-    controller = new QuizController(mockAIService, quizService, userLogService, mockQuizQueue);
+    controller = new QuizController(
+      mockAIService,
+      quizService,
+      userLogService,
+      mockQuizQueue,
+      mockAdminInstructionService
+    );
   });
 
   beforeEach(async () => {

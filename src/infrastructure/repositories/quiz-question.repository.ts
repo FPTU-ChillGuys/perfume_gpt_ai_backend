@@ -9,7 +9,8 @@ import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 export class QuizQuestionRepository extends SqlEntityRepository<QuizQuestion> {
   async createWithAnswers(request: QuizQuestionRequest): Promise<QuizQuestion> {
     const quizQuestion = new QuizQuestion({
-      question: request.question
+      question: request.question,
+      questionType: request.questionType
     });
 
     quizQuestion.answers.set(

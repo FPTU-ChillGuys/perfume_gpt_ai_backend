@@ -7,7 +7,8 @@ import {
   Param,
   Post,
   Put,
-  Query
+  Query,
+  UseInterceptors
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -41,6 +42,7 @@ import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException
 import { QueueName, QuizJobName } from 'src/application/constant/processor';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
+import { CacheInterceptor, CacheKey, CacheTTL } from '@nestjs/cache-manager';
 
 @ApiTags('Quizzes')
 @Controller('quizzes')
@@ -58,6 +60,8 @@ export class QuizController {
   @Get('questions')
   @ApiOperation({ summary: 'Lấy danh sách câu hỏi quiz' })
   @ApiBaseResponse(QuizQuestionResponse, true)
+  @CacheTTL(1)
+  @UseInterceptors(CacheInterceptor)
   async getAllQuizzes(): Promise<BaseResponse<QuizQuestionResponse[]>> {
     const quizQues = await this.quizService.getAllQuizQues();
 
@@ -77,6 +81,8 @@ export class QuizController {
   @ApiOperation({ summary: 'Lấy câu hỏi quiz theo ID' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
   @ApiBaseResponse(QuizQuestionResponse)
+  @CacheTTL(1)
+  @UseInterceptors(CacheInterceptor)
   async getQuizQuesById(
     @Param('id') id: string
   ): Promise<BaseResponse<QuizQuestionResponse>> {

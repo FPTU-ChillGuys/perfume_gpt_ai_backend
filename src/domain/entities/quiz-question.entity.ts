@@ -1,13 +1,24 @@
-import { Collection, Entity, OneToMany, Property } from '@mikro-orm/core';
+import { Collection, Entity, Enum, OneToMany, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
 import { QuizAnswer } from './quiz-answer.entity';
 import { QuizQuestionRepository } from 'src/infrastructure/repositories/quiz-question.repository';
 import { QuizQuestionAnswerDetail } from './quiz-question-answer-detail.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
+/** Loại câu hỏi quiz */
+export enum QuestionType {
+  SINGLE = 'single',
+  MULTIPLE = 'multiple'
+}
+
 /** Entity lưu câu hỏi quiz */
 @Entity({ repository: () => QuizQuestionRepository })
 export class QuizQuestion extends Common {
+  /** Loại câu hỏi (chọn 1 hoặc nhiều đáp án) */
+  @ApiProperty({ description: 'Loại câu hỏi', enum: QuestionType, default: QuestionType.SINGLE })
+  @Enum({ items: () => QuestionType, default: QuestionType.SINGLE })
+  questionType: QuestionType = QuestionType.SINGLE;
+
   /** Nội dung câu hỏi */
   @ApiProperty({ description: 'Nội dung câu hỏi' })
   @Property()

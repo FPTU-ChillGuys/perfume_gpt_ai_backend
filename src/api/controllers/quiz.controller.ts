@@ -123,17 +123,18 @@ export class QuizController {
     return Ok();
   }
 
-  /** Cập nhật câu trả lời quiz */
+  /** Cập nhật câu hỏi quiz (nội dung, loại và/hoặc câu trả lời) */
+  @Role(['admin'])
   @Put('questions/:id')
-  @ApiOperation({ summary: 'Cập nhật câu trả lời quiz' })
+  @ApiOperation({ summary: 'Cập nhật câu hỏi quiz (questionType và/hoặc answers)' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
-  @ApiBody({ type: [QuizAnswerRequest] })
+  @ApiBody({ type: QuizQuestionRequest })
   @ApiBaseResponse(QuizQuestionResponse)
   async updateQuizAnswer(
-    @Param() id: string,
-    @Body() quizAnswerRequest: QuizAnswerRequest[]
+    @Param('id') id: string,
+    @Body() quizQuestionRequest: QuizQuestionRequest
   ): Promise<BaseResponse<QuizQuestionResponse>> {
-    return this.quizService.updateAnswer(id, quizAnswerRequest);
+    return this.quizService.updateAnswer(id, quizQuestionRequest);
   }
 
   /** Trả lời quiz và nhận gợi ý nước hoa từ AI */

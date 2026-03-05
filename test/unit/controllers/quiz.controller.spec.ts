@@ -132,15 +132,15 @@ describe('QuizController', () => {
   // ────────── PUT /quizzes/questions/:id ──────────
   describe('updateQuizAnswer', () => {
     it('TC-FUNC-076: should update quiz question answers', async () => {
-      const answers = [{ answer: 'Updated answer' }];
+      const updateRequest = { question: 'Q?', answers: [{ answer: 'Updated answer' }] };
       quizService.updateAnswer.mockResolvedValue(
-        successResponse({ id: TEST_QUIZ_QUESTION_ID, answers }),
+        successResponse({ id: TEST_QUIZ_QUESTION_ID, answers: updateRequest.answers }),
       );
 
-      const result = await controller.updateQuizAnswer(TEST_QUIZ_QUESTION_ID, answers as any);
+      const result = await controller.updateQuizAnswer(TEST_QUIZ_QUESTION_ID, updateRequest as any);
 
       expect(result.success).toBe(true);
-      expect(quizService.updateAnswer).toHaveBeenCalledWith(TEST_QUIZ_QUESTION_ID, answers);
+      expect(quizService.updateAnswer).toHaveBeenCalledWith(TEST_QUIZ_QUESTION_ID, updateRequest);
     });
 
     it('TC-NEG-070: should handle non-existent question', async () => {
@@ -148,7 +148,7 @@ describe('QuizController', () => {
         errorResponse('Question not found'),
       );
 
-      const result = await controller.updateQuizAnswer('bad-id', []);
+      const result = await controller.updateQuizAnswer('bad-id', { question: 'Q?', answers: [] });
 
       expect(result.success).toBe(false);
     });

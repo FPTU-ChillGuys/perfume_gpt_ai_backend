@@ -408,6 +408,20 @@
           "default": "true",
           "mappedType": "boolean"
         },
+        "question_type": {
+          "name": "question_type",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "'single'",
+          "enumItems": [
+            "single",
+            "multiple"
+          ],
+          "mappedType": "enum"
+        },
         "question": {
           "name": "question",
           "type": "varchar(255)",

@@ -38,7 +38,7 @@ export class QuizService {
 
   async updateAnswer(
     id: string,
-    answers: QuizAnswerRequest[]
+    request: QuizQuestionRequest
   ): Promise<BaseResponse<QuizQuestionResponse>> {
     return await funcHandlerAsync(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
@@ -50,10 +50,15 @@ export class QuizService {
         return { success: false, error: 'Quiz question not found' };
       }
 
+      // Cập nhật questionType nếu có
+      if (request.questionType !== undefined) {
+        quizQuestion.questionType = request.questionType;
+      }
+
       const updatedQuizQuestion =
         await this.unitOfWork.AIQuizQuestionRepo.updateWithAnswers(
           quizQuestion,
-          answers
+          request.answers
         );
 
       return {

@@ -131,9 +131,10 @@ describe('QuizController (Integration)', () => {
       });
       const questionId = created.data!;
 
-      const result = await controller.updateQuizAnswer(questionId, [
-        { answer: 'New Answer' } as any,
-      ]);
+      const result = await controller.updateQuizAnswer(questionId, {
+        question: 'Q?',
+        answers: [{ answer: 'New Answer' }],
+      });
 
       // updateAnswer uses funcHandlerAsync; verify the response shape
       expect(result).toHaveProperty('success');

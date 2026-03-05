@@ -7,6 +7,7 @@ export class QuizQuestionMapper {
   static toResponse(entity: QuizQuestion, includeAnswers: boolean = false): QuizQuestionResponse {
     const response = new QuizQuestionResponse({
       id: entity.id,
+      questionType: entity.questionType,
       question: entity.question,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt
@@ -25,7 +26,8 @@ export class QuizQuestionMapper {
 
   static toEntity(request: QuizQuestionRequest): QuizQuestion {
     const quizQuestion = new QuizQuestion({
-      question: request.question
+      question: request.question,
+      ...(request.questionType && { questionType: request.questionType })
     });
 
     // Map answers if provided
@@ -44,6 +46,10 @@ export class QuizQuestionMapper {
   }
 
   static updateEntity(entity: QuizQuestion, request: QuizQuestionRequest): QuizQuestion {
+    if (request.questionType !== undefined) {
+      entity.questionType = request.questionType;
+    }
+
     if (request.question) {
       entity.question = request.question;
     }

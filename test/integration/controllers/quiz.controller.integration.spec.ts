@@ -25,6 +25,10 @@ describe('QuizController (Integration)', () => {
     TextGenerateStreamFromMessages: jest.fn(),
   } as unknown as AIService;
 
+  const mockQuizQueue = {
+    add: jest.fn(),
+  } as any;
+
   beforeAll(async () => {
     module = await createIntegrationTestingModule([
       QuizService,
@@ -35,7 +39,7 @@ describe('QuizController (Integration)', () => {
     quizService = module.get(QuizService);
     userLogService = module.get(UserLogService);
     unitOfWork = module.get(UnitOfWork);
-    controller = new QuizController(mockAIService, quizService, userLogService);
+    controller = new QuizController(mockAIService, quizService, userLogService, mockQuizQueue);
   });
 
   beforeEach(async () => {

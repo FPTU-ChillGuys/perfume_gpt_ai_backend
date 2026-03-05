@@ -51,4 +51,23 @@ export class QuizQuestionRepository extends SqlEntityRepository<QuizQuestion> {
     await em.flush();
     return quizQuestion;
   }
+
+  /** Soft delete câu hỏi và tất cả câu trả lời liên quan */
+  async softDeleteQuestion(id: string): Promise<QuizQuestion | null> {
+    const em = this.getEntityManager();
+
+    const quizQuestion = await this.findOne({ id, isActive: true }, { populate: ['answers'] });
+    if (!quizQuestion) return null;
+
+    // Soft delete question
+    quizQuestion.isActive = false;
+
+    // Soft delete all related answers
+    for (const answer of quizQuestion.answers.getItems()) {
+      answer.isActive = false;
+    }
+
+    await em.flush();
+    return quizQuestion;
+  }
 }

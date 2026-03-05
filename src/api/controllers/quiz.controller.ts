@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -297,5 +298,24 @@ export class QuizController {
     @Param('userId') userId: string
   ): Promise<BaseResponse<QuizQuestionAnswerResponse>> {
     return this.quizService.getQuizQuesAnwsByUserId(userId);
+  }
+
+  /** Xóa mềm câu hỏi quiz (isActive = false) */
+  @Role(['admin'])
+  @Delete('questions/:id')
+  @ApiOperation({ summary: 'Xóa câu hỏi quiz (soft delete)' })
+  @ApiParam({ name: 'id', description: 'ID câu hỏi cần xóa' })
+  @ApiBaseResponse(Boolean)
+  async deleteQuizQuestion(
+    @Param('id') id: string
+  ): Promise<BaseResponse<void>> {
+    const result = await this.quizService.softDeleteQuestion(id);
+    if (!result.success) {
+      throw new BadRequestWithDetailsException(
+        result.error ?? 'Quiz question not found or already deleted',
+        { questionId: id }
+      );
+    }
+    return Ok();
   }
 }

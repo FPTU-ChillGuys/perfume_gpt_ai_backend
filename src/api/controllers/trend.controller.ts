@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Post, Query, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
@@ -17,8 +17,13 @@ import { Output } from 'ai';
 import { convertSearchOutputToProductResponse, searchOutput } from 'src/chatbot/utils/output/search.output';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { ZodObject } from 'zod';
+import * as crypto from 'crypto';
 import { productOutput } from 'src/chatbot/utils/output/product.output';
+
+const cachingTrendTTL = 60 * 60 * 24 * 1000;
 
 @Role(['admin', 'user'])
 @ApiTags('Trends')
@@ -27,8 +32,10 @@ export class TrendController {
   constructor(
     private userLogService: UserLogService,
     @Inject(AI_SERVICE) private aiService: AIService,
-    private readonly adminInstructionService: AdminInstructionService
+    private readonly adminInstructionService: AdminInstructionService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) { }
+
 
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
   @Get('summary')
@@ -110,6 +117,78 @@ export class TrendController {
   ): Promise<BaseResponse<ProductResponse[]>> {
     const trendResult = await this.getProductFromTrend(allUserLogRequest)
     return trendResult
+  }
+
+  /**
+   * Khởi tạo job để lấy product từ xu hướng (caching 1 ngày)
+   */
+  @Public()
+  @Get('product/job')
+  @ApiOperation({ summary: 'Khởi tạo job để lấy product từ xu hướng' })
+  @ApiBaseResponse(String)
+  @CacheTTL(cachingTrendTTL) // cache kết quả API (tức là jobId) trong 1 ngày
+  @UseInterceptors(CacheInterceptor)
+  async createProductTrendJob(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<{ jobId: string }>> {
+    const jobId = crypto.randomUUID();
+
+    // Lưu trạng thái job ban đầu là pending
+    await this.cacheManager.set(`trend_job_${jobId}`, { status: 'pending' }, cachingTrendTTL);
+
+    // Chạy ngầm việc request data AI
+    this.processTrendJobBackground(jobId, allUserLogRequest);
+
+    return Ok({ jobId });
+  }
+
+  private async processTrendJobBackground(jobId: string, request: AllUserLogRequest) {
+    try {
+      const trendResult = await this.getProductFromTrend(request);
+
+      if (trendResult.success) {
+        await this.cacheManager.set(
+          `trend_job_${jobId}`,
+          { status: 'completed', data: trendResult.data },
+          cachingTrendTTL // lưu data trong 1 ngày
+        );
+      } else {
+        await this.cacheManager.set(
+          `trend_job_${jobId}`,
+          { status: 'failed', error: trendResult.error || 'Unknown error from AI service' },
+          cachingTrendTTL
+        );
+      }
+    } catch (error) {
+      console.error(`[TrendController] Lỗi khi xử lý background job ${jobId}:`, error);
+      await this.cacheManager.set(
+        `trend_job_${jobId}`,
+        { status: 'failed', error: error instanceof Error ? error.message : 'Internal Server Error' },
+        cachingTrendTTL
+      );
+    }
+  }
+
+  /**
+   * Kiểm tra kết quả job lấy product từ xu hướng
+   */
+  @Public()
+  @Get('product/job/:jobId')
+  @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job' })
+  @ApiBaseResponse(Object) // Trả về dynamic object
+  async getProductTrendJobResult(
+    @Param('jobId') jobId: string
+  ): Promise<BaseResponse<any>> {
+    const jobData = await this.cacheManager.get(`trend_job_${jobId}`);
+
+    if (!jobData) {
+      throw new InternalServerErrorWithDetailsException('Job not found or expired', {
+        jobId,
+        endpoint: 'trends/product/job/:jobId'
+      });
+    }
+
+    return Ok(jobData);
   }
 
   /** Lấy product từ xu hướng người dùng */

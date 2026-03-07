@@ -32,6 +32,9 @@ export const INSTRUCTION_TYPE_LOG = 'log';
 /** Loại instruction cho chatbot conversation */
 export const INSTRUCTION_TYPE_CONVERSATION = 'conversation';
 
+/** Loại instruction cho quiz tư vấn nước hoa */
+export const INSTRUCTION_TYPE_QUIZ = 'quiz';
+
 /** Danh sách tất cả các loại instruction hợp lệ */
 export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_REVIEW,
@@ -42,6 +45,7 @@ export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_REPURCHASE,
   INSTRUCTION_TYPE_LOG,
   INSTRUCTION_TYPE_CONVERSATION,
+  INSTRUCTION_TYPE_QUIZ,
 ] as const;
 
 export type InstructionDomainType = (typeof ALL_INSTRUCTION_TYPES)[number];

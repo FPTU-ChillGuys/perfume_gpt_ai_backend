@@ -1,5 +1,9 @@
-import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import * as crypto from 'crypto';
+import { processBackgroundJob } from 'src/infrastructure/utils/background-job.helper';
 import { Public, Role } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
@@ -19,6 +23,7 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
+import { CACHE_TTL_1MONTH, CACHE_TTL_6HOUR } from 'src/infrastructure/cacheable/cacheable.constants';
 
 @ApiBearerAuth('jwt')
 @Role(['admin'])
@@ -29,16 +34,11 @@ export class ReviewController {
     constructor(
         private readonly reviewService: ReviewService,
         @Inject(AI_SERVICE) private aiService: AIService,
-        private readonly adminInstructionService: AdminInstructionService
+        private readonly adminInstructionService: AdminInstructionService,
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) { }
 
-    /** Lấy danh sách đánh giá */
-    @Get()
-    @ApiOperation({ summary: 'Lấy danh sách đánh giá (phân trang)' })
-    @ApiBaseResponse(PagedResult<ReviewListItemResponse>)
-    async getReviews(@Query() request: GetPagedReviewRequest): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
-        return await this.reviewService.getAllReviews(request);
-    }
+
 
     /** Tóm tắt đánh giá bằng AI cho tất cả variant */
     @Get('summary/all')
@@ -80,6 +80,65 @@ export class ReviewController {
         return Ok(summaryResponse.data);
     }
 
+    /** Lấy danh sách đánh giá */
+    @Get()
+    @ApiOperation({ summary: 'Lấy danh sách đánh giá (phân trang)' })
+    @ApiBaseResponse(PagedResult<ReviewListItemResponse>)
+    async getReviews(@Query() request: GetPagedReviewRequest): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
+        return await this.reviewService.getAllReviews(request);
+    }
+
+    /** 
+     * Khởi tạo job để lấy tóm tắt đánh giá bằng AI theo variant ID (caching 1 tuần) 
+     */
+    @Get('summary/job/:variantId')
+    @ApiOperation({ summary: 'Khởi tạo job để tóm tắt đánh giá theo variant ID' })
+    @ApiBaseResponse(String)
+    @CacheTTL(CACHE_TTL_1MONTH) // cache kết quả API (tức là jobId) trong 1 tuần
+    @UseInterceptors(CacheInterceptor)
+    @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
+    async createReviewSummaryJob(
+        @Param('variantId') variantId: string
+    ): Promise<BaseResponse<{ jobId: string }>> {
+        const jobId = crypto.randomUUID();
+        const cacheKey = `review_summary_job_${jobId}_${variantId}`;
+        const ttlMilliseconds = CACHE_TTL_1MONTH; // 1 week
+
+        await this.cacheManager.set(cacheKey, { status: 'pending' }, ttlMilliseconds);
+
+        processBackgroundJob(
+            this.cacheManager,
+            () => this.getReviewSummaryByVariantId(variantId),
+            { cacheKey, ttlMilliseconds }
+        );
+
+        return Ok({ jobId });
+    }
+
+    /**
+     * Kiểm tra kết quả job lấy tóm tắt đánh giá
+     */
+    @Get('summary/job/result/:jobId')
+    @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job tóm tắt đánh giá' })
+    @ApiBaseResponse(Object) // Trả về dynamic object
+    @ApiQuery({ name: 'variantId', description: 'ID của variant sản phẩm đã dùng tạo job', required: true })
+    async getReviewSummaryJobResult(
+        @Param('jobId') jobId: string,
+        @Query('variantId') variantId: string
+    ): Promise<BaseResponse<any>> {
+        const cacheKey = `review_summary_job_${jobId}_${variantId}`;
+        const jobData = await this.cacheManager.get(cacheKey);
+
+        if (!jobData) {
+            throw new InternalServerErrorWithDetailsException('Job not found or expired', {
+                jobId,
+                variantId,
+                endpoint: 'reviews/summary/job/result/:jobId'
+            });
+        }
+
+        return Ok(jobData);
+    }
 
     /** Tóm tắt đánh giá bằng AI theo variant ID */
     @Get('summary/:variantId')

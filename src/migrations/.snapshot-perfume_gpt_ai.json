@@ -36,6 +36,16 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
+        },
         "instruction": {
           "name": "instruction",
           "type": "text",
@@ -106,6 +116,16 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
+        },
         "user_id": {
           "name": "user_id",
           "type": "varchar(255)",
@@ -175,6 +195,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         }
       },
       "name": "common",
@@ -226,6 +256,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         },
         "user_id": {
           "name": "user_id",
@@ -288,6 +328,16 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
+        },
         "inventory_log": {
           "name": "inventory_log",
           "type": "text",
@@ -347,6 +397,30 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
+        },
+        "question_type": {
+          "name": "question_type",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "'single'",
+          "enumItems": [
+            "single",
+            "multiple"
+          ],
+          "mappedType": "enum"
         },
         "question": {
           "name": "question",
@@ -408,6 +482,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         },
         "answer": {
           "name": "answer",
@@ -492,6 +576,16 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
+        },
         "user_id": {
           "name": "user_id",
           "type": "varchar(255)",
@@ -552,6 +646,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         },
         "question_id": {
           "name": "question_id",
@@ -671,6 +775,16 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
+        },
         "type_review": {
           "name": "type_review",
           "type": "text",
@@ -752,6 +866,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         },
         "product_id": {
           "name": "product_id",
@@ -847,6 +971,16 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
@@ -906,6 +1040,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         },
         "user_id": {
           "name": "user_id",
@@ -996,6 +1140,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         },
         "message_id": {
           "name": "message_id",
@@ -1101,6 +1255,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         },
         "sender": {
           "name": "sender",
@@ -1230,6 +1394,16 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
+        },
         "quiz_ques_ans_detail_id": {
           "name": "quiz_ques_ans_detail_id",
           "type": "uuid",
@@ -1324,6 +1498,16 @@
           "nullable": false,
           "length": 6,
           "mappedType": "datetime"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "true",
+          "mappedType": "boolean"
         },
         "content": {
           "name": "content",

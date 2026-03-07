@@ -140,11 +140,14 @@ describe('QuizService (Integration)', () => {
         answers: [{ answer: 'Old A1' }, { answer: 'Old A2' }],
       });
 
-      const result = await service.updateAnswer(created.data!, [
-        { answer: 'New A1' },
-        { answer: 'New A2' },
-        { answer: 'New A3' },
-      ]);
+      const result = await service.updateAnswer(created.data!, {
+        question: 'Original Q?',
+        answers: [
+          { answer: 'New A1' },
+          { answer: 'New A2' },
+          { answer: 'New A3' },
+        ],
+      });
 
       // Verify via direct ORM query — mapper omits answers in response
       if (result.success) {
@@ -158,7 +161,7 @@ describe('QuizService (Integration)', () => {
 
     it('should return error for non-existent question', async () => {
       const fakeId = uuidv4();
-      const result = await service.updateAnswer(fakeId, [{ answer: 'X' }]);
+      const result = await service.updateAnswer(fakeId, { question: 'X?', answers: [{ answer: 'X' }] });
 
       expect(result.success).toBe(false);
     });

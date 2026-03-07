@@ -38,21 +38,27 @@ export class QuizService {
 
   async updateAnswer(
     id: string,
-    answers: QuizAnswerRequest[]
+    request: QuizQuestionRequest
   ): Promise<BaseResponse<QuizQuestionResponse>> {
     return await funcHandlerAsync(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne({
-        id
+        id,
+        isActive: true
       });
 
       if (!quizQuestion) {
         return { success: false, error: 'Quiz question not found' };
       }
 
+      // Cập nhật questionType nếu có
+      if (request.questionType !== undefined) {
+        quizQuestion.questionType = request.questionType;
+      }
+
       const updatedQuizQuestion =
         await this.unitOfWork.AIQuizQuestionRepo.updateWithAnswers(
           quizQuestion,
-          answers
+          request.answers
         );
 
       return {
@@ -68,7 +74,8 @@ export class QuizService {
     return await funcHandlerAsync(async () => {
       const quizQuestion = await this.unitOfWork.AIQuizQuestionRepo.findOne(
         {
-          id
+          id,
+          isActive: true
         },
         { populate: ['answers'] }
       );
@@ -87,7 +94,7 @@ export class QuizService {
   ): Promise<BaseResponse<QuizQuestionResponse[]>> {
     return await funcHandlerAsync(async () => {
       const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.find(
-        { id: { $in: ids } },
+        { id: { $in: ids }, isActive: true },
         { populate: ['answers'] }
       );
       const quizQuestionsResponses =
@@ -99,9 +106,10 @@ export class QuizService {
   async getAllQuizQues(): Promise<BaseResponse<QuizQuestionResponse[]>> {
     return await funcHandlerAsync(
       async () => {
-        const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.findAll({
-          populate: ['answers']
-        });
+        const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.find(
+          { isActive: true },
+          { populate: ['answers'] }
+        );
 
         const quizQuestionsResponses =
           QuizQuestionMapper.toResponseList(quizQuestions, true);
@@ -201,7 +209,7 @@ export class QuizService {
     const details = await Promise.all(
       request.details.map(async (item) => {
         const question = await this.unitOfWork.AIQuizQuestionRepo.findOne(
-          { id: item.questionId },
+          { id: item.questionId, isActive: true },
           { populate: ['answers'] }
         );
         if (!question) {
@@ -221,5 +229,16 @@ export class QuizService {
       userId: request.userId,
       details
     });
+  }
+
+  /** Soft delete câu hỏi quiz và tất cả câu trả lời liên quan */
+  async softDeleteQuestion(id: string): Promise<BaseResponse<void>> {
+    return await funcHandlerAsync(async () => {
+      const deleted = await this.unitOfWork.AIQuizQuestionRepo.softDeleteQuestion(id);
+      if (!deleted) {
+        return { success: false, error: 'Quiz question not found or already deleted' };
+      }
+      return { success: true, data: undefined };
+    }, 'Failed to delete quiz question', true);
   }
 }

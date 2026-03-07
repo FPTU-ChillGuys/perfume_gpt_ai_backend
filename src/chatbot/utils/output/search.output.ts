@@ -1,6 +1,7 @@
 import { Output } from 'ai';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import z from 'zod';
+import { productOutputSchema } from './product.output';
 
 export const searchOutput = {
   schema: z.object({
@@ -42,7 +43,7 @@ export const searchOutputSchema = searchOutput.schema;
 
 export const convertSearchOutputToProductResponse = (output: string): ProductResponse[] => {
   try {
-    const parsedOutput = searchOutputSchema.parse(JSON.parse(output));
+    const parsedOutput = productOutputSchema.parse(JSON.parse(output));
     if (!parsedOutput.products || parsedOutput.products.length === 0) {
       console.warn('[TrendProduct] AI trả về mảng products rỗng - không tìm thấy sản phẩm phù hợp.');
       return [];
@@ -54,7 +55,9 @@ export const convertSearchOutputToProductResponse = (output: string): ProductRes
       brandName: product.brandName,
       categoryName: product.categoryName,
       primaryImage: product.primaryImage,
-    })) as ProductResponse[];
+      attributes: product.attributes,
+      variants: product.variants,
+    })) as unknown as ProductResponse[];
   } catch (error) {
     console.error('[TrendProduct] Lỗi parse structured output:', error);
     return [];

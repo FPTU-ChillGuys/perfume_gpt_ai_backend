@@ -9,7 +9,8 @@ import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 export class QuizQuestionRepository extends SqlEntityRepository<QuizQuestion> {
   async createWithAnswers(request: QuizQuestionRequest): Promise<QuizQuestion> {
     const quizQuestion = new QuizQuestion({
-      question: request.question
+      question: request.question,
+      questionType: request.questionType
     });
 
     quizQuestion.answers.set(
@@ -48,6 +49,25 @@ export class QuizQuestionRepository extends SqlEntityRepository<QuizQuestion> {
     );
 
     em.persist(quizQuestion);
+    await em.flush();
+    return quizQuestion;
+  }
+
+  /** Soft delete câu hỏi và tất cả câu trả lời liên quan */
+  async softDeleteQuestion(id: string): Promise<QuizQuestion | null> {
+    const em = this.getEntityManager();
+
+    const quizQuestion = await this.findOne({ id, isActive: true }, { populate: ['answers'] });
+    if (!quizQuestion) return null;
+
+    // Soft delete question
+    quizQuestion.isActive = false;
+
+    // Soft delete all related answers
+    for (const answer of quizQuestion.answers.getItems()) {
+      answer.isActive = false;
+    }
+
     await em.flush();
     return quizQuestion;
   }

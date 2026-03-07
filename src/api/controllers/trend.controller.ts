@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Post, Query, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, Req, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
@@ -15,8 +15,16 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Output } from 'ai';
 import { convertSearchOutputToProductResponse, searchOutput } from 'src/chatbot/utils/output/search.output';
+import { processBackgroundJob } from 'src/infrastructure/utils/background-job.helper';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { ZodObject } from 'zod';
+import * as crypto from 'crypto';
+import { productOutput } from 'src/chatbot/utils/output/product.output';
+
+const cachingTrendTTL = 60 * 60 * 24 * 1000;
 
 @Role(['admin', 'user'])
 @ApiTags('Trends')
@@ -25,17 +33,20 @@ export class TrendController {
   constructor(
     private userLogService: UserLogService,
     @Inject(AI_SERVICE) private aiService: AIService,
-    private readonly adminInstructionService: AdminInstructionService
+    private readonly adminInstructionService: AdminInstructionService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) { }
 
+
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
-  @ApiBearerAuth("jwt")
   @Get('summary')
+  @Public()
   @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
   @ApiBaseResponse(String)
   @ApiBody({ type: AllUserLogRequest })
   async summarizeLogs(
-    @Query() allUserLogRequest: AllUserLogRequest
+    @Query() allUserLogRequest: AllUserLogRequest,
+    output: ZodObject = searchOutput.schema
   ): Promise<BaseResponse<string>> {
     const summaries =
       await this.userLogService.getAllUserLogSummaryReport(allUserLogRequest);
@@ -58,7 +69,7 @@ export class TrendController {
     const trendResponse = await this.aiService.textGenerateFromPrompt(
       trendPrompt,
       trendSystemPrompt,
-      Output.object(searchOutput)
+      Output.object({ schema: output })
     );
 
     if (!trendResponse.success) {
@@ -75,7 +86,7 @@ export class TrendController {
   async getProductFromTrend(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<ProductResponse[]>> {
-    const trendResult = await this.summarizeLogs(allUserLogRequest);
+    const trendResult = await this.summarizeLogs(allUserLogRequest, productOutput.schema);
     if (!trendResult.success) {
       throw new InternalServerErrorWithDetailsException('Failed to get AI trend response', {
         service: 'AIService',
@@ -93,31 +104,83 @@ export class TrendController {
   }
 
 
-  /** Lấy product từ xu hướng người dùng */
-  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
-  @CacheTTL(1)
+  /** Lấy product từ xu hướng người dùng (caching) */
+  // kích hoạt cache response
   @Public()
-  @Get("product")
-  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
+  @Get("product/caching")
+  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng (caching)' })
   @ApiBaseResponse(ProductResponse)
   @ApiBody({ type: AllUserLogRequest })
-  async getProductNoCaching(
+  @CacheTTL(60 * 60 * 24 * 1000)
+  @UseInterceptors(CacheInterceptor)
+  async getProductFromTrendCaching(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<ProductResponse[]>> {
     const trendResult = await this.getProductFromTrend(allUserLogRequest)
     return trendResult
   }
 
-
-  /** Lấy product từ xu hướng người dùng (caching) */
-  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
-  @CacheTTL(60 * 60 * 24)
+  /**
+   * Khởi tạo job để lấy product từ xu hướng (caching 1 ngày)
+   */
   @Public()
-  @Get("product/caching")
-  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng (caching)' })
+  @Get('product/job')
+  @ApiOperation({ summary: 'Khởi tạo job để lấy product từ xu hướng' })
+  @ApiBaseResponse(String)
+  @CacheTTL(cachingTrendTTL) // cache kết quả API (tức là jobId) trong 1 ngày
+  @UseInterceptors(CacheInterceptor)
+  async createProductTrendJob(
+    @Req() request: Request,
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<{ jobId: string }>> {
+    const jobId = crypto.randomUUID();
+    const cacheKey = `trend_job_${jobId}`;
+
+    // Lưu trạng thái job ban đầu là pending
+    await this.cacheManager.set(cacheKey, { status: 'pending' }, cachingTrendTTL);
+
+    // Chạy ngầm việc request data AI
+    processBackgroundJob(
+      this.cacheManager,
+      () => this.getProductFromTrend(allUserLogRequest),
+      { cacheKey, ttlMilliseconds: cachingTrendTTL },
+      request
+    );
+
+    return Ok({ jobId });
+  }
+
+  /**
+   * Kiểm tra kết quả job lấy product từ xu hướng
+   */
+  @Public()
+  @Get('product/job/:jobId')
+  @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job' })
+  @ApiBaseResponse(Object) // Trả về dynamic object
+  async getProductTrendJobResult(
+    @Param('jobId') jobId: string
+  ): Promise<BaseResponse<any>> {
+    const jobData = await this.cacheManager.get(`trend_job_${jobId}`);
+
+    if (!jobData) {
+      throw new InternalServerErrorWithDetailsException('Job not found or expired', {
+        jobId,
+        endpoint: 'trends/product/job/:jobId'
+      });
+    }
+
+    return Ok(jobData);
+  }
+
+  /** Lấy product từ xu hướng người dùng */
+  @Public()
+  @Get("product")
+  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
   @ApiBaseResponse(ProductResponse)
   @ApiBody({ type: AllUserLogRequest })
-  async getProductFromTrendCaching(
+  @CacheTTL(1) // 1 ms
+  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
+  async getProductNoCaching(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<ProductResponse[]>> {
     const trendResult = await this.getProductFromTrend(allUserLogRequest)

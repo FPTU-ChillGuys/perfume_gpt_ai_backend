@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
   Post,
   Put,
-  Query
+  Query,
+  UseInterceptors
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -22,10 +24,9 @@ import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
-import {
-  QUIZ_SYSTEM_PROMPT,
-  quizPrompt
-} from 'src/application/constant/prompts';
+import { quizPrompt } from 'src/application/constant/prompts';
+import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+import { INSTRUCTION_TYPE_QUIZ } from 'src/application/constant/prompts/admin-instruction-types';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
@@ -40,6 +41,7 @@ import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException
 import { QueueName, QuizJobName } from 'src/application/constant/processor';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
+import { CacheInterceptor, CacheKey, CacheTTL } from '@nestjs/cache-manager';
 
 @ApiTags('Quizzes')
 @Controller('quizzes')
@@ -49,7 +51,8 @@ export class QuizController {
     private quizService: QuizService,
     private logService: UserLogService,
     @InjectQueue(QueueName.QUIZ_QUEUE)
-    private readonly quizQueue: Queue
+    private readonly quizQueue: Queue,
+    private readonly adminInstructionService: AdminInstructionService
   ) { }
 
   /** Lấy tất cả câu hỏi quiz */
@@ -57,6 +60,8 @@ export class QuizController {
   @Get('questions')
   @ApiOperation({ summary: 'Lấy danh sách câu hỏi quiz' })
   @ApiBaseResponse(QuizQuestionResponse, true)
+  @CacheTTL(1)
+  @UseInterceptors(CacheInterceptor)
   async getAllQuizzes(): Promise<BaseResponse<QuizQuestionResponse[]>> {
     const quizQues = await this.quizService.getAllQuizQues();
 
@@ -76,6 +81,8 @@ export class QuizController {
   @ApiOperation({ summary: 'Lấy câu hỏi quiz theo ID' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
   @ApiBaseResponse(QuizQuestionResponse)
+  @CacheTTL(1)
+  @UseInterceptors(CacheInterceptor)
   async getQuizQuesById(
     @Param('id') id: string
   ): Promise<BaseResponse<QuizQuestionResponse>> {
@@ -122,17 +129,18 @@ export class QuizController {
     return Ok();
   }
 
-  /** Cập nhật câu trả lời quiz */
+  /** Cập nhật câu hỏi quiz (nội dung, loại và/hoặc câu trả lời) */
+  @Role(['admin'])
   @Put('questions/:id')
-  @ApiOperation({ summary: 'Cập nhật câu trả lời quiz' })
+  @ApiOperation({ summary: 'Cập nhật câu hỏi quiz (questionType và/hoặc answers)' })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
-  @ApiBody({ type: [QuizAnswerRequest] })
+  @ApiBody({ type: QuizQuestionRequest })
   @ApiBaseResponse(QuizQuestionResponse)
   async updateQuizAnswer(
-    @Param() id: string,
-    @Body() quizAnswerRequest: QuizAnswerRequest[]
+    @Param('id') id: string,
+    @Body() quizQuestionRequest: QuizQuestionRequest
   ): Promise<BaseResponse<QuizQuestionResponse>> {
-    return this.quizService.updateAnswer(id, quizAnswerRequest);
+    return this.quizService.updateAnswer(id, quizQuestionRequest);
   }
 
   /** Trả lời quiz và nhận gợi ý nước hoa từ AI */
@@ -200,10 +208,13 @@ export class QuizController {
       savedQuizQuesAnsResponse.data.id
     );
 
+    // Get system prompt
+    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_QUIZ);
+
     // Get AI response
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       prompt,
-      QUIZ_SYSTEM_PROMPT,
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -267,10 +278,13 @@ export class QuizController {
       details: quizAnswers
     });
 
+    // Get system prompt
+    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_QUIZ);
+
     // Get AI response
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       prompt,
-      QUIZ_SYSTEM_PROMPT,
+      systemPrompt,
       Output.object(searchOutput)
     );
 
@@ -297,5 +311,24 @@ export class QuizController {
     @Param('userId') userId: string
   ): Promise<BaseResponse<QuizQuestionAnswerResponse>> {
     return this.quizService.getQuizQuesAnwsByUserId(userId);
+  }
+
+  /** Xóa mềm câu hỏi quiz (isActive = false) */
+  @Role(['admin'])
+  @Delete('questions/:id')
+  @ApiOperation({ summary: 'Xóa câu hỏi quiz (soft delete)' })
+  @ApiParam({ name: 'id', description: 'ID câu hỏi cần xóa' })
+  @ApiBaseResponse(Boolean)
+  async deleteQuizQuestion(
+    @Param('id') id: string
+  ): Promise<BaseResponse<void>> {
+    const result = await this.quizService.softDeleteQuestion(id);
+    if (!result.success) {
+      throw new BadRequestWithDetailsException(
+        result.error ?? 'Quiz question not found or already deleted',
+        { questionId: id }
+      );
+    }
+    return Ok();
   }
 }

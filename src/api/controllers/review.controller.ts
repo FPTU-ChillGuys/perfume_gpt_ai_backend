@@ -32,13 +32,7 @@ export class ReviewController {
         private readonly adminInstructionService: AdminInstructionService
     ) { }
 
-    /** Lấy danh sách đánh giá */
-    @Get()
-    @ApiOperation({ summary: 'Lấy danh sách đánh giá (phân trang)' })
-    @ApiBaseResponse(PagedResult<ReviewListItemResponse>)
-    async getReviews(@Query() request: GetPagedReviewRequest): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
-        return await this.reviewService.getAllReviews(request);
-    }
+
 
     /** Tóm tắt đánh giá bằng AI cho tất cả variant */
     @Get('summary/all')
@@ -80,6 +74,13 @@ export class ReviewController {
         return Ok(summaryResponse.data);
     }
 
+    /** Lấy danh sách đánh giá */
+    @Get()
+    @ApiOperation({ summary: 'Lấy danh sách đánh giá (phân trang)' })
+    @ApiBaseResponse(PagedResult<ReviewListItemResponse>)
+    async getReviews(@Query() request: GetPagedReviewRequest): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
+        return await this.reviewService.getAllReviews(request);
+    }
 
     /** Tóm tắt đánh giá bằng AI theo variant ID */
     @Get('summary/:variantId')

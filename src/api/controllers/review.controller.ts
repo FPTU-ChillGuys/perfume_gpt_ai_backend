@@ -91,6 +91,7 @@ export class ReviewController {
     /** 
      * Khởi tạo job để lấy tóm tắt đánh giá bằng AI theo variant ID (caching 1 tuần) 
      */
+    @Public()
     @Get('summary/job/:variantId')
     @ApiOperation({ summary: 'Khởi tạo job để tóm tắt đánh giá theo variant ID' })
     @ApiBaseResponse(String)
@@ -118,6 +119,7 @@ export class ReviewController {
     /**
      * Kiểm tra kết quả job lấy tóm tắt đánh giá
      */
+    @Public()
     @Get('summary/job/result/:jobId')
     @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job tóm tắt đánh giá' })
     @ApiBaseResponse(Object) // Trả về dynamic object

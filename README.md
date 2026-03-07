@@ -16,6 +16,7 @@
   - [Bước 7: Chạy migration](#bước-7-chạy-migration)
   - [Bước 8: Seed dữ liệu mặc định](#bước-8-seed-dữ-liệu-mặc-định)
   - [Bước 9: Chạy project](#bước-9-chạy-project)
+- [NPM Scripts & CLI Commands](#npm-scripts--cli-commands)
 - [Admin Instructions (Chỉ thị AI)](#admin-instructions-chỉ-thị-ai)
 - [BullMQ — Job Queue (Redis)](#bullmq--job-queue-redis)
 - [Prisma — Kết nối SQL Server (.NET DB)](#prisma--kết-nối-sql-server-net-db)
@@ -329,6 +330,97 @@ pnpm run start:prod
 Server sẽ chạy tại: **<http://localhost:3000>**
 
 API Reference (Scalar): **<http://localhost:3000/reference>**
+
+---
+
+## NPM Scripts & CLI Commands
+
+Tất cả câu lệnh đều chạy với `pnpm run <script-name>`.
+
+| Loại | Script | Mô tả | Ví dụ |
+|------|--------|-------|-------|
+| **Server** | `start` | Chạy app một lần | `pnpm run start` |
+| | `start:dev` | Chạy app ở mode watch (auto-reload) | `pnpm run start:dev` |
+| | `start:debug` | Chạy app ở debug mode (port 9229) | `pnpm run start:debug` |
+| | `start:prod` | Chạy app ở production mode | `pnpm run start:prod` |
+| **Build** | `build` | Compile TypeScript → JavaScript | `pnpm run build` |
+| | `build:watch` | Compile ở watch mode | `pnpm run build:watch` |
+| | `clean` | Xóa thư mục dist + coverage | `pnpm run clean` |
+| **Database** | `migration:up` | Chạy tất cả pending migrations (MikroORM) | `pnpm run migration:up` |
+| | `migration:down` | Rollback migration cuối cùng | `pnpm run migration:down` |
+| | `migration:create` | Tạo migration mới | `pnpm run migration:create -- --name=AddNewColumn` |
+| | `db:check` | Kiểm tra kết nối database | `pnpm run db:check` |
+| | `prisma:generate` | Generate Prisma Client (khi SQL Server schema thay đổi) | `pnpm run prisma:generate` |
+| **Seeding** | `seed` | Chạy seed dữ liệu mặc định cho kho instruction | `pnpm run seed` |
+| | `sync:prompts` | Đồng bộ hóa prompts từ code vào database | `pnpm run sync:prompts` |
+| **Testing** | `test` | Chạy tất cả tests (unit + integration) | `pnpm run test` |
+| | `test:all` | Chạy tất cả tests (unit + integration + e2e) | `pnpm run test:all` |
+| | `test:unit` | Chạy unit tests | `pnpm run test:unit` |
+| | `test:unit:watch` | Unit tests ở watch mode | `pnpm run test:unit:watch` |
+| | `test:unit:cov` | Unit tests + coverage report | `pnpm run test:unit:cov` |
+| | `test:integration` | Chạy integration tests | `pnpm run test:integration` |
+| | `test:integration:watch` | Integration tests ở watch mode | `pnpm run test:integration:watch` |
+| | `test:integration:cov` | Integration tests + coverage | `pnpm run test:integration:cov` |
+| | `test:integration:setup` | Setup test database | `pnpm run test:integration:setup` |
+| | `test:e2e` | Chạy e2e tests | `pnpm run test:e2e` |
+| | `test:debug` | Debug tests (open chrome://inspect) | `pnpm run test:debug` |
+| **Code Quality** | `lint` | Kiểm tra + fix ESLint violations | `pnpm run lint` |
+| | `format` | Format code với Prettier | `pnpm run format` |
+| **Utilities** | `bullmq:delete-all-jobs` | Xóa tất cả jobs trong BullMQ queue (Redis) | `pnpm run bullmq:delete-all-jobs` |
+
+### Best Practices
+
+**Khi bắt đầu dự án:**
+
+```bash
+# 1. Cài dependencies
+pnpm install
+
+# 2. Setup databases (PostgreSQL + Redis)
+# Hãy chạy docker run commands từ Bước 2 & 2b ở trên
+
+# 3. Kiểm tra kết nối database
+pnpm run db:check
+
+# 4. Chạy migrations
+pnpm run migration:up
+
+# 5. Seed dữ liệu mặc định
+pnpm run seed
+
+# 6. Khởi động dev server
+pnpm run start:dev
+```
+
+**Khi .NET SQL Server schema thay đổi:**
+
+```bash
+# Regenerate Prisma Client
+pnpm run prisma:generate
+```
+
+**Sau khi pull code mới:**
+
+```bash
+# Cài dependencies mới
+pnpm install
+
+# Chạy migrations mới (tự động khi app start, nhưng có thể chạy trước)
+pnpm run migration:up
+
+# Sync prompts nếu có thay đổi
+pnpm run sync:prompts
+```
+
+**Trước khi commit:**
+
+```bash
+# Format + Lint
+pnpm run format && pnpm run lint
+
+# Chạy tests
+pnpm run test:unit
+```
 
 ---
 
@@ -1168,7 +1260,9 @@ Lấy danh sách đánh giá sản phẩm và tóm tắt bằng AI theo variant 
 |--------|----------|-------|------|
 | `GET` | `/reviews` | Lấy danh sách đánh giá (phân trang) | 🔒 admin |
 | `GET` | `/reviews/summary/all` | Tóm tắt đánh giá toàn bộ bằng AI | 🔒 admin |
-| `GET` | `/reviews/summary/:variantId` | Tóm tắt đánh giá bằng AI theo variant ID | 🔒 admin |
+| `GET` | `/reviews/summary/job/:variantId` | **[NEW]** Khởi tạo background job để tóm tắt đánh giá theo variant ID (async) | 🌐 Public |
+| `GET` | `/reviews/summary/job/result/:jobId` | **[NEW]** Kiểm tra kết quả job tóm tắt đánh giá | 🌐 Public |
+| `GET` | `/reviews/summary/:variantId` | Tóm tắt đánh giá bằng AI theo variant ID (sync) | 🔒 admin |
 | `GET` | `/reviews/summary/structured/:variantId` | Tóm tắt AI có cấu trúc (JSON + metadata) | 🔒 admin |
 | `POST` | `/reviews/logs` | Thêm review log mới | 🔒 admin |
 | `GET` | `/reviews/logs` | Lấy tất cả review logs | 🔒 admin |
@@ -1181,8 +1275,18 @@ Lấy danh sách đánh giá sản phẩm và tóm tắt bằng AI theo variant 
 # Lấy danh sách
 curl "http://localhost:3000/reviews?pageIndex=1&pageSize=10"
 
-# Tóm tắt AI theo variant
-curl http://localhost:3000/reviews/summary/<variantId>
+# ========== NEW: Background Job API (Async) ==========
+# Khởi tạo job (không cần token)
+curl "http://localhost:3000/reviews/summary/job/<variantId>"
+# Response: { "success": true, "data": { "jobId": "uuid-xxx" } }
+
+# Kiểm tra kết quả job (không cần token)
+curl "http://localhost:3000/reviews/summary/job/result/<jobId>?variantId=<variantId>"
+# Response: { "success": true, "data": "Tóm tắt: Sản phẩm rất tốt..." }
+
+# ========== Sync API ==========
+# Tóm tắt AI theo variant (sync, chỉ admin)
+curl -H "Authorization: Bearer <admin_token>" http://localhost:3000/reviews/summary/<variantId>
 ```
 
 **HTTP Status Codes:**
@@ -1196,6 +1300,8 @@ curl http://localhost:3000/reviews/summary/<variantId>
 
 > **Lưu ý:**
 >
+> - **Async Job API (NEW):** Endpoints `/reviews/summary/job/*` được đánh dấu `@Public()` — cho phép bất kỳ user nào khởi tạo job mà không cần admin token. Kết quả được cache trong 1 tháng để tối ưu hiệu suất.
+> - **Sync API:** Endpoints `/reviews/summary/:variantId` vẫn yêu cầu admin role để bảo vệ tài nguyên.
 > - Dữ liệu review được lấy từ backend .NET.
 > - Nếu không có review nào cho variant → trả về insufficient data message thay vì gọi AI (tiết kiệm token).
 > - Endpoint `/summary/all` không có tham số route nhưng có thể xung đột route với `/summary/:variantId` khi `all` được parse thành variantId. Cần test kỹ thứ tự khai báo route.

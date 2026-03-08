@@ -107,11 +107,15 @@ export class InventoryController {
         INSTRUCTION_TYPE_INVENTORY
       );
 
+    console.log('Generated inventory report, sending to AI service for analysis...');
+
     // Generate AI summary
     const aiResponse = await this.aiService.textGenerateFromPrompt(
       inventoryReportPrompt(report.toString()),
       adminPrompt
     );
+
+    console.log('Received response from AI service for inventory report.');
 
     if (!aiResponse.success) {
       throw new InternalServerErrorWithDetailsException(

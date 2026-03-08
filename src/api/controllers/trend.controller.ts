@@ -23,8 +23,9 @@ import { Cache } from 'cache-manager';
 import { ZodObject } from 'zod';
 import * as crypto from 'crypto';
 import { productOutput } from 'src/chatbot/utils/output/product.output';
+import { CACHE_TTL_1WEEK } from 'src/infrastructure/cacheable/cacheable.constants';
 
-const cachingTrendTTL = 60 * 60 * 24 * 1000;
+const cachingTrendTTL = CACHE_TTL_1WEEK; // TTL cache cho trend product (1 tuần)
 
 @Role(['admin', 'user'])
 @ApiTags('Trends')

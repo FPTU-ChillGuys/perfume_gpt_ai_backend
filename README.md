@@ -955,7 +955,7 @@ Hệ thống gồm **13 controller** (1 trong `AppModule`, 12 trong `ProviderMod
 | [AdminInstructionController](#2-admininstructioncontroller) | `/admin/instructions` | 🔒 JWT | `admin` (GET all: admin+user) | 7 |
 | [AIAcceptanceController](#3-aiacceptancecontroller) | `/ai-acceptance` | 🔒 JWT | — | 5 |
 | [OrderController](#4-ordercontroller) | `/orders` | 🔒 JWT | `admin` | 4 |
-| [InventoryController](#5-inventorycontroller) | `/inventory` | 🔒 JWT | `admin` | 7 |
+| [InventoryController](#5-inventorycontroller) | `/inventory` | 🔒 JWT | `admin` (2 endpoint public) | 9 |
 | [ConversationController](#6-conversationcontroller) | `/conversation` | Hỗn hợp | `admin` (CRUD) | 12 |
 | [ProductController](#7-productcontroller) | `/products` | 🌐 Public | — | 5 |
 | [ProfileController](#8-profilecontroller) | `/profile` | 🔒 JWT | `admin` hoặc `user` | 2 |
@@ -1146,6 +1146,8 @@ Quản lý tồn kho — lấy stock, batch và tạo báo cáo AI phân tích t
 | `GET` | `/inventory/report` | Lấy báo cáo tồn kho (text thô) | 🔒 admin |
 | `GET` | `/inventory/report/ai` | Tạo báo cáo tồn kho bằng AI (text) | 🔒 admin |
 | `GET` | `/inventory/report/ai/structured` | Tạo báo cáo tồn kho AI có cấu trúc (JSON + metadata) | 🔒 admin |
+| `GET` | `/inventory/report/ai/job` | Khởi tạo job tạo báo cáo tồn kho AI (chạy nền, TTL 1 giờ) | 🌐 Public |
+| `GET` | `/inventory/report/ai/job/result/:jobId` | Kiểm tra trạng thái / kết quả của job | 🌐 Public |
 | `GET` | `/inventory/report/logs` | Lấy lịch sử báo cáo tồn kho (phân trang) | 🔒 admin |
 | `GET` | `/inventory/report/logs/:id` | Lấy chi tiết báo cáo tồn kho theo ID | 🔒 admin |
 
@@ -1157,6 +1159,15 @@ curl -H "Authorization: Bearer <admin_token>" http://localhost:3000/inventory/st
 
 # Báo cáo AI
 curl -H "Authorization: Bearer <admin_token>" http://localhost:3000/inventory/report/ai
+
+# Khởi tạo job báo cáo AI (public, không cần token)
+curl http://localhost:3000/inventory/report/ai/job
+# Response: { "success": true, "data": { "jobId": "uuid", "expirationTime": "..." } }
+
+# Poll kết quả job
+curl http://localhost:3000/inventory/report/ai/job/result/<jobId>
+# Response khi pending: { "success": true, "data": { "status": "pending" } }
+# Response khi done:    { "success": true, "data": { ... báo cáo AI ... } }
 
 # Lấy lịch sử báo cáo
 curl -H "Authorization: Bearer <admin_token>" http://localhost:3000/inventory/report/logs
@@ -1174,9 +1185,11 @@ curl -H "Authorization: Bearer <admin_token>" http://localhost:3000/inventory/re
 
 > **Lưu ý:**
 >
-> - Tất cả endpoint đều yêu cầu role `admin` (class-level `@Role('admin')`).
+> - Hầu hết endpoint đều yêu cầu role `admin` (class-level `@Role('admin')`).
+> - `report/ai/job` và `report/ai/job/result/:jobId` là **Public** — không cần JWT.
+> - Job có TTL **1 giờ**; sau 1 giờ cache sẽ hết hạn và `result/:jobId` trả 500 `Job not found or expired`.
 > - Dữ liệu stock/batch được lấy từ backend .NET.
-> - Endpoint `report/ai` tự động lưu kết quả thành `InventoryLog` trong PostgreSQL.
+> - Endpoint `report/ai` (và job tương ứng) tự động lưu kết quả thành `InventoryLog` trong PostgreSQL.
 
 ---
 

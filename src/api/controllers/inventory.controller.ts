@@ -1,12 +1,18 @@
-import { Controller, Get, Inject, Query } from '@nestjs/common';
+import { Controller, Get, Inject, Param, Query, UseInterceptors } from '@nestjs/common';
+import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import * as crypto from 'crypto';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
-import { Role } from 'src/application/common/Metadata';
+import { Public, Role } from 'src/application/common/Metadata';
+import { processBackgroundJob } from 'src/api/controllers/helper/background-job.helper';
+import { CACHE_TTL_1HOUR, CACHE_TTL_6HOUR } from 'src/infrastructure/cacheable/cacheable.constants';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
@@ -34,6 +40,7 @@ import {
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
+import { add } from 'date-fns';
 
 @Role(['admin'])
 @ApiTags('Inventory')
@@ -47,7 +54,8 @@ export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
     @Inject(AI_SERVICE) private readonly aiService: AIService,
-    private readonly adminInstructionService: AdminInstructionService
+    private readonly adminInstructionService: AdminInstructionService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
   ) { }
 
   /** Lấy thông tin tồn kho */
@@ -173,6 +181,58 @@ export class InventoryController {
     });
 
     return Ok(structuredResponse);
+  }
+
+  /**
+   * Khởi tạo job để tạo báo cáo tồn kho bằng AI (caching 6 tiếng)
+   */
+  @Public()
+  @Get('report/ai/job')
+  @ApiOperation({ summary: 'Khởi tạo job để tạo báo cáo tồn kho bằng AI' })
+  @ApiBaseResponse(String)
+  @CacheTTL(CACHE_TTL_1HOUR)
+  @UseInterceptors(CacheInterceptor)
+  async createInventoryReportJob(): Promise<BaseResponse<{ jobId: string }>> {
+    const jobId = crypto.randomUUID();
+    const cacheKey = `inventory_report_job_${jobId}`;
+    const ttlMilliseconds = CACHE_TTL_1HOUR;
+
+    await this.cacheManager.set(cacheKey, { status: 'pending' }, ttlMilliseconds);
+
+    processBackgroundJob(
+      this.cacheManager,
+      () => this.getAIInventoryReport(),
+      { cacheKey, ttlMilliseconds }
+    );
+
+    // Goi them thoi gian tiep theo cho den khi het caching
+    const expirationTime = add(new Date(), { seconds: ttlMilliseconds/1000 });
+
+    return Ok({ jobId, expirationTime});
+  }
+
+  /**
+   * Kiểm tra kết quả job tạo báo cáo tồn kho bằng AI
+   */
+  @Public()
+  @Get('report/ai/job/result/:jobId')
+  @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job báo cáo tồn kho' })
+  @ApiBaseResponse(Object)
+  @ApiParam({ name: 'jobId', description: 'ID của job' })
+  async getInventoryReportJobResult(
+    @Param('jobId') jobId: string
+  ): Promise<BaseResponse<any>> {
+    const cacheKey = `inventory_report_job_${jobId}`;
+    const jobData = await this.cacheManager.get(cacheKey);
+
+    if (!jobData) {
+      throw new InternalServerErrorWithDetailsException('Job not found or expired', {
+        jobId,
+        endpoint: 'inventory/report/ai/job/result/:jobId'
+      });
+    }
+
+    return Ok(jobData);
   }
 
   @Get('report/logs')

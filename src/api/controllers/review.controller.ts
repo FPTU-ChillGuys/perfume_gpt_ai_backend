@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestj
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
-import { processBackgroundJob } from 'src/infrastructure/utils/background-job.helper';
+import { processBackgroundJob } from 'src/api/controllers/helper/background-job.helper';
 import { Public, Role } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';

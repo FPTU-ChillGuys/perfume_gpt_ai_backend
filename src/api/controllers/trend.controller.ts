@@ -15,7 +15,7 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Output } from 'ai';
 import { convertSearchOutputToProductResponse, searchOutput } from 'src/chatbot/utils/output/search.output';
-import { processBackgroundJob } from 'src/infrastructure/utils/background-job.helper';
+import { processBackgroundJob } from 'src/api/controllers/helper/background-job.helper';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';

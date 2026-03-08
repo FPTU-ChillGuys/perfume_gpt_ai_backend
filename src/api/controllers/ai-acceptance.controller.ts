@@ -22,6 +22,18 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 export class AIAcceptanceController {
   constructor(private readonly aiAcceptanceService: AIAcceptanceService) {}
 
+  @Get('status/all')
+  @ApiOperation({
+    summary: 'Lấy trạng thái chấp nhận AI của tất cả người dùng'
+  })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
+  @ApiBaseResponse(AIAcceptance)
+  async getAllAIAcceptanceStatus(): Promise<
+    BaseResponse<AIAcceptance[] | null>
+  > {
+    return this.aiAcceptanceService.getAllAIAcceptanceStatus();
+  }
+
   /** Cập nhật trạng thái chấp nhận AI theo ID */
   @Post(':id')
   @ApiOperation({ summary: 'Cập nhật trạng thái chấp nhận AI theo ID' })
@@ -45,18 +57,8 @@ export class AIAcceptanceController {
   @ApiBaseResponse(AIAcceptance)
   async getAIAcceptanceStatus(
     @Param('userId') userId: string
-  ): Promise<BaseResponse<AIAcceptance | null>> {
+  ): Promise<BaseResponse<AIAcceptance[] | null>> {
     return this.aiAcceptanceService.getAIAcceptanceByUserId(userId);
-  }
-
-  @Get('status/all')
-  @ApiOperation({ summary: 'Lấy trạng thái chấp nhận AI theo user ID' })
-  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
-  @ApiBaseResponse(AIAcceptance)
-  async getAllAIAcceptanceStatus(): Promise<
-    BaseResponse<AIAcceptance[] | null>
-  > {
-    return this.aiAcceptanceService.getAllAIAcceptanceStatus();
   }
 
   /** Lấy tỷ lệ chấp nhận AI theo trạng thái */

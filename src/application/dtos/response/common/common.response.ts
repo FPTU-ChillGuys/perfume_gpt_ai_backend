@@ -13,4 +13,7 @@ export class CommonResponse {
   /** Ngày cập nhật gần nhất */
   @ApiProperty({ description: 'Ngày cập nhật gần nhất' })
   updatedAt?: Date = new Date();
+
+  @ApiProperty({ description: 'Trạng thái hoạt động' })
+  isActive?: boolean = true;
 }

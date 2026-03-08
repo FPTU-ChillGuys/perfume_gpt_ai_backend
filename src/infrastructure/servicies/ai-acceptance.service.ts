@@ -51,6 +51,16 @@ export class AIAcceptanceService {
     return { success: true, data: aiAcceptance };
   }
 
+  
+  async getAllAIAcceptanceStatus(): Promise<BaseResponse<AIAcceptance[] | null>> {
+    const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll();
+    console.log('All AI Acceptance Records:', aiAcceptance);
+    if (!aiAcceptance) {
+      return { success: false, error: 'AIAcceptance record not found' };
+    }
+    return { success: true, data: aiAcceptance };
+  }
+
   async getAIAcceptanceRateByAcceptanceStatus(
     isAccepted: boolean
   ): Promise<BaseResponse<number>> {

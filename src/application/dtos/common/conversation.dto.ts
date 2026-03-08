@@ -30,7 +30,7 @@ export class ConversationRequestDto {
   /** ID người dùng (tự động lấy từ JWT token, không cần truyền) */
   @ApiProperty({ description: 'ID người dùng (tự động lấy từ token, không cần truyền)', format: 'uuid', required: false })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   userId?: string;
 
   /** Danh sách tin nhắn */

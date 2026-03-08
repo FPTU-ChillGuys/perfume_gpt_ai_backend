@@ -57,13 +57,13 @@ const registerQueue = BullModule.registerQueue(
     AdminInstructionController,
     OrderController,
   ],
-  providers: [
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: CacheInterceptor
-    },
-    CacheableModule
-  ],
+  // providers: [
+  //   {
+  //     provide: APP_INTERCEPTOR,
+  //     useClass: CacheInterceptor
+  //   },
+  //   CacheableModule
+  // ],
   exports: modules
 })
 export class ProviderModule { }

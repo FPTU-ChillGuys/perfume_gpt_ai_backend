@@ -4,8 +4,9 @@
 
 ## Mục lục
 
+- [🚀 Quick Setup (Cài Đặt Nhanh)](#-quick-setup-cài-đặt-nhanh)
 - [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
-- [Cài đặt từng bước](#cài-đặt-từng-bước)
+- [Cài đặt từng bước (Manual)](#cài-đặt-từng-bước-manual)
   - [Bước 1: Clone repository & cài đặt dependencies](#bước-1-clone-repository--cài-đặt-dependencies)
   - [Bước 2: Cài đặt PostgreSQL (Docker)](#bước-2-cài-đặt-postgresql-docker)
   - [Bước 2b: Cài đặt Redis (Docker)](#bước-2b-cài-đặt-redis-docker)
@@ -42,6 +43,72 @@
 
 ---
 
+## 🚀 Quick Setup (Cài Đặt Nhanh)
+
+> **Recommended:** Nếu bạn muốn một cài đặt tự động mà không phải lo về từng bước chi tiết, hãy sử dụng script tự động này.
+
+### Yêu cầu tối thiểu
+
+- Node.js >= 18
+- pnpm >= 8
+- Docker (chạy PostgreSQL & Redis)
+- SQL Server instance sẵn có (hoặc configure như guide bên dưới)
+
+### Cài đặt tự động (1 lệnh)
+
+```bash
+# 1. Clone & install dependencies
+git clone https://github.com/FPTU-ChillGuys/perfume_gpt_ai_backend.git
+cd perfume_gpt_ai_backend
+pnpm install
+
+# 2. Run automated setup (tự động sẽ kiểm tra và cài đặt)
+pnpm setup
+```
+
+### Script tự động sẽ:
+
+1. ✅ **Kiểm tra (Pre-check)** — Xác minh Node.js, pnpm, Docker, Prisma CLI
+2. ✅ **Cài Docker** — Tạo & khởi động PostgreSQL & Redis containers
+3. ✅ **Tạo cấu hình** — Copy `.env.example` → `.env` & `host-config.mjs.example` → `host-config.mjs`
+4. ✅ **Chạy migrations** — MikroORM (PostgreSQL) & Prisma (SQL Server)
+5. ✅ **Seed dữ liệu** — Tự động seed admin instructions & default data
+6. ✅ **Kiểm tra kết nối** — Xác minh PostgreSQL, Redis, SQL Server connect thành công
+7. ✅ **Chạy dev server** — (Optional) Hỏi bạn có muốn chạy `pnpm dev` ngay không?
+
+### Output ví dụ:
+
+```
+✓ Node.js >= 18 (v18.17.0)
+✓ pnpm found (v8.10.2)
+✓ Docker is installed
+✓ Docker daemon is running
+✓ PostgreSQL container running
+✓ Redis container running
+✓ host-config.mjs exists
+✓ .env exists
+...
+════════════════════════════════════════════════════════════
+  Database Connection Status
+════════════════════════════════════════════════════════════
+✓ PostgreSQL (MikroORM): Connected
+✓ SQL Server (Prisma): Connected
+✓ Redis (BullMQ): Connected
+════════════════════════════════════════════════════════════
+
+Setup completed successfully!
+```
+
+### Nếu setup thất bại?
+
+- **PostgreSQL not running?** → Script sẽ giúp bạn tạo container
+- **.env/host-config chưa có?** → Script auto copy từ template
+- **Cần sửa credentials?** → Mở `.env` & `host-config.mjs` để chỉnh lại
+
+Xem [Cài đặt từng bước (Manual)](#cài-đặt-từng-bước-manual) nếu cần debugging chi tiết.
+
+---
+
 ## Yêu cầu hệ thống
 
 | Tool           | Phiên bản tối thiểu | Ghi chú                                          |
@@ -56,7 +123,9 @@
 
 ---
 
-## Cài đặt từng bước
+## Cài đặt từng bước (Manual)
+
+Nếu bạn muốn control toàn bộ quá trình setup hoặc troubleshoot, hãy follow các bước này:
 
 ### Bước 1: Clone repository & cài đặt dependencies
 

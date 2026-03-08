@@ -8,33 +8,70 @@ import { execSync } from 'child_process';
 import { HttpExceptionFilter } from './application/filters/http-exception.filter';
 import { SuccessResponseInterceptor } from './application/common/interceptors/success-response.interceptor';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import { PrismaService } from './prisma/prisma.service'; 
+import { createClient } from '@keyv/redis';
 
 const logger = new Logger('Bootstrap');
+/**
+ * Check and display database connection status
+ */
+async function displayDatabaseStatus(app: any): Promise<void> {
+  const orm = app.get(MikroORM);
+  const prismaService = app.get(PrismaService);
 
-/** Tạm thời: chạy migration bằng CLI trực tiếp (MikroORM) */
-function runMigrationCLI(): void {
+  const colors = {
+    reset: '\x1b[0m',
+    green: '\x1b[32m',
+    red: '\x1b[31m',
+    yellow: '\x1b[33m',
+    cyan: '\x1b[36m',
+    bright: '\x1b[1m'
+  };
+
+  const statusLine = (name: string, connected: boolean, message: string = '') => {
+    const symbol = connected ? '✓' : '✗';
+    const color = connected ? colors.green : colors.red;
+    const msg = message ? ` - ${message}` : '';
+    console.log(`${color}${symbol}${colors.reset} ${name}${msg}`);
+  };
+
+  console.log(`\n${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════`);
+  console.log(`  Database Connection Status`);
+  console.log(`════════════════════════════════════════════════════════════${colors.reset}`);
+
+  // PostgreSQL (MikroORM)
   try {
-    logger.log('[MikroORM] Đang chạy npx mikro-orm migration:up ...');
-    const output = execSync('npx mikro-orm migration:up', {
-      cwd: process.cwd(),
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    logger.log('[MikroORM] Migration CLI output:\n' + output);
+    const isConnected = orm.isConnected();
+    statusLine('PostgreSQL (MikroORM)', isConnected);
   } catch (error: any) {
-    logger.error(
-      '[MikroORM] Migration CLI thất bại: ' + (error.stderr || error.message)
-    );
-    throw error;
+    statusLine('PostgreSQL (MikroORM)', false, error.message);
   }
+
+  // SQL Server (Prisma)
+  try {
+    await prismaService.$queryRaw`SELECT 1`;
+    statusLine('SQL Server (Prisma)', true);
+  } catch (error: any) {
+    statusLine('SQL Server (Prisma)', false, error.message);
+  }
+
+  // Redis (BullMQ)
+  try {
+    const client = createClient({
+      url: `redis://${process.env.REDIS_HOST ?? 'localhost'}:${process.env.REDIS_PORT ?? '6379'}`
+    });
+    await client.connect();
+    const pong = await client.ping();
+    await client.quit();
+    statusLine('Redis (BullMQ)', pong === 'PONG');
+  } catch (error: any) {
+    statusLine('Redis (BullMQ)', false, error.message);
+  }
+
+  console.log(`${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════${colors.reset}\n`);
 }
 
-
 async function bootstrap() {
-  // Chạy MikroORM migration trước khi khởi tạo NestJS app
-  // (Prisma connection test được xử lý tự động trong PrismaService.onModuleInit)
-  runMigrationCLI();
-
   const app = await NestFactory.create(AppModule, { cors: true });
 
   // Seed dữ liệu mặc định cho admin instructions (idempotent)
@@ -93,6 +130,15 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new SuccessResponseInterceptor());
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
+
+  // Display database connection status after app starts
+  try {
+    await displayDatabaseStatus(app);
+    logger.log(`Application is running on: http://localhost:${port}`);
+  } catch (error) {
+    logger.warn('Could not display database status');
+  }
 }
 bootstrap();

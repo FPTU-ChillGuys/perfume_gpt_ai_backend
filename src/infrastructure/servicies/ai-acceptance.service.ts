@@ -56,7 +56,7 @@ export class AIAcceptanceService {
     BaseResponse<AIAcceptance[] | null>
   > {
     return await funcHandlerAsync(async () => {
-      const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll();
+      const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
       console.log('All AI Acceptance Records:', aiAcceptance);
       if (!aiAcceptance) {
         return { success: false, error: 'AIAcceptance record not found' };

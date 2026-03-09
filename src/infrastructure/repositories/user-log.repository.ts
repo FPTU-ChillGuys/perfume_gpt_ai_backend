@@ -80,7 +80,8 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
         'userQuizLogs.quizQuesAnsDetail.question',
         'userQuizLogs.quizQuesAnsDetail.answer',
         'userSearchLogs'
-      ]
+      ],
+      orderBy: { updatedAt: 'DESC' }
     });
   }
 
@@ -100,7 +101,8 @@ export class UserLogRepository extends SqlEntityRepository<UserLog> {
           $gte: startOfDay(allUserLogRequest.startDate!),
           $lte: endOfDay(allUserLogRequest.endDate)
         }
-      }
+      },
+      orderBy: { updatedAt: 'DESC' }
     });
   }
 

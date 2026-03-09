@@ -108,7 +108,7 @@ export class QuizService {
       async () => {
         const quizQuestions = await this.unitOfWork.AIQuizQuestionRepo.find(
           { isActive: true },
-          { populate: ['answers'] }
+          { populate: ['answers'], orderBy: { updatedAt: 'DESC' } }
         );
 
         const quizQuestionsResponses =
@@ -151,7 +151,8 @@ export class QuizService {
     return await funcHandlerAsync(async () => {
       const quizQuestionAnswers =
         await this.unitOfWork.AIQuizQuestionAnswerRepo.findAll({
-          populate: ['details', 'details.question', 'details.answer']
+          populate: ['details', 'details.question', 'details.answer'],
+          orderBy: { updatedAt: 'DESC' }
         });
 
       const quizQuestionAnswersResponses =

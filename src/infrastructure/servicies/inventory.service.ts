@@ -255,7 +255,7 @@ export class InventoryService {
   async getAllInventoryLogs(): Promise<BaseResponse<InventoryLog[]>> {
     return funcHandlerAsync(
       async () => {
-        const logs = await this.unitOfWork.InventoryLogRepo.findAll();
+        const logs = await this.unitOfWork.InventoryLogRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
         return { success: true, data: logs };
       },
       'Failed to fetch inventory logs',

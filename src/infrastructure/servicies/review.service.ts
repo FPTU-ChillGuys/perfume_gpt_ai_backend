@@ -252,7 +252,7 @@ export class ReviewService {
   async getAllReviewLogs(): Promise<BaseResponseAPI<ReviewLog[]>> {
     return await funcHandlerAsync(
       async () => {
-        const result = await this.unitOfWork.ReviewLogRepo.findAll();
+        const result = await this.unitOfWork.ReviewLogRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
         return { success: true, payload: result };
       },
       'Failed to fetch review logs',

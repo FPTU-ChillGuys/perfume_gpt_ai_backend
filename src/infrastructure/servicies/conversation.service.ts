@@ -139,7 +139,8 @@ export class ConversationService {
     return await funcHandlerAsync(
       async () => {
         const conversations = await this.unitOfWork.AIConversationRepo.findAll({
-          populate: ['messages']
+          populate: ['messages'],
+          orderBy: { updatedAt: 'DESC' }
         });
 
         const response = ConversationMapper.toResponseList(conversations, true);

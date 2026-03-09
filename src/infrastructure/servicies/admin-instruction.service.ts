@@ -18,7 +18,7 @@ export class AdminInstructionService {
   async getAllInstructions(): Promise<BaseResponse<AdminInstructionResponse[]>> {
     return await funcHandlerAsync(
       async () => {
-        const instructions = await this.unitOfWork.AdminInstructionRepo.findAll();
+        const instructions = await this.unitOfWork.AdminInstructionRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
         const response = instructions.map((i) => this.toResponse(i));
         return { success: true, data: response };
       },

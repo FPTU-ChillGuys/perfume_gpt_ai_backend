@@ -10,6 +10,7 @@ import {
 import { gpt5nano } from 'src/chatbot/models/openai';
 import { Injectable } from '@nestjs/common';
 import { error } from 'console';
+import { aiModels } from 'src/chatbot/ai-model';
 
 @Injectable()
 export class AIService {
@@ -27,7 +28,7 @@ export class AIService {
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
       const text = await textGenerationFromPromptToResultWithErrorHandler(
-        gpt5nano,
+        aiModels,
         prompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
@@ -47,7 +48,7 @@ export class AIService {
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
       const text = await textGenerationFromMessagesToResultWithErrorHandler(
-        gpt5nano,
+        aiModels,
         messages,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
@@ -67,7 +68,7 @@ export class AIService {
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
       const stream = streamTextGenerationFromPromptToResultWithErrorHandler(
-        gpt5nano,
+        aiModels,
         prompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
@@ -86,7 +87,7 @@ export class AIService {
     errorMessage?: string
   ): ReadableStream<any> {
     const stream = streamTextGenerationFromMessagesToResultWithErrorHandler(
-      gpt5nano,
+      aiModels,
       messages,
       this.systemPrompt + (additionalSystemPrompt ?? ''),
       this.tools,

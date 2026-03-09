@@ -21,11 +21,8 @@ export class ConversationProcessor extends WorkerHost {
       switch (job.name) {
         case ConversationJobName.ADD_MESSAGE_AND_LOG.toString():
           //Check type cua conversationDto
-          console.log('Processing conversation job with data:', job.data);
           await this.conversationService.saveOrUpdateConversation(job.data.responseConversation);
-          console.log('Conversation saved successfully for job:', job.id);
           await this.userLogHelper.overrideWeeklyLogSummaryByUserId(job.data.userId);
-          console.log('User log summary updated successfully for user:', job.data.userId);
           break;
         default:
           throw new Error(`Unknown job name: ${job.name}`);

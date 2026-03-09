@@ -6,27 +6,22 @@ import {
   Post,
   Query,
   Req,
-  Res,
-  Sse
-} from '@nestjs/common';
+  Res} from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiForbiddenResponse,
   ApiOperation,
   ApiQuery,
   ApiTags,
-  ApiUnauthorizedResponse
+
 } from '@nestjs/swagger';
-import { createUIMessageStreamResponse, Output, pipeUIMessageStreamToResponse, UIMessage } from 'ai';
+import { Output, pipeUIMessageStreamToResponse, UIMessage } from 'ai';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import {
   ConversationDto,
   ConversationRequestDto,
-  ConversationRequestDtoV2,
-  convertStringifyToMessageRequestDto
-} from 'src/application/dtos/common/conversation.dto';
+  ConversationRequestDtoV2} from 'src/application/dtos/common/conversation.dto';
 import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -42,7 +37,7 @@ import {
   conversationSystemPrompt
 } from 'src/application/constant/prompts';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { AI_CONVERSATION_SERVICE, AI_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
@@ -79,7 +74,7 @@ import { ServerResponse } from 'node:http';
 @Controller('conversation')
 export class ConversationController {
   constructor(
-    @Inject(AI_SERVICE) private aiService: AIService,
+    @Inject(AI_CONVERSATION_SERVICE) private aiService: AIService,
     private conversationService: ConversationService,
     private logService: UserLogService,
     private orderService: OrderService,

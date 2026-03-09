@@ -73,7 +73,7 @@ export class AIAcceptanceService {
       return { success: true, data: 0 };
     }
     const acceptedCount = await this.unitOfWork.AIAcceptanceRepo.count({
-      isAccepted: true
+      isAccepted: isAccepted
     });
     const acceptanceRate = (acceptedCount / totalCount) * 100;
     return { success: true, data: acceptanceRate };

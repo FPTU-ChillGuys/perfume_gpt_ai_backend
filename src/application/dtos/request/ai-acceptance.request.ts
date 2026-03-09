@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsUUID } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
 
 /** Request tạo hoặc cập nhật trạng thái chấp nhận AI */
 export class AIAcceptanceRequest {
@@ -12,6 +12,12 @@ export class AIAcceptanceRequest {
   @ApiProperty({ description: 'Người dùng có chấp nhận đề xuất AI hay không' })
   @IsBoolean()
   isAccepted: boolean;
+
+  /** ID cart item liên quan (tùy chọn) */
+  @ApiProperty({ description: 'ID cart item nếu có liên quan', required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  cartItemId?: string | null;
 
   constructor(init?: Partial<AIAcceptanceRequest>) {
     Object.assign(this, init);

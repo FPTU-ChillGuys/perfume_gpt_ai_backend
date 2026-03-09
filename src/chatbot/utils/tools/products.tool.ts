@@ -22,18 +22,18 @@ export class ProductTool {
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
-          const response = await this.productService.getAllProducts({
+          const response = await this.productService.getAllProductsWithVariants({
             PageNumber: input.pageNumber,
             PageSize: input.pageSize,
             // SortBy: input.sortBy || '',
             SortOrder: input.sortOrder,
             IsDescending: input.isDescending
           });
-          console.log('ProductTool response:', response.payload?.items);
+          console.log('ProductTool response:', response.data?.items);
           if (!response.success) {
             return { success: false, error: 'Failed to fetch products.' };
           }
-          return { success: true, data: response.payload?.items || [] };
+          return { success: true, data: response.data?.items || [] };
         },
         'Error occurred while fetching products.',
         true

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -39,16 +39,38 @@ export class AIAcceptanceController {
   @ApiOperation({ summary: 'Cập nhật trạng thái chấp nhận AI theo ID' })
   @ApiParam({ name: 'id', description: 'ID bản ghi AI acceptance' })
   @ApiQuery({ name: 'status', description: 'Trạng thái (true/false)' })
+  @ApiQuery({ name: 'cartItemId', description: 'ID cart item liên quan (tùy chọn)', required: false })
   @ApiBaseResponse(AIAcceptance)
   async updateAIAcceptanceData(
     @Param('id') id: string,
-    @Query('status') status: string
+    @Query('cartItemId') cartItemId: string,
+    @Query('status') status: boolean
   ): Promise<BaseResponse<AIAcceptance>> {
     return this.aiAcceptanceService.updateAIAcceptanceStatusById(
       id,
-      status === 'true'
+      cartItemId,
+      status
     );
   }
+
+  @Put('user/:userId')
+  @ApiOperation({ summary: 'Cập nhật trạng thái chấp nhận AI theo ID người dùng và ID cart item' })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
+  @ApiQuery({ name: 'status', description: 'Trạng thái (true/false)' })
+  @ApiQuery({ name: 'cartItemId', description: 'ID cart item liên quan (tùy chọn)', required: false })
+  @ApiBaseResponse(AIAcceptance)
+  async updateAIAcceptanceDataByUserIdAndCartId(
+    @Param('userId') userId: string,
+    @Query('cartItemId') cartItemId: string,
+    @Query('status') status: boolean,
+  ): Promise<BaseResponse<AIAcceptance>> {
+    return this.aiAcceptanceService.updateAIAcceptanceByUserIdAndCartId(
+      userId,
+      cartItemId,
+      status
+    );
+  }
+
 
   /** Lấy trạng thái chấp nhận AI theo user ID */
   @Get('status/:userId')
@@ -96,18 +118,25 @@ export class AIAcceptanceController {
   @ApiOperation({ summary: 'Tạo bản ghi chấp nhận AI mới' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   @ApiQuery({
-    name: 'isAccepted',
+    name: 'status',
     required: true,
     description: 'Trạng thái chấp nhận (true/false)'
+  })
+  @ApiQuery({
+    name: 'cartItemId',
+    required: false,
+    description: 'ID cart item liên quan (tùy chọn)'
   })
   @ApiBaseResponse(AIAcceptance)
   async createAIAcceptanceRecord(
     @Param('userId') userId: string,
-    @Query('isAccepted') isAccepted: string
+    @Query('cartItemId') cartItemId: string,
+    @Query('status') status: string,
   ): Promise<BaseResponse<AIAcceptance>> {
     return this.aiAcceptanceService.createAIAcceptanceRecord(
       userId,
-      isAccepted === 'false'
+      status === 'true',
+      cartItemId
     );
   }
 }

@@ -50,6 +50,11 @@ export const ADMIN_INSTRUCTION_SEED_DATA: SeedInstruction[] = [
 # BƯỚC 4: CẤU TRÚC BÁO CÁO ĐỘNG (DYNAMIC STRUCTURE)
 Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sau NẾU CHÚNG CÓ DỮ LIỆU THỰC TẾ:
 
+# BƯỚC 5: QUY TẮC ĐỊNH DẠNG VĂN BẢN (TEXT FORMATTING)
+- TUYỆT ĐỐI KHÔNG sử dụng các ký tự định dạng Markdown như in đậm (**text**), in nghiêng (*text*), hoặc heading (#, ##).
+- CHỈ ĐƯỢC PHÉP trình bày dưới dạng văn bản thuần túy (Plain text).
+- Dùng ký tự gạch ngang "-" và dấu cách để làm các mục danh sách (List). Ví dụ: "- Mùi hương: Dễ chịu."
+
 1. Tổng quan Cảm xúc: [Bắt buộc có: Tích cực / Trung lập / Tiêu cực]
 
 2. Đánh giá Chi tiết: (Chỉ in tiêu đề này nếu có ít nhất 1 trong các dòng bên dưới)

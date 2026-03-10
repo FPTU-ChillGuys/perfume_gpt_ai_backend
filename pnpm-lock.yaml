@@ -80,6 +80,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^11.2.5
         version: 11.2.5(@nestjs/common@11.1.12(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.12)(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)
+      '@openrouter/ai-sdk-provider':
+        specifier: ^2.2.5
+        version: 2.2.5(ai@6.0.42(zod@4.3.5))(zod@4.3.5)
       '@prisma/adapter-mssql':
         specifier: ^7.4.1
         version: 7.4.1(@azure/core-client@1.10.1)
@@ -1362,6 +1365,13 @@ packages:
 
   '@one-ini/wasm@0.1.1':
     resolution: {integrity: sha512-XuySG1E38YScSJoMlqovLru4KTUNSjgVTIjyh7qMX6aNN5HY5Ct5LhRJdxO79JtTzKfzV/bnWpz+zquYrISsvw==}
+
+  '@openrouter/ai-sdk-provider@2.2.5':
+    resolution: {integrity: sha512-IgM96gPvpxMZYYJQSIuXqvHX0mUXHEvsa/AtIlfb1VK4ek584ydAzc/wf3IuKxNof15o38WZMpCwfsOFHv96Jg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      ai: ^6.0.0
+      zod: ^3.25.0 || ^4.0.0
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -6903,6 +6913,11 @@ snapshots:
 
   '@one-ini/wasm@0.1.1':
     optional: true
+
+  '@openrouter/ai-sdk-provider@2.2.5(ai@6.0.42(zod@4.3.5))(zod@4.3.5)':
+    dependencies:
+      ai: 6.0.42(zod@4.3.5)
+      zod: 4.3.5
 
   '@opentelemetry/api@1.9.0': {}
 

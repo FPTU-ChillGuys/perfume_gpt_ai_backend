@@ -63,6 +63,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.1.1",
     "@nestjs/swagger": "^11.2.5",
+    "@openrouter/ai-sdk-provider": "^2.2.5",
     "@prisma/adapter-mssql": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "@scalar/nestjs-api-reference": "^1.0.18",

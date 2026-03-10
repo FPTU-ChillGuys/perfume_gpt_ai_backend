@@ -4,7 +4,7 @@ import { Public, Role } from 'src/application/common/Metadata';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ADVANCED_MATCHING_SYSTEM_PROMPT, trendForecastingPrompt, INSTRUCTION_TYPE_TREND } from 'src/application/constant/prompts';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { AI_SERVICE, AI_TREND_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
@@ -33,7 +33,7 @@ const cachingTrendTTL = CACHE_TTL_1WEEK; // TTL cache cho trend product (1 tuầ
 export class TrendController {
   constructor(
     private userLogService: UserLogService,
-    @Inject(AI_SERVICE) private aiService: AIService,
+    @Inject(AI_TREND_SERVICE) private aiService: AIService,
     private readonly adminInstructionService: AdminInstructionService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) { }

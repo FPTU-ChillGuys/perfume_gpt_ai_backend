@@ -10,6 +10,7 @@ import { ReviewTool } from './tools/review.tool';
 export class Tools {
   getTools: ToolSet;
   getToolsForChatbot: ToolSet;
+  getToolsForTrend: ToolSet;
 
   constructor(
     private readonly productTool: ProductTool,
@@ -25,6 +26,11 @@ export class Tools {
       // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile
+    };
+
+    this.getToolsForTrend = {
+      getAllProducts: this.productTool.getAllProducts,
+      searchProduct: this.productTool.searchProduct,
     };
 
     this.getTools = {

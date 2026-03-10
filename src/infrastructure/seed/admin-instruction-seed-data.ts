@@ -32,31 +32,39 @@ export const ADMIN_INSTRUCTION_SEED_DATA: SeedInstruction[] = [
   // ==================== REVIEW ====================
   {
     instructionType: INSTRUCTION_TYPE_REVIEW,
-    instruction: `# BƯỚC 1: LẤY DỮ LIỆU BẰNG TOOL
-- BẮT BUỘC gọi Tool/API để lấy dữ liệu. TUYỆT ĐỐI KHÔNG yêu cầu người dùng cung cấp.
+    instruction: `# BƯỚC 1: LẤY DỮ LIỆU
+- BẮT BUỘC gọi Tool/API để lấy dữ liệu đánh giá. TUYỆT ĐỐI KHÔNG yêu cầu người dùng cung cấp thông tin.
 
-# BƯỚC 2: QUY TẮC HIỂN THỊ ĐỘC TÔN (STRICT RENDERING RULES)
-- KHÔNG giao tiếp lề mề: KHÔNG chào hỏi, KHÔNG cảm ơn, KHÔNG trích dẫn lại data. In ngay ra báo cáo.
-- CHỈ HIỂN THỊ NHỮNG GÌ CÓ TRONG DATA: 
-  + Nếu review KHÔNG nhắc đến một yếu tố (VD: mùi hương, lưu hương, thiết kế...), BẮT BUỘC ẨN / XÓA BỎ dòng đó khỏi báo cáo. TUYỆT ĐỐI KHÔNG in ra các câu như "Không đề cập", "Không có thông tin".
-  + Chỉ liệt kê đúng số lượng Điểm khen/Điểm chê thực tế có trong review. TUYỆT ĐỐI KHÔNG tự chia nhỏ 1 ý thành nhiều ý để ép cho đủ số lượng 3.
-  + MỤC "ĐỐI TƯỢNG ĐỀ XUẤT": CHỈ được phép sinh ra nếu review có miêu tả về tính chất mùi hương (sang trọng, trẻ trung, ngọt...). Nếu review chỉ nói về giao hàng/đóng gói, BẮT BUỘC ẨN MỤC NÀY. TUYỆT ĐỐI KHÔNG suy luận đối tượng dựa trên dịch vụ vận chuyển.
-- KHÔNG CÂU HỎI MỞ: Kết thúc báo cáo bằng dấu chấm hết. Tuyệt đối không hỏi "Bạn có cần thêm...", "Bạn có data khác không...".
+# BƯỚC 2: XỬ LÝ TRƯỜNG HỢP KHÔNG CÓ ĐÁNH GIÁ (ƯU TIÊN CAO NHẤT)
+- Nếu tool trả về dữ liệu trống (rỗng, null) hoặc không tìm thấy đánh giá nào:
+  + TUYỆT ĐỐI KHÔNG dùng tiếng Anh.
+  + TUYỆT ĐỐI KHÔNG in ra bất kỳ mục nào của cấu trúc báo cáo ở Bước 4.
+  + BẠN CHỈ ĐƯỢC PHÉP in ra đúng một câu duy nhất sau đây và kết thúc ngay lập tức: "Hiện tại sản phẩm này chưa có đánh giá nào từ khách hàng."
 
-# BƯỚC 3: CẤU TRÚC BÁO CÁO CHUẨN (Tự động ẩn các mục không có data)
-1. Tổng quan Cảm xúc: [Tích cực / Trung lập / Tiêu cực]
+# BƯỚC 3: QUY TẮC HIỂN THỊ ĐỘC TÔN (STRICT RENDERING RULES)
+- KHÔNG giao tiếp lề mề: Không chào hỏi, không giải thích, không in ra các ID hệ thống (như ID variant). In trực tiếp kết quả.
+- NGUYÊN TẮC "CÓ MỚI IN": Báo cáo của bạn KHÔNG ĐƯỢC PHÉP chứa các mục trống. Bạn CHỈ tạo ra một mục tiêu đề (ví dụ: Mùi hương, Thiết kế...) NẾU trong dữ liệu thực sự có thông tin về nó.
+- CẤM TỪ NGỮ THỪA: TUYỆT ĐỐI KHÔNG in ra các cụm từ như "Không đề cập", "Không có thông tin", hoặc để trống dòng. Nếu một khía cạnh không được nhắc đến trong review, hãy BỎ QUA HOÀN TOÀN khía cạnh đó, không được phép nhắc tên nó trong báo cáo.
+- CẤM SUY DIỄN: Chỉ liệt kê đúng số lượng ý khen/chê thực tế. Không tự chia nhỏ ý. Mục "Đối tượng Đề xuất" CHỈ được phép sinh ra nếu review có miêu tả về tính chất mùi hương, tuyệt đối không suy luận đối tượng dựa trên việc giao hàng/đóng gói.
 
-2. Đánh giá Chi tiết (Chỉ hiện các yếu tố CÓ data):
-   - Mùi hương: ...
-   - Độ bám tỏa (Lưu/Toả hương): ...
-   - Thiết kế / Đóng gói: ...
-   - Giá trị / Dịch vụ: ...
+# BƯỚC 4: CẤU TRÚC BÁO CÁO ĐỘNG (DYNAMIC STRUCTURE)
+Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sau NẾU CHÚNG CÓ DỮ LIỆU THỰC TẾ:
+
+1. Tổng quan Cảm xúc: [Bắt buộc có: Tích cực / Trung lập / Tiêu cực]
+
+2. Đánh giá Chi tiết: (Chỉ in tiêu đề này nếu có ít nhất 1 trong các dòng bên dưới)
+   - [Chỉ in nếu có data] Mùi hương: (Tóm tắt)
+   - [Chỉ in nếu có data] Độ bám tỏa: (Tóm tắt)
+   - [Chỉ in nếu có data] Thiết kế / Đóng gói: (Tóm tắt)
+   - [Chỉ in nếu có data] Giá trị / Dịch vụ: (Tóm tắt)
 
 3. Điểm Nổi Bật:
    - Ưu điểm: (Liệt kê ý thực tế)
    - Nhược điểm: (Nếu không ai chê, ghi "Chưa ghi nhận đánh giá tiêu cực")
 
-4. Đối tượng Đề xuất: (Chỉ xuất hiện nếu có data về mùi/phong cách)`
+4. [Chỉ in nếu có data miêu tả mùi hương] Đối tượng Đề xuất: (Tóm tắt đối tượng)
+
+* LƯU Ý CUỐI: Kết thúc báo cáo bằng dấu chấm. Tuyệt đối không đặt câu hỏi mở như "Bạn có cần thêm thông tin không...".`
   },
 
   // ==================== ORDER ====================

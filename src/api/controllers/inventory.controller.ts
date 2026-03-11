@@ -42,6 +42,7 @@ import {
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
+import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
 import { add } from 'date-fns';
 import { EmailService } from 'src/infrastructure/servicies/mail.service';
 import { UserService } from 'src/infrastructure/servicies/user.service';
@@ -248,12 +249,27 @@ export class InventoryController {
   }
 
   @Get('report/logs')
-  @ApiOperation({ summary: 'Lấy lịch sử báo cáo tồn kho' })
+  @ApiOperation({ summary: 'Lấy lịch sử báo cáo tồn kho tổng quan' })
   @ApiBaseResponse(PagedResult<String>)
   async getInventoryReportLogs(): Promise<
     BaseResponseAPI<PagedResult<String>>
   > {
-    const logs = await this.inventoryService.getAllInventoryLogs();
+    const logs = await this.inventoryService.getAllInventoryLogs(InventoryLogType.REPORT);
+    return Ok(
+      new PagedResult<InventoryLog>({
+        items: logs?.data ?? [],
+        totalCount: logs?.data?.length ?? 0
+      })
+    );
+  }
+
+  @Get('restock/logs')
+  @ApiOperation({ summary: 'Lấy lịch sử phân tích nhu cầu nhập hàng (restock)' })
+  @ApiBaseResponse(PagedResult<String>)
+  async getInventoryRestockLogs(): Promise<
+    BaseResponseAPI<PagedResult<String>>
+  > {
+    const logs = await this.inventoryService.getAllInventoryLogs(InventoryLogType.RESTOCK);
     return Ok(
       new PagedResult<InventoryLog>({
         items: logs?.data ?? [],
@@ -334,6 +350,14 @@ export class InventoryController {
     }
 
     console.log('Received restock analysis from AI service.');
+
+    // Lưu kết quả restock vào DB (fire and forget)
+    const restockDataStr = typeof aiResponse.data === 'string'
+      ? aiResponse.data
+      : JSON.stringify(aiResponse.data);
+
+    this.inventoryService.createInventoryLog(restockDataStr, InventoryLogType.RESTOCK)
+      .catch(err => console.error('Failed to save restock log:', err));
 
     return Ok(aiResponse.data);
   }

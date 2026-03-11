@@ -10,6 +10,7 @@ import { BatchResponse } from 'src/application/dtos/response/batch.response';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
+import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
 import { TrendLog } from 'src/domain/entities/trend-log.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 
@@ -236,27 +237,33 @@ export class InventoryService {
   }
 
   async createInventoryLog(
-    report: string
+    report: string,
+    type: InventoryLogType = InventoryLogType.REPORT
   ): Promise<BaseResponseAPI<InventoryLog>> {
     return funcHandlerAsync(
       async () => {
         const logEntry = await this.unitOfWork.InventoryLogRepo.insert(
           new InventoryLog({
-            inventoryLog: report
+            inventoryLog: report,
+            type: type
           })
         );
         // No need to await or return anything, just fire and forget
-        return { success: true, data: logEntry };
+        return { success: true, data: logEntry as any };
       },
       'Failed to create inventory log',
       true
     );
   }
 
-  async getAllInventoryLogs(): Promise<BaseResponse<InventoryLog[]>> {
+  async getAllInventoryLogs(type?: InventoryLogType): Promise<BaseResponse<InventoryLog[]>> {
     return funcHandlerAsync(
       async () => {
-        const logs = await this.unitOfWork.InventoryLogRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
+        const where = type ? { type } : {};
+        const logs = await this.unitOfWork.InventoryLogRepo.find(
+          where,
+          { orderBy: { updatedAt: 'DESC' } }
+        );
         return { success: true, data: logs };
       },
       'Failed to fetch inventory logs',

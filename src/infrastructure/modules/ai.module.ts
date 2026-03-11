@@ -13,6 +13,8 @@ export const AI_TREND_SERVICE = 'AI_TREND_SERVICE';
 
 export const AI_RECOMMENDATION_AND_REPURCHASE_SERVICE = 'AI_RECOMMENDATION_AND_REPURCHASE_SERVICE';
 
+export const AI_RESTOCK_SERVICE = 'AI_RESTOCK_SERVICE';
+
 const aiProvider: Provider = {
   provide: AI_SERVICE,
   useFactory: (tools: Tools) => {
@@ -45,9 +47,17 @@ const aiRecommendationAndRepurchaseProvider: Provider = {
   inject: [Tools]
 };
 
+const aiRestockProvider: Provider = {
+  provide: AI_RESTOCK_SERVICE,
+  useFactory: (tools: Tools) => {
+    return new AIService(SYSTEM_PROMPT, tools.getToolsForTrend, 10);
+  },
+  inject: [Tools]
+};
+
 @Module({
   imports: [UnitOfWorkModule, ToolModule],
-  providers: [aiProvider, aiConversationProvider, aiTrendProvider, aiRecommendationAndRepurchaseProvider],
-  exports: [aiProvider, aiConversationProvider, aiTrendProvider, aiRecommendationAndRepurchaseProvider]
+  providers: [aiProvider, aiConversationProvider, aiTrendProvider, aiRecommendationAndRepurchaseProvider, aiRestockProvider],
+  exports: [aiProvider, aiConversationProvider, aiTrendProvider, aiRecommendationAndRepurchaseProvider, aiRestockProvider]
 })
-export class AIModule {}
+export class AIModule { }

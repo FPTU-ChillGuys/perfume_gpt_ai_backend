@@ -35,6 +35,9 @@ export const INSTRUCTION_TYPE_CONVERSATION = 'conversation';
 /** Loại instruction cho quiz tư vấn nước hoa */
 export const INSTRUCTION_TYPE_QUIZ = 'quiz';
 
+/** Loại instruction cho phân tích nhu cầu nhập hàng (restock) */
+export const INSTRUCTION_TYPE_RESTOCK = 'restock';
+
 /** Danh sách tất cả các loại instruction hợp lệ */
 export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_REVIEW,
@@ -46,6 +49,7 @@ export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_LOG,
   INSTRUCTION_TYPE_CONVERSATION,
   INSTRUCTION_TYPE_QUIZ,
+  INSTRUCTION_TYPE_RESTOCK,
 ] as const;
 
 export type InstructionDomainType = (typeof ALL_INSTRUCTION_TYPES)[number];

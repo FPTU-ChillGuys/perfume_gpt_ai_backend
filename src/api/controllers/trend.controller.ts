@@ -24,6 +24,7 @@ import { ZodObject } from 'zod';
 import * as crypto from 'crypto';
 import { productOutput } from 'src/chatbot/utils/output/product.output';
 import { CACHE_TTL_1WEEK } from 'src/infrastructure/cacheable/cacheable.constants';
+import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
 
 const cachingTrendTTL = CACHE_TTL_1WEEK; // TTL cache cho trend product (1 tuần)
 
@@ -36,6 +37,7 @@ export class TrendController {
     @Inject(AI_TREND_SERVICE) private aiService: AIService,
     private readonly adminInstructionService: AdminInstructionService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly inventoryService: InventoryService,
   ) { }
 
 
@@ -80,6 +82,14 @@ export class TrendController {
         endpoint: 'trends/summary'
       });
     }
+
+    // Lưu kết quả trend vào DB qua InventoryService (fire and forget)
+    const trendData = typeof trendResponse.data === 'string'
+      ? trendResponse.data
+      : JSON.stringify(trendResponse.data);
+    this.inventoryService.saveTrendLog(trendData).catch((err) => {
+      console.error('Failed to save trend log:', err);
+    });
 
     return Ok(trendResponse.data);
   }

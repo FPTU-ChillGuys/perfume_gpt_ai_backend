@@ -1,6 +1,7 @@
 import { Controller, Get, Inject, Param, Query, UseInterceptors } from '@nestjs/common';
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { Output } from 'ai';
 import * as crypto from 'crypto';
 import {
   ApiBearerAuth,
@@ -20,7 +21,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { AI_SERVICE, AI_RESTOCK_SERVICE } from 'src/infrastructure/modules/ai.module';
 import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
 import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
@@ -35,7 +36,8 @@ import {
 } from 'src/infrastructure/utils/insufficient-data';
 import {
   inventoryReportPrompt,
-  INSTRUCTION_TYPE_INVENTORY
+  INSTRUCTION_TYPE_INVENTORY,
+  INSTRUCTION_TYPE_RESTOCK
 } from 'src/application/constant/prompts';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
@@ -43,6 +45,7 @@ import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { add } from 'date-fns';
 import { EmailService } from 'src/infrastructure/servicies/mail.service';
 import { UserService } from 'src/infrastructure/servicies/user.service';
+import { restockOutput } from 'src/chatbot/utils/output/restock.output';
 
 @Role(['admin'])
 @ApiTags('Inventory')
@@ -56,6 +59,7 @@ export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
     @Inject(AI_SERVICE) private readonly aiService: AIService,
+    @Inject(AI_RESTOCK_SERVICE) private readonly aiRestockService: AIService,
     private readonly adminInstructionService: AdminInstructionService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly emailService: EmailService,
@@ -267,5 +271,70 @@ export class InventoryController {
     return this.inventoryService.getInventoryLogById(id);
   }
 
-  //Tao email cảnh bảo stock 
+  //Tao email cảnh bảo stock
+
+  /** Phân tích nhu cầu nhập hàng (restock) dựa trên xu hướng bán hàng */
+  @Get('restock/ai')
+  @ApiOperation({ summary: 'Phân tích nhu cầu nhập hàng dựa trên xu hướng (AI)' })
+  @ApiBaseResponse(Object)
+  async getAIRestockingNeeds(): Promise<BaseResponse<any>> {
+    // 1. Lấy dữ liệu tồn kho toàn bộ variant
+    const stockResponse = await this.inventoryService.getInventoryStock(
+      new InventoryStockRequest({ PageNumber: 1, PageSize: 1000 })
+    );
+    const stockItems = stockResponse.payload?.items ?? [];
+
+    if (stockItems.length === 0) {
+      return Ok('Không có dữ liệu tồn kho để phân tích.');
+    }
+
+    // 2. Lấy 2 trend log mới nhất
+    const trendLogsResponse = await this.inventoryService.getLatestTrendLogs(2);
+    const trendLogs = trendLogsResponse.data ?? [];
+
+    if (trendLogs.length === 0) {
+      return Ok('Không đủ dữ liệu xu hướng để phân tích restock. Vui lòng gọi GET /trends/summary trước.');
+    }
+
+    const latestTrend = trendLogs[0]?.trendData ?? '';
+    const previousTrend = trendLogs[1]?.trendData ?? '(Không có dữ liệu xu hướng trước đó)';
+
+    // 3. Build context prompt
+    const stockDataStr = JSON.stringify(stockItems, null, 2);
+    const restockPrompt = [
+      '[DỮ LIỆU TỒN KHO HIỆN TẠI]',
+      stockDataStr,
+      '',
+      '[XU HƯỚNG MỚI NHẤT]',
+      latestTrend,
+      '',
+      '[XU HƯỚNG TRƯỚC ĐÓ]',
+      previousTrend
+    ].join('\n');
+
+    // 4. Lấy admin instruction cho domain restock
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(
+      INSTRUCTION_TYPE_RESTOCK
+    );
+
+    console.log('Sending restock analysis request to AI service...');
+
+    // 5. Gọi AI (dùng AI_RESTOCK_SERVICE — chỉ có trend tools và restockOutput)
+    const aiResponse = await this.aiRestockService.textGenerateFromPrompt(
+      restockPrompt,
+      adminPrompt,
+      Output.object({ schema: restockOutput.schema })
+    );
+
+    if (!aiResponse.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI restock analysis',
+        { service: 'AIRestockService' }
+      );
+    }
+
+    console.log('Received restock analysis from AI service.');
+
+    return Ok(aiResponse.data);
+  }
 }

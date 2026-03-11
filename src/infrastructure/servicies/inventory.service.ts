@@ -10,6 +10,7 @@ import { BatchResponse } from 'src/application/dtos/response/batch.response';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
+import { TrendLog } from 'src/domain/entities/trend-log.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 
 @Injectable()
@@ -17,7 +18,7 @@ export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly unitOfWork: UnitOfWork
-  ) {}
+  ) { }
 
   async getInventoryStock(
     request: InventoryStockRequest
@@ -31,17 +32,17 @@ export class InventoryService {
           ...(request.VariantId ? { VariantId: request.VariantId } : {}),
           ...(request.SearchTerm
             ? {
-                ProductVariants: {
-                  Products: { Name: { contains: request.SearchTerm } }
-                }
+              ProductVariants: {
+                Products: { Name: { contains: request.SearchTerm } }
               }
+            }
             : {}),
           ...(request.IsLowStock != null
             ? {
-                ProductVariants: {
-                  Stocks: request.IsLowStock ? { isNot: null } : undefined
-                }
+              ProductVariants: {
+                Stocks: request.IsLowStock ? { isNot: null } : undefined
               }
+            }
             : {})
         };
 
@@ -119,33 +120,33 @@ export class InventoryService {
             : {}),
           ...(request.isExpired != null
             ? {
-                ExpiryDate: request.isExpired
-                  ? { lt: new Date() }
-                  : { gte: new Date() }
-              }
+              ExpiryDate: request.isExpired
+                ? { lt: new Date() }
+                : { gte: new Date() }
+            }
             : {}),
           ...(request.variantSku ||
-          request.productName ||
-          request.volumeMl ||
-          request.concentrationName
+            request.productName ||
+            request.volumeMl ||
+            request.concentrationName
             ? {
-                ProductVariants: {
-                  ...(request.variantSku
-                    ? { Sku: { contains: request.variantSku } }
-                    : {}),
-                  ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
-                  ...(request.productName
-                    ? { Products: { Name: { contains: request.productName } } }
-                    : {}),
-                  ...(request.concentrationName
-                    ? {
-                        Concentrations: {
-                          Name: { contains: request.concentrationName }
-                        }
-                      }
-                    : {})
-                }
+              ProductVariants: {
+                ...(request.variantSku
+                  ? { Sku: { contains: request.variantSku } }
+                  : {}),
+                ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
+                ...(request.productName
+                  ? { Products: { Name: { contains: request.productName } } }
+                  : {}),
+                ...(request.concentrationName
+                  ? {
+                    Concentrations: {
+                      Name: { contains: request.concentrationName }
+                    }
+                  }
+                  : {})
               }
+            }
             : {})
         };
 
@@ -272,4 +273,26 @@ export class InventoryService {
       return { success: true, data: log };
     }, 'Failed to fetch inventory log');
   }
+
+  /** Lấy N trend log mới nhất (sắp xếp theo thời gian tạo giảm dần) */
+  async getLatestTrendLogs(count: number) {
+    return funcHandlerAsync(async () => {
+      const logs = await this.unitOfWork.TrendLogRepo.find(
+        {},
+        { orderBy: { createdAt: 'DESC' }, limit: count }
+      );
+      return { success: true, data: logs };
+    }, 'Failed to fetch trend logs');
+  }
+
+  /** Lưu kết quả trend AI vào DB (dùng EntityManager qua repository theo MikroORM v6) */
+  async saveTrendLog(trendData: string): Promise<void> {
+    try {
+      const log = new TrendLog({ trendData });
+      await this.unitOfWork.TrendLogRepo.getEntityManager().persistAndFlush(log);
+    } catch (err) {
+      console.error('Failed to save trend log:', err);
+    }
+  }
 }
+

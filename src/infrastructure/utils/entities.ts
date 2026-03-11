@@ -13,6 +13,7 @@ import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
 import { UserSearchLog } from 'src/domain/entities/user-search.log.entity';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
+import { TrendLog } from 'src/domain/entities/trend-log.entity';
 
 export const entities = [
   Conversation,
@@ -29,5 +30,6 @@ export const entities = [
   UserSearchLog,
   AIAcceptance,
   InventoryLog,
-  ReviewLog
+  ReviewLog,
+  TrendLog
 ];

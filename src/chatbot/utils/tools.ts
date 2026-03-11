@@ -5,19 +5,22 @@ import { OrderTool } from './tools/orders.tool';
 import { ProfileTool } from './tools/profile.tool';
 import { LogTool } from './tools/log.tool';
 import { ReviewTool } from './tools/review.tool';
+import { UserTool } from './tools/user.tool';
 
 @Injectable()
 export class Tools {
   getTools: ToolSet;
   getToolsForChatbot: ToolSet;
   getToolsForTrend: ToolSet;
+  getToolsForRecomendationAndRepurchase: ToolSet;
 
   constructor(
     private readonly productTool: ProductTool,
     private readonly orderTool: OrderTool,
     private readonly profileTool: ProfileTool,
     private readonly logTool: LogTool,
-    private readonly reviewTool: ReviewTool
+    private readonly reviewTool: ReviewTool,
+    private readonly userTool: UserTool
   ) {
     this.getToolsForChatbot = {
       getAllProducts: this.productTool.getAllProducts,
@@ -30,7 +33,19 @@ export class Tools {
 
     this.getToolsForTrend = {
       getAllProducts: this.productTool.getAllProducts,
+      searchProduct: this.productTool.searchProduct
+    };
+
+    this.getToolsForRecomendationAndRepurchase = {
+      getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
+      getOrderDetailsWithOrdersByUserId:
+        this.orderTool.getOrderDetailsWithOrdersByUserId,
+      getOwnProfile: this.profileTool.getOwnProfile,
+      // getUserById: this.profileTool.getUserById,
+      getUserLogSummaryReportPerWeek:
+        this.logTool.getUserLogSummaryReportPerWeek,
+      getUserById: this.userTool.getUserById
     };
 
     this.getTools = {

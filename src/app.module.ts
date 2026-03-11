@@ -14,8 +14,10 @@ import { mikro } from '@automapper/mikro';
 import { CamelCaseNamingConvention } from '@automapper/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { EjsAdapter } from '@nestjs-modules/mailer/dist/adapters/ejs.adapter';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
+import * as path from 'path';
 
 @Module({
   imports: [
@@ -46,28 +48,47 @@ import { PrismaModule } from './prisma/prisma.module';
           algorithms: ['RS256'],
           issuer: config.get<string>('JWT_ISSUER'),
           audience: config.get<string>('JWT_AUDIENCE')
-        },
+        }
       })
     }),
     ScheduleModule.forRoot(),
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        transport: {
-          host: 'smtp.gmail.com',
-          port: 587,
-          secure: false,
-          auth: {
-            user: config.get<string>('GOOGLE_EMAIL'),
-            pass: config.get<string>('GOOGLE_APP_PASSWORD')
-          }
-        },
-        defaults: {
-          from: 'No reply <noreply@perfume.com>'
-        },
-        preview: true
-      })
+      useFactory: (config: ConfigService) => {
+        // Xác định template directory dựa trên environment
+        const isProduction = process.env.NODE_ENV === 'production';
+        const templateDir = isProduction
+          ? path.join(__dirname, '..', 'infrastructure', 'templates', 'emails')
+          : path.join(
+              process.cwd(),
+              'src',
+              'infrastructure',
+              'templates',
+              'emails'
+            );
+
+        return {
+          transport: {
+            host: 'smtp.gmail.com',
+            port: 587,
+            secure: false,
+            auth: {
+              user: config.get<string>('GOOGLE_EMAIL'),
+              pass: config.get<string>('GOOGLE_APP_PASSWORD')
+            }
+          },
+          defaults: {
+            from: 'No reply <noreply@perfume.com>'
+          },
+          template: {
+            dir: templateDir,
+            adapter: new EjsAdapter(),
+            options: {}
+          },
+          preview: true
+        };
+      }
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -75,10 +96,10 @@ import { PrismaModule } from './prisma/prisma.module';
       useFactory: (config: ConfigService) => ({
         connection: {
           host: config.get<string>('REDIS_HOST'),
-          port: config.get<number>('REDIS_PORT'),
+          port: config.get<number>('REDIS_PORT')
         }
       })
-    }),
+    })
   ],
   controllers: [AppController],
   providers: [
@@ -89,4 +110,4 @@ import { PrismaModule } from './prisma/prisma.module';
     }
   ]
 })
-export class AppModule { }
+export class AppModule {}

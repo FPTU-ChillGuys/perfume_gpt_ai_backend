@@ -41,6 +41,8 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { add } from 'date-fns';
+import { EmailService } from 'src/infrastructure/servicies/mail.service';
+import { UserService } from 'src/infrastructure/servicies/user.service';
 
 @Role(['admin'])
 @ApiTags('Inventory')
@@ -55,7 +57,9 @@ export class InventoryController {
     private readonly inventoryService: InventoryService,
     @Inject(AI_SERVICE) private readonly aiService: AIService,
     private readonly adminInstructionService: AdminInstructionService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly emailService: EmailService,
+    private readonly userService: UserService,
   ) { }
 
   /** Lấy thông tin tồn kho */
@@ -210,9 +214,9 @@ export class InventoryController {
     );
 
     // Goi them thoi gian tiep theo cho den khi het caching
-    const expirationTime = add(new Date(), { seconds: ttlMilliseconds/1000 });
+    const expirationTime = add(new Date(), { seconds: ttlMilliseconds / 1000 });
 
-    return Ok({ jobId, expirationTime});
+    return Ok({ jobId, expirationTime });
   }
 
   /**
@@ -262,4 +266,6 @@ export class InventoryController {
   ): Promise<BaseResponse<InventoryLog>> {
     return this.inventoryService.getInventoryLogById(id);
   }
+
+  //Tao email cảnh bảo stock 
 }

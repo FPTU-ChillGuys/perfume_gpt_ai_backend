@@ -45,23 +45,6 @@ export class ReviewController {
     @ApiBaseResponse(String)
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
     async getReviewSummaryFromAllVariant(): Promise<BaseResponse<string>> {
-        // const reviewsResponse = await this.reviewService.getAllReviews(new GetPagedReviewRequest());
-
-        // if (!reviewsResponse.success) {
-        //     throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
-        //         service: 'ReviewService',
-        //         endpoint: 'reviews/summary/all'
-        //     });
-        // }
-
-        // const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
-
-        // if (isArrayEmpty(reviews)) {
-        //     return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
-        // }
-
-        // const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
-
         // Lấy admin instruction cho domain review (nếu có)
         const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
 
@@ -76,6 +59,11 @@ export class ReviewController {
                 endpoint: 'reviews/summary/all'
             });
         }
+
+        // Lưu log đánh giá tổng quan (fire and forget)
+        await this.reviewService.addReviewLog(ReviewTypeEnum.ALL, null, summaryResponse.data ?? '').catch((err) => {
+            console.error('Failed to save review summary log (ALL):', err);
+        });
 
         return Ok(summaryResponse.data);
     }
@@ -148,24 +136,6 @@ export class ReviewController {
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI theo variant ID' })
     @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
     async getReviewSummaryByVariantId(@Param('variantId') variantId: string): Promise<BaseResponse<string>> {
-        // const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
-
-        // if (!reviewsResponse.success) {
-        //     throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
-        //         variantId,
-        //         service: 'ReviewService',
-        //         endpoint: 'reviews/summary/:variantId'
-        //     });
-        // }
-
-        // const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
-
-        // if (isArrayEmpty(reviews)) {
-        //     return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
-        // }
-
-        // const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
-
         // Lấy admin instruction cho domain review (nếu có)
         const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
 
@@ -181,6 +151,11 @@ export class ReviewController {
                 endpoint: 'reviews/summary/:variantId'
             });
         }
+
+        // Lưu log đánh giá theo variant (fire and forget)
+        await this.reviewService.addReviewLog(ReviewTypeEnum.ID, variantId, summaryResponse.data ?? '').catch((err) => {
+            console.error(`Failed to save review summary log for variant ${variantId}:`, err);
+        });
 
         return Ok(summaryResponse.data);
     }
@@ -247,6 +222,11 @@ export class ReviewController {
             reviewCount: reviews.length,
             generatedAt: new Date(),
             metadata: new AIResponseMetadata({ processingTimeMs })
+        });
+
+        // Lưu log đánh giá theo variant (fire and forget)
+        await this.reviewService.addReviewLog(ReviewTypeEnum.ID, variantId, summaryResponse.data ?? '').catch((err) => {
+            console.error(`Failed to save structured review summary log for variant ${variantId}:`, err);
         });
 
         return Ok(structuredResponse);

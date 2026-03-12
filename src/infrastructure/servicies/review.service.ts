@@ -94,7 +94,7 @@ export class ReviewService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly unitOfWork: UnitOfWork
-  ) {}
+  ) { }
 
   async getAllReviews(
     request: GetPagedReviewRequest
@@ -112,11 +112,11 @@ export class ReviewService {
           ...(request.Status ? { Status: request.Status } : {}),
           ...(request.MinRating || request.MaxRating
             ? {
-                Rating: {
-                  ...(request.MinRating ? { gte: request.MinRating } : {}),
-                  ...(request.MaxRating ? { lte: request.MaxRating } : {})
-                }
+              Rating: {
+                ...(request.MinRating ? { gte: request.MinRating } : {}),
+                ...(request.MaxRating ? { lte: request.MaxRating } : {})
               }
+            }
             : {}),
           ...(request.HasImages ? { Media: { some: {} } } : {})
         };
@@ -204,14 +204,14 @@ export class ReviewService {
 
   async addReviewLog(
     type: ReviewTypeEnum,
-    variantId: string,
+    variantId: string | null,
     reviewLog: string
   ): Promise<BaseResponseAPI<ReviewLog>> {
     return await funcHandlerAsync(
       async () => {
         const log = new ReviewLog({
           typeReview: type,
-          variantId,
+          ...(variantId ? { variantId } : {}),
           reviewLog
         });
         const result = await this.unitOfWork.ReviewLogRepo.insert(log);

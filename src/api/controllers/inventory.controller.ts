@@ -106,17 +106,14 @@ export class InventoryController {
   @ApiBaseResponse(String)
   @CacheTTL(CACHE_TTL_1HOUR)
   @UseInterceptors(CacheInterceptor)
-  async createInventoryReportJob(
-    @Query('forceRefresh') forceRefresh?: boolean
-  ): Promise<BaseResponse<{ jobId: string }>> {
+  async createInventoryReportJob(): Promise<BaseResponse<{ jobId: string }>> {
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIInventoryReport(),
       {
         type: 'inventory_report_job',
         cacheKeyFactory: (jobId) => `inventory_report_job_${jobId}`,
-        ttlMilliseconds: CACHE_TTL_1HOUR,
-        forceRefresh: forceRefresh === true || String(forceRefresh) === 'true'
+        ttlMilliseconds: CACHE_TTL_1HOUR
       }
     );
   }
@@ -194,17 +191,14 @@ export class InventoryController {
   @ApiBaseResponse(String)
   @CacheTTL(CACHE_TTL_1HOUR)
   @UseInterceptors(CacheInterceptor)
-  async createRestockReportJob(
-    @Query('forceRefresh') forceRefresh?: boolean
-  ): Promise<BaseResponse<{ jobId: string }>> {
+  async createRestockReportJob(): Promise<BaseResponse<{ jobId: string }>> {
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIRestockingNeeds(),
       {
         type: 'inventory_restock_job',
         cacheKeyFactory: (jobId) => `inventory_restock_job_${jobId}`,
-        ttlMilliseconds: CACHE_TTL_1HOUR,
-        forceRefresh: forceRefresh === true || String(forceRefresh) === 'true'
+        ttlMilliseconds: CACHE_TTL_1HOUR
       }
     );
   }

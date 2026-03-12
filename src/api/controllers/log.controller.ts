@@ -45,18 +45,6 @@ export class LogController extends LogHelper {
   @Public()
   @Get('report/activity/all')
   @ApiOperation({ summary: 'Lấy báo cáo tất cả log hoạt động người dùng' })
-  @ApiQuery({
-    name: 'period',
-    enum: PeriodEnum,
-    description: 'Khoảng thời gian lọc'
-  })
-  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
-  @ApiQuery({
-    name: 'startDate',
-    type: Date,
-    required: false,
-    description: 'Ngày bắt đầu (tùy chọn)'
-  })
   @ApiBaseResponse(String)
   async getReportFromAllLogs(
     @Query() allUserLogRequest: AllUserLogRequest
@@ -77,19 +65,6 @@ export class LogController extends LogHelper {
   /** Lấy báo cáo log hoạt động người dùng */
   @Get('report/activity/user')
   @ApiOperation({ summary: 'Lấy báo cáo log hoạt động người dùng' })
-  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
-  @ApiQuery({
-    name: 'period',
-    enum: PeriodEnum,
-    description: 'Khoảng thời gian lọc'
-  })
-  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
-  @ApiQuery({
-    name: 'startDate',
-    type: Date,
-    required: false,
-    description: 'Ngày bắt đầu (tùy chọn)'
-  })
   @ApiBaseResponse(String)
   async collectLogs(
     @Query() userLogRequest: UserLogRequest
@@ -126,18 +101,6 @@ export class LogController extends LogHelper {
   /** Lấy tất cả log hoạt động người dùng theo khoảng thời gian */
   @Get("all/period")
   @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng theo khoảng thời gian' })
-  @ApiQuery({
-    name: 'period',
-    enum: PeriodEnum,
-    description: 'Khoảng thời gian lọc'
-  })
-  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
-  @ApiQuery({
-    name: 'startDate',
-    type: Date,
-    required: false,
-    description: 'Ngày bắt đầu (tùy chọn)'
-  })
   @ApiBaseResponse(Array<UserLog>)
   async getUserLogsWithPeriod(
     @Query() allUserLogRequest: AllUserLogRequest
@@ -153,19 +116,6 @@ export class LogController extends LogHelper {
   /** Tóm tắt log người dùng bằng AI */
   @Get('summarize')
   @ApiOperation({ summary: 'Tóm tắt log người dùng bằng AI' })
-  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
-  @ApiQuery({
-    name: 'period',
-    enum: PeriodEnum,
-    description: 'Khoảng thời gian lọc'
-  })
-  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
-  @ApiQuery({
-    name: 'startDate',
-    type: Date,
-    required: false,
-    description: 'Ngày bắt đầu (tùy chọn)'
-  })
   @ApiBaseResponse(String)
   async summarizeLogs(
     @Query() userLogRequest: UserLogRequest
@@ -227,18 +177,6 @@ export class LogController extends LogHelper {
   /** Tóm tắt log của tất cả người dùng bằng AI (chú ý: có thể mất thời gian và không lưu vào DB) */
   @Get('summarize/all')
   @ApiOperation({ summary: 'Tóm tắt log tất cả người dùng bằng AI' })
-  @ApiQuery({
-    name: 'period',
-    enum: PeriodEnum,
-    description: 'Khoảng thời gian lọc'
-  })
-  @ApiQuery({ name: 'endDate', type: Date, description: 'Ngày kết thúc' })
-  @ApiQuery({
-    name: 'startDate',
-    type: Date,
-    required: false,
-    description: 'Ngày bắt đầu (tùy chọn)'
-  })
   @ApiBaseResponse(String)
   async summarizeAllLogs(
     @Query() allUserLogRequest: AllUserLogRequest

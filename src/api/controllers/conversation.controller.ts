@@ -115,6 +115,52 @@ export class ConversationController {
     return await this.conversationService.getAllConversationsPaginated(request);
   }
 
+
+  private async processAiChatResponse(
+    convertedMessages: UIMessage[],
+    conversationMessages: any[],
+    conversationId: string,
+    userId: string,
+    adminInstruction: string | undefined,
+    combinedPrompt: string,
+    endpoint: string,
+    saveStrategy: 'sync' | 'queue' | 'queue_with_userid'
+  ): Promise<ConversationDto> {
+    const systemPrompt = conversationSystemPrompt(
+      adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      combinedPrompt
+    );
+
+    const message = await this.aiService.textGenerateFromMessages(
+      convertedMessages,
+      systemPrompt,
+      Output.object(searchOutput)
+    );
+
+    if (!message.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        { userId, conversationId, service: 'AIService', endpoint }
+      );
+    }
+
+    const responseConversation = overrideMessagesToConversation(
+      conversationId || '',
+      userId || '',
+      addMessageToMessages(message.data || '', conversationMessages || [])
+    );
+
+    if (saveStrategy === 'sync') {
+      await this.conversationService.saveOrUpdateConversation(responseConversation);
+    } else if (saveStrategy === 'queue') {
+      await this.conversationQueue.add(ConversationJobName.ADD_MESSAGE_AND_LOG, responseConversation);
+    } else if (saveStrategy === 'queue_with_userid') {
+      await this.conversationQueue.add(ConversationJobName.ADD_MESSAGE_AND_LOG, { responseConversation, userId });
+    }
+
+    return responseConversation;
+  }
+
   /**
    * Chat V1 - Sử dụng log tóm tắt từ user log service (nhanh hơn nhưng phụ thuộc nội dung tóm tắt của service)
    * @note userId được lấy từ JWT token. Guest (không có token) sẽ không lấy log/order/profile.
@@ -166,57 +212,12 @@ export class ConversationController {
     // Guest: không lấy log, order, profile
     //-------------------------------------------------------------
 
-    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
     const adminSystemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
-    const systemPrompt = conversationSystemPrompt(
-      adminSystemPrompt || ADVANCED_MATCHING_SYSTEM_PROMPT,
-      combinedPrompt
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages, conversation.messages || [], conversation.id || '',
+      userId || '', adminSystemPrompt, combinedPrompt, 'chat/v1', 'sync'
     );
-
-    // Call AI service to get response
-    const message = await this.aiService.textGenerateFromMessages(
-      convertedMessages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    if (!message.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'AIService',
-          endpoint: 'chat/v1'
-        }
-      );
-    }
-
-    // Prepare response conversation
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id || '',
-      userId || '',
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    // Save or update conversation in database
-    if (
-      !(await this.conversationService.isExistConversation(
-        responseConversation.id || ''
-      ))
-    ) {
-      await this.conversationService.addConversation(responseConversation);
-    } else {
-      await this.conversationService.updateMessageToConversation(
-        responseConversation.id!,
-        responseConversation.messages || []
-      );
-    }
-
-    return {
-      success: true,
-      data: responseConversation
-    };
+    return Ok(responseConversation);
   }
 
   /**
@@ -274,57 +275,12 @@ export class ConversationController {
     // Guest: không lấy log, order, profile
     //-------------------------------------------------------------
 
-    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
     const adminSystemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_CONVERSATION);
-    const systemPrompt = conversationSystemPrompt(
-      adminSystemPrompt || ADVANCED_MATCHING_SYSTEM_PROMPT,
-      combinedPrompt
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages, conversation.messages || [], conversation.id || '',
+      userId || '', adminSystemPrompt, combinedPrompt, 'chat/v2', 'sync'
     );
-
-    // Call AI service to get response
-    const message = await this.aiService.textGenerateFromMessages(
-      convertedMessages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    if (!message.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'AIService',
-          endpoint: 'chat/v2'
-        }
-      );
-    }
-
-    // Prepare response conversation
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id || '',
-      userId || '',
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    // Luu hoac cap nhat conversation vao db
-    if (
-      !(await this.conversationService.isExistConversation(
-        responseConversation.id || ''
-      ))
-    ) {
-      await this.conversationService.addConversation(responseConversation);
-    } else {
-      await this.conversationService.updateMessageToConversation(
-        responseConversation.id!,
-        responseConversation.messages || []
-      );
-    }
-
-    return {
-      success: true,
-      data: responseConversation
-    };
+    return Ok(responseConversation);
   }
 
   /**
@@ -372,42 +328,10 @@ export class ConversationController {
       );
     }
 
-    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
-    const systemPrompt = conversationSystemPrompt(
-      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
-      promptResult.data.combinedPrompt
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages, conversation.messages || [], conversation.id || '',
+      userId || '', promptResult.data.adminInstruction, promptResult.data.combinedPrompt, 'chat/v3', 'sync'
     );
-
-    // Call AI service
-    const message = await this.aiService.textGenerateFromMessages(
-      convertedMessages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    if (!message.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'AIService',
-          endpoint: 'chat/v3'
-        }
-      );
-    }
-
-    // Lưu conversation
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id || '',
-      userId || '',
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    await this.conversationService.saveOrUpdateConversation(
-      responseConversation
-    );
-
     return Ok(responseConversation);
   }
 
@@ -455,42 +379,10 @@ export class ConversationController {
       );
     }
 
-    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
-    const systemPrompt = conversationSystemPrompt(
-      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
-      promptResult.data.combinedPrompt
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages, conversation.messages || [], conversation.id || '',
+      userId || '', promptResult.data.adminInstruction, promptResult.data.combinedPrompt, 'chat/v4', 'sync'
     );
-
-    // Call AI service
-    const message = await this.aiService.textGenerateFromMessages(
-      convertedMessages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    if (!message.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'AIService',
-          endpoint: 'chat/v4'
-        }
-      );
-    }
-
-    // Lưu conversation
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id || '',
-      userId || '',
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    await this.conversationService.saveOrUpdateConversation(
-      responseConversation
-    );
-
     return Ok(responseConversation);
   }
 
@@ -540,43 +432,10 @@ export class ConversationController {
       );
     }
 
-    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
-    const systemPrompt = conversationSystemPrompt(
-      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
-      promptResult.data.combinedPrompt
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages, conversation.messages || [], conversation.id || '',
+      userId || '', promptResult.data.adminInstruction, promptResult.data.combinedPrompt, 'chat/v5', 'queue'
     );
-
-    // Call AI service
-    const message = await this.aiService.textGenerateFromMessages(
-      convertedMessages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    if (!message.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'AIService',
-          endpoint: 'chat/v4'
-        }
-      );
-    }
-
-    // Lưu conversation
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id || '',
-      userId || '',
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    await this.conversationQueue.add(
-      ConversationJobName.ADD_MESSAGE_AND_LOG,
-      responseConversation
-    );
-
     return Ok(responseConversation);
   }
 
@@ -625,43 +484,10 @@ export class ConversationController {
       );
     }
 
-    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
-    const systemPrompt = conversationSystemPrompt(
-      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
-      promptResult.data.combinedPrompt
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages, conversation.messages || [], conversation.id || '',
+      userId || '', promptResult.data.adminInstruction, promptResult.data.combinedPrompt, 'chat/v6', 'queue_with_userid'
     );
-
-    // Call AI service
-    const message = await this.aiService.textGenerateFromMessages(
-      convertedMessages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    if (!message.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'AIService',
-          endpoint: 'chat/v4'
-        }
-      );
-    }
-
-    // Lưu conversation
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id || '',
-      userId || '',
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    await this.conversationQueue.add(
-      ConversationJobName.ADD_MESSAGE_AND_LOG,
-      { responseConversation, userId }
-    );
-
     return Ok(responseConversation);
   }
 
@@ -706,44 +532,10 @@ export class ConversationController {
       );
     }
 
-    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
-    const systemPrompt = conversationSystemPrompt(
-      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
-      promptResult.data.combinedPrompt
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages, conversation.messages || [], conversation.id || '',
+      userId || '', promptResult.data.adminInstruction, promptResult.data.combinedPrompt, 'chat/v7', 'queue_with_userid'
     );
-
-    // Call AI service
-    const message = await this.aiService.textGenerateFromMessages(
-      convertedMessages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-
-    if (!message.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'AIService',
-          endpoint: 'chat/v4'
-        }
-      );
-    }
-
-    // Lưu conversation
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id || '',
-      userId || '',
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    await this.conversationQueue.add(
-      ConversationJobName.ADD_MESSAGE_AND_LOG,
-      { responseConversation, userId }
-    );
-
     return Ok(responseConversation);
   }
 
@@ -787,43 +579,10 @@ export class ConversationController {
       );
     }
 
-    // Lay system prompt: uu tien admin instruction tu DB, fallback sang hardcode
-    const systemPrompt = conversationSystemPrompt(
-      promptResult.data.adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
-      promptResult.data.combinedPrompt
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages, conversation.messages || [], conversation.id || '',
+      userId || '', promptResult.data.adminInstruction, promptResult.data.combinedPrompt, 'chat/v6', 'queue_with_userid'
     );
-
-    // Call AI service
-    const message = await this.aiService.textGenerateFromMessages(
-      convertedMessages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    if (!message.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'AIService',
-          endpoint: 'chat/v4'
-        }
-      );
-    }
-
-    // Lưu conversation
-    const responseConversation = overrideMessagesToConversation(
-      conversation.id || '',
-      userId || '',
-      addMessageToMessages(message.data || '', conversation.messages || [])
-    );
-
-    await this.conversationQueue.add(
-      ConversationJobName.ADD_MESSAGE_AND_LOG,
-      { responseConversation, userId }
-    );
-
     return Ok(responseConversation);
   }
 

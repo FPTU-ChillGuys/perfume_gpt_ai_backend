@@ -18,21 +18,30 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
   stopWhen?: number,
   output?: any
 ) {
-  try {
-    const result = await generateText({
-      model: model,
-      prompt: prompt,
-      system: systemPrompt ? systemPrompt : undefined,
-      tools: tools ? tools : undefined,
-      stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
-      output: output ? output : undefined
-    });
-    return result.text;
-  } catch (error) {
-    console.error('Error in TextGenerationFromMessages:', error);
-    return errorMessage
-      ? errorMessage
-      : 'Hệ thống gặp sự cố khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.';
+  let retries = 2;
+  while (retries >= 0) {
+    try {
+      const result = await generateText({
+        model: model,
+        prompt: prompt,
+        system: systemPrompt ? systemPrompt : undefined,
+        tools: tools ? tools : undefined,
+        stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
+        output: output ? output : undefined
+      });
+      return result.text;
+    } catch (error) {
+      console.error(`Error in TextGenerationFromPrompt (Remaining retries: ${retries}):`, error);
+      if (retries === 0) {
+        if (output) {
+          throw error;
+        }
+        return errorMessage
+          ? errorMessage
+          : 'Hệ thống gặp sự cố khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.';
+      }
+      retries--;
+    }
   }
 }
 
@@ -45,22 +54,31 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
   stopWhen?: number,
   output?: any
 ) {
-  try {
-    const modelMessages = await convertToModelMessages(messages);
-    const result = await generateText({
-      model: model,
-      messages: modelMessages,
-      system: systemPrompt ? systemPrompt : undefined,
-      tools: tools ? tools : undefined,
-      stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
-      output: output ? output : undefined
-    });
-    return result.text;
-  } catch (error) {
-    console.error('Error in TextGenerationFromMessages:', error);
-    return errorMessage
-      ? errorMessage
-      : 'Hệ thống gặp sự cố khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.';
+  let retries = 2;
+  while (retries >= 0) {
+    try {
+      const modelMessages = await convertToModelMessages(messages);
+      const result = await generateText({
+        model: model,
+        messages: modelMessages,
+        system: systemPrompt ? systemPrompt : undefined,
+        tools: tools ? tools : undefined,
+        stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
+        output: output ? output : undefined
+      });
+      return result.text;
+    } catch (error) {
+      console.error(`Error in TextGenerationFromMessages (Remaining retries: ${retries}):`, error);
+      if (retries === 0) {
+        if (output) {
+          throw error;
+        }
+        return errorMessage
+          ? errorMessage
+          : 'Hệ thống gặp sự cố khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.';
+      }
+      retries--;
+    }
   }
 }
 

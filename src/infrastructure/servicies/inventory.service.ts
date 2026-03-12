@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from 'generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
@@ -13,13 +13,36 @@ import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
 import { TrendLog } from 'src/domain/entities/trend-log.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { Output } from 'ai';
+import { AIHelper } from '../helpers/ai.helper';
+import { AI_HELPER, AI_RESTOCK_HELPER } from '../modules/ai.module';
+import { AdminInstructionService } from './admin-instruction.service';
+import {
+  inventoryReportPrompt,
+  INSTRUCTION_TYPE_INVENTORY,
+  INSTRUCTION_TYPE_RESTOCK
+} from 'src/application/constant/prompts';
+import {
+  isDataEmpty,
+  INSUFFICIENT_DATA_MESSAGES
+} from '../utils/insufficient-data';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import {
+  AIInventoryReportStructuredResponse,
+  AIResponseMetadata
+} from 'src/application/dtos/response/ai-structured.response';
+import { restockOutput } from 'src/chatbot/utils/output/restock.output';
 
 @Injectable()
 export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly unitOfWork: UnitOfWork
-  ) { }
+    private readonly unitOfWork: UnitOfWork,
+    @Inject(AI_HELPER) private readonly aiHelper: AIHelper,
+    @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
+    private readonly adminInstructionService: AdminInstructionService
+  ) {}
 
   async getInventoryStock(
     request: InventoryStockRequest
@@ -300,6 +323,101 @@ export class InventoryService {
     } catch (err) {
       console.error('Failed to save trend log:', err);
     }
+  }
+
+  async generateAIInventoryReport(): Promise<BaseResponse<string>> {
+    const report = await this.createReportFromBatchAndStock();
+    if (isDataEmpty(report?.toString())) {
+      return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
+    }
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+    const aiResponse = await this.aiHelper.textGenerateFromPrompt(
+      inventoryReportPrompt(report.toString()),
+      adminPrompt
+    );
+    if (!aiResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
+        service: 'AIHelper'
+      });
+    }
+    await this.createInventoryLog(aiResponse.data ?? 'No report generated');
+    return Ok(aiResponse.data);
+  }
+
+  async generateStructuredAIInventoryReport(): Promise<BaseResponse<AIInventoryReportStructuredResponse>> {
+    const startTime = Date.now();
+    const report = await this.createReportFromBatchAndStock();
+    if (isDataEmpty(report?.toString())) {
+      return Ok(new AIInventoryReportStructuredResponse({
+        report: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT,
+        generatedAt: new Date(),
+        metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
+      }));
+    }
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+    const aiResponse = await this.aiHelper.textGenerateFromPrompt(
+      inventoryReportPrompt(report.toString()),
+      adminPrompt
+    );
+    if (!aiResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
+        service: 'AIHelper'
+      });
+    }
+    return Ok(new AIInventoryReportStructuredResponse({
+      report: aiResponse.data ?? '',
+      generatedAt: new Date(),
+      metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
+    }));
+  }
+
+  async analyzeRestockNeeds(): Promise<BaseResponse<any>> {
+    const stockResponse = await this.getInventoryStock(
+      new InventoryStockRequest({ PageNumber: 1, PageSize: 1000 })
+    );
+    const stockItems = stockResponse.payload?.items ?? [];
+    if (stockItems.length === 0) {
+      return Ok('Không có dữ liệu tồn kho để phân tích.');
+    }
+
+    const trendLogsResponse = await this.getLatestTrendLogs(2);
+    const trendLogs = trendLogsResponse.data ?? [];
+    if (trendLogs.length === 0) {
+      return Ok('Không đủ dữ liệu xu hướng để phân tích restock. Vui lòng gọi GET /trends/summary trước.');
+    }
+
+    const latestTrend = trendLogs[0]?.trendData ?? '';
+    const previousTrend = trendLogs[1]?.trendData ?? '(Không có dữ liệu xu hướng trước đó)';
+    const restockPrompt = [
+      '[DỮ LIỆU TỒN KHO HIỆN TẠI]',
+      JSON.stringify(stockItems, null, 2),
+      '',
+      '[XU HƯỚNG MỚI NHẤT]',
+      latestTrend,
+      '',
+      '[XU HƯỚNG TRƯỚC ĐÓ]',
+      previousTrend
+    ].join('\n');
+
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RESTOCK);
+    const aiResponse = await this.aiRestockHelper.textGenerateFromPrompt(
+      restockPrompt,
+      adminPrompt,
+      Output.object({ schema: restockOutput.schema })
+    );
+    if (!aiResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI restock analysis', {
+        service: 'AIRestockHelper'
+      });
+    }
+
+    const restockDataStr = typeof aiResponse.data === 'string'
+      ? aiResponse.data
+      : JSON.stringify(aiResponse.data);
+    this.createInventoryLog(restockDataStr, InventoryLogType.RESTOCK)
+      .catch(err => console.error('Failed to save restock log:', err));
+
+    return Ok(aiResponse.data);
   }
 }
 

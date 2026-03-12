@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from 'generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
@@ -8,12 +8,27 @@ import {
   MediaResponse
 } from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
+import { AIHelper } from '../helpers/ai.helper';
+import { AI_HELPER } from '../modules/ai.module';
+import { AdminInstructionService } from './admin-instruction.service';
+import { reviewSummaryPrompt, INSTRUCTION_TYPE_REVIEW } from 'src/application/constant/prompts';
+import {
+  isArrayEmpty,
+  INSUFFICIENT_DATA_MESSAGES
+} from '../utils/insufficient-data';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import {
+  AIReviewSummaryStructuredResponse,
+  AIResponseMetadata
+} from 'src/application/dtos/response/ai-structured.response';
 
 const reviewInclude = {
   AspNetUsers_Reviews_UserIdToAspNetUsers: {
@@ -93,8 +108,10 @@ function mapToReviewListItemResponse(
 export class ReviewService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly unitOfWork: UnitOfWork
-  ) { }
+    private readonly unitOfWork: UnitOfWork,
+    @Inject(AI_HELPER) private readonly aiHelper: AIHelper,
+    private readonly adminInstructionService: AdminInstructionService
+  ) {}
 
   async getAllReviews(
     request: GetPagedReviewRequest
@@ -258,5 +275,83 @@ export class ReviewService {
       'Failed to fetch review logs',
       true
     );
+  }
+
+  async generateReviewSummaryAll(): Promise<BaseResponse<string>> {
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
+    const summaryResponse = await this.aiHelper.textGenerateFromPrompt('', adminPrompt);
+    if (!summaryResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
+        service: 'AIHelper',
+        endpoint: 'reviews/summary/all'
+      });
+    }
+    await this.addReviewLog(ReviewTypeEnum.ALL, null, summaryResponse.data ?? '').catch(err => {
+      console.error('Failed to save review summary log (ALL):', err);
+    });
+    return Ok(summaryResponse.data);
+  }
+
+  async generateReviewSummaryByVariantId(variantId: string): Promise<BaseResponse<string>> {
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
+    const summaryResponse = await this.aiHelper.textGenerateFromPrompt('ID variant: ' + variantId, adminPrompt);
+    if (!summaryResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
+        variantId,
+        service: 'AIHelper',
+        endpoint: 'reviews/summary/:variantId'
+      });
+    }
+    await this.addReviewLog(ReviewTypeEnum.ID, variantId, summaryResponse.data ?? '').catch(err => {
+      console.error(`Failed to save review summary log for variant ${variantId}:`, err);
+    });
+    return Ok(summaryResponse.data);
+  }
+
+  async generateStructuredReviewSummary(
+    variantId: string
+  ): Promise<BaseResponse<AIReviewSummaryStructuredResponse>> {
+    const startTime = Date.now();
+    const reviewsResponse = await this.getReviewsByVariantId(variantId);
+    if (!reviewsResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
+        variantId,
+        service: 'ReviewService',
+        endpoint: 'reviews/summary/structured/:variantId'
+      });
+    }
+    const reviews = reviewsResponse.payload ?? [];
+    if (isArrayEmpty(reviews)) {
+      return Ok(new AIReviewSummaryStructuredResponse({
+        summary: INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY,
+        variantId,
+        reviewCount: 0,
+        generatedAt: new Date(),
+        metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
+      }));
+    }
+    const reviewsText = reviews.map((r: ReviewResponse) => r.comment).join('\n');
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
+    const summaryResponse = await this.aiHelper.textGenerateFromPrompt(
+      reviewSummaryPrompt(reviewsText),
+      adminPrompt
+    );
+    if (!summaryResponse.success) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
+        variantId,
+        service: 'AIHelper',
+        endpoint: 'reviews/summary/structured/:variantId'
+      });
+    }
+    await this.addReviewLog(ReviewTypeEnum.ID, variantId, summaryResponse.data ?? '').catch(err => {
+      console.error(`Failed to save structured review summary log for variant ${variantId}:`, err);
+    });
+    return Ok(new AIReviewSummaryStructuredResponse({
+      summary: summaryResponse.data ?? '',
+      variantId,
+      reviewCount: reviews.length,
+      generatedAt: new Date(),
+      metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
+    }));
   }
 }

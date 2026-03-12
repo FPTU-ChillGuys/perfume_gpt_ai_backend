@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
@@ -9,21 +9,10 @@ import {
 } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
-import { PeriodEnum } from 'src/domain/enum/period.enum';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { convertToUTC } from 'src/infrastructure/utils/time-zone';
-import {
-  isDataEmpty,
-  INSUFFICIENT_DATA_MESSAGES
-} from 'src/infrastructure/utils/insufficient-data';
-import { INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
-import { LogHelper } from './helper/logHelper.controller';
 import { UserLog } from 'src/domain/entities/user-log.entity';
 import { CacheTTL } from '@nestjs/cache-manager';
 
@@ -31,14 +20,8 @@ import { CacheTTL } from '@nestjs/cache-manager';
 @ApiBearerAuth("jwt")
 @ApiTags('Logs')
 @Controller('logs')
-export class LogController extends LogHelper {
-  constructor(
-    protected userLogService: UserLogService,
-    @Inject(AI_SERVICE) protected aiService: AIService,
-    protected readonly adminInstructionService: AdminInstructionService
-  ) {
-    super(userLogService, aiService, adminInstructionService);
-  }
+export class LogController {
+  constructor(protected userLogService: UserLogService) {}
 
   /** Lấy báo cáo tất cả log hoạt động người dùng */
   @CacheTTL(1)
@@ -120,58 +103,7 @@ export class LogController extends LogHelper {
   async summarizeLogs(
     @Query() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
-    const response =
-      await this.userLogService.getReportAndPromptSummaryUserLogs(
-        userLogRequest
-      );
-
-    if (!response.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to summarize user logs',
-        { userId: userLogRequest.userId, period: userLogRequest.period }
-      );
-    }
-
-    if (isDataEmpty(response.data?.prompt)) {
-      return Ok(INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE);
-    }
-
-    // Lấy admin instruction cho domain log (nếu có)
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_LOG
-      );
-
-    // Summarize with AI
-    const aiResponse = await this.aiService.textGenerateFromPrompt(
-      response.data!.prompt,
-      adminPrompt
-    );
-
-    // Determine start date
-    const startDate =
-      userLogRequest.startDate ||
-      this.userLogService.getFirstDateOfPeriod(
-        userLogRequest.period!,
-        userLogRequest.endDate!
-      );
-
-    // Save summary to database
-    await this.userLogService.saveUserLogSummary(
-      userLogRequest.userId,
-      startDate,
-      userLogRequest.endDate!,
-      aiResponse.data || ''
-    );
-
-    if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        { userId: userLogRequest.userId, service: 'AIService' }
-      );
-    }
-
-    return Ok(aiResponse.data);
+    return this.userLogService.summarizeUserLogs(userLogRequest);
   }
 
   /** Tóm tắt log của tất cả người dùng bằng AI (chú ý: có thể mất thời gian và không lưu vào DB) */
@@ -181,47 +113,12 @@ export class LogController extends LogHelper {
   async summarizeAllLogs(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<string>> {
-    const response =
-      await this.userLogService.getReportAndPromptSummaryAllUsersLogs(
-        allUserLogRequest
-      );
-
-    if (!response.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to summarize user logs',
-        { period: allUserLogRequest.period }
-      );
-    }
-
-    if (isDataEmpty(response.data?.prompt)) {
-      return Ok(INSUFFICIENT_DATA_MESSAGES.LOG_SUMMARIZE);
-    }
-
-    // Lấy admin instruction cho domain log (nếu có)
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_LOG
-      );
-
-    // Summarize with AI
-    const aiResponse = await this.aiService.textGenerateFromPrompt(
-      response.data!.prompt,
-      adminPrompt
-    );
-
-    if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        { service: 'AIService' }
-      );
-    }
-
-    return Ok(aiResponse.data);
+    return this.userLogService.summarizeAllUserLogs(allUserLogRequest);
   }
 
   @Cron(CronExpression.EVERY_WEEK)
   async summarizeLogsPerWeekWithCronJob(): Promise<BaseResponse<string>> {
-    await this.summarizeLogsPerWeek();
+    await this.userLogService.summarizePerWeek();
     return Ok('Scheduled task completed.');
   }
 
@@ -229,7 +126,7 @@ export class LogController extends LogHelper {
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tuần (thủ công)' })
   @ApiBaseResponse(String)
   async summaryLogsPerWeekManually(): Promise<BaseResponse<string>> {
-    await this.summarizeLogsPerWeek();
+    await this.userLogService.summarizePerWeek();
     return Ok('Manual log summarization completed.');
   }
 
@@ -237,7 +134,7 @@ export class LogController extends LogHelper {
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tháng (thủ công)' })
   @ApiBaseResponse(String)
   async summaryLogsPerMonthManually(): Promise<BaseResponse<string>> {
-    await this.summarizeLogsPerMonth();
+    await this.userLogService.summarizePerMonth();
     return Ok('Manual log summarization completed.');
   }
 
@@ -245,7 +142,7 @@ export class LogController extends LogHelper {
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng năm (thủ công)' })
   @ApiBaseResponse(String)
   async summaryLogsPerYearManually(): Promise<BaseResponse<string>> {
-    await this.summarizeLogsPerYear();
+    await this.userLogService.summarizePerYear();
     return Ok('Manual log summarization completed.');
   }
 

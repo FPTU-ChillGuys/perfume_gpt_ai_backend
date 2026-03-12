@@ -6,7 +6,7 @@ import { AIModule } from './ai.module';
 import { LogTool } from 'src/chatbot/utils/tools/log.tool';
 
 @Module({
-  imports: [UnitOfWorkModule, AdminInstructionModule],
+  imports: [UnitOfWorkModule, AdminInstructionModule, forwardRef(() => AIModule)],
   providers: [UserLogService, LogTool],
   exports: [UserLogService, LogTool]
 })

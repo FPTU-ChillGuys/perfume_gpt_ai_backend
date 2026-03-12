@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Inject,
   Param,
   Post,
   Put,
@@ -24,36 +23,17 @@ import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
-import { quizPrompt } from 'src/application/constant/prompts';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { INSTRUCTION_TYPE_QUIZ } from 'src/application/constant/prompts/admin-instruction-types';
-import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { QuizService } from 'src/infrastructure/servicies/quiz.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { Output } from 'ai';
-import { searchOutput } from 'src/chatbot/utils/output/search.output';
 import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
-import { QueueName, QuizJobName } from 'src/application/constant/processor';
-import { Queue } from 'bullmq';
-import { InjectQueue } from '@nestjs/bullmq';
-import { CacheInterceptor, CacheKey, CacheTTL } from '@nestjs/cache-manager';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 
 @ApiTags('Quizzes')
 @Controller('quizzes')
 export class QuizController {
-  constructor(
-    @Inject(AI_SERVICE) private aiService: AIService,
-    private quizService: QuizService,
-    private logService: UserLogService,
-    @InjectQueue(QueueName.QUIZ_QUEUE)
-    private readonly quizQueue: Queue,
-    private readonly adminInstructionService: AdminInstructionService
-  ) { }
+  constructor(private quizService: QuizService) {}
 
   /** Lấy tất cả câu hỏi quiz */
   @Public()
@@ -154,79 +134,7 @@ export class QuizController {
     @Query('userId') userId: string,
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    // Lay cau hoi quiz va cau tra loi tuong ung
-    const questionIds = quizAnswers.map((qa) => qa.questionId);
-    const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
-    if (!quizQueses.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get quiz question',
-        { questionIds }
-      );
-    }
-
-    // Map từng quizAnswer (questionId + answerId) sang cặp (question text + answer text)
-    const quesAnses: Array<{ question: string; answer: string }> = [];
-    if (quizQueses.data) {
-      for (const quizAnswer of quizAnswers) {
-        const quizQues = quizQueses.data.find((q) => q.id === quizAnswer.questionId);
-        if (quizQues?.answers && quizQues.question) {
-          const answer = quizQues.answers.find(
-            (ans) => ans.id === quizAnswer.answerId
-          );
-          if (answer?.answer) {
-            quesAnses.push({
-              question: quizQues.question,
-              answer: answer.answer
-            });
-          }
-        }
-      }
-    }
-
-    // Generate prompt
-    const prompt = quizPrompt(quesAnses);
-
-    // Them quiz question answer detail vao user log
-    const quizQuesAnsDetail = new QuizQuesAnwsRequest({
-      userId: userId,
-      details: quizAnswers
-    });
-
-    const savedQuizQuesAnsResponse =
-      await this.quizService.addQuizQuesAnws(quizQuesAnsDetail);
-
-    if (!savedQuizQuesAnsResponse.success || !savedQuizQuesAnsResponse.data?.id) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to save quiz question answers',
-        { userId }
-      );
-    }
-
-    // Save user quiz log
-    await this.logService.addQuizQuesAnsDetailToUserLog(
-      userId,
-      savedQuizQuesAnsResponse.data.id
-    );
-
-    // Get system prompt
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_QUIZ);
-
-    // Get AI response
-    const aiResponse = await this.aiService.textGenerateFromPrompt(
-      prompt,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    // Return response
-    if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        { userId, service: 'AIService' }
-      );
-    }
-
-    return Ok(aiResponse.data);
+    return this.quizService.processQuizAndGetAIResponse(userId, quizAnswers);
   }
 
   /** Trả lời quiz và nhận gợi ý nước hoa từ AI */
@@ -240,63 +148,7 @@ export class QuizController {
     @Query('userId') userId: string,
     @Body() quizAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    // Lay cau hoi quiz va cau tra loi tuong ung
-    const questionIds = quizAnswers.map((qa) => qa.questionId);
-    const quizQueses = await this.quizService.getQuizQuesByIdList(questionIds);
-    if (!quizQueses.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get quiz question',
-        { questionIds }
-      );
-    }
-
-    // Map từng quizAnswer (questionId + answerId) sang cặp (question text + answer text)
-    const quesAnses: Array<{ question: string; answer: string }> = [];
-    if (quizQueses.data) {
-      for (const quizAnswer of quizAnswers) {
-        const quizQues = quizQueses.data.find((q) => q.id === quizAnswer.questionId);
-        if (quizQues?.answers && quizQues.question) {
-          const answer = quizQues.answers.find(
-            (ans) => ans.id === quizAnswer.answerId
-          );
-          if (answer?.answer) {
-            quesAnses.push({
-              question: quizQues.question,
-              answer: answer.answer
-            });
-          }
-        }
-      }
-    }
-
-    // Generate prompt
-    const prompt = quizPrompt(quesAnses);
-
-    // Add job to queue
-    await this.quizQueue.add(QuizJobName.ADD_QUIZ_QUESTION_AND_ANSWER, {
-      userId,
-      details: quizAnswers
-    });
-
-    // Get system prompt
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_QUIZ);
-
-    // Get AI response
-    const aiResponse = await this.aiService.textGenerateFromPrompt(
-      prompt,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
-
-    // Return response
-    if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
-        { userId, service: 'AIService' }
-      );
-    }
-
-    return Ok(aiResponse.data);
+    return this.quizService.processQuizV2AndGetAIResponse(userId, quizAnswers);
   }
 
   /** Lấy tất cả câu hỏi và câu trả lời quiz của người dùng */

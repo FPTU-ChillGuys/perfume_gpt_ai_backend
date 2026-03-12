@@ -2,11 +2,10 @@ import { InjectMapper } from '@automapper/nestjs';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { Mapper } from '@automapper/core';
 import { funcHandlerAsync } from '../utils/error-handler';
-import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { QuizAnswerRequest } from 'src/application/dtos/request/quiz-answer.request';
 import { QuizQuestionRequest } from 'src/application/dtos/request/quiz-question.request';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { QuizQuestionResponse } from 'src/application/dtos/response/quiz-question.response';
 import {
   QuizQuestionAnswerMapper,
@@ -14,13 +13,31 @@ import {
 } from 'src/application/mapping';
 import { QuizQuesAnwsRequest } from 'src/application/dtos/request/quiz-ques-ans.request';
 import { QuizQuestionAnswerResponse } from 'src/application/dtos/response/quiz-question-answer.response';
+import { Output } from 'ai';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { QueueName, QuizJobName } from 'src/application/constant/processor';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { AIHelper } from '../helpers/ai.helper';
+import { AI_HELPER } from '../modules/ai.module';
+import { AdminInstructionService } from './admin-instruction.service';
+import { UserLogService } from './user-log.service';
+import { quizPrompt } from 'src/application/constant/prompts';
+import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
+import { INSTRUCTION_TYPE_QUIZ } from 'src/application/constant/prompts/admin-instruction-types';
+import { searchOutput } from 'src/chatbot/utils/output/search.output';
 
 @Injectable()
 export class QuizService {
   constructor(
     private unitOfWork: UnitOfWork,
-    @InjectMapper() private mapper: Mapper
-  ) { }
+    @InjectMapper() private mapper: Mapper,
+    @Inject(AI_HELPER) private readonly aiHelper: AIHelper,
+    private readonly adminInstructionService: AdminInstructionService,
+    private readonly userLogService: UserLogService,
+    @InjectQueue(QueueName.QUIZ_QUEUE) private readonly quizQueue: Queue
+  ) {}
 
   async addQuizQues(
     question: QuizQuestionRequest
@@ -241,5 +258,104 @@ export class QuizService {
       }
       return { success: true, data: undefined };
     }, 'Failed to delete quiz question', true);
+  }
+
+  /** Xử lý quiz, lưu kết quả trực tiếp, và trả về gợi ý AI */
+  async processQuizAndGetAIResponse(
+    userId: string,
+    quizAnswers: { questionId: string; answerId: string }[]
+  ): Promise<BaseResponse<string>> {
+    const questionIds = quizAnswers.map((qa) => qa.questionId);
+    const quizQueses = await this.getQuizQuesByIdList(questionIds);
+    if (!quizQueses.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get quiz question',
+        { questionIds }
+      );
+    }
+
+    const quesAnses: Array<{ question: string; answer: string }> = [];
+    if (quizQueses.data) {
+      for (const quizAnswer of quizAnswers) {
+        const quizQues = quizQueses.data.find((q) => q.id === quizAnswer.questionId);
+        if (quizQues?.answers && quizQues.question) {
+          const answer = quizQues.answers.find((ans) => ans.id === quizAnswer.answerId);
+          if (answer?.answer) {
+            quesAnses.push({ question: quizQues.question, answer: answer.answer });
+          }
+        }
+      }
+    }
+
+    const prompt = quizPrompt(quesAnses);
+
+    const savedQuizQuesAnsResponse = await this.addQuizQuesAnws(
+      new QuizQuesAnwsRequest({ userId, details: quizAnswers })
+    );
+
+    if (!savedQuizQuesAnsResponse.success || !savedQuizQuesAnsResponse.data?.id) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to save quiz question answers',
+        { userId }
+      );
+    }
+
+    await this.userLogService.addQuizQuesAnsDetailToUserLog(userId, savedQuizQuesAnsResponse.data.id);
+
+    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_QUIZ);
+    const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt, Output.object(searchOutput));
+
+    if (!aiResponse.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        { userId, service: 'AIHelper' }
+      );
+    }
+
+    return Ok(aiResponse.data);
+  }
+
+  /** Xử lý quiz qua BullMQ queue và trả về gợi ý AI */
+  async processQuizV2AndGetAIResponse(
+    userId: string,
+    quizAnswers: { questionId: string; answerId: string }[]
+  ): Promise<BaseResponse<string>> {
+    const questionIds = quizAnswers.map((qa) => qa.questionId);
+    const quizQueses = await this.getQuizQuesByIdList(questionIds);
+    if (!quizQueses.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get quiz question',
+        { questionIds }
+      );
+    }
+
+    const quesAnses: Array<{ question: string; answer: string }> = [];
+    if (quizQueses.data) {
+      for (const quizAnswer of quizAnswers) {
+        const quizQues = quizQueses.data.find((q) => q.id === quizAnswer.questionId);
+        if (quizQues?.answers && quizQues.question) {
+          const answer = quizQues.answers.find((ans) => ans.id === quizAnswer.answerId);
+          if (answer?.answer) {
+            quesAnses.push({ question: quizQues.question, answer: answer.answer });
+          }
+        }
+      }
+    }
+
+    const prompt = quizPrompt(quesAnses);
+
+    await this.quizQueue.add(QuizJobName.ADD_QUIZ_QUESTION_AND_ANSWER, { userId, details: quizAnswers });
+
+    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_QUIZ);
+    const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt, Output.object(searchOutput));
+
+    if (!aiResponse.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        { userId, service: 'AIHelper' }
+      );
+    }
+
+    return Ok(aiResponse.data);
   }
 }

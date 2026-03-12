@@ -12,8 +12,10 @@ import { ProfileModule } from "../profile.module";
 import { QuizModule } from "../quiz.module";
 import { ReviewModule } from "../review.module";
 import { ToolModule } from "../tool.module";
+import { TrendModule } from "../trend.module";
 import { UserLogModule } from "../user-log.module";
 import { UserModule } from "../user.module";
+import { RecommendationModule } from "../recommendation.module";
 
 export const modules = [
   ConversationModule,
@@ -31,4 +33,6 @@ export const modules = [
   ProfileModule,
   EmailModule,
   UserModule,
+  TrendModule,
+  RecommendationModule,
 ];

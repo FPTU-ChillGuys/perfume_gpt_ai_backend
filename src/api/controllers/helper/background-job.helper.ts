@@ -1,5 +1,9 @@
 import { Cache } from 'cache-manager';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import * as crypto from 'crypto';
+import { add } from 'date-fns';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 export interface BackgroundJobOptions {
     /** The cache key to store the job status and result */
@@ -85,4 +89,59 @@ export async function processBackgroundJob<T>(
             ttlMilliseconds
         );
     }
+}
+
+/**
+ * Creates a background job and initializes its cache status.
+ * @param cacheManager - The Cache execution context
+ * @param jobFunction - The function to execute in the background
+ * @param options - Cache key factory and TTL configuration
+ * @param request - Optional Request object
+ * @returns Result containing the job ID and expiration time
+ */
+export async function createBackgroundJob<T>(
+    cacheManager: Cache,
+    jobFunction: () => Promise<BaseResponse<T>>,
+    options: {
+        cacheKeyFactory: (jobId: string) => string;
+        ttlMilliseconds: number;
+    },
+    request?: Request
+): Promise<BaseResponse<{ jobId: string; expirationTime?: Date }>> {
+    const jobId = crypto.randomUUID();
+    const cacheKey = options.cacheKeyFactory(jobId);
+
+    await cacheManager.set(cacheKey, { status: 'pending' }, options.ttlMilliseconds);
+
+    processBackgroundJob(
+        cacheManager,
+        jobFunction,
+        { cacheKey, ttlMilliseconds: options.ttlMilliseconds },
+        request
+    );
+
+    const expirationTime = add(new Date(), { seconds: options.ttlMilliseconds / 1000 });
+
+    return Ok({ jobId, expirationTime });
+}
+
+/**
+ * Checks the status and result of a background job.
+ * @param cacheManager - The Cache execution context
+ * @param cacheKey - The specific cache key for the job
+ * @param errorDetails - Any additional metadata to log if the job is not found
+ * @returns The cache data for the job
+ */
+export async function checkBackgroundJobResult(
+    cacheManager: Cache,
+    cacheKey: string,
+    errorDetails: Record<string, any>
+): Promise<BaseResponse<any>> {
+    const jobData = await cacheManager.get(cacheKey);
+
+    if (!jobData) {
+        throw new InternalServerErrorWithDetailsException('Job not found or expired', errorDetails);
+    }
+
+    return Ok(jobData);
 }

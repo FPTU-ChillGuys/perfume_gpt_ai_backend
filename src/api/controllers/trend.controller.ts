@@ -7,7 +7,7 @@ import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator
 import { AITrendForecastStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
-import { processBackgroundJob } from 'src/api/controllers/helper/background-job.helper';
+import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
@@ -24,7 +24,7 @@ export class TrendController {
   constructor(
     private readonly trendService: TrendService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache
-  ) {}
+  ) { }
 
 
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
@@ -75,21 +75,15 @@ export class TrendController {
     @Req() request: Request,
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<{ jobId: string }>> {
-    const jobId = crypto.randomUUID();
-    const cacheKey = `trend_job_${jobId}`;
-
-    // Lưu trạng thái job ban đầu là pending
-    await this.cacheManager.set(cacheKey, { status: 'pending' }, cachingTrendTTL);
-
-    // Chạy ngầm việc request data AI
-    processBackgroundJob(
+    return createBackgroundJob(
       this.cacheManager,
       () => this.getProductFromTrend(allUserLogRequest),
-      { cacheKey, ttlMilliseconds: cachingTrendTTL },
-      request
+      {
+        cacheKeyFactory: (jobId) => `trend_job_${jobId}`,
+        ttlMilliseconds: cachingTrendTTL
+      },
+      request as any
     );
-
-    return Ok({ jobId });
   }
 
   /**
@@ -102,16 +96,11 @@ export class TrendController {
   async getProductTrendJobResult(
     @Param('jobId') jobId: string
   ): Promise<BaseResponse<any>> {
-    const jobData = await this.cacheManager.get(`trend_job_${jobId}`);
-
-    if (!jobData) {
-      throw new InternalServerErrorWithDetailsException('Job not found or expired', {
-        jobId,
-        endpoint: 'trends/product/job/:jobId'
-      });
-    }
-
-    return Ok(jobData);
+    return checkBackgroundJobResult(
+      this.cacheManager,
+      `trend_job_${jobId}`,
+      { jobId, endpoint: 'trends/product/job/:jobId' }
+    );
   }
 
   /** Lấy product từ xu hướng người dùng */

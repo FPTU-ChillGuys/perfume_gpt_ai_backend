@@ -1,5 +1,3 @@
-import { Mapper } from '@automapper/core';
-import { InjectMapper } from '@automapper/nestjs';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -34,11 +32,10 @@ import { PagedConversationRequest } from 'src/application/dtos/request/paged-con
 export class ConversationService {
   constructor(
     private unitOfWork: UnitOfWork,
-    @InjectMapper() private mapper: Mapper,
     @Inject(AI_CONVERSATION_HELPER) private readonly aiHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
     @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue
-  ) {}
+  ) { }
 
   async addConversation(
     conversationRequest: ConversationDto

@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestj
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
-import { processBackgroundJob } from 'src/api/controllers/helper/background-job.helper';
+import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
 import { Public, Role } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse } from 'src/application/dtos/response/review.response';
@@ -30,7 +30,7 @@ export class ReviewController {
         private readonly reviewService: ReviewService,
         private readonly reviewAIService: ReviewAIService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    ) {}
+    ) { }
 
 
 
@@ -63,19 +63,14 @@ export class ReviewController {
     async createReviewSummaryJob(
         @Param('variantId') variantId: string
     ): Promise<BaseResponse<{ jobId: string }>> {
-        const jobId = crypto.randomUUID();
-        const cacheKey = `review_summary_job_${jobId}_${variantId}`;
-        const ttlMilliseconds = CACHE_TTL_1MONTH; // 1 week
-
-        await this.cacheManager.set(cacheKey, { status: 'pending' }, ttlMilliseconds);
-
-        processBackgroundJob(
+        return createBackgroundJob(
             this.cacheManager,
             () => this.getReviewSummaryByVariantId(variantId),
-            { cacheKey, ttlMilliseconds }
+            {
+                cacheKeyFactory: (jobId) => `review_summary_job_${jobId}_${variantId}`,
+                ttlMilliseconds: CACHE_TTL_1MONTH
+            }
         );
-
-        return Ok({ jobId });
     }
 
     /**
@@ -90,18 +85,11 @@ export class ReviewController {
         @Param('jobId') jobId: string,
         @Query('variantId') variantId: string
     ): Promise<BaseResponse<any>> {
-        const cacheKey = `review_summary_job_${jobId}_${variantId}`;
-        const jobData = await this.cacheManager.get(cacheKey);
-
-        if (!jobData) {
-            throw new InternalServerErrorWithDetailsException('Job not found or expired', {
-                jobId,
-                variantId,
-                endpoint: 'reviews/summary/job/result/:jobId'
-            });
-        }
-
-        return Ok(jobData);
+        return checkBackgroundJobResult(
+            this.cacheManager,
+            `review_summary_job_${jobId}_${variantId}`,
+            { jobId, variantId, endpoint: 'reviews/summary/job/result/:jobId' }
+        );
     }
 
     /** Tóm tắt đánh giá bằng AI theo variant ID */

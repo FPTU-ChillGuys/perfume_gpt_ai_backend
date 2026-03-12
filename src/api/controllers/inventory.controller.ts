@@ -11,7 +11,7 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
-import { processBackgroundJob } from 'src/api/controllers/helper/background-job.helper';
+import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
 import { CACHE_TTL_1HOUR } from 'src/infrastructure/cacheable/cacheable.constants';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
@@ -43,7 +43,7 @@ export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) {}
+  ) { }
 
   /** Lấy thông tin tồn kho */
   @Get('stock')
@@ -107,22 +107,14 @@ export class InventoryController {
   @CacheTTL(CACHE_TTL_1HOUR)
   @UseInterceptors(CacheInterceptor)
   async createInventoryReportJob(): Promise<BaseResponse<{ jobId: string }>> {
-    const jobId = crypto.randomUUID();
-    const cacheKey = `inventory_report_job_${jobId}`;
-    const ttlMilliseconds = CACHE_TTL_1HOUR;
-
-    await this.cacheManager.set(cacheKey, { status: 'pending' }, ttlMilliseconds);
-
-    processBackgroundJob(
+    return createBackgroundJob(
       this.cacheManager,
       () => this.getAIInventoryReport(),
-      { cacheKey, ttlMilliseconds }
+      {
+        cacheKeyFactory: (jobId) => `inventory_report_job_${jobId}`,
+        ttlMilliseconds: CACHE_TTL_1HOUR
+      }
     );
-
-    // Goi them thoi gian tiep theo cho den khi het caching
-    const expirationTime = add(new Date(), { seconds: ttlMilliseconds / 1000 });
-
-    return Ok({ jobId, expirationTime });
   }
 
   /**
@@ -136,17 +128,11 @@ export class InventoryController {
   async getInventoryReportJobResult(
     @Param('jobId') jobId: string
   ): Promise<BaseResponse<any>> {
-    const cacheKey = `inventory_report_job_${jobId}`;
-    const jobData = await this.cacheManager.get(cacheKey);
-
-    if (!jobData) {
-      throw new InternalServerErrorWithDetailsException('Job not found or expired', {
-        jobId,
-        endpoint: 'inventory/report/ai/job/result/:jobId'
-      });
-    }
-
-    return Ok(jobData);
+    return checkBackgroundJobResult(
+      this.cacheManager,
+      `inventory_report_job_${jobId}`,
+      { jobId, endpoint: 'inventory/report/ai/job/result/:jobId' }
+    );
   }
 
   @Get('report/logs')

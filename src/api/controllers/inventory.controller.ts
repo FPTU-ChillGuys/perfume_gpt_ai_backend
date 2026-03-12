@@ -183,4 +183,38 @@ export class InventoryController {
   async getAIRestockingNeeds(): Promise<BaseResponse<any>> {
     return this.inventoryService.analyzeRestockNeeds();
   }
+
+  @Public()
+  @Get('restock/job')
+  @ApiOperation({ summary: 'Khởi tạo job để phân tích nhu cầu nhập hàng (restock)' })
+  @ApiBaseResponse(String)
+  @CacheTTL(CACHE_TTL_1HOUR)
+  @UseInterceptors(CacheInterceptor)
+  async createRestockReportJob(): Promise<BaseResponse<{ jobId: string }>> {
+    return createBackgroundJob(
+      this.cacheManager,
+      () => this.getAIRestockingNeeds(),
+      {
+        cacheKeyFactory: (jobId) => `inventory_restock_job_${jobId}`,
+        ttlMilliseconds: CACHE_TTL_1HOUR
+      }
+    );
+  }
+
+  @Public()
+  @Get('restock/job/result/:jobId')
+  @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job phân tích nhu cầu nhập hàng (restock)' })
+  @ApiBaseResponse(Object)
+  @ApiParam({ name: 'jobId', description: 'ID của job' })
+  async getRestockJobResult(
+    @Param('jobId') jobId: string
+  ): Promise<BaseResponse<any>> {
+    return checkBackgroundJobResult(
+      this.cacheManager,
+      `inventory_restock_job_${jobId}`,
+      { jobId, endpoint: 'inventory/restock/job/result/:jobId' }
+    );
+  }
+
+
 }

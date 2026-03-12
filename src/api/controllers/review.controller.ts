@@ -3,27 +3,22 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestj
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
-import { processBackgroundJob } from 'src/api/controllers/helper/background-job.helper';
+import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
 import { Public, Role } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
-import { ReviewListItemResponse, ReviewResponse } from 'src/application/dtos/response/review.response';
-import { reviewSummaryPrompt, INSTRUCTION_TYPE_REVIEW } from 'src/application/constant/prompts';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
+import { ReviewListItemResponse } from 'src/application/dtos/response/review.response';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+import { ReviewAIService } from 'src/infrastructure/servicies/review-ai.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { AIReviewSummaryStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
-import { AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
-import { isArrayEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
-import { CACHE_TTL_1MONTH, CACHE_TTL_6HOUR } from 'src/infrastructure/cacheable/cacheable.constants';
+import { CACHE_TTL_1MONTH } from 'src/infrastructure/cacheable/cacheable.constants';
 
 @ApiBearerAuth('jwt')
 @Role(['admin'])
@@ -33,8 +28,7 @@ export class ReviewController {
 
     constructor(
         private readonly reviewService: ReviewService,
-        @Inject(AI_SERVICE) private aiService: AIService,
-        private readonly adminInstructionService: AdminInstructionService,
+        private readonly reviewAIService: ReviewAIService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) { }
 
@@ -45,39 +39,7 @@ export class ReviewController {
     @ApiBaseResponse(String)
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
     async getReviewSummaryFromAllVariant(): Promise<BaseResponse<string>> {
-        // const reviewsResponse = await this.reviewService.getAllReviews(new GetPagedReviewRequest());
-
-        // if (!reviewsResponse.success) {
-        //     throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
-        //         service: 'ReviewService',
-        //         endpoint: 'reviews/summary/all'
-        //     });
-        // }
-
-        // const reviews = reviewsResponse.payload ? reviewsResponse.payload.items : [];
-
-        // if (isArrayEmpty(reviews)) {
-        //     return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
-        // }
-
-        // const reviewsText = reviews.map((review: ReviewListItemResponse) => review.commentPreview).join('\n');
-
-        // Lấy admin instruction cho domain review (nếu có)
-        const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
-
-        const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            "",
-            adminPrompt
-        );
-
-        if (!summaryResponse.success) {
-            throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
-                service: 'AIService',
-                endpoint: 'reviews/summary/all'
-            });
-        }
-
-        return Ok(summaryResponse.data);
+        return this.reviewAIService.generateReviewSummaryAll();
     }
 
     /** Lấy danh sách đánh giá */
@@ -101,19 +63,15 @@ export class ReviewController {
     async createReviewSummaryJob(
         @Param('variantId') variantId: string
     ): Promise<BaseResponse<{ jobId: string }>> {
-        const jobId = crypto.randomUUID();
-        const cacheKey = `review_summary_job_${jobId}_${variantId}`;
-        const ttlMilliseconds = CACHE_TTL_1MONTH; // 1 week
-
-        await this.cacheManager.set(cacheKey, { status: 'pending' }, ttlMilliseconds);
-
-        processBackgroundJob(
+        return createBackgroundJob(
             this.cacheManager,
             () => this.getReviewSummaryByVariantId(variantId),
-            { cacheKey, ttlMilliseconds }
+            {
+                type: `review_summary_job_${variantId}`,
+                cacheKeyFactory: (jobId) => `review_summary_job_${jobId}_${variantId}`,
+                ttlMilliseconds: CACHE_TTL_1MONTH
+            }
         );
-
-        return Ok({ jobId });
     }
 
     /**
@@ -128,18 +86,11 @@ export class ReviewController {
         @Param('jobId') jobId: string,
         @Query('variantId') variantId: string
     ): Promise<BaseResponse<any>> {
-        const cacheKey = `review_summary_job_${jobId}_${variantId}`;
-        const jobData = await this.cacheManager.get(cacheKey);
-
-        if (!jobData) {
-            throw new InternalServerErrorWithDetailsException('Job not found or expired', {
-                jobId,
-                variantId,
-                endpoint: 'reviews/summary/job/result/:jobId'
-            });
-        }
-
-        return Ok(jobData);
+        return checkBackgroundJobResult(
+            this.cacheManager,
+            `review_summary_job_${jobId}_${variantId}`,
+            { jobId, variantId, endpoint: 'reviews/summary/job/result/:jobId' }
+        );
     }
 
     /** Tóm tắt đánh giá bằng AI theo variant ID */
@@ -148,41 +99,7 @@ export class ReviewController {
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI theo variant ID' })
     @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
     async getReviewSummaryByVariantId(@Param('variantId') variantId: string): Promise<BaseResponse<string>> {
-        // const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
-
-        // if (!reviewsResponse.success) {
-        //     throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
-        //         variantId,
-        //         service: 'ReviewService',
-        //         endpoint: 'reviews/summary/:variantId'
-        //     });
-        // }
-
-        // const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
-
-        // if (isArrayEmpty(reviews)) {
-        //     return Ok(INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY);
-        // }
-
-        // const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
-
-        // Lấy admin instruction cho domain review (nếu có)
-        const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
-
-        const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            "ID variant: " + variantId,
-            adminPrompt
-        );
-
-        if (!summaryResponse.success) {
-            throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
-                variantId,
-                service: 'AIService',
-                endpoint: 'reviews/summary/:variantId'
-            });
-        }
-
-        return Ok(summaryResponse.data);
+        return this.reviewAIService.generateReviewSummaryByVariantId(variantId);
     }
 
 
@@ -197,59 +114,7 @@ export class ReviewController {
     async getStructuredReviewSummaryByVariantId(
         @Param('variantId') variantId: string
     ): Promise<BaseResponse<AIReviewSummaryStructuredResponse>> {
-        const startTime = Date.now();
-
-        const reviewsResponse = await this.reviewService.getReviewsByVariantId(variantId);
-
-        if (!reviewsResponse.success) {
-            throw new InternalServerErrorWithDetailsException('Failed to fetch reviews', {
-                variantId,
-                service: 'ReviewService',
-                endpoint: 'reviews/summary/structured/:variantId'
-            });
-        }
-
-        const reviews = reviewsResponse.payload ? reviewsResponse.payload : [];
-
-        if (isArrayEmpty(reviews)) {
-            return Ok(new AIReviewSummaryStructuredResponse({
-                summary: INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY,
-                variantId,
-                reviewCount: 0,
-                generatedAt: new Date(),
-                metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
-            }));
-        }
-
-        const reviewsText = reviews.map((review: ReviewResponse) => review.comment).join('\n');
-
-        // Lấy admin instruction cho domain review (nếu có)
-        const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
-
-        const summaryResponse = await this.aiService.textGenerateFromPrompt(
-            reviewSummaryPrompt(reviewsText),
-            adminPrompt
-        );
-
-        if (!summaryResponse.success) {
-            throw new InternalServerErrorWithDetailsException('Failed to get AI summary response', {
-                variantId,
-                service: 'AIService',
-                endpoint: 'reviews/summary/structured/:variantId'
-            });
-        }
-
-        const processingTimeMs = Date.now() - startTime;
-
-        const structuredResponse = new AIReviewSummaryStructuredResponse({
-            summary: summaryResponse.data ?? '',
-            variantId,
-            reviewCount: reviews.length,
-            generatedAt: new Date(),
-            metadata: new AIResponseMetadata({ processingTimeMs })
-        });
-
-        return Ok(structuredResponse);
+        return this.reviewAIService.generateStructuredReviewSummary(variantId);
     }
 
     /** Thêm review log */

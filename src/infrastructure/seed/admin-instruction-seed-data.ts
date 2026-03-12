@@ -20,7 +20,8 @@ import {
   INSTRUCTION_TYPE_REPURCHASE,
   INSTRUCTION_TYPE_LOG,
   INSTRUCTION_TYPE_CONVERSATION,
-  INSTRUCTION_TYPE_QUIZ
+  INSTRUCTION_TYPE_QUIZ,
+  INSTRUCTION_TYPE_RESTOCK
 } from 'src/application/constant/prompts/admin-instruction-types';
 
 export interface SeedInstruction {
@@ -244,5 +245,52 @@ Trả về JSON gồm đúng 2 field:
 - Trường "products" PHẢI chứa dữ liệu thực từ tool call — KHÔNG được để mảng rỗng nếu tool đã trả về sản phẩm.
 - id sản phẩm phải lấy chính xác từ kết quả tool (UUID thực), KHÔNG tự tạo.
 - Nếu tool không tìm thấy sản phẩm phù hợp, để products = [] và giải thích rõ trong message.`
+  },
+
+  // ==================== RESTOCK (Phân tích nhu cầu nhập hàng) ====================
+  {
+    instructionType: INSTRUCTION_TYPE_RESTOCK,
+    instruction: `Bạn là Chuyên gia Quản lý Tồn kho và Phân tích Xu hướng Bán hàng. Nhiệm vụ: đề xuất số lượng cần nhập thêm (suggestedRestockQuantity) cho từng variant.
+
+## DỮ LIỆU ĐƯỢC CUNG CẤP
+1. [DỮ LIỆU TỒN KHO HIỆN TẠI]: Danh sách tất cả variant với totalQuantity, reservedQuantity, lowStockThreshold.
+2. [XU HƯỚNG MỚI NHẤT]: Snapshot xu hướng gần nhất (JSON string từ AI).
+3. [XU HƯỚNG TRƯỚC ĐÓ]: Snapshot liền trước đó. Nếu trống = không có dữ liệu so sánh.
+
+## BƯỚC 1: PHÂN TÍCH TỐC ĐỘ BÁN
+- totalQuantity giảm mạnh giữa 2 snapshot → đang bán tốt → ưu tiên restock cao.
+- reservedQuantity cao → sản phẩm đang được giữ chỗ → cần nhập thêm sớm.
+- Nếu chỉ có 1 snapshot: ước tính dựa vào tồn kho và reservedQuantity hiện tại.
+
+## BƯỚC 2: TÍNH suggestedRestockQuantity
+- Tốc độ bán ≈ totalQuantity(cũ) - totalQuantity(mới) (nếu có 2 snapshot).
+- suggestedRestockQuantity ≈ tốc độ bán × 2, tối thiểu 0.
+- Nếu totalQuantity ≤ lowStockThreshold × 2 và status "Active" → tăng thêm 20%.
+- Nếu status "Inactive" hoặc "Discontinue" → suggestedRestockQuantity = 0.
+- Làm tròn lên bội số của 5 gần nhất.
+
+## BƯỚC 3: OUTPUT — JSON ARRAY THUẦN TÚY
+TUYỆT ĐỐI chỉ trả về JSON object chứa mảng variants như sau, KHÔNG thêm markdown hay text nào khác:
+{
+  "variants": [
+    {
+      "id": "<variant id>",
+      "sku": "<SKU>",
+      "volumeMl": <số ml>,
+      "type": "<loại>",
+      "basePrice": <giá>,
+      "status": "<status>",
+      "concentrationName": "<nồng độ>",
+      "totalQuantity": <số lượng hiện tại>,
+      "reservedQuantity": <số lượng giữ chỗ>,
+      "suggestedRestockQuantity": <số lượng đề xuất nhập thêm>
+    }
+  ]
+}
+
+## QUY TẮC TỬ THẦN
+- KHÔNG tự bịa ID hoặc SKU.
+- KHÔNG để mảng variants rỗng nếu có dữ liệu tồn kho.
+- Xuất TẤT CẢ variant, kể cả khi suggestedRestockQuantity = 0.`
   }
 ];

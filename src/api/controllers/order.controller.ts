@@ -61,12 +61,6 @@ export class OrderController {
   /** Lấy danh sách tất cả đơn hàng */
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả đơn hàng' })
-  @ApiQuery({
-    name: 'orderRequest',
-    type: String,
-    required: false,
-    description: 'Tham số lọc đơn hàng'
-  })
   @ApiBaseResponse(PagedResult<OrderResponse>)
   async getAllOrders(
     @Query() orderRequest: OrderRequest
@@ -78,18 +72,40 @@ export class OrderController {
   @Get('user/:userId')
   @ApiOperation({ summary: 'Lấy đơn hàng theo user ID' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
-  @ApiQuery({
-    name: 'orderRequest',
-    type: String,
-    required: false,
-    description: 'Tham số lọc đơn hàng'
-  })
   @ApiBaseResponse(PagedResult<OrderResponse>)
   async getOrdersByUserId(
     @Param('userId') userId: string,
     @Query() orderRequest: OrderRequest
   ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
     return await this.orderService.getOrdersByUserId(userId, orderRequest);
+  }
+
+  private async fetchAndGenerateOrderSummary(userId: string, endpoint: string) {
+    const startTime = Date.now();
+    const ordersResponse = await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(userId);
+
+    if (!ordersResponse.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to retrieve orders for AI summary',
+        { userId, service: 'OrderService', endpoint }
+      );
+    }
+
+    if (isDataEmpty(ordersResponse.data)) {
+      return { summary: INSUFFICIENT_DATA_MESSAGES.ORDER_SUMMARY, processingTimeMs: Date.now() - startTime };
+    }
+
+    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_ORDER);
+    const aiResponse = await this.aiService.textGenerateFromPrompt(orderSummaryPrompt(ordersResponse.data ?? ''), adminPrompt);
+
+    if (!aiResponse.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to generate AI order summary',
+        { userId, service: 'AIService', endpoint }
+      );
+    }
+
+    return { summary: aiResponse.data ?? '', processingTimeMs: Date.now() - startTime };
   }
 
   /** Tạo báo cáo tóm tắt đơn hàng bằng AI */
@@ -100,50 +116,8 @@ export class OrderController {
   async getAIOrderSummary(
     @Query('userId') userId: string
   ): Promise<BaseResponse<string>> {
-    // Lay tat ca don hang cua user
-    const ordersResponse =
-      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userId
-      );
-
-    if (!ordersResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to retrieve orders for AI summary',
-        {
-          userId,
-          service: 'OrderService',
-          endpoint: 'orders/summary/ai'
-        }
-      );
-    }
-
-    if (isDataEmpty(ordersResponse.data)) {
-      return Ok(INSUFFICIENT_DATA_MESSAGES.ORDER_SUMMARY);
-    }
-
-    // Lấy admin instruction cho domain order (nếu có)
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_ORDER
-      );
-
-    // Goi AI service de tao summary
-    const aiResponse = await this.aiService.textGenerateFromPrompt(
-      orderSummaryPrompt(ordersResponse.data ?? ''),
-      adminPrompt
-    );
-
-    if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to generate AI order summary',
-        {
-          userId,
-          service: 'AIService',
-          endpoint: 'orders/summary/ai'
-        }
-      );
-    }
-    return Ok(aiResponse.data);
+    const result = await this.fetchAndGenerateOrderSummary(userId, 'orders/summary/ai');
+    return Ok(result.summary);
   }
 
   /**
@@ -157,66 +131,13 @@ export class OrderController {
   async getStructuredAIOrderSummary(
     @Query('userId') userId: string
   ): Promise<BaseResponse<AIOrderSummaryStructuredResponse>> {
-    const startTime = Date.now();
-
-    const ordersResponse =
-      await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
-        userId
-      );
-
-    if (!ordersResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to retrieve orders for AI summary',
-        {
-          userId,
-          service: 'OrderService',
-          endpoint: 'orders/summary/ai/structured'
-        }
-      );
-    }
-
-    if (isDataEmpty(ordersResponse.data)) {
-      const processingTimeMs = Date.now() - startTime;
-      return {
-        success: true,
-        data: new AIOrderSummaryStructuredResponse({
-          summary: INSUFFICIENT_DATA_MESSAGES.ORDER_SUMMARY,
-          userId,
-          generatedAt: new Date(),
-          metadata: new AIResponseMetadata({ processingTimeMs })
-        })
-      };
-    }
-
-    // Lấy admin instruction cho domain order (nếu có)
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_ORDER
-      );
-
-    const aiResponse = await this.aiService.textGenerateFromPrompt(
-      orderSummaryPrompt(ordersResponse.data ?? ''),
-      adminPrompt
-    );
-
-    if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to generate AI order summary',
-        {
-          userId,
-          service: 'AIService',
-          endpoint: 'orders/summary/ai/structured'
-        }
-      );
-    }
-
-    const processingTimeMs = Date.now() - startTime;
+    const result = await this.fetchAndGenerateOrderSummary(userId, 'orders/summary/ai/structured');
 
     const structuredResponse = new AIOrderSummaryStructuredResponse({
-      summary: aiResponse.data ?? '',
+      summary: result.summary,
       userId,
       generatedAt: new Date(),
-      metadata: new AIResponseMetadata({ processingTimeMs })
+      metadata: new AIResponseMetadata({ processingTimeMs: result.processingTimeMs })
     });
 
     return Ok(structuredResponse);

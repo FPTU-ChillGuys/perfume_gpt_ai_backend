@@ -43,6 +43,7 @@ export {
   INSTRUCTION_TYPE_REPURCHASE,
   INSTRUCTION_TYPE_LOG,
   INSTRUCTION_TYPE_CONVERSATION,
+  INSTRUCTION_TYPE_RESTOCK,
   ALL_INSTRUCTION_TYPES
 } from './admin-instruction-types';
 export type { InstructionDomainType } from './admin-instruction-types';

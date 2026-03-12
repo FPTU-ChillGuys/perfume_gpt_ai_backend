@@ -1,11 +1,23 @@
-import { Mapper } from '@automapper/core';
-import { InjectMapper } from '@automapper/nestjs';
 import { UnitOfWork } from '../repositories/unit-of-work';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Conversation } from 'src/domain/entities/conversation.entity';
-import { Injectable } from '@nestjs/common';
-import { ConversationDto } from 'src/application/dtos/common/conversation.dto';
+import { Inject, Injectable } from '@nestjs/common';
+import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/common/conversation.dto';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { Output, UIMessage } from 'ai';
+import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { ADVANCED_MATCHING_SYSTEM_PROMPT, conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
+import { addMessageToMessages, convertToMessages, overrideMessagesToConversation } from 'src/infrastructure/utils/message-helper';
+import { buildCombinedPromptV5 } from 'src/infrastructure/utils/prompt-builder';
+import { AIHelper } from '../helpers/ai.helper';
+import { AI_CONVERSATION_HELPER } from '../modules/ai.module';
+import { AdminInstructionService } from './admin-instruction.service';
+import { ConversationJobName, QueueName } from 'src/application/constant/processor';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { v4 as uuid } from 'uuid';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { Message } from 'src/domain/entities/message.entity';
 import { MessageDto } from 'src/application/dtos/common/message.dto';
@@ -20,7 +32,9 @@ import { PagedConversationRequest } from 'src/application/dtos/request/paged-con
 export class ConversationService {
   constructor(
     private unitOfWork: UnitOfWork,
-    @InjectMapper() private mapper: Mapper
+    @Inject(AI_CONVERSATION_HELPER) private readonly aiHelper: AIHelper,
+    private readonly adminInstructionService: AdminInstructionService,
+    @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue
   ) { }
 
   async addConversation(
@@ -206,5 +220,79 @@ export class ConversationService {
         conversation.messages || []
       );
     }
+  }
+
+  private async processAiChatResponse(
+    convertedMessages: UIMessage[],
+    conversationMessages: any[],
+    conversationId: string,
+    userId: string,
+    adminInstruction: string | undefined,
+    combinedPrompt: string,
+    endpoint: string
+  ): Promise<ConversationDto> {
+    const systemPrompt = conversationSystemPrompt(
+      adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      combinedPrompt
+    );
+
+    const message = await this.aiHelper.textGenerateFromMessages(
+      convertedMessages,
+      systemPrompt,
+      Output.object(searchOutput)
+    );
+
+    if (!message.success) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI response',
+        { userId, conversationId, service: 'AIHelper', endpoint }
+      );
+    }
+
+    const responseConversation = overrideMessagesToConversation(
+      conversationId || '',
+      userId || '',
+      addMessageToMessages(message.data || '', conversationMessages || [])
+    );
+
+    await this.conversationQueue.add(
+      ConversationJobName.ADD_MESSAGE_AND_LOG,
+      { responseConversation, userId }
+    );
+
+    return responseConversation;
+  }
+
+  /** Xử lý chat V8 (buildCombinedPromptV5 + queue_with_userid) */
+  async chat(
+    conversation: ConversationRequestDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    const userId = conversation.userId ?? uuid();
+    const convertedMessages: UIMessage[] = convertToMessages(conversation.messages || []);
+
+    const promptResult = await buildCombinedPromptV5(
+      INSTRUCTION_TYPE_CONVERSATION,
+      this.adminInstructionService,
+      userId
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        { userId, conversationId: conversation.id, service: 'PromptBuilder', endpoint: 'chat/v8' }
+      );
+    }
+
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages,
+      conversation.messages || [],
+      conversation.id || '',
+      userId,
+      promptResult.data.adminInstruction,
+      promptResult.data.combinedPrompt,
+      'chat/v8'
+    );
+
+    return Ok(responseConversation);
   }
 }

@@ -1,5 +1,5 @@
 import { UnitOfWork } from '../repositories/unit-of-work';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { UserLog } from 'src/domain/entities/user-log.entity';
@@ -25,17 +25,16 @@ import { convertToUTC } from '../utils/time-zone';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
-import { generateSummaryPrompt, INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
+import { generateSummaryPrompt } from 'src/application/constant/prompts';
 import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
-import { AIService } from './ai.service';
-import { AI_SERVICE } from '../modules/ai.module';
+import { Ok } from 'src/application/dtos/response/common/success-response';
 import { INSUFFICIENT_DATA_MESSAGES, isDataEmpty } from '../utils/insufficient-data';
-import { AdminInstructionService } from './admin-instruction.service';
 
 @Injectable()
 export class UserLogService {
-  /** Cache cho user log summary report (TTL = 5 phút) */
-  constructor(protected unitOfWork: UnitOfWork, protected adminInstructionService: AdminInstructionService) { }
+  constructor(
+    protected unitOfWork: UnitOfWork
+  ) {}
 
   /** Lay tat ca log */
   async getAllLogs(): Promise<BaseResponse<UserLog[]>> {
@@ -688,5 +687,7 @@ export class UserLogService {
     return this.getUserLogSummaryByUserId(userId, startDate, endDate);
   }
 
-
+  /** Tong hop log va goi AI, tra ve chuoi ket qua (dung cho controller) */
+  // AI methods moved to UserLogAIService
 }
+

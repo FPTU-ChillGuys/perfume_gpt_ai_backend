@@ -11,8 +11,8 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
-import { processBackgroundJob } from 'src/api/controllers/helper/background-job.helper';
-import { CACHE_TTL_1HOUR, CACHE_TTL_6HOUR } from 'src/infrastructure/cacheable/cacheable.constants';
+import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
+import { CACHE_TTL_1HOUR } from 'src/infrastructure/cacheable/cacheable.constants';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
@@ -20,26 +20,15 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
 import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import {
-  AIInventoryReportStructuredResponse,
-  AIResponseMetadata
+  AIInventoryReportStructuredResponse
 } from 'src/application/dtos/response/ai-structured.response';
-import {
-  isDataEmpty,
-  INSUFFICIENT_DATA_MESSAGES
-} from 'src/infrastructure/utils/insufficient-data';
-import {
-  inventoryReportPrompt,
-  INSTRUCTION_TYPE_INVENTORY
-} from 'src/application/constant/prompts';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
+import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
 import { add } from 'date-fns';
 
 @Role(['admin'])
@@ -53,9 +42,7 @@ import { add } from 'date-fns';
 export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
-    @Inject(AI_SERVICE) private readonly aiService: AIService,
-    private readonly adminInstructionService: AdminInstructionService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) { }
 
   /** Lấy thông tin tồn kho */
@@ -94,42 +81,7 @@ export class InventoryController {
   @ApiOperation({ summary: 'Tạo báo cáo tồn kho bằng AI' })
   @ApiBaseResponse(String)
   async getAIInventoryReport(): Promise<BaseResponse<string>> {
-    // Fetch stock and batch data
-    const report = await this.inventoryService.createReportFromBatchAndStock();
-
-    if (isDataEmpty(report?.toString())) {
-      return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
-    }
-
-    // Lấy admin instruction cho domain inventory (nếu có)
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_INVENTORY
-      );
-
-    console.log('Generated inventory report, sending to AI service for analysis...');
-
-    // Generate AI summary
-    const aiResponse = await this.aiService.textGenerateFromPrompt(
-      inventoryReportPrompt(report.toString()),
-      adminPrompt
-    );
-
-    console.log('Received response from AI service for inventory report.');
-
-    if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI inventory report',
-        { service: 'AIService' }
-      );
-    }
-
-    // Create inventory log
-    await this.inventoryService.createInventoryLog(
-      aiResponse.data ?? 'No report generated'
-    );
-
-    return Ok(aiResponse.data);
+    return this.inventoryService.generateAIInventoryReport();
   }
 
   /**
@@ -142,49 +94,7 @@ export class InventoryController {
   async getStructuredAIInventoryReport(): Promise<
     BaseResponse<AIInventoryReportStructuredResponse>
   > {
-    const startTime = Date.now();
-
-    const report = await this.inventoryService.createReportFromBatchAndStock();
-
-    if (isDataEmpty(report?.toString())) {
-      const processingTimeMs = Date.now() - startTime;
-      return {
-        success: true,
-        data: new AIInventoryReportStructuredResponse({
-          report: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT,
-          generatedAt: new Date(),
-          metadata: new AIResponseMetadata({ processingTimeMs })
-        })
-      };
-    }
-
-    // Lấy admin instruction cho domain inventory (nếu có)
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_INVENTORY
-      );
-
-    const aiResponse = await this.aiService.textGenerateFromPrompt(
-      inventoryReportPrompt(report.toString()),
-      adminPrompt
-    );
-
-    if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI inventory report',
-        { service: 'AIService' }
-      );
-    }
-
-    const processingTimeMs = Date.now() - startTime;
-
-    const structuredResponse = new AIInventoryReportStructuredResponse({
-      report: aiResponse.data ?? '',
-      generatedAt: new Date(),
-      metadata: new AIResponseMetadata({ processingTimeMs })
-    });
-
-    return Ok(structuredResponse);
+    return this.inventoryService.generateStructuredAIInventoryReport();
   }
 
   /**
@@ -197,22 +107,15 @@ export class InventoryController {
   @CacheTTL(CACHE_TTL_1HOUR)
   @UseInterceptors(CacheInterceptor)
   async createInventoryReportJob(): Promise<BaseResponse<{ jobId: string }>> {
-    const jobId = crypto.randomUUID();
-    const cacheKey = `inventory_report_job_${jobId}`;
-    const ttlMilliseconds = CACHE_TTL_1HOUR;
-
-    await this.cacheManager.set(cacheKey, { status: 'pending' }, ttlMilliseconds);
-
-    processBackgroundJob(
+    return createBackgroundJob(
       this.cacheManager,
       () => this.getAIInventoryReport(),
-      { cacheKey, ttlMilliseconds }
+      {
+        type: 'inventory_report_job',
+        cacheKeyFactory: (jobId) => `inventory_report_job_${jobId}`,
+        ttlMilliseconds: CACHE_TTL_1HOUR
+      }
     );
-
-    // Goi them thoi gian tiep theo cho den khi het caching
-    const expirationTime = add(new Date(), { seconds: ttlMilliseconds/1000 });
-
-    return Ok({ jobId, expirationTime});
   }
 
   /**
@@ -226,26 +129,35 @@ export class InventoryController {
   async getInventoryReportJobResult(
     @Param('jobId') jobId: string
   ): Promise<BaseResponse<any>> {
-    const cacheKey = `inventory_report_job_${jobId}`;
-    const jobData = await this.cacheManager.get(cacheKey);
-
-    if (!jobData) {
-      throw new InternalServerErrorWithDetailsException('Job not found or expired', {
-        jobId,
-        endpoint: 'inventory/report/ai/job/result/:jobId'
-      });
-    }
-
-    return Ok(jobData);
+    return checkBackgroundJobResult(
+      this.cacheManager,
+      `inventory_report_job_${jobId}`,
+      { jobId, endpoint: 'inventory/report/ai/job/result/:jobId' }
+    );
   }
 
   @Get('report/logs')
-  @ApiOperation({ summary: 'Lấy lịch sử báo cáo tồn kho' })
+  @ApiOperation({ summary: 'Lấy lịch sử báo cáo tồn kho tổng quan' })
   @ApiBaseResponse(PagedResult<String>)
   async getInventoryReportLogs(): Promise<
     BaseResponseAPI<PagedResult<String>>
   > {
-    const logs = await this.inventoryService.getAllInventoryLogs();
+    const logs = await this.inventoryService.getAllInventoryLogs(InventoryLogType.REPORT);
+    return Ok(
+      new PagedResult<InventoryLog>({
+        items: logs?.data ?? [],
+        totalCount: logs?.data?.length ?? 0
+      })
+    );
+  }
+
+  @Get('restock/logs')
+  @ApiOperation({ summary: 'Lấy lịch sử phân tích nhu cầu nhập hàng (restock)' })
+  @ApiBaseResponse(PagedResult<String>)
+  async getInventoryRestockLogs(): Promise<
+    BaseResponseAPI<PagedResult<String>>
+  > {
+    const logs = await this.inventoryService.getAllInventoryLogs(InventoryLogType.RESTOCK);
     return Ok(
       new PagedResult<InventoryLog>({
         items: logs?.data ?? [],
@@ -262,4 +174,49 @@ export class InventoryController {
   ): Promise<BaseResponse<InventoryLog>> {
     return this.inventoryService.getInventoryLogById(id);
   }
+
+  //Tao email cảnh bảo stock
+
+  /** Phân tích nhu cầu nhập hàng (restock) dựa trên xu hướng bán hàng */
+  @Get('restock/ai')
+  @ApiOperation({ summary: 'Phân tích nhu cầu nhập hàng dựa trên xu hướng (AI)' })
+  @ApiBaseResponse(Object)
+  async getAIRestockingNeeds(): Promise<BaseResponse<any>> {
+    return this.inventoryService.analyzeRestockNeeds();
+  }
+
+  @Public()
+  @Get('restock/job')
+  @ApiOperation({ summary: 'Khởi tạo job để phân tích nhu cầu nhập hàng (restock)' })
+  @ApiBaseResponse(String)
+  @CacheTTL(CACHE_TTL_1HOUR)
+  @UseInterceptors(CacheInterceptor)
+  async createRestockReportJob(): Promise<BaseResponse<{ jobId: string }>> {
+    return createBackgroundJob(
+      this.cacheManager,
+      () => this.getAIRestockingNeeds(),
+      {
+        type: 'inventory_restock_job',
+        cacheKeyFactory: (jobId) => `inventory_restock_job_${jobId}`,
+        ttlMilliseconds: CACHE_TTL_1HOUR
+      }
+    );
+  }
+
+  @Public()
+  @Get('restock/job/result/:jobId')
+  @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job phân tích nhu cầu nhập hàng (restock)' })
+  @ApiBaseResponse(Object)
+  @ApiParam({ name: 'jobId', description: 'ID của job' })
+  async getRestockJobResult(
+    @Param('jobId') jobId: string
+  ): Promise<BaseResponse<any>> {
+    return checkBackgroundJobResult(
+      this.cacheManager,
+      `inventory_restock_job_${jobId}`,
+      { jobId, endpoint: 'inventory/restock/job/result/:jobId' }
+    );
+  }
+
+
 }

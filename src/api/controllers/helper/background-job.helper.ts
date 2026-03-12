@@ -1,5 +1,9 @@
 import { Cache } from 'cache-manager';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import * as crypto from 'crypto';
+import { add } from 'date-fns';
+import { Ok } from 'src/application/dtos/response/common/success-response';
+import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 
 export interface BackgroundJobOptions {
     /** The cache key to store the job status and result */
@@ -85,4 +89,84 @@ export async function processBackgroundJob<T>(
             ttlMilliseconds
         );
     }
+}
+
+/**
+ * Creates a background job or returns an existing running job if one exists.
+ * @param cacheManager - The Cache execution context
+ * @param jobFunction - The function to execute in the background
+ * @param options - Configuration for the background job
+ * @param request - Optional Request object
+ * @returns Result containing the job ID and expiration time
+ */
+export async function createBackgroundJob<T>(
+    cacheManager: Cache,
+    jobFunction: () => Promise<BaseResponse<T>>,
+    options: {
+        type: string; // The type/category of the job, e.g., 'trend_job', 'inventory_report_job'
+        cacheKeyFactory: (jobId: string) => string;
+        ttlMilliseconds: number;
+        forceRefresh?: boolean;
+    },
+    request?: Request
+): Promise<BaseResponse<{ jobId: string; expirationTime?: Date }>> {
+    const latestJobKey = `${options.type}_latest_job_id`;
+
+    // Check if there is an existing valid job ID for this type and we are not forcing a refresh
+    if (!options.forceRefresh) {
+        const existingJobId = await cacheManager.get<string>(latestJobKey);
+        if (existingJobId) {
+            const existingJobCacheKey = options.cacheKeyFactory(existingJobId);
+            const existingJobData = await cacheManager.get(existingJobCacheKey);
+
+            // If the job data still exists, we reuse this job ID
+            if (existingJobData) {
+                const expirationTime = add(new Date(), { seconds: options.ttlMilliseconds / 1000 });
+                return Ok({ jobId: existingJobId, expirationTime });
+            }
+        }
+    }
+
+    // No existing job or it expired, create a new one
+    const jobId = crypto.randomUUID();
+    const cacheKey = options.cacheKeyFactory(jobId);
+
+    // Save the new job ID as the latest for this type
+    await cacheManager.set(latestJobKey, jobId, options.ttlMilliseconds);
+
+    // Initialize job status
+    await cacheManager.set(cacheKey, { status: 'pending' }, options.ttlMilliseconds);
+
+    // Start background processing
+    processBackgroundJob(
+        cacheManager,
+        jobFunction,
+        { cacheKey, ttlMilliseconds: options.ttlMilliseconds },
+        request
+    );
+
+    const expirationTime = add(new Date(), { seconds: options.ttlMilliseconds / 1000 });
+
+    return Ok({ jobId, expirationTime });
+}
+
+/**
+ * Checks the status and result of a background job.
+ * @param cacheManager - The Cache execution context
+ * @param cacheKey - The specific cache key for the job
+ * @param errorDetails - Any additional metadata to log if the job is not found
+ * @returns The cache data for the job
+ */
+export async function checkBackgroundJobResult(
+    cacheManager: Cache,
+    cacheKey: string,
+    errorDetails: Record<string, any>
+): Promise<BaseResponse<any>> {
+    const jobData = await cacheManager.get(cacheKey);
+
+    if (!jobData) {
+        throw new InternalServerErrorWithDetailsException('Job not found or expired', errorDetails);
+    }
+
+    return Ok(jobData);
 }

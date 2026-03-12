@@ -8,6 +8,7 @@ import {
   MediaResponse
 } from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -95,7 +96,7 @@ export class ReviewService {
     private readonly prisma: PrismaService,
     private readonly unitOfWork: UnitOfWork
   ) {}
-
+  
   async getAllReviews(
     request: GetPagedReviewRequest
   ): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
@@ -112,11 +113,11 @@ export class ReviewService {
           ...(request.Status ? { Status: request.Status } : {}),
           ...(request.MinRating || request.MaxRating
             ? {
-                Rating: {
-                  ...(request.MinRating ? { gte: request.MinRating } : {}),
-                  ...(request.MaxRating ? { lte: request.MaxRating } : {})
-                }
+              Rating: {
+                ...(request.MinRating ? { gte: request.MinRating } : {}),
+                ...(request.MaxRating ? { lte: request.MaxRating } : {})
               }
+            }
             : {}),
           ...(request.HasImages ? { Media: { some: {} } } : {})
         };
@@ -204,14 +205,14 @@ export class ReviewService {
 
   async addReviewLog(
     type: ReviewTypeEnum,
-    variantId: string,
+    variantId: string | null,
     reviewLog: string
   ): Promise<BaseResponseAPI<ReviewLog>> {
     return await funcHandlerAsync(
       async () => {
         const log = new ReviewLog({
           typeReview: type,
-          variantId,
+          ...(variantId ? { variantId } : {}),
           reviewLog
         });
         const result = await this.unitOfWork.ReviewLogRepo.insert(log);
@@ -258,5 +259,14 @@ export class ReviewService {
       'Failed to fetch review logs',
       true
     );
+  }
+
+  /** Lấy toàn bộ review không phân trang – dùng cho AI summary */
+  async getReviewsUnpaged(variantId?: string): Promise<ReviewResponse[]> {
+    const reviews = await this.prisma.reviews.findMany({
+      where: variantId ? { OrderDetails: { VariantId: variantId } } : undefined,
+      include: reviewInclude
+    });
+    return reviews.map(mapToReviewResponse);
   }
 }

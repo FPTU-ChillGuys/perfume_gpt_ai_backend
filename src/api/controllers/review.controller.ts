@@ -8,6 +8,7 @@ import { Public, Role } from 'src/application/common/Metadata';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse } from 'src/application/dtos/response/review.response';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
+import { ReviewAIService } from 'src/infrastructure/servicies/review-ai.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -27,6 +28,7 @@ export class ReviewController {
 
     constructor(
         private readonly reviewService: ReviewService,
+        private readonly reviewAIService: ReviewAIService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {}
 
@@ -37,7 +39,7 @@ export class ReviewController {
     @ApiBaseResponse(String)
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI cho tất cả variant' })
     async getReviewSummaryFromAllVariant(): Promise<BaseResponse<string>> {
-        return this.reviewService.generateReviewSummaryAll();
+        return this.reviewAIService.generateReviewSummaryAll();
     }
 
     /** Lấy danh sách đánh giá */
@@ -108,7 +110,7 @@ export class ReviewController {
     @ApiOperation({ summary: 'Tóm tắt đánh giá bằng AI theo variant ID' })
     @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
     async getReviewSummaryByVariantId(@Param('variantId') variantId: string): Promise<BaseResponse<string>> {
-        return this.reviewService.generateReviewSummaryByVariantId(variantId);
+        return this.reviewAIService.generateReviewSummaryByVariantId(variantId);
     }
 
 
@@ -123,7 +125,7 @@ export class ReviewController {
     async getStructuredReviewSummaryByVariantId(
         @Param('variantId') variantId: string
     ): Promise<BaseResponse<AIReviewSummaryStructuredResponse>> {
-        return this.reviewService.generateStructuredReviewSummary(variantId);
+        return this.reviewAIService.generateStructuredReviewSummary(variantId);
     }
 
     /** Thêm review log */

@@ -1,5 +1,5 @@
 import { UnitOfWork } from '../repositories/unit-of-work';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { UserLog } from 'src/domain/entities/user-log.entity';
@@ -25,20 +25,15 @@ import { convertToUTC } from '../utils/time-zone';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
-import { generateSummaryPrompt, INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
+import { generateSummaryPrompt } from 'src/application/constant/prompts';
 import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
-import { AIHelper } from '../helpers/ai.helper';
-import { AI_HELPER } from '../modules/ai.module';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { INSUFFICIENT_DATA_MESSAGES, isDataEmpty } from '../utils/insufficient-data';
-import { AdminInstructionService } from './admin-instruction.service';
 
 @Injectable()
 export class UserLogService {
   constructor(
-    protected unitOfWork: UnitOfWork,
-    protected adminInstructionService: AdminInstructionService,
-    @Inject(AI_HELPER) private readonly aiHelper: AIHelper
+    protected unitOfWork: UnitOfWork
   ) {}
 
   /** Lay tat ca log */
@@ -693,85 +688,6 @@ export class UserLogService {
   }
 
   /** Tong hop log va goi AI, tra ve chuoi ket qua (dung cho controller) */
-  async summarizeUserLogs(request: UserLogRequest): Promise<BaseResponse<string>> {
-    const reportResult = await this.getReportAndPromptSummaryUserLogs(request);
-    if (!reportResult.success || !reportResult.data) {
-      return { success: false, error: 'Failed to get user log report' };
-    }
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_LOG);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(reportResult.data.prompt, systemPrompt);
-    if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
-    }
-    return Ok(aiResponse.data);
-  }
-
-  /** Tong hop log tat ca user va goi AI, tra ve chuoi ket qua (dung cho controller) */
-  async summarizeAllUserLogs(request: AllUserLogRequest): Promise<BaseResponse<string>> {
-    const reportResult = await this.getReportAndPromptSummaryAllUsersLogs(request);
-    if (!reportResult.success || !reportResult.data) {
-      return { success: false, error: 'Failed to get all user log report' };
-    }
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_LOG);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(reportResult.data.prompt, systemPrompt);
-    if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
-    }
-    return Ok(aiResponse.data);
-  }
-
-  /** Tong hop log, goi AI, luu ket qua vao DB (dung cho scheduler) */
-  async summarizeAndSaveForUser(userId: string, period: PeriodEnum): Promise<void> {
-    const userLogRequest = new UserLogRequest({ userId, period, endDate: new Date() });
-    const reportResult = await this.getReportAndPromptSummaryUserLogs(userLogRequest);
-    if (!reportResult.success || !reportResult.data) {
-      console.log(`Failed to summarize logs for userId: ${userId}`);
-      return;
-    }
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_LOG);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(reportResult.data.prompt, systemPrompt);
-    const startDate = convertToUTC(userLogRequest.startDate) ||
-      this.getFirstDateOfPeriod(userLogRequest.period!, userLogRequest.endDate!);
-    await this.saveUserLogSummary(userId, startDate, userLogRequest.endDate!, aiResponse.data || '');
-    if (!aiResponse.success) {
-      console.log(`Failed to get AI response for userId: ${userId}`);
-    } else {
-      console.log(`Successfully summarized logs for userId: ${userId}`);
-    }
-  }
-
-  /** Tong hop log tat ca user, goi AI, luu ket qua vao DB (dung cho scheduler) */
-  async summarizeAndSaveForAllUsers(period: PeriodEnum): Promise<void> {
-    const userIds = await this.getAllUserIdsFromLogs();
-    console.log(`Found ${userIds.length} unique user IDs.`);
-    for (const userId of userIds) {
-      await this.summarizeAndSaveForUser(userId, period);
-    }
-    console.log('Scheduled task completed: User logs summarized and saved.');
-  }
-
-  async summarizePerWeek(): Promise<void> {
-    try {
-      await this.summarizeAndSaveForAllUsers(PeriodEnum.WEEKLY);
-    } catch (error) {
-      console.error('Error summarizing weekly logs:', error);
-    }
-  }
-
-  async summarizePerMonth(): Promise<void> {
-    try {
-      await this.summarizeAndSaveForAllUsers(PeriodEnum.MONTHLY);
-    } catch (error) {
-      console.error('Error summarizing monthly logs:', error);
-    }
-  }
-
-  async summarizePerYear(): Promise<void> {
-    try {
-      await this.summarizeAndSaveForAllUsers(PeriodEnum.YEARLY);
-    } catch (error) {
-      console.error('Error summarizing yearly logs:', error);
-    }
-  }
+  // AI methods moved to UserLogAIService
 }
 

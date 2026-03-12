@@ -10,6 +10,7 @@ import {
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { UserLogAIService } from 'src/infrastructure/servicies/user-log-ai.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
@@ -21,7 +22,10 @@ import { CacheTTL } from '@nestjs/cache-manager';
 @ApiTags('Logs')
 @Controller('logs')
 export class LogController {
-  constructor(protected userLogService: UserLogService) {}
+  constructor(
+    protected userLogService: UserLogService,
+    protected userLogAIService: UserLogAIService
+  ) {}
 
   /** Lấy báo cáo tất cả log hoạt động người dùng */
   @CacheTTL(1)
@@ -103,7 +107,7 @@ export class LogController {
   async summarizeLogs(
     @Query() userLogRequest: UserLogRequest
   ): Promise<BaseResponse<string>> {
-    return this.userLogService.summarizeUserLogs(userLogRequest);
+    return this.userLogAIService.summarizeUserLogs(userLogRequest);
   }
 
   /** Tóm tắt log của tất cả người dùng bằng AI (chú ý: có thể mất thời gian và không lưu vào DB) */
@@ -113,12 +117,12 @@ export class LogController {
   async summarizeAllLogs(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<string>> {
-    return this.userLogService.summarizeAllUserLogs(allUserLogRequest);
+    return this.userLogAIService.summarizeAllUserLogs(allUserLogRequest);
   }
 
   @Cron(CronExpression.EVERY_WEEK)
   async summarizeLogsPerWeekWithCronJob(): Promise<BaseResponse<string>> {
-    await this.userLogService.summarizePerWeek();
+    await this.userLogAIService.summarizePerWeek();
     return Ok('Scheduled task completed.');
   }
 
@@ -126,7 +130,7 @@ export class LogController {
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tuần (thủ công)' })
   @ApiBaseResponse(String)
   async summaryLogsPerWeekManually(): Promise<BaseResponse<string>> {
-    await this.userLogService.summarizePerWeek();
+    await this.userLogAIService.summarizePerWeek();
     return Ok('Manual log summarization completed.');
   }
 
@@ -134,7 +138,7 @@ export class LogController {
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tháng (thủ công)' })
   @ApiBaseResponse(String)
   async summaryLogsPerMonthManually(): Promise<BaseResponse<string>> {
-    await this.userLogService.summarizePerMonth();
+    await this.userLogAIService.summarizePerMonth();
     return Ok('Manual log summarization completed.');
   }
 
@@ -142,7 +146,7 @@ export class LogController {
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng năm (thủ công)' })
   @ApiBaseResponse(String)
   async summaryLogsPerYearManually(): Promise<BaseResponse<string>> {
-    await this.userLogService.summarizePerYear();
+    await this.userLogAIService.summarizePerYear();
     return Ok('Manual log summarization completed.');
   }
 

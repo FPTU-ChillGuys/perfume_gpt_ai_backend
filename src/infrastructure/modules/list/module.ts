@@ -11,9 +11,11 @@ import { ProductModule } from "../product.module";
 import { ProfileModule } from "../profile.module";
 import { QuizModule } from "../quiz.module";
 import { ReviewModule } from "../review.module";
+import { ReviewAIModule } from "../review-ai.module";
 import { ToolModule } from "../tool.module";
 import { TrendModule } from "../trend.module";
 import { UserLogModule } from "../user-log.module";
+import { UserLogAIModule } from "../user-log-ai.module";
 import { UserModule } from "../user.module";
 import { RecommendationModule } from "../recommendation.module";
 
@@ -25,7 +27,9 @@ export const modules = [
   MappingModule,
   AIModule,
   UserLogModule,
+  UserLogAIModule,
   ReviewModule,
+  ReviewAIModule,
   InventoryModule,
   OrderModule,
   AIAcceptanceModule,

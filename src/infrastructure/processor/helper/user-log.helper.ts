@@ -1,25 +1,27 @@
-import { UserLogService } from "src/infrastructure/servicies/user-log.service";
+import { Injectable } from "@nestjs/common";
+import { UserLogAIService } from "src/infrastructure/servicies/user-log-ai.service";
 import { PeriodEnum } from "src/domain/enum/period.enum";
 
+@Injectable()
 export class UserLogHelper {
 
     constructor(
-        protected userLogService: UserLogService
+        protected userLogAIService: UserLogAIService
     ) { }
 
     /** Ghi de log theo tuan */
     async overrideWeeklyLogSummaryByUserId(userId: string): Promise<void> {
-        await this.userLogService.summarizeAndSaveForUser(userId, PeriodEnum.WEEKLY);
+        await this.userLogAIService.summarizeAndSaveForUser(userId, PeriodEnum.WEEKLY);
     }
 
     /** Ghi de log theo thang */
     async overrideMonthlyLogSummaryByUserId(userId: string): Promise<void> {
-        await this.userLogService.summarizeAndSaveForUser(userId, PeriodEnum.MONTHLY);
+        await this.userLogAIService.summarizeAndSaveForUser(userId, PeriodEnum.MONTHLY);
     }
 
     /** Ghi de log theo nam */
     async overrideYearlyLogSummaryByUserId(userId: string): Promise<void> {
-        await this.userLogService.summarizeAndSaveForUser(userId, PeriodEnum.YEARLY);
+        await this.userLogAIService.summarizeAndSaveForUser(userId, PeriodEnum.YEARLY);
     }
 
 }

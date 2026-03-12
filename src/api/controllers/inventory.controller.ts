@@ -111,6 +111,7 @@ export class InventoryController {
       this.cacheManager,
       () => this.getAIInventoryReport(),
       {
+        type: 'inventory_report_job',
         cacheKeyFactory: (jobId) => `inventory_report_job_${jobId}`,
         ttlMilliseconds: CACHE_TTL_1HOUR
       }
@@ -195,6 +196,7 @@ export class InventoryController {
       this.cacheManager,
       () => this.getAIRestockingNeeds(),
       {
+        type: 'inventory_restock_job',
         cacheKeyFactory: (jobId) => `inventory_restock_job_${jobId}`,
         ttlMilliseconds: CACHE_TTL_1HOUR
       }

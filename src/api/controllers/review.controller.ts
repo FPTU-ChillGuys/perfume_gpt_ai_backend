@@ -67,6 +67,7 @@ export class ReviewController {
             this.cacheManager,
             () => this.getReviewSummaryByVariantId(variantId),
             {
+                type: `review_summary_job_${variantId}`,
                 cacheKeyFactory: (jobId) => `review_summary_job_${jobId}_${variantId}`,
                 ttlMilliseconds: CACHE_TTL_1MONTH
             }

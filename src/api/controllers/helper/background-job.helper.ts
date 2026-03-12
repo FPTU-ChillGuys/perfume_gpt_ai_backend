@@ -92,10 +92,10 @@ export async function processBackgroundJob<T>(
 }
 
 /**
- * Creates a background job and initializes its cache status.
+ * Creates a background job or returns an existing running job if one exists.
  * @param cacheManager - The Cache execution context
  * @param jobFunction - The function to execute in the background
- * @param options - Cache key factory and TTL configuration
+ * @param options - Configuration for the background job
  * @param request - Optional Request object
  * @returns Result containing the job ID and expiration time
  */
@@ -103,16 +103,38 @@ export async function createBackgroundJob<T>(
     cacheManager: Cache,
     jobFunction: () => Promise<BaseResponse<T>>,
     options: {
+        type: string; // The type/category of the job, e.g., 'trend_job', 'inventory_report_job'
         cacheKeyFactory: (jobId: string) => string;
         ttlMilliseconds: number;
     },
     request?: Request
 ): Promise<BaseResponse<{ jobId: string; expirationTime?: Date }>> {
+    const latestJobKey = `${options.type}_latest_job_id`;
+
+    // Check if there is an existing valid job ID for this type
+    const existingJobId = await cacheManager.get<string>(latestJobKey);
+    if (existingJobId) {
+        const existingJobCacheKey = options.cacheKeyFactory(existingJobId);
+        const existingJobData = await cacheManager.get(existingJobCacheKey);
+
+        // If the job data still exists, we reuse this job ID
+        if (existingJobData) {
+            const expirationTime = add(new Date(), { seconds: options.ttlMilliseconds / 1000 });
+            return Ok({ jobId: existingJobId, expirationTime });
+        }
+    }
+
+    // No existing job or it expired, create a new one
     const jobId = crypto.randomUUID();
     const cacheKey = options.cacheKeyFactory(jobId);
 
+    // Save the new job ID as the latest for this type
+    await cacheManager.set(latestJobKey, jobId, options.ttlMilliseconds);
+
+    // Initialize job status
     await cacheManager.set(cacheKey, { status: 'pending' }, options.ttlMilliseconds);
 
+    // Start background processing
     processBackgroundJob(
         cacheManager,
         jobFunction,

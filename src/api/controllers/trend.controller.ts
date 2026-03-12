@@ -69,8 +69,8 @@ export class TrendController {
   @Get('product/job')
   @ApiOperation({ summary: 'Khởi tạo job để lấy product từ xu hướng' })
   @ApiBaseResponse(String)
-  @CacheTTL(cachingTrendTTL) // cache kết quả API (tức là jobId) trong 1 ngày
-  @UseInterceptors(CacheInterceptor)
+  // @CacheTTL(cachingTrendTTL) // cache kết quả API (tức là jobId) trong 1 ngày
+  // @UseInterceptors(CacheInterceptor)
   async createProductTrendJob(
     @Req() request: Request,
     @Query() allUserLogRequest: AllUserLogRequest
@@ -79,6 +79,7 @@ export class TrendController {
       this.cacheManager,
       () => this.getProductFromTrend(allUserLogRequest),
       {
+        type: 'trend_job',
         cacheKeyFactory: (jobId) => `trend_job_${jobId}`,
         ttlMilliseconds: cachingTrendTTL
       },

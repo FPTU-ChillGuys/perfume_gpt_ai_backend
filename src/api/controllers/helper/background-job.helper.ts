@@ -106,21 +106,24 @@ export async function createBackgroundJob<T>(
         type: string; // The type/category of the job, e.g., 'trend_job', 'inventory_report_job'
         cacheKeyFactory: (jobId: string) => string;
         ttlMilliseconds: number;
+        forceRefresh?: boolean;
     },
     request?: Request
 ): Promise<BaseResponse<{ jobId: string; expirationTime?: Date }>> {
     const latestJobKey = `${options.type}_latest_job_id`;
 
-    // Check if there is an existing valid job ID for this type
-    const existingJobId = await cacheManager.get<string>(latestJobKey);
-    if (existingJobId) {
-        const existingJobCacheKey = options.cacheKeyFactory(existingJobId);
-        const existingJobData = await cacheManager.get(existingJobCacheKey);
+    // Check if there is an existing valid job ID for this type and we are not forcing a refresh
+    if (!options.forceRefresh) {
+        const existingJobId = await cacheManager.get<string>(latestJobKey);
+        if (existingJobId) {
+            const existingJobCacheKey = options.cacheKeyFactory(existingJobId);
+            const existingJobData = await cacheManager.get(existingJobCacheKey);
 
-        // If the job data still exists, we reuse this job ID
-        if (existingJobData) {
-            const expirationTime = add(new Date(), { seconds: options.ttlMilliseconds / 1000 });
-            return Ok({ jobId: existingJobId, expirationTime });
+            // If the job data still exists, we reuse this job ID
+            if (existingJobData) {
+                const expirationTime = add(new Date(), { seconds: options.ttlMilliseconds / 1000 });
+                return Ok({ jobId: existingJobId, expirationTime });
+            }
         }
     }
 

@@ -73,7 +73,8 @@ export class TrendController {
   // @UseInterceptors(CacheInterceptor)
   async createProductTrendJob(
     @Req() request: Request,
-    @Query() allUserLogRequest: AllUserLogRequest
+    @Query() allUserLogRequest: AllUserLogRequest,
+    @Query('forceRefresh') forceRefresh?: boolean
   ): Promise<BaseResponse<{ jobId: string }>> {
     return createBackgroundJob(
       this.cacheManager,
@@ -81,7 +82,8 @@ export class TrendController {
       {
         type: 'trend_job',
         cacheKeyFactory: (jobId) => `trend_job_${jobId}`,
-        ttlMilliseconds: cachingTrendTTL
+        ttlMilliseconds: cachingTrendTTL,
+        forceRefresh: forceRefresh === true || String(forceRefresh) === 'true'
       },
       request as any
     );

@@ -61,7 +61,8 @@ export class ReviewController {
     @UseInterceptors(CacheInterceptor)
     @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
     async createReviewSummaryJob(
-        @Param('variantId') variantId: string
+        @Param('variantId') variantId: string,
+        @Query('forceRefresh') forceRefresh?: boolean
     ): Promise<BaseResponse<{ jobId: string }>> {
         return createBackgroundJob(
             this.cacheManager,
@@ -69,7 +70,8 @@ export class ReviewController {
             {
                 type: `review_summary_job_${variantId}`,
                 cacheKeyFactory: (jobId) => `review_summary_job_${jobId}_${variantId}`,
-                ttlMilliseconds: CACHE_TTL_1MONTH
+                ttlMilliseconds: CACHE_TTL_1MONTH,
+                forceRefresh: forceRefresh === true || String(forceRefresh) === 'true'
             }
         );
     }

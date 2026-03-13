@@ -1,19 +1,25 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductController } from 'src/api/controllers/product.controller';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
-import { createMockProductService } from '../../helpers/mock-factories';
+import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { createMockProductService, createMockUserLogService } from '../../helpers/mock-factories';
 import { successResponseAPI, errorResponseAPI, createMockRequest } from '../../helpers/test-constants';
 
 describe('ProductController', () => {
   let controller: ProductController;
   let productService: ReturnType<typeof createMockProductService>;
+  let userLogService: ReturnType<typeof createMockUserLogService>;
 
   beforeEach(async () => {
     productService = createMockProductService();
+    userLogService = createMockUserLogService();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ProductController],
-      providers: [{ provide: ProductService, useValue: productService }],
+      providers: [
+        { provide: ProductService, useValue: productService },
+        { provide: UserLogService, useValue: userLogService }
+      ],
     }).compile();
 
     controller = module.get<ProductController>(ProductController);
@@ -70,7 +76,7 @@ describe('ProductController', () => {
 
   // ────────── GET /products/search ──────────
   describe('getProductsBySemanticSearch', () => {
-    const pagedRequest = { PageNumber: 1, PageSize: 10 } as any;
+    const searchRequest = { searchText: 'Chanel', PageNumber: 1, PageSize: 10 } as any;
 
     it('TC-FUNC-012: should return matching products for search query', async () => {
       const mockProducts = {
@@ -82,13 +88,13 @@ describe('ProductController', () => {
       );
 
       const result = await controller.getProductsBySemanticSearch(
-        createMockRequest(), 'Chanel', pagedRequest,
+        createMockRequest(), searchRequest,
       );
 
       expect(result.success).toBe(true);
       expect(result.payload!.items).toHaveLength(1);
       expect(productService.getProductsUsingSemanticSearch)
-        .toHaveBeenCalledWith('Chanel', pagedRequest);
+        .toHaveBeenCalledWith('Chanel', searchRequest);
     });
 
     it('TC-FUNC-013: should return empty for no matching products', async () => {
@@ -97,7 +103,7 @@ describe('ProductController', () => {
       );
 
       const result = await controller.getProductsBySemanticSearch(
-        createMockRequest(), 'xyz-nonexistent', pagedRequest,
+        createMockRequest(), { ...searchRequest, searchText: 'xyz-nonexistent' },
       );
 
       expect(result.success).toBe(true);
@@ -110,7 +116,7 @@ describe('ProductController', () => {
       );
 
       const result = await controller.getProductsBySemanticSearch(
-        createMockRequest(), '<script>alert("xss")</script>', pagedRequest,
+        createMockRequest(), { ...searchRequest, searchText: '<script>alert("xss")</script>' },
       );
 
       expect(result.success).toBe(true);

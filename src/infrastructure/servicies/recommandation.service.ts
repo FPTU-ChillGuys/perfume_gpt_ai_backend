@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Output } from 'ai';
 import { INSTRUCTION_TYPE_RECOMMENDATION, INSTRUCTION_TYPE_REPURCHASE } from 'src/application/constant/prompts';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -24,7 +25,7 @@ export class RecommendationService {
     private readonly userService: UserService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService
-  ) {}
+  ) { }
 
   private async generateAIText(
     prompt: string,
@@ -167,17 +168,31 @@ export class RecommendationService {
     }
   }
 
+  @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: 'Asia/Ho_Chi_Minh' }) // Chạy vào 8h sáng mỗi ngày
   async sendRecommendationToAllUsers(): Promise<void> {
-    const userIds = await this.userService.getAllUserIds();
-    for (const userId of userIds.payload ?? []) {
-      await this.sendRecommendation(userId);
+    this.logger.log('Bắt đầu chạy cron job: Gửi daily recommendation cho tất cả người dùng');
+    try {
+      const userIds = await this.userService.getAllUserIds();
+      for (const userId of userIds.payload ?? []) {
+        await this.sendRecommendation(userId);
+      }
+      this.logger.log('Đã hoàn thành cron job: Gửi daily recommendation');
+    } catch (error) {
+      this.logger.error('Lỗi khi chạy cron job daily recommendation:', error);
     }
   }
 
+  @Cron(CronExpression.EVERY_DAY_AT_9AM, { timeZone: 'Asia/Ho_Chi_Minh' }) // Chạy vào 9h sáng mỗi ngày
   async sendRepurchaseToAllUsers(): Promise<void> {
-    const userIds = await this.userService.getAllUserIds();
-    for (const userId of userIds.payload ?? []) {
-      await this.sendRepurchase(userId);
+    this.logger.log('Bắt đầu chạy cron job: Gửi daily repurchase cho tất cả người dùng');
+    try {
+      const userIds = await this.userService.getAllUserIds();
+      for (const userId of userIds.payload ?? []) {
+        await this.sendRepurchase(userId);
+      }
+      this.logger.log('Đã hoàn thành cron job: Gửi daily repurchase');
+    } catch (error) {
+      this.logger.error('Lỗi khi chạy cron job daily repurchase:', error);
     }
   }
 }

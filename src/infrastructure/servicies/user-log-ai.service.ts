@@ -9,6 +9,7 @@ import { AIHelper } from '../helpers/ai.helper';
 import { AI_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
 import { UserLogService } from './user-log.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class UserLogAIService {
@@ -99,4 +100,12 @@ export class UserLogAIService {
       console.error('Error summarizing yearly logs:', error);
     }
   }
+
+  /** ---------------------- CRON JOB ---------------------------- */
+
+  @Cron(CronExpression.EVERY_WEEKEND)
+  async handleWeeklySummary() {
+    await this.summarizePerWeek();
+  }
+
 }

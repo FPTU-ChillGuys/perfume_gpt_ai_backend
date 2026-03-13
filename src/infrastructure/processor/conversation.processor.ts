@@ -21,11 +21,7 @@ export class ConversationProcessor extends WorkerHost {
       switch (job.name) {
         case ConversationJobName.ADD_MESSAGE_AND_LOG.toString():
           //Check type cua conversationDto
-          await this.conversationService.saveOrUpdateConversation(job.data.responseConversation);
-          //Check xem hôm nay có phải chủ nhật không? Nếu có thì override lại weekly log summary để tránh tiêu token khi người dùng có nhiều cuộc hội thoại trong tuần
-          if (new Date().getDay() === 0) {
-            await this.userLogHelper.overrideWeeklyLogSummaryByUserId(job.data.userId);
-          }
+          await this.conversationService.saveOrUpdateConversation(job.data.responseConversation);      
           break;
         default:
           throw new Error(`Unknown job name: ${job.name}`);

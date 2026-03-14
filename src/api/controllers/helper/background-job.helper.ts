@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import { add } from 'date-fns';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import { Request } from 'express';
 
 export interface BackgroundJobOptions {
     /** The cache key to store the job status and result */
@@ -107,10 +108,31 @@ export async function createBackgroundJob<T>(
         cacheKeyFactory: (jobId: string) => string;
         ttlMilliseconds: number;
         forceRefresh?: boolean;
+        cacheByRequest?: boolean;
     },
     request?: Request
 ): Promise<BaseResponse<{ jobId: string; expirationTime?: Date }>> {
-    const latestJobKey = `${options.type}_latest_job_id`;
+    let latestJobKey = `${options.type}_latest_job_id`;
+
+    if (options.cacheByRequest && request) {
+        const inputUrl = request.originalUrl || request.url || '';
+        try {
+            const urlObj = new URL(inputUrl, request.protocol + '://' + request.get('host'));
+            urlObj.searchParams.delete('forceRefresh');
+
+            let payloadString = urlObj.pathname + urlObj.search;
+            if (request.method && request.method !== 'GET' && request.body) {
+                payloadString += JSON.stringify(request.body);
+            }
+
+            const hashedPayload = crypto.createHash('md5').update(payloadString).digest('hex');
+            latestJobKey = `${options.type}_latest_job_id_${hashedPayload}`;
+        } catch (err) {
+            // Fallback if URL parsing fails
+            const hashedFallback = crypto.createHash('md5').update(inputUrl).digest('hex');
+            latestJobKey = `${options.type}_latest_job_id_${hashedFallback}`;
+        }
+    }
 
     // Check if there is an existing valid job ID for this type and we are not forcing a refresh
     if (!options.forceRefresh) {

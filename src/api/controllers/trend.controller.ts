@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Inject, Param, Query, Req, UseInterceptors } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { AllUserLogRequest } from 'src/application/dtos/request/user-log.request';
@@ -83,9 +84,10 @@ export class TrendController {
         type: 'trend_job',
         cacheKeyFactory: (jobId) => `trend_job_${jobId}`,
         ttlMilliseconds: cachingTrendTTL,
-        forceRefresh: forceRefresh === true || String(forceRefresh) === 'true'
+        forceRefresh: forceRefresh === true || String(forceRefresh) === 'true',
+        cacheByRequest: true
       },
-      request as any
+      request
     );
   }
 

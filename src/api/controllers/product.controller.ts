@@ -46,7 +46,6 @@ export class ProductController {
       const anonymousUserId = uuidv4();
       await this.userLog.addSearchLogToUserLog(anonymousUserId, request.searchText);
     }
-    await this.userLog.addSearchLogToUserLog(userId!, request.searchText);
     return result;
   }
 

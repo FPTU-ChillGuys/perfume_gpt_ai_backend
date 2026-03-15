@@ -148,7 +148,7 @@ export class QuizService {
         await this.unitOfWork.AIQuizQuestionAnswerRepo.createQuesAns(quesAns);
 
       //Log last quiz question answer
-      this.unitOfWork.UserLogRepo.addQuizQuesAnsDetailLogToUserLog(
+      await this.unitOfWork.EventLogRepo.createQuizEventsFromDetails(
         quizQuesAnws.userId,
         quizQuestionAnswer.details.getItems()
       );

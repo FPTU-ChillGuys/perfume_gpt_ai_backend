@@ -14,8 +14,17 @@ import { UserLogAIService } from 'src/infrastructure/servicies/user-log-ai.servi
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
-import { UserLog } from 'src/domain/entities/user-log.entity';
 import { CacheTTL } from '@nestjs/cache-manager';
+import { EventLogQueryRequest } from 'src/application/dtos/request/event-log.request';
+import { EventLog } from 'src/domain/entities/event-log.entity';
+import { EventLogPagedQueryRequest } from 'src/application/dtos/request/event-log.request';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import {
+  EventLogCreateRequest,
+  EventLogSummaryQueryRequest
+} from 'src/application/dtos/request/event-log.request';
+import { EventLogSummaryResponse } from 'src/application/dtos/response/event-log-summary.response';
+import { EventLogTimeSeriesResponse } from 'src/application/dtos/response/event-log-timeseries.response';
 
 @Role(['admin'])
 @ApiBearerAuth("jwt")
@@ -74,10 +83,88 @@ export class LogController {
   @CacheTTL(0)
   @Get("all")
   @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng' })
-  @ApiBaseResponse(Array<UserLog>)
+  @ApiBaseResponse(Array<EventLog>)
   async getAllUserLogs(
-  ): Promise<BaseResponse<UserLog[]>> {
-    const response = await this.userLogService.getAllLogs();
+  ): Promise<BaseResponse<EventLog[]>> {
+    const response = await this.userLogService.getAllEventLogs();
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Lấy event log dạng mới (message/search/quiz) */
+  @CacheTTL(0)
+  @Get('events')
+  @ApiOperation({ summary: 'Lấy event log dạng mới' })
+  @ApiBaseResponse(Array<EventLog>)
+  async getEventLogs(
+    @Query() request: EventLogQueryRequest
+  ): Promise<BaseResponse<EventLog[]>> {
+    const response = await this.userLogService.getEventLogs(request);
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Lấy event log dạng mới có phân trang */
+  @CacheTTL(0)
+  @Get('events/paged')
+  @ApiOperation({ summary: 'Lấy event log dạng mới có phân trang' })
+  @ApiBaseResponse(PagedResult<EventLog>)
+  async getPagedEventLogs(
+    @Query() request: EventLogPagedQueryRequest
+  ): Promise<BaseResponse<PagedResult<EventLog>>> {
+    const response = await this.userLogService.getEventLogsPaged(request);
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Tạo event log theo contract mới */
+  @Post('events')
+  @ApiOperation({ summary: 'Tạo event log theo contract mới' })
+  @ApiBody({ type: EventLogCreateRequest })
+  @ApiBaseResponse(String)
+  async createEventLog(
+    @Body() request: EventLogCreateRequest
+  ): Promise<BaseResponse<{ id: string }>> {
+    const response = await this.userLogService.createEventLog(request);
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Thống kê nhanh event log cho dashboard */
+  @Get('events/summary')
+  @ApiOperation({ summary: 'Thống kê nhanh event log cho dashboard' })
+  @ApiBaseResponse(EventLogSummaryResponse)
+  async getEventLogsSummary(
+    @Query() request: EventLogSummaryQueryRequest
+  ): Promise<BaseResponse<EventLogSummaryResponse>> {
+    const response = await this.userLogService.getEventLogsSummary(request);
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Thống kê time-series event log cho dashboard chart */
+  @Get('events/summary/timeseries')
+  @ApiOperation({ summary: 'Thống kê time-series event log cho dashboard chart' })
+  @ApiBaseResponse(EventLogTimeSeriesResponse)
+  async getEventLogsTimeSeries(
+    @Query() request: EventLogSummaryQueryRequest
+  ): Promise<BaseResponse<EventLogTimeSeriesResponse>> {
+    const response = await this.userLogService.getEventLogsTimeSeries(request);
 
     return {
       success: response.success,
@@ -88,11 +175,11 @@ export class LogController {
   /** Lấy tất cả log hoạt động người dùng theo khoảng thời gian */
   @Get("all/period")
   @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng theo khoảng thời gian' })
-  @ApiBaseResponse(Array<UserLog>)
+  @ApiBaseResponse(Array<EventLog>)
   async getUserLogsWithPeriod(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<UserLog[]>> {
-    const response = await this.userLogService.getUserLogsWithPeriod(allUserLogRequest);
+  ): Promise<BaseResponse<EventLog[]>> {
+    const response = await this.userLogService.getEventLogsWithPeriod(allUserLogRequest);
 
     return {
       success: response.success,

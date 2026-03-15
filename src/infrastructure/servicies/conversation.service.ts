@@ -66,7 +66,7 @@ export class ConversationService {
 
         //Luu message vao log (chỉ khi user đã đăng nhập)
         if (conversation.userId) {
-          await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
+          await this.unitOfWork.EventLogRepo.createMessageEvent(
             conversation.userId,
             conversation.messages.getItems()[conversation.messages.getItems().length - 2]
           );
@@ -106,7 +106,7 @@ export class ConversationService {
 
         //Lay message luu vao log (chỉ khi user đã đăng nhập)
         if (conversation.userId) {
-          await this.unitOfWork.UserLogRepo.addMessageLogToUserLog(
+          await this.unitOfWork.EventLogRepo.createMessageEvent(
             conversation.userId,
             messages[messages.length - 2]
           );

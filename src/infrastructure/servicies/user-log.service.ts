@@ -42,29 +42,10 @@ import {
   QueueName,
   UserLogSummaryJobName
 } from 'src/application/constant/processor';
-import * as natural from 'natural';
+import { tokenizeText } from '../utils/nlp-tokenizer';
 
 @Injectable()
 export class UserLogService {
-  private readonly _tokenizer = new natural.WordTokenizer();
-
-  private readonly PHRASE_DICT = new Set([
-    // vi — domain nước hoa
-    'nước hoa', 'hoa hồng', 'hoa nhài', 'hoa oải hương',
-    'cam quýt', 'gỗ đàn hương', 'xạ hương', 'mùi hương',
-    'lâu trôi', 'lưu hương', 'gợi ý', 'tặng quà',
-    // en — perfume domain
-    'long lasting', 'eau de parfum', 'eau de toilette',
-    'floral scent', 'woody scent', 'fresh scent',
-    'rose perfume', 'citrus perfume', 'vanilla perfume',
-  ]);
-
-  private readonly STOP_WORDS = new Set([
-    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'for', 'from',
-    'in', 'is', 'it', 'or', 'of', 'on', 'the', 'to', 'with',
-    'cho', 'cua', 'de', 'la', 'nhu', 'o', 'tai', 'toi', 'va', 'voi',
-  ]);
-
   constructor(
     protected unitOfWork: UnitOfWork,
     @InjectQueue(QueueName.USER_LOG_SUMMARY_QUEUE)
@@ -359,35 +340,6 @@ export class UserLogService {
     };
   }
 
-  private tokenizeText(input: string): string[] {
-    if (!input) return [];
-
-    const normalized = input.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ');
-    const unigrams = (this._tokenizer.tokenize(normalized) ?? [])
-      .filter(t => t.length >= 2 && !this.STOP_WORDS.has(t));
-
-    // trigram trước — ưu tiên phrase dài hơn (vd: "gỗ đàn hương", "eau de parfum")
-    const matchedTrigrams = natural.NGrams.trigrams(unigrams)
-      .map(trio => trio.join(' '))
-      .filter(tg => this.PHRASE_DICT.has(tg));
-
-    // bigram sau
-    const matchedBigrams = natural.NGrams.bigrams(unigrams)
-      .map(pair => pair.join(' '))
-      .filter(bg => this.PHRASE_DICT.has(bg));
-
-    const matchedPhrases = [...matchedTrigrams, ...matchedBigrams];
-
-    // loại unigram đã được ghép thành phrase
-    const usedTokens = new Set<string>();
-    for (const phrase of matchedPhrases) {
-      for (const part of phrase.split(' ')) usedTokens.add(part);
-    }
-    const remainingUnigrams = unigrams.filter(t => !usedTokens.has(t));
-
-    return [...matchedPhrases, ...remainingUnigrams];
-  }
-
   private normalizeFeatureSnapshot(
     snapshot?: Record<string, unknown>
   ): Record<string, Record<string, number>> {
@@ -502,7 +454,7 @@ export class UserLogService {
       }
 
       const normalizedText = textParts.join(' ').toLowerCase();
-      const keywords = this.tokenizeText(normalizedText);
+      const keywords = tokenizeText(normalizedText);
       for (const keyword of keywords) {
         this.increaseCounter(featureSnapshot.keywordCounts, keyword);
       }

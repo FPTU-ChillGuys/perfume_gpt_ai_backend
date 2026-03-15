@@ -58,3 +58,10 @@ export class AllUserLogRequest {
     Object.assign(this, init);
   }
 }
+
+export class AllUserLogWithForceRefreshRequest extends AllUserLogRequest {
+  /** Bắt buộc làm mới cache */
+  @ApiProperty({ description: 'Bắt buộc làm mới cache', default: false })
+  @IsOptional()
+  forceRefresh: boolean = false;
+}

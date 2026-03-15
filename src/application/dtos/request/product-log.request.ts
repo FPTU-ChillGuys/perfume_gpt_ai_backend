@@ -3,12 +3,12 @@ import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class ProductViewLogRequest {
   @ApiProperty({ description: 'UUID của sản phẩm', format: 'uuid' })
-  @IsUUID('4')
+  @IsString()
   productId!: string;
 
   @ApiProperty({ description: 'UUID của variant (nếu người dùng click vào một variant cụ thể)', required: false, nullable: true, format: 'uuid' })
   @IsOptional()
-  @IsUUID('4')
+  @IsString()
   variantId?: string;
 }
 

@@ -27,9 +27,9 @@ model Addresses {
   IsDefault    Boolean
   CreatedAt    DateTime
   UpdatedAt    DateTime?
-  DistrictId   Int         @default(0, map: "DF__Addresses__Distr__45BE5BA9")
-  ProvinceId   Int         @default(0, map: "DF__Addresses__Provi__46B27FE2")
-  WardCode     String      @default("N'", map: "DF__Addresses__WardC__47A6A41B") @db.NVarChar(Max)
+  DistrictId   Int         @default(0, map: "DF__Addresses__Distr__3E1D39E1")
+  ProvinceId   Int         @default(0, map: "DF__Addresses__Provi__3F115E1A")
+  WardCode     String      @default("N'", map: "DF__Addresses__WardC__40058253") @db.NVarChar(Max)
   AspNetUsers  AspNetUsers @relation(fields: [UserId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Addresses_AspNetUsers_UserId")
 
   @@index([UserId], map: "IX_Addresses_UserId")
@@ -146,6 +146,7 @@ model Attributes {
   Name              String              @db.NVarChar(Max)
   Description       String              @db.NVarChar(Max)
   IsVariantLevel    Boolean
+  InternalCode      String              @unique(map: "IX_Attributes_InternalCode") @default("N'", map: "DF__Attribute__Inter__40F9A68C") @db.NVarChar(450)
   AttributeValues   AttributeValues[]
   ProductAttributes ProductAttributes[]
 }
@@ -170,7 +171,7 @@ model Batches {
   ImportQuantity         Int
   RemainingQuantity      Int
   CreatedAt              DateTime
-  ReservedQuantity       Int                      @default(0, map: "DF__Batches__Reserve__01D345B0")
+  ReservedQuantity       Int                      @default(0, map: "DF__Batches__Reserve__41EDCAC5")
   RowVersion             Unsupported("timestamp")
   ImportDetails          ImportDetails            @relation(fields: [ImportDetailId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Batches_ImportDetails_ImportDetailId")
   ProductVariants        ProductVariants          @relation(fields: [VariantId], references: [Id], onUpdate: NoAction, map: "FK_Batches_ProductVariants_VariantId")
@@ -184,7 +185,7 @@ model Batches {
 
 model Brands {
   Id       Int        @id(map: "PK_Brands") @default(autoincrement())
-  Name     String     @default("N'", map: "DF__Brands__Name__6FB49575") @db.NVarChar(Max)
+  Name     String     @default("N'", map: "DF__Brands__Name__42E1EEFE") @db.NVarChar(Max)
   Products Products[]
 }
 
@@ -209,13 +210,13 @@ model Carts {
 
 model Categories {
   Id       Int        @id(map: "PK_Categories") @default(autoincrement())
-  Name     String     @default("N'", map: "DF__Categories__Name__6EC0713C") @db.NVarChar(Max)
+  Name     String     @default("N'", map: "DF__Categories__Name__43D61337") @db.NVarChar(Max)
   Products Products[]
 }
 
 model Concentrations {
   Id              Int               @id(map: "PK_Concentrations") @default(autoincrement())
-  Name            String            @default("N'", map: "DF__Concentrat__Name__6DCC4D03") @db.NVarChar(Max)
+  Name            String            @default("N'", map: "DF__Concentrat__Name__44CA3770") @db.NVarChar(Max)
   ProductVariants ProductVariants[]
 }
 
@@ -239,7 +240,7 @@ model ImportDetails {
   UnitPrice        Decimal         @db.Decimal(18, 2)
   ProductVariantId String          @db.UniqueIdentifier
   Note             String?         @db.NVarChar(Max)
-  RejectQuantity   Int             @default(0, map: "DF__ImportDet__Rejec__65370702")
+  RejectQuantity   Int             @default(0, map: "DF__ImportDet__Rejec__45BE5BA9")
   Batches          Batches[]
   ImportTickets    ImportTickets   @relation(fields: [ImportId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ImportDetails_ImportTickets_ImportId")
   ProductVariants  ProductVariants @relation(fields: [ProductVariantId], references: [Id], onUpdate: NoAction, map: "FK_ImportDetails_ProductVariants_ProductVariantId")
@@ -254,14 +255,14 @@ model ImportTickets {
   SupplierId                                          Int
   ExpectedArrivalDate                                 DateTime
   TotalCost                                           Decimal         @db.Decimal(18, 2)
-  Status                                              String          @default("N'", map: "DF__ImportTic__Statu__56E8E7AB") @db.NVarChar(Max)
-  CreatedAt                                           DateTime        @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__ImportTic__Creat__5E8A0973")
+  Status                                              String          @default("N'", map: "DF__ImportTic__Statu__47A6A41B") @db.NVarChar(Max)
+  CreatedAt                                           DateTime        @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__ImportTic__Creat__489AC854")
   DeletedAt                                           DateTime?
-  IsDeleted                                           Boolean         @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__ImportTic__IsDel__5F7E2DAC")
+  IsDeleted                                           Boolean         @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__ImportTic__IsDel__498EEC8D")
   UpdatedAt                                           DateTime?
   UpdatedBy                                           String?         @db.NVarChar(Max)
   VerifiedById                                        String?         @db.UniqueIdentifier
-  ActualImportDate                                    DateTime        @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__ImportTic__Actua__1209AD79")
+  ActualImportDate                                    DateTime        @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__ImportTic__Actua__46B27FE2")
   ImportDetails                                       ImportDetails[]
   AspNetUsers_ImportTickets_CreatedByIdToAspNetUsers  AspNetUsers     @relation("ImportTickets_CreatedByIdToAspNetUsers", fields: [CreatedById], references: [Id], onUpdate: NoAction, map: "FK_ImportTickets_AspNetUsers_CreatedById")
   AspNetUsers_ImportTickets_VerifiedByIdToAspNetUsers AspNetUsers?    @relation("ImportTickets_VerifiedByIdToAspNetUsers", fields: [VerifiedById], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_ImportTickets_AspNetUsers_VerifiedById")
@@ -320,7 +321,7 @@ model Notifications {
   Id          String      @id(map: "PK_Notifications") @db.UniqueIdentifier
   UserId      String      @db.UniqueIdentifier
   Message     String?     @db.NVarChar(Max)
-  Type        String      @default("N'", map: "DF__Notificati__Type__55F4C372") @db.NVarChar(Max)
+  Type        String      @default("N'", map: "DF__Notificati__Type__4A8310C6") @db.NVarChar(Max)
   StockId     String?     @db.UniqueIdentifier
   OrderId     String?     @db.UniqueIdentifier
   VoucherId   String?     @db.UniqueIdentifier
@@ -346,7 +347,7 @@ model OrderDetails {
   VariantId       String          @db.UniqueIdentifier
   Quantity        Int
   UnitPrice       Decimal         @db.Decimal(18, 2)
-  Snapshot        String          @default("N'", map: "DF__OrderDeta__Snaps__4D5F7D71") @db.NVarChar(Max)
+  Snapshot        String          @default("N'", map: "DF__OrderDeta__Snaps__4B7734FF") @db.NVarChar(Max)
   Orders          Orders          @relation(fields: [OrderId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_OrderDetails_Orders_OrderId")
   ProductVariants ProductVariants @relation(fields: [VariantId], references: [Id], onUpdate: NoAction, map: "FK_OrderDetails_ProductVariants_VariantId")
   Reviews         Reviews?
@@ -360,11 +361,11 @@ model Orders {
   CustomerId                                 String?               @db.UniqueIdentifier
   StaffId                                    String?               @db.UniqueIdentifier
   Type                                       String                @db.NVarChar(Max)
-  Status                                     String                @default("N'", map: "DF__Orders__Status__531856C7") @db.NVarChar(Max)
+  Status                                     String                @default("N'", map: "DF__Orders__Status__4D5F7D71") @db.NVarChar(Max)
   TotalAmount                                Decimal               @db.Decimal(18, 2)
-  PaymentStatus                              String                @default("N'", map: "DF__Orders__PaymentS__540C7B00") @db.NVarChar(Max)
-  VoucherId                                  String?               @db.UniqueIdentifier
-  CreatedAt                                  DateTime              @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__Orders__CreatedA__55009F39")
+  PaymentStatus                              String                @default("N'", map: "DF__Orders__PaymentS__4E53A1AA") @db.NVarChar(Max)
+  UserVoucherId                              String?               @db.UniqueIdentifier
+  CreatedAt                                  DateTime              @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__Orders__CreatedA__4C6B5938")
   UpdatedAt                                  DateTime?
   PaidAt                                     DateTime?
   PaymentExpiresAt                           DateTime?
@@ -372,27 +373,26 @@ model Orders {
   OrderDetails                               OrderDetails[]
   AspNetUsers_Orders_CustomerIdToAspNetUsers AspNetUsers?          @relation("Orders_CustomerIdToAspNetUsers", fields: [CustomerId], references: [Id], onUpdate: NoAction, map: "FK_Orders_AspNetUsers_CustomerId")
   AspNetUsers_Orders_StaffIdToAspNetUsers    AspNetUsers?          @relation("Orders_StaffIdToAspNetUsers", fields: [StaffId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_Orders_AspNetUsers_StaffId")
-  Vouchers                                   Vouchers?             @relation(fields: [VoucherId], references: [Id], onUpdate: NoAction, map: "FK_Orders_Vouchers_VoucherId")
   PaymentTransactions                        PaymentTransactions[]
   RecipientInfos                             RecipientInfos?
   ShippingInfos                              ShippingInfos?
   StockReservations                          StockReservations[]
+  UserVouchers                               UserVouchers?
 
   @@index([CustomerId], map: "IX_Orders_CustomerId")
   @@index([StaffId], map: "IX_Orders_StaffId")
-  @@index([VoucherId], map: "IX_Orders_VoucherId")
 }
 
 model PaymentTransactions {
   Id                        String                @id(map: "PK_PaymentTransactions") @db.UniqueIdentifier
   OrderId                   String                @db.UniqueIdentifier
   Method                    String                @db.NVarChar(Max)
-  TransactionStatus         String                @default("N'", map: "DF__PaymentTr__Trans__5224328E") @db.NVarChar(Max)
+  TransactionStatus         String                @default("N'", map: "DF__PaymentTr__Trans__4F47C5E3") @db.NVarChar(Max)
   Amount                    Decimal               @db.Decimal(18, 2)
   CreatedAt                 DateTime
   UpdatedAt                 DateTime?
   OriginalPaymentId         String?               @db.UniqueIdentifier
-  RetryAttempt              Int                   @default(0, map: "DF__PaymentTr__Retry__5CA1C101")
+  RetryAttempt              Int                   @default(0, map: "DF__PaymentTr__Retry__503BEA1C")
   FailureReason             String?               @db.NVarChar(Max)
   Orders                    Orders                @relation(fields: [OrderId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_PaymentTransactions_Orders_OrderId")
   PaymentTransactions       PaymentTransactions?  @relation("PaymentTransactionsToPaymentTransactions", fields: [OriginalPaymentId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_PaymentTransactions_PaymentTransactions_OriginalPaymentId")
@@ -408,7 +408,7 @@ model ProductAttributes {
   ProductId       String?          @db.UniqueIdentifier
   VariantId       String?          @db.UniqueIdentifier
   AttributeId     Int
-  ValueId         Int              @default(0, map: "DF__ProductAt__Value__02925FBF")
+  ValueId         Int              @default(0, map: "DF__ProductAt__Value__51300E55")
   Attributes      Attributes       @relation(fields: [AttributeId], references: [Id], onUpdate: NoAction, map: "FK_ProductAttributes_Attributes_AttributeId")
   AttributeValues AttributeValues  @relation(fields: [ValueId], references: [Id], onUpdate: NoAction, map: "FK_ProductAttributes_AttributeValues_ValueId")
   Products        Products?        @relation(fields: [ProductId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ProductAttributes_Products_ProductId")
@@ -422,15 +422,14 @@ model ProductAttributes {
 
 model Products {
   Id                String              @id(map: "PK_Products") @db.UniqueIdentifier
-  Name              String              @default("N'", map: "DF__Products__Name__6BE40491") @db.NVarChar(Max)
+  Name              String              @default("N'", map: "DF__Products__Name__540C7B00") @db.NVarChar(Max)
   BrandId           Int
   CategoryId        Int
   Description       String?             @db.NVarChar(Max)
-  CreatedAt         DateTime            @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__Products__Create__4B7734FF")
+  CreatedAt         DateTime            @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__Products__Create__5224328E")
   DeletedAt         DateTime?
-  IsDeleted         Boolean             @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Products__IsDele__4C6B5938")
+  IsDeleted         Boolean             @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Products__IsDele__531856C7")
   UpdatedAt         DateTime?
-//  Embedding         Bytes?              @db.VarBinary(Max)
   Media             Media[]
   ProductAttributes ProductAttributes[]
   Brands            Brands              @relation(fields: [BrandId], references: [Id], onUpdate: NoAction, map: "FK_Products_Brands_BrandId")
@@ -447,14 +446,14 @@ model ProductVariants {
   Sku                    String                   @db.NVarChar(Max)
   VolumeMl               Int
   ConcentrationId        Int
-  Type                   String                   @default("N'", map: "DF__ProductVar__Type__503BEA1C") @db.NVarChar(Max)
+  Type                   String                   @default("N'", map: "DF__ProductVar__Type__57DD0BE4") @db.NVarChar(Max)
   BasePrice              Decimal                  @db.Decimal(18, 2)
-  Status                 String                   @default("N'", map: "DF__ProductVa__Statu__51300E55") @db.NVarChar(Max)
-  CreatedAt              DateTime                 @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__ProductVa__Creat__489AC854")
+  Status                 String                   @default("N'", map: "DF__ProductVa__Statu__58D1301D") @db.NVarChar(Max)
+  CreatedAt              DateTime                 @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__ProductVa__Creat__55F4C372")
   DeletedAt              DateTime?
-  IsDeleted              Boolean                  @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__ProductVa__IsDel__4A8310C6")
+  IsDeleted              Boolean                  @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__ProductVa__IsDel__56E8E7AB")
   UpdatedAt              DateTime?
-  Barcode                String                   @default("N'", map: "DF__ProductVa__Barco__5AB9788F") @db.NVarChar(Max)
+  Barcode                String                   @default("N'", map: "DF__ProductVa__Barco__55009F39") @db.NVarChar(Max)
   Batches                Batches[]
   CartItems              CartItems[]
   ImportDetails          ImportDetails[]
@@ -482,14 +481,14 @@ model Receipts {
 model RecipientInfos {
   Id           String @id(map: "PK_RecipientInfos") @db.UniqueIdentifier
   OrderId      String @unique(map: "IX_RecipientInfos_OrderId") @db.UniqueIdentifier
-  FullName     String @default("N'", map: "DF__Recipient__FullN__67DE6983") @db.NVarChar(Max)
-  Phone        String @default("N'", map: "DF__Recipient__Phone__66EA454A") @db.NVarChar(Max)
-  DistrictId   Int    @default(0, map: "DF__Recipient__Distr__57DD0BE4")
-  FullAddress  String @default("N'", map: "DF__Recipient__FullA__58D1301D") @db.NVarChar(Max)
-  WardCode     String @default("N'", map: "DF__Recipient__WardC__59C55456") @db.NVarChar(Max)
-  DistrictName String @default("N'", map: "DF__Recipient__Distr__52E34C9D") @db.NVarChar(Max)
-  ProvinceName String @default("N'", map: "DF__Recipient__Provi__53D770D6") @db.NVarChar(Max)
-  WardName     String @default("N'", map: "DF__Recipient__WardN__54CB950F") @db.NVarChar(Max)
+  FullName     String @default("N'", map: "DF__Recipient__FullN__5CA1C101") @db.NVarChar(Max)
+  Phone        String @default("N'", map: "DF__Recipient__Phone__5D95E53A") @db.NVarChar(Max)
+  DistrictId   Int    @default(0, map: "DF__Recipient__Distr__5E8A0973")
+  FullAddress  String @default("N'", map: "DF__Recipient__FullA__5F7E2DAC") @db.NVarChar(Max)
+  WardCode     String @default("N'", map: "DF__Recipient__WardC__607251E5") @db.NVarChar(Max)
+  DistrictName String @default("N'", map: "DF__Recipient__Distr__59C55456") @db.NVarChar(Max)
+  ProvinceName String @default("N'", map: "DF__Recipient__Provi__5AB9788F") @db.NVarChar(Max)
+  WardName     String @default("N'", map: "DF__Recipient__WardN__5BAD9CC8") @db.NVarChar(Max)
   Orders       Orders @relation(fields: [OrderId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_RecipientInfos_Orders_OrderId")
 }
 
@@ -499,7 +498,6 @@ model Reviews {
   OrderDetailId                                       String       @unique(map: "IX_Reviews_OrderDetailId") @db.UniqueIdentifier
   Rating                                              Int
   Comment                                             String       @db.NVarChar(Max)
-  Status                                              String       @db.NVarChar(450)
   ModeratedByStaffId                                  String?      @db.UniqueIdentifier
   ModeratedAt                                         DateTime?
   ModerationReason                                    String?      @db.NVarChar(Max)
@@ -514,17 +512,16 @@ model Reviews {
 
   @@index([ModeratedByStaffId], map: "IX_Reviews_ModeratedByStaffId")
   @@index([Rating], map: "IX_Reviews_Rating")
-  @@index([Status], map: "IX_Reviews_Status")
   @@index([UserId], map: "IX_Reviews_UserId")
 }
 
 model ShippingInfos {
   Id             String  @id(map: "PK_ShippingInfos") @db.UniqueIdentifier
   OrderId        String  @unique(map: "IX_ShippingInfos_OrderId") @db.UniqueIdentifier
-  CarrierName    String  @default("N'", map: "DF__ShippingI__Carri__5BAD9CC8") @db.NVarChar(Max)
+  CarrierName    String  @default("N'", map: "DF__ShippingI__Carri__6166761E") @db.NVarChar(Max)
   TrackingNumber String? @db.NVarChar(Max)
   ShippingFee    Decimal @db.Decimal(18, 2)
-  Status         String  @default("N'", map: "DF__ShippingI__Statu__4F47C5E3") @db.NVarChar(Max)
+  Status         String  @default("N'", map: "DF__ShippingI__Statu__625A9A57") @db.NVarChar(Max)
   LeadTime       Int?
   Orders         Orders  @relation(fields: [OrderId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ShippingInfos_Orders_OrderId")
 }
@@ -533,10 +530,10 @@ model StockAdjustmentDetails {
   Id                 String           @id(map: "PK_StockAdjustmentDetails") @db.UniqueIdentifier
   StockAdjustmentId  String           @db.UniqueIdentifier
   ProductVariantId   String           @db.UniqueIdentifier
-  BatchId            String           @default(dbgenerated("00000000-0000-0000-0000-000000000000"), map: "DF__StockAdju__Batch__7FEAFD3E") @db.UniqueIdentifier
+  BatchId            String           @default(dbgenerated("00000000-0000-0000-0000-000000000000"), map: "DF__StockAdju__Batch__6442E2C9") @db.UniqueIdentifier
   AdjustmentQuantity Int
   Note               String?          @db.NVarChar(Max)
-  ApprovedQuantity   Int              @default(0, map: "DF__StockAdju__Appro__7EF6D905")
+  ApprovedQuantity   Int              @default(0, map: "DF__StockAdju__Appro__634EBE90")
   Batches            Batches          @relation(fields: [BatchId], references: [Id], onUpdate: NoAction, map: "FK_StockAdjustmentDetails_Batches_BatchId")
   ProductVariants    ProductVariants  @relation(fields: [ProductVariantId], references: [Id], onUpdate: NoAction, map: "FK_StockAdjustmentDetails_ProductVariants_ProductVariantId")
   StockAdjustments   StockAdjustments @relation(fields: [StockAdjustmentId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_StockAdjustmentDetails_StockAdjustments_StockAdjustmentId")
@@ -592,7 +589,7 @@ model Stocks {
   VariantId         String                   @unique(map: "IX_Stocks_VariantId") @db.UniqueIdentifier
   TotalQuantity     Int
   LowStockThreshold Int
-  ReservedQuantity  Int                      @default(0, map: "DF__Stocks__Reserved__00DF2177")
+  ReservedQuantity  Int                      @default(0, map: "DF__Stocks__Reserved__65370702")
   RowVersion        Unsupported("timestamp")
   Notifications     Notifications[]
   ProductVariants   ProductVariants          @relation(fields: [VariantId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Stocks_ProductVariants_VariantId")
@@ -600,10 +597,10 @@ model Stocks {
 
 model Suppliers {
   Id            Int             @id(map: "PK_Suppliers") @default(autoincrement())
-  Name          String          @default("N'", map: "DF__Suppliers__Name__690797E6") @db.NVarChar(Max)
-  ContactEmail  String          @default("N'", map: "DF__Suppliers__Conta__69FBBC1F") @db.NVarChar(Max)
-  Phone         String          @default("N'", map: "DF__Suppliers__Phone__681373AD") @db.NVarChar(Max)
-  Address       String          @default("N'", map: "DF__Suppliers__Addre__6AEFE058") @db.NVarChar(Max)
+  Name          String          @default("N'", map: "DF__Suppliers__Name__671F4F74") @db.NVarChar(Max)
+  ContactEmail  String          @default("N'", map: "DF__Suppliers__Conta__681373AD") @db.NVarChar(Max)
+  Phone         String          @default("N'", map: "DF__Suppliers__Phone__662B2B3B") @db.NVarChar(Max)
+  Address       String          @default("N'", map: "DF__Suppliers__Addre__690797E6") @db.NVarChar(Max)
   ImportTickets ImportTickets[]
 }
 
@@ -618,7 +615,7 @@ model TemporaryMedia {
   UploadedByUserId String?      @db.UniqueIdentifier
   ExpiresAt        DateTime
   CreatedAt        DateTime
-  IsPrimary        Boolean      @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Temporary__IsPri__11158940")
+  IsPrimary        Boolean      @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Temporary__IsPri__69FBBC1F")
   TargetEntityType Int?
   AspNetUsers      AspNetUsers? @relation(fields: [UploadedByUserId], references: [Id], onUpdate: NoAction, map: "FK_TemporaryMedia_AspNetUsers_UploadedByUserId")
 
@@ -627,33 +624,38 @@ model TemporaryMedia {
 }
 
 model UserVouchers {
-  Id          String      @id(map: "PK_UserVouchers") @db.UniqueIdentifier
-  UserId      String      @db.UniqueIdentifier
-  VoucherId   String      @db.UniqueIdentifier
-  IsUsed      Boolean
-  CreatedAt   DateTime    @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__UserVouch__Creat__634EBE90")
-  UpdatedAt   DateTime?
-  Status      String      @default("N'", map: "DF__UserVouch__Statu__6442E2C9") @db.NVarChar(Max)
-  AspNetUsers AspNetUsers @relation(fields: [UserId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_UserVouchers_AspNetUsers_UserId")
-  Vouchers    Vouchers    @relation(fields: [VoucherId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_UserVouchers_Vouchers_VoucherId")
+  Id                String       @id(map: "PK_UserVouchers") @db.UniqueIdentifier
+  UserId            String?      @db.UniqueIdentifier
+  VoucherId         String       @db.UniqueIdentifier
+  IsUsed            Boolean
+  CreatedAt         DateTime     @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__UserVouch__Creat__6AEFE058")
+  UpdatedAt         DateTime?
+  Status            String       @default("N'", map: "DF__UserVouch__Statu__6BE40491") @db.NVarChar(Max)
+  GuestEmailOrPhone String?      @db.NVarChar(Max)
+  OrderId           String?      @unique(map: "IX_UserVouchers_OrderId", where: raw("([OrderId] IS NOT NULL)")) @db.UniqueIdentifier
+  AspNetUsers       AspNetUsers? @relation(fields: [UserId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_UserVouchers_AspNetUsers_UserId")
+  Orders            Orders?      @relation(fields: [OrderId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_UserVouchers_Orders_OrderId")
+  Vouchers          Vouchers     @relation(fields: [VoucherId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_UserVouchers_Vouchers_VoucherId")
 
   @@index([UserId], map: "IX_UserVouchers_UserId")
   @@index([VoucherId], map: "IX_UserVouchers_VoucherId")
 }
 
 model Vouchers {
-  Id             String          @id(map: "PK_Vouchers") @db.UniqueIdentifier
-  Code           String          @db.NVarChar(Max)
-  DiscountValue  Decimal         @db.Decimal(18, 2)
-  DiscountType   String          @default("N'", map: "DF__Vouchers__Discou__4E53A1AA") @db.NVarChar(Max)
-  RequiredPoints Int
-  MinOrderValue  Decimal         @db.Decimal(18, 2)
-  ExpiryDate     DateTime
-  CreatedAt      DateTime        @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__Vouchers__Create__6166761E")
-  DeletedAt      DateTime?
-  IsDeleted      Boolean         @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Vouchers__IsDele__625A9A57")
-  UpdatedAt      DateTime?
-  Notifications  Notifications[]
-  Orders         Orders[]
-  UserVouchers   UserVouchers[]
+  Id                String          @id(map: "PK_Vouchers") @db.UniqueIdentifier
+  Code              String          @unique(map: "IX_Vouchers_Code") @db.NVarChar(450)
+  DiscountValue     Decimal         @db.Decimal(18, 2)
+  DiscountType      String          @default("N'", map: "DF__Vouchers__Discou__6EC0713C") @db.NVarChar(Max)
+  RequiredPoints    Int
+  MinOrderValue     Decimal         @db.Decimal(18, 2)
+  ExpiryDate        DateTime
+  CreatedAt         DateTime        @default(dbgenerated("0001-01-01T00:00:00.0000000"), map: "DF__Vouchers__Create__6CD828CA")
+  DeletedAt         DateTime?
+  IsDeleted         Boolean         @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Vouchers__IsDele__6DCC4D03")
+  UpdatedAt         DateTime?
+  IsPublic          Boolean         @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Vouchers__IsPubl__3FD07829")
+  RemainingQuantity Int             @default(0, map: "DF__Vouchers__Remain__40C49C62")
+  TotalQuantity     Int             @default(0, map: "DF__Vouchers__TotalQ__41B8C09B")
+  Notifications     Notifications[]
+  UserVouchers      UserVouchers[]
 }

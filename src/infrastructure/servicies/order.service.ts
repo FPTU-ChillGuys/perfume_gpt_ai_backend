@@ -33,7 +33,11 @@ const orderDetailInclude = {
       },
     },
   },
-  Vouchers: true,
+  UserVouchers: {
+    include: {
+      Vouchers: true,
+    },
+  },
   RecipientInfos: true,
   ShippingInfos: true,
 } satisfies Prisma.OrdersInclude;
@@ -73,8 +77,8 @@ function mapOrderFull(o: OrderFull): OrderResponse {
     paymentStatus: o.PaymentStatus as 'Unpaid' | 'Paid' | 'Refunded',
     paidAt: o.PaidAt?.toISOString() ?? null,
     paymentExpiresAt: o.PaymentExpiresAt?.toISOString() ?? null,
-    voucherId: o.VoucherId ?? null,
-    voucherCode: o.Vouchers?.Code ?? null,
+    voucherId: o.UserVoucherId ?? null,
+    voucherCode: o.UserVouchers?.Vouchers?.Code ?? null,
     recipientInfo: o.RecipientInfos
       ? {
           fullName: o.RecipientInfos.FullName,

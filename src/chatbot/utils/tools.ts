@@ -43,8 +43,7 @@ export class Tools {
         this.orderTool.getOrderDetailsWithOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
       // getUserById: this.profileTool.getUserById,
-      getUserLogSummaryReportPerWeek:
-        this.logTool.getUserLogSummaryReportPerWeek,
+      getUserLogSummaryReport: this.logTool.getUserLogSummaryReport,
       getUserById: this.userTool.getUserById
     };
 
@@ -65,13 +64,8 @@ export class Tools {
       getUserActivityReportPerWeek: this.logTool.getUserActivityReportPerWeek,
       // getUserActivityReportPerMonth: this.logTool.getUserActivityReportPerMonth,
       // getUserActivityReportPerYear: this.logTool.getUserActivityReportPerYear,
-      getUserLogSummaryReportPerWeek:
-        this.logTool.getUserLogSummaryReportPerWeek,
-      // getUserLogSummaryReportPerMonth: this.logTool.getUserLogSummaryReportPerMonth,
-      // getUserLogSummaryReportPerYear: this.logTool.getUserLogSummaryReportPerYear,
-      getUserLogSummariesPerWeek: this.logTool.getUserLogSummariesPerWeek,
-      // getUserLogSummariesPerMonth: this.logTool.getUserLogSummariesPerMonth,
-      // getUserLogSummariesPerYear: this.logTool.getUserLogSummariesPerYear,
+      getUserLogSummaryReport: this.logTool.getUserLogSummaryReport,
+      getUserLogSummaries: this.logTool.getUserLogSummaries,
       // Review tools
       getReviewsByVariantId: this.reviewTool.getReviewsByVariantId,
       getReviewStatisticsByVariantId:

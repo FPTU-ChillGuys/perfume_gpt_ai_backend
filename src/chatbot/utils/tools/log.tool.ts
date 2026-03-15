@@ -122,56 +122,15 @@ export class LogTool {
         }
     });
 
-    // /**
-    //  * Lấy bản tóm tắt log đã được AI tóm tắt sẵn (summary table) của user.
-    //  * Nhanh hơn getUserActivityReport vì đọc từ cache/DB summary.
-    //  */
-    // getUserLogSummaryReport: Tool = tool({
-    //     description:
-    //         'Get a pre-generated AI summary report of a user\'s activity logs. ' +
-    //         'Faster than getUserActivityReport as it reads from saved summaries. ' +
-    //         'Use this when you need a quick overview of what the user has been doing.',
-    //     inputSchema: z.object({
-    //         userId: z.string().describe('The ID of the user'),
-    //         startDate: z
-    //             .string()
-    //             .optional()
-    //             .describe('Start date in ISO format (optional)'),
-    //         endDate: z
-    //             .string()
-    //             .optional()
-    //             .describe('End date in ISO format (optional)')
-    //     }),
-    //     execute: async (input) => {
-    //         return await funcHandlerAsync(
-    //             async () => {
-    //                 const response =
-    //                     await this.userLogService.getUserLogSummaryReportByUserId(
-    //                         input.userId,
-    //                         input.startDate ? new Date(input.startDate) : undefined,
-    //                         input.endDate ? new Date(input.endDate) : undefined
-    //                     );
-    //                 if (!response.success) {
-    //                     return { success: false, error: 'Failed to fetch user log summary report.' };
-    //                 }
-    //                 return { success: true, data: response.data || '' };
-    //             },
-    //             'Error occurred while fetching user log summary report.',
-    //             true
-    //         );
-    //     }
-    // });
-
     /**
-     * Lấy bản tóm tắt log đã được AI tóm tắt sẵn (summary table) của user.
-     * Nhanh hơn getUserActivityReport vì đọc từ cache/DB summary.
+     * Lấy bản tóm tắt hành vi của user (rolling summary, không theo kỳ).
+     * Dùng cho chatbot và recommendation.
      */
-    getUserLogSummaryReportPerWeek: Tool = tool({
+    getUserLogSummaryReport: Tool = tool({
         description:
-            'Get a pre-generated AI summary report of a user\'s activity logs. ' +
-            'Faster than getUserActivityReport as it reads from saved summaries. ' +
-            'Use this when you need a quick overview of what the user has been doing.' +
-            'Nên dùng cho chatbot và recommendation.',
+            'Get the rolling behavior summary report of a user. ' +
+            'Returns a pre-built text summary of their keywords, intents, active hours, and event types. ' +
+            'Use this for personalized recommendations and chatbot context.',
         inputSchema: z.object({
             userId: z.string().describe('The ID of the user'),
         }),
@@ -194,166 +153,14 @@ export class LogTool {
     });
 
     /**
-     * Lấy bản tóm tắt log đã được AI tóm tắt sẵn (summary table) của user.
-     * Nhanh hơn getUserActivityReport vì đọc từ cache/DB summary.
+     * Lấy danh sách bản tóm tắt hành vi của user (rolling summary).
      */
-    getUserLogSummaryReportPerMonth: Tool = tool({
+    getUserLogSummaries: Tool = tool({
         description:
-            'Get a pre-generated AI summary report of a user\'s activity logs. ' +
-            'Faster than getUserActivityReport as it reads from saved summaries. ' +
-            'Use this when you need a quick overview of what the user has been doing.' +
-            'Có thể dùng cho chatbot và recommendation nhưng không khuyên khích, tốt nhất là dùng cho trend và phân tích',
+            'Get the saved rolling log summaries for a user. ' +
+            'Returns the user behavior snapshot including keyword counts, intent distribution, and active hours.',
         inputSchema: z.object({
             userId: z.string().describe('The ID of the user'),
-        }),
-        execute: async (input) => {
-            return await funcHandlerAsync(
-                async () => {
-                    const response =
-                        await this.userLogService.getUserLogSummaryReportByUserId(
-                            input.userId
-                        );
-                    if (!response.success) {
-                        return { success: false, error: 'Failed to fetch user log summary report.' };
-                    }
-                    return { success: true, data: response.data || '' };
-                },
-                'Error occurred while fetching user log summary report.',
-                true
-            );
-        }
-    });
-
-    /**
-     * Lấy bản tóm tắt log đã được AI tóm tắt sẵn (summary table) của user.
-     * Nhanh hơn getUserActivityReport vì đọc từ cache/DB summary.
-     */
-    getUserLogSummaryReportPerYear: Tool = tool({
-        description:
-            'Get a pre-generated AI summary report of a user\'s activity logs. ' +
-            'Faster than getUserActivityReport as it reads from saved summaries. ' +
-            'Use this when you need a quick overview of what the user has been doing.' +
-            'Có thể dùng cho chatbot và recommendation nhưng không khuyên khích, tốt nhất là dùng cho trend và phân tích',
-        inputSchema: z.object({
-            userId: z.string().describe('The ID of the user'),
-        }),
-        execute: async (input) => {
-            return await funcHandlerAsync(
-                async () => {
-                    const response =
-                        await this.userLogService.getUserLogSummaryReportByUserId(
-                            input.userId
-                        );
-                    if (!response.success) {
-                        return { success: false, error: 'Failed to fetch user log summary report.' };
-                    }
-                    return { success: true, data: response.data || '' };
-                },
-                'Error occurred while fetching user log summary report.',
-                true
-            );
-        }
-    });
-
-    // /**
-    //  * Lấy danh sách các bản tóm tắt log của user theo khoảng thời gian.
-    //  */
-    // getUserLogSummaries: Tool = tool({
-    //     description:
-    //         'Get a list of saved log summaries for a user within a date range. ' +
-    //         'Returns multiple summary entries, each covering a specific time window.',
-    //     inputSchema: z.object({
-    //         userId: z.string().describe('The ID of the user'),
-    //         startDate: z.string().describe('Start date in ISO format'),
-    //         endDate: z.string().describe('End date in ISO format')
-    //     }),
-    //     execute: async (input) => {
-    //         return await funcHandlerAsync(
-    //             async () => {
-    //                 const response =
-    //                     await this.userLogService.getUserLogSummariesByUserId(
-    //                         input.userId,
-    //                         new Date(input.startDate),
-    //                         new Date(input.endDate)
-    //                     );
-    //                 if (!response.success) {
-    //                     return { success: false, error: 'Failed to fetch user log summaries.' };
-    //                 }
-    //                 return { success: true, data: response.data || [] };
-    //             },
-    //             'Error occurred while fetching user log summaries.',
-    //             true
-    //         );
-    //     }
-    // });
-
-    /**
-   * Lấy danh sách các bản tóm tắt log của user theo khoảng thời gian.
-   */
-    getUserLogSummariesPerWeek: Tool = tool({
-        description:
-            'Get a list of saved log summaries for a user within a date range. ' +
-            'Returns multiple summary entries, each covering a specific time window.',
-        inputSchema: z.object({
-            userId: z.string().describe('The ID of the user'),
-        }),
-        execute: async (input) => {
-            return await funcHandlerAsync(
-                async () => {
-                    const response =
-                        await this.userLogService.getUserLogSummariesByUserId(
-                            input.userId
-                        );
-                    if (!response.success) {
-                        return { success: false, error: 'Failed to fetch user log summaries.' };
-                    }
-                    return { success: true, data: response.data || [] };
-                },
-                'Error occurred while fetching user log summaries.',
-                true
-            );
-        }
-    });
-
-    /**
-   * Lấy danh sách các bản tóm tắt log của user theo khoảng thời gian.
-   */
-    getUserLogSummariesPerMonth: Tool = tool({
-        description:
-            'Get a list of saved log summaries for a user within a date range. ' +
-            'Returns multiple summary entries, each covering a specific time window.',
-        inputSchema: z.object({
-            userId: z.string().describe('The ID of the user'),
-        }),
-        execute: async (input) => {
-            return await funcHandlerAsync(
-                async () => {
-                    const response =
-                        await this.userLogService.getUserLogSummariesByUserId(
-                            input.userId
-                        );
-                    if (!response.success) {
-                        return { success: false, error: 'Failed to fetch user log summaries.' };
-                    }
-                    return { success: true, data: response.data || [] };
-                },
-                'Error occurred while fetching user log summaries.',
-                true
-            );
-        }
-    });
-
-    /**
-   * Lấy danh sách các bản tóm tắt log của user theo khoảng thời gian.
-   */
-    getUserLogSummariesPerYear: Tool = tool({
-        description:
-            'Get a list of saved log summaries for a user within a date range. ' +
-            'Returns multiple summary entries, each covering a specific time window.',
-        inputSchema: z.object({
-            userId: z.string().describe('The ID of the user'),
-            startDate: z.string().describe('Start date in ISO format'),
-            endDate: z.string().describe('End date in ISO format')
         }),
         execute: async (input) => {
             return await funcHandlerAsync(

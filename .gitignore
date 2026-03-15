@@ -61,3 +61,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 
 /generated/prisma
+docs/library.md
+docs/log-support.md
+docs/xu-li-van-ban.md

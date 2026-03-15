@@ -27,6 +27,7 @@ import {
 } from 'src/application/mapping/custom';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
+import { UserLogService } from './user-log.service';
 
 @Injectable()
 export class ConversationService {
@@ -34,6 +35,7 @@ export class ConversationService {
     private unitOfWork: UnitOfWork,
     @Inject(AI_CONVERSATION_HELPER) private readonly aiHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
+    private readonly userLogService: UserLogService,
     @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue
   ) { }
 
@@ -70,6 +72,7 @@ export class ConversationService {
             conversation.userId,
             conversation.messages.getItems()[conversation.messages.getItems().length - 2]
           );
+          await this.userLogService.enqueueRollingSummaryUpdate(conversation.userId);
         }
 
         const conversationDto = ConversationMapper.toResponse(
@@ -110,6 +113,7 @@ export class ConversationService {
             conversation.userId,
             messages[messages.length - 2]
           );
+          await this.userLogService.enqueueRollingSummaryUpdate(conversation.userId);
         }
 
         return {

@@ -148,10 +148,14 @@ export class QuizService {
         await this.unitOfWork.AIQuizQuestionAnswerRepo.createQuesAns(quesAns);
 
       //Log last quiz question answer
-      await this.unitOfWork.EventLogRepo.createQuizEventsFromDetails(
+      const quizEventIds = await this.unitOfWork.EventLogRepo.createQuizEventsFromDetails(
         quizQuesAnws.userId,
         quizQuestionAnswer.details.getItems()
       );
+
+      if (quizEventIds.length) {
+        await this.userLogService.enqueueRollingSummaryUpdate(quizQuesAnws.userId);
+      }
 
       const savedQuesAns = QuizQuestionAnswerMapper.toResponse(
         quizQuestionAnswer,

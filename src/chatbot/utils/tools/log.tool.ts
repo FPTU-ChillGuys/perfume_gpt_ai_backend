@@ -4,49 +4,11 @@ import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import * as z from 'zod';
-import { subMonths, subWeeks, subYears } from 'date-fns';
 
 @Injectable()
 export class LogTool {
     constructor(private readonly userLogService: UserLogService) { }
 
-    // /**
-    //  * Lấy báo cáo hoạt động của một user trong khoảng thời gian.
-    //  * AI dùng tool này để hiểu user đã làm gì gần đây (search, chat, quiz).
-    //  */
-    // getUserActivityReport: Tool = tool({
-    //     description:
-    //         'Get a text activity report for a specific user within a time period. ' +
-    //         'Returns a summary of their searches, messages, and quiz answers. ' +
-    //         'Use this to personalize recommendations or understand user behavior.',
-    //     inputSchema: z.object({
-    //         userId: z.string().describe('The ID of the user'),
-    //         period: z
-    //             .enum(PeriodEnum)
-    //             .describe('Time period: WEEKLY, MONTHLY, or YEARLY'),
-    //         endDate: z
-    //             .string()
-    //             .describe('End date in ISO format, e.g. "2025-12-31T23:59:59Z"')
-    //     }),
-    //     execute: async (input) => {
-    //         return await funcHandlerAsync(
-    //             async () => {
-    //                 const response =
-    //                     await this.userLogService.getReportAndPromptSummaryUserLogs({
-    //                         userId: input.userId,
-    //                         period: input.period,
-    //                         endDate: new Date(input.endDate)
-    //                     });
-    //                 if (!response.success) {
-    //                     return { success: false, error: 'Failed to fetch user activity report.' };
-    //                 }
-    //                 return { success: true, data: response.data?.response || '' };
-    //             },
-    //             'Error occurred while fetching user activity report.',
-    //             true
-    //         );
-    //     }
-    // });
 
 
 
@@ -218,9 +180,7 @@ export class LogTool {
                 async () => {
                     const response =
                         await this.userLogService.getUserLogSummaryReportByUserId(
-                            input.userId,
-                            subWeeks(new Date(), 2),
-                            new Date()
+                            input.userId
                         );
                     if (!response.success) {
                         return { success: false, error: 'Failed to fetch user log summary report.' };
@@ -251,9 +211,7 @@ export class LogTool {
                 async () => {
                     const response =
                         await this.userLogService.getUserLogSummaryReportByUserId(
-                            input.userId,
-                            subMonths(new Date(), 1),
-                            new Date()
+                            input.userId
                         );
                     if (!response.success) {
                         return { success: false, error: 'Failed to fetch user log summary report.' };
@@ -284,9 +242,7 @@ export class LogTool {
                 async () => {
                     const response =
                         await this.userLogService.getUserLogSummaryReportByUserId(
-                            input.userId,
-                            subYears(new Date(), 1),
-                            new Date()
+                            input.userId
                         );
                     if (!response.success) {
                         return { success: false, error: 'Failed to fetch user log summary report.' };
@@ -346,9 +302,7 @@ export class LogTool {
                 async () => {
                     const response =
                         await this.userLogService.getUserLogSummariesByUserId(
-                            input.userId,
-                            subWeeks(new Date(), 2),
-                            new Date()
+                            input.userId
                         );
                     if (!response.success) {
                         return { success: false, error: 'Failed to fetch user log summaries.' };
@@ -376,9 +330,7 @@ export class LogTool {
                 async () => {
                     const response =
                         await this.userLogService.getUserLogSummariesByUserId(
-                            input.userId,
-                            subMonths(new Date(), 1),
-                            new Date()
+                            input.userId
                         );
                     if (!response.success) {
                         return { success: false, error: 'Failed to fetch user log summaries.' };
@@ -408,9 +360,7 @@ export class LogTool {
                 async () => {
                     const response =
                         await this.userLogService.getUserLogSummariesByUserId(
-                            input.userId,
-                            subYears(new Date(), 1),
-                            new Date()
+                            input.userId
                         );
                     if (!response.success) {
                         return { success: false, error: 'Failed to fetch user log summaries.' };

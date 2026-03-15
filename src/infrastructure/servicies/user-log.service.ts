@@ -36,12 +36,62 @@ import {
   EventLogTimeSeriesResponse
 } from 'src/application/dtos/response/event-log-timeseries.response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import {
+  QueueName,
+  UserLogSummaryJobName
+} from 'src/application/constant/processor';
+import * as natural from 'natural';
 
 @Injectable()
 export class UserLogService {
+  private readonly _tokenizer = new natural.WordTokenizer();
+
+  private readonly PHRASE_DICT = new Set([
+    // vi — domain nước hoa
+    'nước hoa', 'hoa hồng', 'hoa nhài', 'hoa oải hương',
+    'cam quýt', 'gỗ đàn hương', 'xạ hương', 'mùi hương',
+    'lâu trôi', 'lưu hương', 'gợi ý', 'tặng quà',
+    // en — perfume domain
+    'long lasting', 'eau de parfum', 'eau de toilette',
+    'floral scent', 'woody scent', 'fresh scent',
+    'rose perfume', 'citrus perfume', 'vanilla perfume',
+  ]);
+
+  private readonly STOP_WORDS = new Set([
+    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'for', 'from',
+    'in', 'is', 'it', 'or', 'of', 'on', 'the', 'to', 'with',
+    'cho', 'cua', 'de', 'la', 'nhu', 'o', 'tai', 'toi', 'va', 'voi',
+  ]);
+
   constructor(
-    protected unitOfWork: UnitOfWork
+    protected unitOfWork: UnitOfWork,
+    @InjectQueue(QueueName.USER_LOG_SUMMARY_QUEUE)
+    private readonly userLogSummaryQueue: Queue
   ) {}
+
+  async enqueueRollingSummaryUpdate(userId: string): Promise<void> {
+    if (!userId) {
+      return;
+    }
+
+    await this.userLogSummaryQueue.add(
+      UserLogSummaryJobName.UPDATE_ROLLING_SUMMARY,
+      { userId },
+      {
+        jobId: `rolling-summary:${userId}`,
+        delay: 10_000,
+        removeOnComplete: true,
+        removeOnFail: 200,
+        attempts: 2,
+        backoff: {
+          type: 'exponential',
+          delay: 2_000
+        }
+      }
+    );
+  }
 
   /** Lay tat ca log */
   async getAllLogs(): Promise<BaseResponse<EventLog[]>> {
@@ -130,6 +180,10 @@ export class UserLogService {
           contentText: request.contentText,
           metadata: request.metadata
         });
+
+        if (request.userId) {
+          await this.enqueueRollingSummaryUpdate(request.userId);
+        }
 
         return { success: true, data: { id } };
       },
@@ -305,6 +359,199 @@ export class UserLogService {
     };
   }
 
+  private tokenizeText(input: string): string[] {
+    if (!input) return [];
+
+    const normalized = input.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ');
+    const unigrams = (this._tokenizer.tokenize(normalized) ?? [])
+      .filter(t => t.length >= 2 && !this.STOP_WORDS.has(t));
+
+    // trigram trước — ưu tiên phrase dài hơn (vd: "gỗ đàn hương", "eau de parfum")
+    const matchedTrigrams = natural.NGrams.trigrams(unigrams)
+      .map(trio => trio.join(' '))
+      .filter(tg => this.PHRASE_DICT.has(tg));
+
+    // bigram sau
+    const matchedBigrams = natural.NGrams.bigrams(unigrams)
+      .map(pair => pair.join(' '))
+      .filter(bg => this.PHRASE_DICT.has(bg));
+
+    const matchedPhrases = [...matchedTrigrams, ...matchedBigrams];
+
+    // loại unigram đã được ghép thành phrase
+    const usedTokens = new Set<string>();
+    for (const phrase of matchedPhrases) {
+      for (const part of phrase.split(' ')) usedTokens.add(part);
+    }
+    const remainingUnigrams = unigrams.filter(t => !usedTokens.has(t));
+
+    return [...matchedPhrases, ...remainingUnigrams];
+  }
+
+  private normalizeFeatureSnapshot(
+    snapshot?: Record<string, unknown>
+  ): Record<string, Record<string, number>> {
+    const safe = (value: unknown): Record<string, number> => {
+      if (!value || typeof value !== 'object') {
+        return {};
+      }
+
+      const normalized: Record<string, number> = {};
+      for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+        const numeric = Number(raw);
+        if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
+          normalized[key] = numeric;
+        }
+      }
+      return normalized;
+    };
+
+    return {
+      eventTypeCounts: safe(snapshot?.eventTypeCounts),
+      keywordCounts: safe(snapshot?.keywordCounts),
+      intentCounts: safe(snapshot?.intentCounts),
+      audienceCounts: safe(snapshot?.audienceCounts),
+      hourCounts: safe(snapshot?.hourCounts)
+    };
+  }
+
+  private buildRollingSummaryText(
+    featureSnapshot: Record<string, Record<string, number>>,
+    totalEvents: number
+  ): string {
+    const topEntries = (obj: Record<string, number>, limit = 5): string =>
+      Object.entries(obj)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([key, value]) => `${key} (${value})`)
+        .join(', ');
+
+    const topKeywords = topEntries(featureSnapshot.keywordCounts);
+    const intents = topEntries(featureSnapshot.intentCounts, 3);
+    const audiences = topEntries(featureSnapshot.audienceCounts, 3);
+    const activeHours = topEntries(featureSnapshot.hourCounts, 3);
+    const eventTypes = topEntries(featureSnapshot.eventTypeCounts, 3);
+
+    return [
+      `Total events: ${totalEvents}.`,
+      `Top event types: ${eventTypes || 'n/a'}.`,
+      `Top keywords: ${topKeywords || 'n/a'}.`,
+      `Detected intents: ${intents || 'n/a'}.`,
+      `Detected audiences: ${audiences || 'n/a'}.`,
+      `Active hours: ${activeHours || 'n/a'}.`
+    ].join(' ');
+  }
+
+  private increaseCounter(
+    counters: Record<string, number>,
+    key: string,
+    amount = 1
+  ): void {
+    if (!key) {
+      return;
+    }
+    counters[key] = (counters[key] || 0) + amount;
+  }
+
+  async rebuildRollingSummaryForUser(userId: string): Promise<void> {
+    if (!userId) {
+      return;
+    }
+
+    const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
+    const lastEventAt = existingSummary?.lastEventAt;
+
+    const events = await this.unitOfWork.EventLogRepo.getEventLogs({
+      userId,
+      startDate: lastEventAt || undefined
+    });
+
+    const newEvents = events
+      .filter((event) =>
+        !lastEventAt || event.createdAt.getTime() > lastEventAt.getTime()
+      )
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+    if (!newEvents.length) {
+      return;
+    }
+
+    const featureSnapshot = this.normalizeFeatureSnapshot(existingSummary?.featureSnapshot);
+    let totalEvents = existingSummary?.totalEvents || 0;
+    let latestEventAt = existingSummary?.lastEventAt;
+
+    for (const event of newEvents) {
+      totalEvents += 1;
+      latestEventAt = !latestEventAt || latestEventAt < event.createdAt
+        ? event.createdAt
+        : latestEventAt;
+
+      this.increaseCounter(featureSnapshot.eventTypeCounts, event.eventType);
+      this.increaseCounter(featureSnapshot.hourCounts, String(event.createdAt.getHours()));
+
+      const textParts: string[] = [];
+      if (event.contentText) {
+        textParts.push(event.contentText);
+      }
+
+      if (typeof event.metadata?.question === 'string') {
+        textParts.push(event.metadata.question as string);
+      }
+      if (typeof event.metadata?.answer === 'string') {
+        textParts.push(event.metadata.answer as string);
+      }
+
+      const normalizedText = textParts.join(' ').toLowerCase();
+      const keywords = this.tokenizeText(normalizedText);
+      for (const keyword of keywords) {
+        this.increaseCounter(featureSnapshot.keywordCounts, keyword);
+      }
+
+      if (/recommend|goi y|gợi ý|suggest/.test(normalizedText)) {
+        this.increaseCounter(featureSnapshot.intentCounts, 'recommendation');
+      }
+      if (/buy|mua|order|don hang|đơn hàng/.test(normalizedText)) {
+        this.increaseCounter(featureSnapshot.intentCounts, 'purchase');
+      }
+      if (/gift|qua tang|quà tặng/.test(normalizedText)) {
+        this.increaseCounter(featureSnapshot.intentCounts, 'gift');
+      }
+      if (event.eventType === EventLogEventType.QUIZ) {
+        this.increaseCounter(featureSnapshot.intentCounts, 'quiz_engagement');
+      }
+
+      if (/men|male|nam/.test(normalizedText)) {
+        this.increaseCounter(featureSnapshot.audienceCounts, 'male');
+      }
+      if (/women|female|nu|nữ/.test(normalizedText)) {
+        this.increaseCounter(featureSnapshot.audienceCounts, 'female');
+      }
+      if (/unisex/.test(normalizedText)) {
+        this.increaseCounter(featureSnapshot.audienceCounts, 'unisex');
+      }
+    }
+
+    const logSummary = this.buildRollingSummaryText(featureSnapshot, totalEvents);
+
+    if (!existingSummary) {
+      const newSummary = new UserLogSummary({
+        userId,
+        logSummary,
+        featureSnapshot,
+        totalEvents,
+        lastEventAt: latestEventAt
+      });
+      await this.unitOfWork.UserLogSummaryRepo.insert(newSummary);
+      return;
+    }
+
+    existingSummary.logSummary = logSummary;
+    existingSummary.featureSnapshot = featureSnapshot;
+    existingSummary.totalEvents = totalEvents;
+    existingSummary.lastEventAt = latestEventAt;
+    await this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
+  }
+
   /** Lay tat ca log */
   async getUserLogsWithPeriod(allUserLogRequest: AllUserLogRequest): Promise<BaseResponse<EventLog[]>> {
     return {
@@ -359,6 +606,7 @@ export class UserLogService {
         userId,
         searchText
       );
+      await this.enqueueRollingSummaryUpdate(userId);
       return { success: true, data: { id } };
     }, 'Failed to add user search log');
   }
@@ -367,7 +615,9 @@ export class UserLogService {
     userId: string,
     searchText: string
   ): Promise<string> {
-    return this.unitOfWork.EventLogRepo.createSearchEvent(userId, searchText);
+    const id = await this.unitOfWork.EventLogRepo.createSearchEvent(userId, searchText);
+    await this.enqueueRollingSummaryUpdate(userId);
+    return id;
   }
 
   async addQuizQuesAnsDetailToUserLog(
@@ -379,29 +629,46 @@ export class UserLogService {
         id: quizQuesAnsId
       });
 
-    return this.unitOfWork.EventLogRepo.createQuizEventsFromDetails(
+    const ids = await this.unitOfWork.EventLogRepo.createQuizEventsFromDetails(
       userId,
       quizQuesAnsDetail?.details.getItems() || []
     );
+
+    if (ids.length) {
+      await this.enqueueRollingSummaryUpdate(userId);
+    }
+
+    return ids;
   }
 
   async saveUserLogSummary(
     userId: string,
-    startDate: Date,
-    endDate: Date,
-    summary: string
+    summary: string,
+    featureSnapshot?: Record<string, unknown>,
+    lastEventAt?: Date
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(
       async () => {
-        const userLogSummary = new UserLogSummary({
-          userId,
-          startDate,
-          endDate,
-          logSummary: summary
-        });
+        const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
+        if (!existingSummary) {
+          const userLogSummary = new UserLogSummary({
+            userId,
+            logSummary: summary,
+            lastEventAt,
+            totalEvents: 0,
+            featureSnapshot: featureSnapshot || {}
+          });
 
-        await this.unitOfWork.UserLogSummaryRepo.insert(userLogSummary);
-        return { success: true, data: userLogSummary.logSummary };
+          await this.unitOfWork.UserLogSummaryRepo.insert(userLogSummary);
+          return { success: true, data: userLogSummary.logSummary };
+        }
+
+        existingSummary.logSummary = summary;
+        existingSummary.lastEventAt = lastEventAt;
+        existingSummary.featureSnapshot =
+          featureSnapshot || existingSummary.featureSnapshot;
+        await this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
+        return { success: true, data: existingSummary.logSummary };
       },
       'Failed to save user log summary',
       true
@@ -416,15 +683,12 @@ export class UserLogService {
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(
       async () => {
-        const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
-          userId,
-          startDate,
-          endDate
-        });
+        const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
         if (!existingSummary) {
           return { success: false, error: 'User log summary not found' };
         }
         existingSummary.logSummary = summary;
+        existingSummary.lastEventAt = endDate;
         this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
         return { success: true, data: existingSummary.logSummary };
 
@@ -448,23 +712,15 @@ export class UserLogService {
           }`
         );
 
-        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({
-          userId: userId,
-          startDate: {
-            $gte: startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
-          },
-          endDate: {
-            $lte: endDate
-              ? endOfDay(convertToUTC(endDate))
-              : endOfDay(convertToUTC(new Date()))
-          }
+        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+          userId: userId
         });
         if (!userLogSummary) {
           return { success: false, error: 'User log summary not found' };
         }
         return {
           success: true,
-          data: UserLogSummaryMapper.toResponseList(userLogSummary)
+          data: [UserLogSummaryMapper.toResponse(userLogSummary)]
         };
       },
       'Failed to get user log summary',
@@ -753,15 +1009,7 @@ export class UserLogService {
     return funcHandlerAsync(
       async () => {
         const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
-          userId: userId,
-          startDate: {
-            $gte: startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
-          },
-          endDate: {
-            $lte: endDate
-              ? endOfDay(convertToUTC(endDate))
-              : endOfDay(convertToUTC(new Date()))
-          }
+          userId: userId
         });
 
         if (!userLogSummary) {
@@ -777,16 +1025,10 @@ export class UserLogService {
   async getAllUserLogSummary(allUserLogRequest: AllUserLogRequest): Promise<BaseResponse<UserLogSummary[] | null>> {
     return funcHandlerAsync(
       async () => {
-        const startDate = allUserLogRequest.startDate ?? this.getFirstDateOfPeriod(allUserLogRequest.period, allUserLogRequest.endDate);
-
-        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find({
-          startDate: {
-            $gte: startDate
-          },
-          endDate: {
-            $lte: endOfDay(convertToUTC(allUserLogRequest.endDate))
-          }
-        });
+        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find(
+          {},
+          { orderBy: { updatedAt: 'DESC' } }
+        );
 
         if (!userLogSummary) {
           return { success: false, error: 'User log summary not found', data: null };

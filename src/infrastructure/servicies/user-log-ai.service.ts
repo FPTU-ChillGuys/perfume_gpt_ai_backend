@@ -1,73 +1,50 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
-import { INSTRUCTION_TYPE_LOG } from 'src/application/constant/prompts';
-import { convertToUTC } from '../utils/time-zone';
-import { AIHelper } from '../helpers/ai.helper';
-import { AI_HELPER } from '../modules/ai.module';
-import { AdminInstructionService } from './admin-instruction.service';
 import { UserLogService } from './user-log.service';
-import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class UserLogAIService {
   constructor(
-    private readonly userLogService: UserLogService,
-    private readonly adminInstructionService: AdminInstructionService,
-    @Inject(AI_HELPER) private readonly aiHelper: AIHelper
+    private readonly userLogService: UserLogService
   ) {}
 
-  /** Tong hop log 1 user va goi AI, tra ve chuoi ket qua (dung cho controller) */
+  /** Tong hop log 1 user theo rolling summary khong dung AI */
   async summarizeUserLogs(request: UserLogRequest): Promise<BaseResponse<string>> {
-    const reportResult = await this.userLogService.getReportAndPromptSummaryUserLogs(request);
-    if (!reportResult.success || !reportResult.data) {
-      return { success: false, error: 'Failed to get user log report' };
+    await this.userLogService.rebuildRollingSummaryForUser(request.userId);
+    const summaryResponse = await this.userLogService.getUserLogSummaryByUserId(request.userId);
+    if (!summaryResponse.success || !summaryResponse.data) {
+      return { success: false, error: 'User rolling summary not found' };
     }
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_LOG);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(reportResult.data.prompt, systemPrompt);
-    if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
-    }
-    return Ok(aiResponse.data);
+    return Ok(summaryResponse.data.logSummary || '');
   }
 
-  /** Tong hop log tat ca user va goi AI, tra ve chuoi ket qua (dung cho controller) */
+  /** Tong hop log tat ca user theo rolling summary khong dung AI */
   async summarizeAllUserLogs(request: AllUserLogRequest): Promise<BaseResponse<string>> {
-    const reportResult = await this.userLogService.getReportAndPromptSummaryAllUsersLogs(request);
-    if (!reportResult.success || !reportResult.data) {
-      return { success: false, error: 'Failed to get all user log report' };
+    const userIds = await this.userLogService.getAllUserIdsFromLogs();
+    for (const userId of userIds) {
+      await this.userLogService.rebuildRollingSummaryForUser(userId);
     }
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_LOG);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(reportResult.data.prompt, systemPrompt);
-    if (!aiResponse.success) {
-      return { success: false, error: 'Failed to get AI response' };
+
+    const summaries = await this.userLogService.getAllUserLogSummary(request);
+    if (!summaries.success || !summaries.data) {
+      return { success: false, error: 'User rolling summaries not found' };
     }
-    return Ok(aiResponse.data);
+
+    const text = summaries.data
+      .map((item) => `${item.userId}: ${item.logSummary}`)
+      .join('\n');
+    return Ok(text);
   }
 
-  /** Tong hop log, goi AI, luu ket qua vao DB (dung cho scheduler/processor) */
+  /** Build rolling summary va luu vao DB */
   async summarizeAndSaveForUser(userId: string, period: PeriodEnum): Promise<void> {
-    const userLogRequest = new UserLogRequest({ userId, period, endDate: new Date() });
-    const reportResult = await this.userLogService.getReportAndPromptSummaryUserLogs(userLogRequest);
-    if (!reportResult.success || !reportResult.data) {
-      console.log(`Failed to summarize logs for userId: ${userId}`);
-      return;
-    }
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_LOG);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(reportResult.data.prompt, systemPrompt);
-    const startDate = convertToUTC(userLogRequest.startDate) ||
-      this.userLogService.getFirstDateOfPeriod(userLogRequest.period!, userLogRequest.endDate!);
-    await this.userLogService.saveUserLogSummary(userId, startDate, userLogRequest.endDate!, aiResponse.data || '');
-    if (!aiResponse.success) {
-      console.log(`Failed to get AI response for userId: ${userId}`);
-    } else {
-      console.log(`Successfully summarized logs for userId: ${userId}`);
-    }
+    await this.userLogService.rebuildRollingSummaryForUser(userId);
   }
 
-  /** Tong hop log tat ca user, goi AI, luu ket qua vao DB */
+  /** Build rolling summary cho tat ca user */
   async summarizeAndSaveForAllUsers(period: PeriodEnum): Promise<void> {
     const userIds = await this.userLogService.getAllUserIdsFromLogs();
     console.log(`Found ${userIds.length} unique user IDs.`);
@@ -101,11 +78,6 @@ export class UserLogAIService {
     }
   }
 
-  /** ---------------------- CRON JOB ---------------------------- */
-
-  @Cron(CronExpression.EVERY_WEEKEND)
-  async handleWeeklySummary() {
-    await this.summarizePerWeek();
-  }
+  /** ---------------------- CRON JOB DISABLED ---------------------------- */
 
 }

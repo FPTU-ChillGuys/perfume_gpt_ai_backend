@@ -7,17 +7,21 @@ export class UserLogSummaryResponse extends CommonResponse {
   @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   userId: string;
 
-  /** Ngày bắt đầu khoảng thời gian */
-  @ApiProperty({ description: 'Ngày bắt đầu' })
-  startDate: Date;
-
-  /** Ngày kết thúc khoảng thời gian */
-  @ApiProperty({ description: 'Ngày kết thúc' })
-  endDate: Date;
-
   /** Nội dung tóm tắt log */
   @ApiProperty({ description: 'Nội dung tóm tắt log' })
   logSummary: string;
+
+  /** Snapshot feature dạng JSON */
+  @ApiProperty({ description: 'Feature snapshot dạng JSON', required: false, type: Object })
+  featureSnapshot?: Record<string, unknown>;
+
+  /** Tổng số event đã xử lý */
+  @ApiProperty({ description: 'Tổng số event đã xử lý', default: 0 })
+  totalEvents: number;
+
+  /** Thời điểm event mới nhất đã xử lý */
+  @ApiProperty({ description: 'Thời điểm event mới nhất đã xử lý', required: false })
+  lastEventAt?: Date;
 
   constructor(init?: Partial<UserLogSummaryResponse>) {
     super();

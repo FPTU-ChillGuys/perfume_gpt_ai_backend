@@ -1,5 +1,4 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
@@ -207,12 +206,6 @@ export class LogController {
     return this.userLogAIService.summarizeAllUserLogs(allUserLogRequest);
   }
 
-  @Cron(CronExpression.EVERY_WEEK)
-  async summarizeLogsPerWeekWithCronJob(): Promise<BaseResponse<string>> {
-    await this.userLogAIService.summarizePerWeek();
-    return Ok('Scheduled task completed.');
-  }
-
   @Get('summarize/weekly/manual')
   @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tuần (thủ công)' })
   @ApiBaseResponse(String)
@@ -288,9 +281,9 @@ export class LogController {
   ): Promise<BaseResponse<string>> {
     const response = await this.userLogService.saveUserLogSummary(
       userLogRequest.userId,
-      userLogRequest.startDate,
-      userLogRequest.endDate,
-      userLogRequest.logSummary
+      userLogRequest.logSummary,
+      userLogRequest.featureSnapshot,
+      userLogRequest.lastEventAt
     );
 
     if (!response.success) {

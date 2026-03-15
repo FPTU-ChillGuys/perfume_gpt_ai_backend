@@ -25,7 +25,9 @@ export class UserLogSummaryProcessor extends WorkerHost {
         return;
       }
 
+      console.log(`Processing user log summary job for userId: ${userId}`);
       await this.userLogService.rebuildRollingSummaryForUser(userId);
+      console.log(`Completed user log summary job for userId: ${userId}`);
     } catch (error) {
       console.error(`Error processing user log summary job ${job.name}:`, error);
       throw error;

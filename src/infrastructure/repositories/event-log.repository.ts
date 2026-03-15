@@ -18,7 +18,7 @@ export type EventLogQuery = {
 export class EventLogRepository extends SqlEntityRepository<EventLog> {
   async createEventLog(event: Partial<EventLog>): Promise<string> {
     const record = new EventLog(event);
-    await this.getEntityManager().persistAndFlush(record);
+    await this.upsert(record);
     return record.id;
   }
 

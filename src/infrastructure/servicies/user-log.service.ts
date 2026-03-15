@@ -57,11 +57,13 @@ export class UserLogService {
       return;
     }
 
+    const safeUserId = userId.replace(/:/g, '_');
+
     await this.userLogSummaryQueue.add(
       UserLogSummaryJobName.UPDATE_ROLLING_SUMMARY,
       { userId },
       {
-        jobId: `rolling-summary:${userId}`,
+        jobId: `rolling-summary-${safeUserId}`,
         delay: 10_000,
         removeOnComplete: true,
         removeOnFail: 200,

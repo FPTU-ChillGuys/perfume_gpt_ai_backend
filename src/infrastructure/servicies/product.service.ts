@@ -294,6 +294,52 @@ export class ProductService {
     );
   }
 
+  async resolveProductViewInfo(
+    productId: string,
+    variantId?: string
+  ): Promise<{ productName?: string; variantName?: string }> {
+    const product = await this.prisma.products.findFirst({
+      where: { Id: productId, IsDeleted: false },
+      select: { Name: true }
+    });
+
+    if (!variantId) {
+      return { productName: product?.Name };
+    }
+
+    const variant = await this.prisma.productVariants.findFirst({
+      where: { Id: variantId, IsDeleted: false },
+      select: {
+        ProductId: true,
+        Sku: true,
+        Type: true,
+        VolumeMl: true,
+        Concentrations: {
+          select: { Name: true }
+        }
+      }
+    });
+
+    if (!variant || variant.ProductId !== productId) {
+      return { productName: product?.Name };
+    }
+
+    const variantParts = [
+      variant.Type?.trim(),
+      variant.VolumeMl ? `${variant.VolumeMl}ml` : undefined,
+      variant.Concentrations?.Name?.trim()
+    ].filter((part): part is string => Boolean(part));
+
+    const variantName =
+      variantParts.join(' ').trim() ||
+      (variant.Sku ? `SKU ${variant.Sku}` : undefined);
+
+    return {
+      productName: product?.Name,
+      variantName
+    };
+  }
+
   /** Lấy chi tiết một sản phẩm kèm toàn bộ variants */
   async getProductWithVariants(
     @Query("id") id: string

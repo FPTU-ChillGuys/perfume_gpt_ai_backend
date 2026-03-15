@@ -572,6 +572,33 @@ export class UserLogService {
     return id;
   }
 
+  async addProductViewLog(
+    userId: string,
+    productId: string,
+    variantId?: string,
+    productName?: string,
+    variantName?: string
+  ): Promise<string> {
+    const id = await this.unitOfWork.EventLogRepo.createProductViewEvent(
+      userId,
+      productId,
+      variantId,
+      productName,
+      variantName
+    );
+    await this.enqueueRollingSummaryUpdate(userId);
+    return id;
+  }
+
+  async addSearchTextLog(
+    userId: string,
+    searchText: string
+  ): Promise<string> {
+    const id = await this.unitOfWork.EventLogRepo.createSearchEvent(userId, searchText);
+    await this.enqueueRollingSummaryUpdate(userId);
+    return id;
+  }
+
   async addQuizQuesAnsDetailToUserLog(
     userId: string,
     quizQuesAnsId: string

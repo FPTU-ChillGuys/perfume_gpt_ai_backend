@@ -367,7 +367,8 @@
           "enumItems": [
             "message",
             "search",
-            "quiz"
+            "quiz",
+            "product"
           ],
           "mappedType": "enum"
         },
@@ -381,7 +382,8 @@
           "enumItems": [
             "conversation",
             "search",
-            "quiz"
+            "quiz",
+            "product"
           ],
           "mappedType": "enum"
         },

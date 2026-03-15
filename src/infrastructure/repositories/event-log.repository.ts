@@ -34,6 +34,27 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
     });
   }
 
+  async createProductViewEvent(
+    userId: string,
+    productId: string,
+    variantId?: string,
+    productName?: string,
+    variantName?: string
+  ): Promise<string> {
+    return this.createEventLog({
+      userId,
+      eventType: EventLogEventType.PRODUCT,
+      entityType: EventLogEntityType.PRODUCT,
+      entityId: productId,
+      metadata: {
+        source: 'product_view',
+        ...(variantId ? { variantId } : {}),
+        ...(productName ? { productName } : {}),
+        ...(variantName ? { variantName } : {})
+      }
+    });
+  }
+
   async createMessageEvent(userId: string, message: Message): Promise<string> {
     return this.createEventLog({
       userId,

@@ -35,6 +35,7 @@ import {
   EventLogTimeSeriesPointResponse,
   EventLogTimeSeriesResponse
 } from 'src/application/dtos/response/event-log-timeseries.response';
+import { AggregatedUserLogSummaryResponse } from 'src/application/dtos/response/aggregated-user-log-summary.response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -793,7 +794,9 @@ export class UserLogService {
     return startDate;
   }
 
-  async getAggregatedUserLogSummaryReport(): Promise<BaseResponse<string>> {
+  async getAggregatedUserLogSummaryReport(): Promise<
+    BaseResponse<AggregatedUserLogSummaryResponse>
+  > {
     return funcHandlerAsync(
       async () => {
         const summaries = await this.getAllUserLogSummary();
@@ -820,7 +823,12 @@ export class UserLogService {
 
         return {
           success: true,
-          data: `Aggregated summary for ${summaries.data.length} users. ${aggregatedText}`
+          data: new AggregatedUserLogSummaryResponse({
+            totalEvents,
+            createdAt: new Date(),
+            logSummary: aggregatedText,
+            featureSnapshot: mergedSnapshot
+          })
         };
       },
       'Failed to aggregate user log summaries',

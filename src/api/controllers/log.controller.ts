@@ -31,6 +31,7 @@ import {
 import { EventLogSummaryResponse } from 'src/application/dtos/response/event-log-summary.response';
 import { EventLogTimeSeriesResponse } from 'src/application/dtos/response/event-log-timeseries.response';
 import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
+import { AggregatedUserLogSummaryResponse } from 'src/application/dtos/response/aggregated-user-log-summary.response';
 
 @Role(['admin'])
 @ApiBearerAuth('jwt')
@@ -258,8 +259,10 @@ export class LogController {
   @ApiOperation({
     summary: 'Tổng hợp summary của nhiều người dùng (runtime only, không lưu DB)'
   })
-  @ApiBaseResponse(String)
-  async getAggregatedUserSummaryReport(): Promise<BaseResponse<string>> {
+  @ApiBaseResponse(AggregatedUserLogSummaryResponse)
+  async getAggregatedUserSummaryReport(): Promise<
+    BaseResponse<AggregatedUserLogSummaryResponse>
+  > {
     return await this.userLogService.getAggregatedUserLogSummaryReport();
   }
 

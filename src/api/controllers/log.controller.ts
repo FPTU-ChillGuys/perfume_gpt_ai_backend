@@ -253,6 +253,16 @@ export class LogController {
     return response;
   }
 
+  /** Xem báo cáo tổng hợp summary của nhiều người dùng (không lưu DB) */
+  @Get('report/summary/aggregate')
+  @ApiOperation({
+    summary: 'Tổng hợp summary của nhiều người dùng (runtime only, không lưu DB)'
+  })
+  @ApiBaseResponse(String)
+  async getAggregatedUserSummaryReport(): Promise<BaseResponse<string>> {
+    return await this.userLogService.getAggregatedUserLogSummaryReport();
+  }
+
   /** Tạo bản tóm tắt log người dùng thủ công */
   @Post()
   @ApiOperation({ summary: 'Tạo bản tóm tắt log người dùng thủ công' })

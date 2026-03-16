@@ -28,12 +28,15 @@ export class Tools {
       // Order tools
       // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
-      getOwnProfile: this.profileTool.getOwnProfile
+      getOwnProfile: this.profileTool.getOwnProfile,
+      productDetailTabContent: this.productTool.productDetailTabContent,
+      getUserLogSummaryReport: this.logTool.getUserLogSummaryReport,
     };
 
     this.getToolsForTrend = {
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct
+    
     };
 
     this.getToolsForRecomendationAndRepurchase = {

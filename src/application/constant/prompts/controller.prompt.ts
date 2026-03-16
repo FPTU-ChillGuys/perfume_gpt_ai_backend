@@ -44,18 +44,11 @@ export const conversationTestSystemPrompt = (
 
 /**
  * Cung cấp context: dữ liệu tóm tắt log người dùng để phân tích xu hướng.
- *
- * Hành vi phân tích, format báo cáo, quy tắc sử dụng tools được điều khiển
- * hoàn toàn bởi Admin Instruction domain "trend" trong DB.
+ * Hành vi phân tích và quy tắc dùng tool được điều khiển hoàn toàn
+ * bởi Admin Instruction domain "trend" trong DB.
  */
 export const trendForecastingPrompt = (summaryData: string): string =>
-  `[DỮ LIỆU NHẬT KÝ NGƯỜI DÙNG ĐỂ PHÂN TÍCH XU HƯỚNG]
-${summaryData}
-
-[YÊU CẦU]
-Dựa trên dữ liệu trên, hãy thực hiện phân tích xu hướng theo đúng hướng dẫn trong system prompt.
-Bắt buộc sử dụng tool searchProduct hoặc getAllProducts để tìm sản phẩm thực tế từ DB và điền vào mảng "products".
-Nếu không tìm được sản phẩm, trả products rỗng và ghi rõ trong "message".`;
+  `[DỮ LIỆU NHẬT KÝ NGƯỜI DÙNG ĐỂ PHÂN TÍCH XU HƯỚNG]\n${summaryData}`;
 
 // ==================== Review Prompts ====================
 

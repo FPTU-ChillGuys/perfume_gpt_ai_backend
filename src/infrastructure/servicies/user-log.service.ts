@@ -35,7 +35,6 @@ import {
   EventLogTimeSeriesPointResponse,
   EventLogTimeSeriesResponse
 } from 'src/application/dtos/response/event-log-timeseries.response';
-import { AggregatedUserLogSummaryResponse } from 'src/application/dtos/response/aggregated-user-log-summary.response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -49,11 +48,14 @@ import {
   buildContentSectionsFromEvents,
   buildDailyLogSummaryMap,
   buildRollingSummaryText,
+  buildSummaryResponseFromEvents,
   convertUserLogsToReport,
+  getFirstDateOfPeriod,
   mergeDailyFeatureSnapshots,
   mergeFeatureSnapshots,
   normalizeDailyFeatureSnapshot,
-  normalizeFeatureSnapshot
+  normalizeFeatureSnapshot,
+  resolveAllUserLogRange
 } from '../utils/user-log-summary.util';
 
 @Injectable()
@@ -379,15 +381,15 @@ export class UserLogService {
     return await funcHandlerAsync(
       async () => {
         if (!allUserLogRequest.startDate) {
-          allUserLogRequest.startDate = this.getFirstDateOfPeriod(
+          allUserLogRequest.startDate = getFirstDateOfPeriod(
             allUserLogRequest.period,
             convertToUTC(allUserLogRequest.endDate)
           );
         }
 
         const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-          startDate: convertToUTC(startOfDay(allUserLogRequest.startDate)),
-          endDate: convertToUTC(endOfDay(allUserLogRequest.endDate))
+          startDate: convertToUTC(startOfDay(allUserLogRequest.startDate!)),
+          endDate: convertToUTC(endOfDay(allUserLogRequest.endDate!))
         });
 
         return { success: true, data: eventLogs };
@@ -622,7 +624,7 @@ export class UserLogService {
       async () => {
         // Xu ly neu khong co startDate thi lay theo period
         if (!userLogRequest.startDate) {
-          userLogRequest.startDate = this.getFirstDateOfPeriod(
+          userLogRequest.startDate = getFirstDateOfPeriod(
             userLogRequest.period,
             convertToUTC(userLogRequest.endDate)
           );
@@ -679,7 +681,7 @@ export class UserLogService {
     return await funcHandlerAsync(
       async () => {
         if (!allUserLogRequest.startDate) {
-          allUserLogRequest.startDate = this.getFirstDateOfPeriod(
+          allUserLogRequest.startDate = getFirstDateOfPeriod(
             allUserLogRequest.period,
             allUserLogRequest.endDate
           );
@@ -747,30 +749,64 @@ export class UserLogService {
     return Array.from(new Set(userIds));
   }
 
-  getFirstDateOfPeriod(period: PeriodEnum, endDate: Date): Date {
-    const endDateObj = new Date(endDate);
-    let startDate = new Date(endDateObj);
-    if (period === PeriodEnum.WEEKLY) {
-      startDate = new Date(endDateObj);
-      startDate.setDate(endDateObj.getDate() - 7);
-    } else if (period === PeriodEnum.MONTHLY) {
-      startDate = new Date(endDateObj);
-      startDate.setMonth(endDateObj.getMonth() - 1);
-    } else if (period === PeriodEnum.YEARLY) {
-      startDate = new Date(endDateObj);
-      startDate.setFullYear(endDateObj.getFullYear() - 1);
-    } else {
-      throw new Error('Invalid period enum');
-    }
-    return startDate;
+
+
+  private resolveAllUserLogRange(request: AllUserLogRequest): {
+    startDate: Date;
+    endDate: Date;
+  } {
+    const endDate = convertToUTC(request.endDate || new Date());
+    const startDate = request.startDate
+      ? convertToUTC(request.startDate)
+      : getFirstDateOfPeriod(request.period, endDate);
+
+    return {
+      startDate: startOfDay(startDate),
+      endDate: endOfDay(endDate)
+    };
   }
 
-  async getAggregatedUserLogSummaryReport(): Promise<
-    BaseResponse<AggregatedUserLogSummaryResponse>
+  private buildSummaryResponseFromEvents(
+    userId: string,
+    eventLogs: EventLog[]
+  ): UserLogSummaryResponse {
+    const featureSnapshot = normalizeFeatureSnapshot();
+    const dailyFeatureSnapshot = normalizeDailyFeatureSnapshot();
+
+    for (const event of eventLogs) {
+      applyEventToFeatureSnapshot(featureSnapshot, event);
+      applyEventToDailyFeatureSnapshot(dailyFeatureSnapshot, event);
+    }
+
+    const totalEvents = eventLogs.length;
+    const dailyLogSummary = buildDailyLogSummaryMap(dailyFeatureSnapshot);
+    const updatedAt =
+      eventLogs.length > 0
+        ? new Date(
+            Math.max(...eventLogs.map((event) => event.createdAt.getTime()))
+          )
+        : new Date();
+
+    return new UserLogSummaryResponse({
+      userId,
+      logSummary: buildRollingSummaryText(featureSnapshot, totalEvents),
+      featureSnapshot,
+      dailyLogSummary,
+      dailyFeatureSnapshot,
+      totalEvents,
+      createdAt: updatedAt,
+      updatedAt
+    });
+  }
+
+  async getAggregatedUserLogSummaryReport(
+    allUserLogRequest?: AllUserLogRequest
+  ): Promise<
+    BaseResponse<UserLogSummaryResponse>
   > {
     return funcHandlerAsync(
       async () => {
-        const summaries = await this.getAllUserLogSummary();
+        const summaries = await this.getAllUserLogSummary(allUserLogRequest);
         if (!summaries.success || !summaries.data?.length) {
           return {
             success: false,
@@ -798,7 +834,8 @@ export class UserLogService {
 
         return {
           success: true,
-          data: new AggregatedUserLogSummaryResponse({
+          data: new UserLogSummaryResponse({
+            userId: 'all',
             totalEvents,
             createdAt: new Date(),
             logSummary: aggregatedText,
@@ -897,11 +934,45 @@ export class UserLogService {
   /** Lay user log summary tu userId */
   async getUserLogSummaryByUserId(
     userId: string,
+    period?: PeriodEnum,
     startDate?: Date,
     endDate?: Date
-  ): Promise<BaseResponse<UserLogSummary | null>> {
+  ): Promise<BaseResponse<UserLogSummaryResponse | null>> {
     return funcHandlerAsync(
       async () => {
+        if (startDate || endDate || period) {
+          const normalizedEndDate = endDate
+            ? endOfDay(convertToUTC(endDate))
+            : endOfDay(convertToUTC(new Date()));
+          const normalizedStartDate = startDate
+            ? startOfDay(convertToUTC(startDate))
+            : startOfDay(
+                getFirstDateOfPeriod(
+                  period ?? PeriodEnum.WEEKLY,
+                  normalizedEndDate
+                )
+              );
+
+          const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+            userId,
+            startDate: normalizedStartDate,
+            endDate: normalizedEndDate
+          });
+
+          if (!eventLogs.length) {
+            return {
+              success: false,
+              error: 'User log summary not found in selected period',
+              data: null
+            };
+          }
+
+          return {
+            success: true,
+            data: buildSummaryResponseFromEvents(userId, eventLogs)
+          };
+        }
+
         const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne(
           {
             userId: userId
@@ -915,29 +986,69 @@ export class UserLogService {
             data: null
           };
         }
-        return { success: true, data: userLogSummary };
+        return {
+          success: true,
+          data: UserLogSummaryMapper.toResponse(userLogSummary)
+        };
       },
       'Failed to get user log summary',
       true
     );
   }
 
-  async getAllUserLogSummary(): Promise<BaseResponse<UserLogSummary[] | null>> {
+  async getAllUserLogSummary(
+    allUserLogRequest?: AllUserLogRequest
+  ): Promise<BaseResponse<UserLogSummaryResponse[] | null>> {
     return funcHandlerAsync(
       async () => {
-        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find(
+        if (allUserLogRequest) {
+          const { startDate, endDate } =
+            resolveAllUserLogRange(allUserLogRequest);
+          const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+            startDate,
+            endDate
+          });
+
+          const groupedByUserId = new Map<string, EventLog[]>();
+          for (const eventLog of eventLogs) {
+            const key = eventLog.userId || 'anonymous';
+            const current = groupedByUserId.get(key) || [];
+            current.push(eventLog);
+            groupedByUserId.set(key, current);
+          }
+
+          const summaryResponses = Array.from(groupedByUserId.entries())
+            .map(([userId, logs]) =>
+              buildSummaryResponseFromEvents(userId, logs)
+            )
+            .sort(
+              (a, b) =>
+                (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+            );
+
+          return {
+            success: true,
+            data: summaryResponses
+          };
+        }
+
+        const userLogSummaryEntities = await this.unitOfWork.UserLogSummaryRepo.find(
           {},
           { orderBy: { updatedAt: 'DESC' } }
         );
 
-        if (!userLogSummary) {
+        if (!userLogSummaryEntities) {
           return {
             success: false,
             error: 'User log summary not found',
             data: null
           };
         }
-        return { success: true, data: userLogSummary };
+
+        return {
+          success: true,
+          data: UserLogSummaryMapper.toResponseList(userLogSummaryEntities)
+        };
       },
       'Failed to get user log summary',
       true
@@ -969,31 +1080,46 @@ export class UserLogService {
   /** Lay user summary theo tuan */
   async getUserLogSummaryByWeek(
     userId: string
-  ): Promise<BaseResponse<UserLogSummary | null>> {
+  ): Promise<BaseResponse<UserLogSummaryResponse | null>> {
     const currentDate = new Date();
     const endDate = endOfWeek(convertToUTC(currentDate));
     const startDate = startOfWeek(convertToUTC(currentDate));
-    return this.getUserLogSummaryByUserId(userId, startDate, endDate);
+    return this.getUserLogSummaryByUserId(
+      userId,
+      PeriodEnum.WEEKLY,
+      startDate,
+      endDate
+    );
   }
 
   /** Lay user summary theo thang */
   async getUserLogSummaryByMonth(
     userId: string
-  ): Promise<BaseResponse<UserLogSummary | null>> {
+  ): Promise<BaseResponse<UserLogSummaryResponse | null>> {
     const currentDate = new Date();
     const endDate = endOfMonth(convertToUTC(currentDate));
     const startDate = startOfMonth(convertToUTC(currentDate));
-    return this.getUserLogSummaryByUserId(userId, startDate, endDate);
+    return this.getUserLogSummaryByUserId(
+      userId,
+      PeriodEnum.MONTHLY,
+      startDate,
+      endDate
+    );
   }
 
   /** Lay user summary theo nam */
   async getUserLogSummaryByYear(
     userId: string
-  ): Promise<BaseResponse<UserLogSummary | null>> {
+  ): Promise<BaseResponse<UserLogSummaryResponse | null>> {
     const currentDate = new Date();
     const endDate = endOfYear(convertToUTC(currentDate));
     const startDate = startOfYear(convertToUTC(currentDate));
-    return this.getUserLogSummaryByUserId(userId, startDate, endDate);
+    return this.getUserLogSummaryByUserId(
+      userId,
+      PeriodEnum.YEARLY,
+      startDate,
+      endDate
+    );
   }
 
   /** Tong hop log va goi AI, tra ve chuoi ket qua (dung cho controller) */

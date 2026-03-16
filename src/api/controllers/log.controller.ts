@@ -30,8 +30,7 @@ import {
 } from 'src/application/dtos/request/event-log.request';
 import { EventLogSummaryResponse } from 'src/application/dtos/response/event-log-summary.response';
 import { EventLogTimeSeriesResponse } from 'src/application/dtos/response/event-log-timeseries.response';
-import { UserLogSummaryMapper } from 'src/application/mapping/custom/user-log-summary.mapper';
-import { AggregatedUserLogSummaryResponse } from 'src/application/dtos/response/aggregated-user-log-summary.response';
+import { PeriodEnum } from 'src/domain/enum/period.enum';
 
 @Role(['admin'])
 @ApiBearerAuth('jwt')
@@ -202,58 +201,53 @@ export class LogController {
 
   @Get('summaries')
   @ApiOperation({ summary: 'Xem chi tiết tất cả các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
-  @ApiQuery({ name: 'userId', type: String })
-  @ApiQuery({ name: 'startDate', type: Date })
-  @ApiQuery({ name: 'endDate', type: Date, example: new Date() })
+  @ApiQuery({ name: 'period', required: false })
+  @ApiQuery({ name: 'startDate', required: false, type: Date })
+  @ApiQuery({ name: 'endDate', required: false, type: Date })
   @ApiBaseResponse(UserLogSummaryResponse, true)
   @CacheTTL(1)
-  async getAllUserLogsSummaries(): Promise<BaseResponse<UserLogSummaryResponse[]>> {
-    const response = await this.userLogService.getAllUserLogSummary();
-    const mappedResponse: UserLogSummaryResponse[] =
-      UserLogSummaryMapper.toResponseList(response.data ?? []);
-    return { success: response.success, data: mappedResponse };
+  async getAllUserLogsSummaries(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
+    const hasTimeFilter =
+      Boolean(allUserLogRequest.startDate) ||
+      Boolean(allUserLogRequest.endDate) ||
+      Boolean(allUserLogRequest.period);
+
+    const response = await this.userLogService.getAllUserLogSummary(
+      hasTimeFilter ? allUserLogRequest : undefined
+    );
+
+    return { success: response.success, data: response.data ?? [] };
   }
 
-  /** Xem 1 bản tóm tắt log user gần nhất, gồm cả overall và daily breakdown */
-  @Get('summaries/detail/:userId')
-  @ApiOperation({ summary: 'Xem 1 bản tóm tắt log user gần nhất, gồm overall và daily breakdown' })
-  @ApiBaseResponse(UserLogSummaryResponse)
-  async getUserLogSummaryDetail(
-    @Param('userId') userId: string
-  ): Promise<BaseResponse<UserLogSummaryResponse>> {
-    const response = await this.userLogService.getUserLogSummaryByUserId(userId);
-
-    if (!response.success || !response.data) {
-      return {
-        success: false,
-        error: response.error
-      };
-    }
-
-    return {
-      success: true,
-      data: UserLogSummaryMapper.toResponse(response.data)
-    };
-  }
 
   /** Xem chi tiết các bản tóm tắt log người dùng */
   @Get('summaries/:userId')
   @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
   @ApiQuery({ name: 'userId', type: String })
-  @ApiQuery({ name: 'startDate', type: Date })
-  @ApiQuery({ name: 'endDate', type: Date, example: new Date() })
+  @ApiQuery({ name: 'period', required: false })
+  @ApiQuery({ name: 'startDate', required: false, type: Date })
+  @ApiQuery({ name: 'endDate', required: false, type: Date, example: new Date() })
   @ApiBaseResponse(UserLogSummaryResponse, true)
   async getUserLogsSummariesById(
     @Param('userId') userId: string,
-    @Query('endDate') endDate: Date,
-    @Query('startDate') startDate: Date
+    @Query('period') period?: PeriodEnum,
+    @Query('endDate') endDate?: Date,
+    @Query('startDate') startDate?: Date
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
-    const response = await this.userLogService.getUserLogSummariesByUserId(
+    const singleResponse = await this.userLogService.getUserLogSummaryByUserId(
       userId,
+      period,
       startDate,
       endDate
     );
-    return response;
+
+    return {
+      success: singleResponse.success,
+      error: singleResponse.error,
+      data: singleResponse.data ? [singleResponse.data] : []
+    };
   }
 
   /** Xem báo cáo tóm tắt log người dùng theo ID */
@@ -281,11 +275,23 @@ export class LogController {
   @ApiOperation({
     summary: 'Tổng hợp summary của nhiều người dùng (runtime only), gồm overall và daily breakdown'
   })
-  @ApiBaseResponse(AggregatedUserLogSummaryResponse)
-  async getAggregatedUserSummaryReport(): Promise<
-    BaseResponse<AggregatedUserLogSummaryResponse>
+  @ApiQuery({ name: 'period', required: false })
+  @ApiQuery({ name: 'startDate', required: false, type: Date })
+  @ApiQuery({ name: 'endDate', required: false, type: Date })
+  @ApiBaseResponse(UserLogSummaryResponse)
+  async getAggregatedUserSummaryReport(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<
+    BaseResponse<UserLogSummaryResponse>
   > {
-    return await this.userLogService.getAggregatedUserLogSummaryReport();
+    const hasTimeFilter =
+      Boolean(allUserLogRequest.startDate) ||
+      Boolean(allUserLogRequest.endDate) ||
+      Boolean(allUserLogRequest.period);
+
+    return await this.userLogService.getAggregatedUserLogSummaryReport(
+      hasTimeFilter ? allUserLogRequest : undefined
+    );
   }
 
   /** Tạo bản tóm tắt log người dùng thủ công */

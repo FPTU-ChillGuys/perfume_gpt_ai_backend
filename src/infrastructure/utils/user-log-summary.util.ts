@@ -2,6 +2,10 @@ import { endOfDay, format, startOfDay } from 'date-fns';
 import { EventLog } from 'src/domain/entities/event-log.entity';
 import { EventLogEventType } from 'src/domain/enum/event-log-event-type.enum';
 import { tokenizeText } from './nlp-tokenizer';
+import { PeriodEnum } from 'src/domain/enum/period.enum';
+import { convertToUTC } from './time-zone';
+import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
+import { AllUserLogRequest } from 'src/application/dtos/request/user-log.request';
 
 export type RollingFeatureSnapshot = {
   eventTypeCounts: Record<string, number>;
@@ -352,4 +356,70 @@ export function convertUserLogsToReport(
   endDate: Date
 ): string {
   return `User activity summary from ${startOfDay(new Date(startDate))} to ${endOfDay(new Date(endDate))}:\n\nSearch Activities: ${searchContents}\n\nMessages: ${messageContents}\n\nQuiz Answers: ${quizContents}\n`;
+}
+
+export function getFirstDateOfPeriod(period: PeriodEnum, endDate: Date): Date {
+  const endDateObj = new Date(endDate);
+  let startDate = new Date(endDateObj);
+  if (period === PeriodEnum.WEEKLY) {
+    startDate = new Date(endDateObj);
+    startDate.setDate(endDateObj.getDate() - 7);
+  } else if (period === PeriodEnum.MONTHLY) {
+    startDate = new Date(endDateObj);
+    startDate.setMonth(endDateObj.getMonth() - 1);
+  } else if (period === PeriodEnum.YEARLY) {
+    startDate = new Date(endDateObj);
+    startDate.setFullYear(endDateObj.getFullYear() - 1);
+  } else {
+    throw new Error('Invalid period enum');
+  }
+  return startDate;
+}
+
+export function resolveAllUserLogRange(request: AllUserLogRequest): {
+  startDate: Date;
+  endDate: Date;
+} {
+  const endDate = convertToUTC(request.endDate || new Date());
+  const startDate = request.startDate
+    ? convertToUTC(request.startDate)
+    : getFirstDateOfPeriod(request.period, endDate);
+
+  return {
+    startDate: startOfDay(startDate),
+    endDate: endOfDay(endDate)
+  };
+}
+
+export function buildSummaryResponseFromEvents(
+  userId: string,
+  eventLogs: EventLog[]
+): UserLogSummaryResponse {
+  const featureSnapshot = normalizeFeatureSnapshot();
+  const dailyFeatureSnapshot = normalizeDailyFeatureSnapshot();
+
+  for (const event of eventLogs) {
+    applyEventToFeatureSnapshot(featureSnapshot, event);
+    applyEventToDailyFeatureSnapshot(dailyFeatureSnapshot, event);
+  }
+
+  const totalEvents = eventLogs.length;
+  const dailyLogSummary = buildDailyLogSummaryMap(dailyFeatureSnapshot);
+  const updatedAt =
+    eventLogs.length > 0
+      ? new Date(
+          Math.max(...eventLogs.map((event) => event.createdAt.getTime()))
+        )
+      : new Date();
+
+  return new UserLogSummaryResponse({
+    userId,
+    logSummary: buildRollingSummaryText(featureSnapshot, totalEvents),
+    featureSnapshot,
+    dailyLogSummary,
+    dailyFeatureSnapshot,
+    totalEvents,
+    createdAt: updatedAt,
+    updatedAt
+  });
 }

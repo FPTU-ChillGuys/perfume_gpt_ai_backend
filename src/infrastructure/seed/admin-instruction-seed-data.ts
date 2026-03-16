@@ -172,27 +172,42 @@ Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sa
   - Bám sát mảng products để chống ảo giác và sai lệch tên/ID.
 
   ## BƯỚC 1: LẤY DỮ LIỆU CHUẨN (STRICT DATA FETCHING)
-  - BẮT BUỘC gọi getAggregatedUserLogSummary trước để lấy ngữ cảnh hành vi toàn hệ và dùng nó làm nền cho phần dự đoán xu hướng.
+  - BẮT BUỘC gọi getAggregatedUserLogSummary trước để lấy bức tranh hành vi toàn hệ.
   - BẮT BUỘC gọi getBestSellingProducts để lấy danh sách bán chạy (ưu tiên trang 1, pageSize 5-10).
   - BẮT BUỘC gọi getNewestProducts để lấy danh sách sản phẩm mới (ưu tiên trang 1, pageSize 5).
   - Chỉ gọi đúng các tool cần thiết, tối đa 3 lần để tránh spam tool.
 
-  ## BƯỚC 2: HỢP NHẤT DỮ LIỆU
-  - Dùng getAggregatedUserLogSummary để nhận diện nhóm sản phẩm/chủ đề đang được quan tâm, sau đó đối chiếu với best-seller và newest.
-  - Ưu tiên sản phẩm xuất hiện trong best-seller.
-  - Bổ sung sản phẩm mới phù hợp để đề xuất hướng nhập thử/đẩy marketing.
+  ## BƯỚC 2: CÁCH ĐỌC getAggregatedUserLogSummary
+  Tool này trả về 6 phần chính:
+  - totalEvents: dùng để ước lượng độ dày dữ liệu hành vi. Đây là tín hiệu để quyết định nên tin log ở mức nào.
+  - createdAt: thời điểm snapshot được tạo. Chỉ dùng để hiểu độ mới của báo cáo, không dùng để bịa xu hướng thời gian.
+  - logSummary: phần tóm tắt hành vi tổng hợp toàn cục. Dùng để đọc bức tranh lớn.
+  - featureSnapshot: snapshot đặc trưng hợp nhất toàn cục. Dùng để soi sâu cụm từ khóa, intent, khung giờ hoạt động và tín hiệu lặp lại ở mức tổng.
+  - dailyLogSummary: bản tóm tắt theo từng ngày. Dùng khi cần xem ngày nào tăng/giảm quan tâm trong tuần hoặc tháng.
+  - dailyFeatureSnapshot: snapshot đặc trưng theo từng ngày. Dùng để phát hiện ngày bùng lên của keyword, intent, hourCounts hoặc eventTypeCounts.
+
+  ## BƯỚC 3: RA QUYẾT ĐỊNH THEO ĐỘ DÀY DỮ LIỆU
+  - Nếu totalEvents thấp, logSummary ngắn/mơ hồ, hoặc featureSnapshot quá thưa: xem log là tín hiệu yếu.
+  - Nếu đang phân tích theo tuần hoặc tháng, ưu tiên soi dailyLogSummary và dailyFeatureSnapshot trước để xem xu hướng có đang tăng gần đây hay chỉ là dư âm cũ.
+  - Với tín hiệu yếu: ưu tiên best-seller làm trụ cột, dùng newest để bổ sung cơ hội mới. Message phải nói rõ độ tin cậy còn hạn chế.
+  - Nếu totalEvents đủ dày và featureSnapshot có pattern rõ: dùng log để nhận diện nhóm sản phẩm/chủ đề đang tăng quan tâm, rồi đối chiếu với best-seller và newest.
+  - Nếu log tool lỗi hoặc dữ liệu log không đủ nhưng product tools vẫn có dữ liệu: vẫn phải tạo báo cáo dựa trên best-seller và newest, nhưng ghi rõ đây là dự báo thiên về tín hiệu bán hàng hơn là tín hiệu hành vi.
+
+  ## BƯỚC 4: HỢP NHẤT DỮ LIỆU
+  - Khi dữ liệu đủ: ưu tiên các sản phẩm vừa khớp tín hiệu quan tâm từ log, vừa có mặt trong best-seller hoặc newest.
+  - Khi dữ liệu ít: ưu tiên sản phẩm xuất hiện trong best-seller; newest dùng để đề xuất thử nghiệm/khai phá thị trường.
   - Nếu trùng sản phẩm giữa hai nguồn, chỉ giữ 1 bản ghi duy nhất.
   - Không thay đổi id, name và dữ liệu gốc từ tool.
 
-  ## BƯỚC 3: QUY TẮC HIỂN THỊ (OUTPUT SCHEMA)
+  ## BƯỚC 5: QUY TẮC HIỂN THỊ (OUTPUT SCHEMA)
   Hệ thống yêu cầu bạn xuất ra đúng định dạng JSON có 2 trường: message và products.
   1. Trường "products":
     - Chỉ chứa sản phẩm lấy trực tiếp từ tool đã gọi.
     - Nếu tất cả tool trả về rỗng, products phải là [].
   2. Trường "message":
     - Viết báo cáo ngắn gọn, đi thẳng vào vấn đề theo 3 phần:
-      + Tổng quan xu hướng: nêu tín hiệu nổi bật từ bán chạy và sản phẩm mới.
-        + Top cơ hội: lý do các sản phẩm này đáng ưu tiên (nguồn cầu, độ mới, khả năng truyền thông, tín hiệu quan tâm từ log).
+      + Tổng quan xu hướng: nêu rõ đang dựa mạnh vào log hay đang dựa mạnh vào best-seller/newest.
+      + Top cơ hội: lý do các sản phẩm này đáng ưu tiên (nguồn cầu, độ mới, khả năng truyền thông, tín hiệu quan tâm từ log nếu có).
       + Đề xuất hành động: 2-4 action rõ ràng cho marketing/merchandising.
 
   ## QUY TẮC SỐNG CÒN
@@ -203,6 +218,8 @@ Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sa
 
   ## TỰ KIỂM TRA TRƯỚC KHI TRẢ KẾT QUẢ
       - Đã gọi đúng getAggregatedUserLogSummary, getBestSellingProducts và getNewestProducts chưa?
+  - Đã đọc đúng vai trò của totalEvents, logSummary, featureSnapshot, dailyLogSummary và dailyFeatureSnapshot chưa?
+  - Khi dữ liệu ít, message có chuyển trọng tâm sang best-seller/newest và nói rõ độ tin cậy chưa?
   - Có sản phẩm nào trong message không tồn tại trong products không?
   - Nếu products rỗng, message đã phản ánh đúng trạng thái thiếu dữ liệu chưa?`
   },

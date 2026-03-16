@@ -186,8 +186,9 @@ export class LogTool {
     getAggregatedUserLogSummary: Tool = tool({
         description:
             'Get aggregated rolling log summary across multiple users. ' +
-            'Returns total events, created time, summary text, and merged feature snapshot. ' +
-            'Use this for trend context and high-level behavior analysis.',
+            'Returns total events, created time, overall summary text, overall feature snapshot, ' +
+            'plus daily summary text and daily feature snapshots keyed by date. ' +
+            'Use the daily fields for weekly or monthly trend analysis and the overall fields for broad context.',
         inputSchema: z.object({}),
         execute: async () => {
             return await funcHandlerAsync(

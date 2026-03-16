@@ -43,14 +43,16 @@ import {
   QueueName,
   UserLogSummaryJobName
 } from 'src/application/constant/processor';
-import { tokenizeText } from '../utils/nlp-tokenizer';
 import {
+  applyEventToDailyFeatureSnapshot,
+  applyEventToFeatureSnapshot,
   buildContentSectionsFromEvents,
+  buildDailyLogSummaryMap,
   buildRollingSummaryText,
   convertUserLogsToReport,
-  extractTextFromMetadata,
-  increaseCounter,
+  mergeDailyFeatureSnapshots,
   mergeFeatureSnapshots,
+  normalizeDailyFeatureSnapshot,
   normalizeFeatureSnapshot
 } from '../utils/user-log-summary.util';
 
@@ -321,70 +323,29 @@ export class UserLogService {
       return;
     }
 
-    const featureSnapshot = normalizeFeatureSnapshot(
-      existingSummary?.featureSnapshot
+    const featureSnapshot = normalizeFeatureSnapshot(existingSummary?.featureSnapshot);
+    const dailyFeatureSnapshot = normalizeDailyFeatureSnapshot(
+      existingSummary?.dailyFeatureSnapshot
     );
     let totalEvents = existingSummary?.totalEvents || 0;
 
     for (const event of newEvents) {
       totalEvents += 1;
 
-      increaseCounter(featureSnapshot.eventTypeCounts, event.eventType);
-      increaseCounter(
-        featureSnapshot.hourCounts,
-        String(event.createdAt.getHours())
-      );
-
-      const textParts: string[] = [];
-      if (event.contentText) {
-        textParts.push(event.contentText);
-      }
-
-      textParts.push(...extractTextFromMetadata(event.metadata));
-
-      const normalizedText = textParts.join(' ').toLowerCase();
-      const keywords = tokenizeText(normalizedText);
-      for (const keyword of keywords) {
-        increaseCounter(featureSnapshot.keywordCounts, keyword);
-      }
-
-      if (/recommend|goi y|gợi ý|suggest/.test(normalizedText)) {
-        increaseCounter(featureSnapshot.intentCounts, 'recommendation');
-      }
-      if (/buy|mua|order|don hang|đơn hàng/.test(normalizedText)) {
-        increaseCounter(featureSnapshot.intentCounts, 'purchase');
-      }
-      if (/gift|qua tang|quà tặng/.test(normalizedText)) {
-        increaseCounter(featureSnapshot.intentCounts, 'gift');
-      }
-      if (event.eventType === EventLogEventType.QUIZ) {
-        increaseCounter(featureSnapshot.intentCounts, 'quiz_engagement');
-      }
-      if (event.eventType === EventLogEventType.PRODUCT) {
-        increaseCounter(featureSnapshot.intentCounts, 'product_interest');
-      }
-
-      if (/men|male|nam/.test(normalizedText)) {
-        increaseCounter(featureSnapshot.audienceCounts, 'male');
-      }
-      if (/women|female|nu|nữ/.test(normalizedText)) {
-        increaseCounter(featureSnapshot.audienceCounts, 'female');
-      }
-      if (/unisex/.test(normalizedText)) {
-        increaseCounter(featureSnapshot.audienceCounts, 'unisex');
-      }
+      applyEventToFeatureSnapshot(featureSnapshot, event);
+      applyEventToDailyFeatureSnapshot(dailyFeatureSnapshot, event);
     }
 
-    const logSummary = buildRollingSummaryText(
-      featureSnapshot,
-      totalEvents
-    );
+    const logSummary = buildRollingSummaryText(featureSnapshot, totalEvents);
+    const dailyLogSummary = buildDailyLogSummaryMap(dailyFeatureSnapshot);
 
     if (!existingSummary) {
       const newSummary = new UserLogSummary({
         userId,
         logSummary,
         featureSnapshot,
+        dailyLogSummary,
+        dailyFeatureSnapshot,
         totalEvents
       });
       await this.unitOfWork.UserLogSummaryRepo.insert(newSummary);
@@ -393,6 +354,8 @@ export class UserLogService {
 
     existingSummary.logSummary = logSummary;
     existingSummary.featureSnapshot = featureSnapshot;
+    existingSummary.dailyLogSummary = dailyLogSummary;
+    existingSummary.dailyFeatureSnapshot = dailyFeatureSnapshot;
     existingSummary.totalEvents = totalEvents;
     await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
       existingSummary
@@ -519,7 +482,9 @@ export class UserLogService {
   async saveUserLogSummary(
     userId: string,
     summary: string,
-    featureSnapshot?: Record<string, unknown>
+    featureSnapshot?: Record<string, unknown>,
+    dailyLogSummary?: Record<string, string>,
+    dailyFeatureSnapshot?: Record<string, unknown>
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(
       async () => {
@@ -530,7 +495,9 @@ export class UserLogService {
             userId,
             logSummary: summary,
             totalEvents: 0,
-            featureSnapshot: featureSnapshot || {}
+            featureSnapshot: featureSnapshot || {},
+            dailyLogSummary: dailyLogSummary || {},
+            dailyFeatureSnapshot: dailyFeatureSnapshot || {}
           });
 
           await this.unitOfWork.UserLogSummaryRepo.insert(userLogSummary);
@@ -540,6 +507,10 @@ export class UserLogService {
         existingSummary.logSummary = summary;
         existingSummary.featureSnapshot =
           featureSnapshot || existingSummary.featureSnapshot;
+        existingSummary.dailyLogSummary =
+          dailyLogSummary || existingSummary.dailyLogSummary;
+        existingSummary.dailyFeatureSnapshot =
+          dailyFeatureSnapshot || existingSummary.dailyFeatureSnapshot;
         await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
           existingSummary
         );
@@ -810,16 +781,20 @@ export class UserLogService {
         const normalizedSnapshots = summaries.data.map((summary) =>
           normalizeFeatureSnapshot(summary.featureSnapshot)
         );
+        const normalizedDailySnapshots = summaries.data.map((summary) =>
+          normalizeDailyFeatureSnapshot(summary.dailyFeatureSnapshot)
+        );
         const mergedSnapshot = mergeFeatureSnapshots(normalizedSnapshots);
+        const mergedDailySnapshot = mergeDailyFeatureSnapshots(
+          normalizedDailySnapshots
+        );
         const totalEvents = summaries.data.reduce(
           (sum, summary) => sum + (summary.totalEvents || 0),
           0
         );
 
-        const aggregatedText = buildRollingSummaryText(
-          mergedSnapshot,
-          totalEvents
-        );
+        const aggregatedText = buildRollingSummaryText(mergedSnapshot, totalEvents);
+        const dailyLogSummary = buildDailyLogSummaryMap(mergedDailySnapshot);
 
         return {
           success: true,
@@ -827,7 +802,9 @@ export class UserLogService {
             totalEvents,
             createdAt: new Date(),
             logSummary: aggregatedText,
-            featureSnapshot: mergedSnapshot
+            dailyLogSummary,
+            featureSnapshot: mergedSnapshot,
+            dailyFeatureSnapshot: mergedDailySnapshot
           })
         };
       },

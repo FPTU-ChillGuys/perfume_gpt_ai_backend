@@ -1,6 +1,7 @@
-import { endOfDay, startOfDay } from 'date-fns';
+import { endOfDay, format, startOfDay } from 'date-fns';
 import { EventLog } from 'src/domain/entities/event-log.entity';
 import { EventLogEventType } from 'src/domain/enum/event-log-event-type.enum';
+import { tokenizeText } from './nlp-tokenizer';
 
 export type RollingFeatureSnapshot = {
   eventTypeCounts: Record<string, number>;
@@ -9,6 +10,18 @@ export type RollingFeatureSnapshot = {
   audienceCounts: Record<string, number>;
   hourCounts: Record<string, number>;
 };
+
+export type DailyFeatureSnapshot = Record<string, RollingFeatureSnapshot>;
+
+export function createEmptyRollingFeatureSnapshot(): RollingFeatureSnapshot {
+  return {
+    eventTypeCounts: {},
+    keywordCounts: {},
+    intentCounts: {},
+    audienceCounts: {},
+    hourCounts: {}
+  };
+}
 
 export function normalizeFeatureSnapshot(
   snapshot?: Record<string, unknown>
@@ -35,6 +48,27 @@ export function normalizeFeatureSnapshot(
     audienceCounts: safe(snapshot?.audienceCounts),
     hourCounts: safe(snapshot?.hourCounts)
   };
+}
+
+export function normalizeDailyFeatureSnapshot(
+  snapshot?: Record<string, unknown>
+): DailyFeatureSnapshot {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return {};
+  }
+
+  const normalized: DailyFeatureSnapshot = {};
+  for (const [dateKey, rawSnapshot] of Object.entries(snapshot)) {
+    if (!rawSnapshot || typeof rawSnapshot !== 'object') {
+      continue;
+    }
+
+    normalized[dateKey] = normalizeFeatureSnapshot(
+      rawSnapshot as Record<string, unknown>
+    );
+  }
+
+  return normalized;
 }
 
 export function increaseCounter(
@@ -93,6 +127,91 @@ export function extractTextFromMetadata(
 
   visit(metadata, 0);
   return pieces;
+}
+
+export function getEventDateKey(date: Date): string {
+  return format(date, 'M/d/yyyy');
+}
+
+export function applyEventToFeatureSnapshot(
+  featureSnapshot: RollingFeatureSnapshot,
+  event: EventLog
+): void {
+  increaseCounter(featureSnapshot.eventTypeCounts, event.eventType);
+  increaseCounter(featureSnapshot.hourCounts, String(event.createdAt.getHours()));
+
+  const textParts: string[] = [];
+  if (event.contentText) {
+    textParts.push(event.contentText);
+  }
+
+  textParts.push(...extractTextFromMetadata(event.metadata));
+
+  const normalizedText = textParts.join(' ').toLowerCase();
+  const keywords = tokenizeText(normalizedText);
+  for (const keyword of keywords) {
+    increaseCounter(featureSnapshot.keywordCounts, keyword);
+  }
+
+  if (/recommend|goi y|gợi ý|suggest/.test(normalizedText)) {
+    increaseCounter(featureSnapshot.intentCounts, 'recommendation');
+  }
+  if (/buy|mua|order|don hang|đơn hàng/.test(normalizedText)) {
+    increaseCounter(featureSnapshot.intentCounts, 'purchase');
+  }
+  if (/gift|qua tang|quà tặng/.test(normalizedText)) {
+    increaseCounter(featureSnapshot.intentCounts, 'gift');
+  }
+  if (event.eventType === EventLogEventType.QUIZ) {
+    increaseCounter(featureSnapshot.intentCounts, 'quiz_engagement');
+  }
+  if (event.eventType === EventLogEventType.PRODUCT) {
+    increaseCounter(featureSnapshot.intentCounts, 'product_interest');
+  }
+
+  if (/men|male|nam/.test(normalizedText)) {
+    increaseCounter(featureSnapshot.audienceCounts, 'male');
+  }
+  if (/women|female|nu|nữ/.test(normalizedText)) {
+    increaseCounter(featureSnapshot.audienceCounts, 'female');
+  }
+  if (/unisex/.test(normalizedText)) {
+    increaseCounter(featureSnapshot.audienceCounts, 'unisex');
+  }
+}
+
+export function applyEventToDailyFeatureSnapshot(
+  dailyFeatureSnapshot: DailyFeatureSnapshot,
+  event: EventLog
+): void {
+  const dateKey = getEventDateKey(event.createdAt);
+  const snapshot = dailyFeatureSnapshot[dateKey] || createEmptyRollingFeatureSnapshot();
+  applyEventToFeatureSnapshot(snapshot, event);
+  dailyFeatureSnapshot[dateKey] = snapshot;
+}
+
+export function getTotalEventsFromFeatureSnapshot(
+  featureSnapshot: RollingFeatureSnapshot
+): number {
+  return Object.values(featureSnapshot.eventTypeCounts).reduce(
+    (sum, value) => sum + value,
+    0
+  );
+}
+
+export function buildDailyLogSummaryMap(
+  dailyFeatureSnapshot: DailyFeatureSnapshot
+): Record<string, string> {
+  const sortedEntries = Object.entries(dailyFeatureSnapshot).sort(
+    (a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()
+  );
+
+  return Object.fromEntries(
+    sortedEntries.map(([dateKey, snapshot]) => [
+      dateKey,
+      buildRollingSummaryText(snapshot, getTotalEventsFromFeatureSnapshot(snapshot))
+    ])
+  );
 }
 
 export function buildRollingSummaryText(
@@ -185,13 +304,7 @@ export function buildContentSectionsFromEvents(eventLogs: EventLog[]): {
 export function mergeFeatureSnapshots(
   snapshots: RollingFeatureSnapshot[]
 ): RollingFeatureSnapshot {
-  const merged: RollingFeatureSnapshot = {
-    eventTypeCounts: {},
-    keywordCounts: {},
-    intentCounts: {},
-    audienceCounts: {},
-    hourCounts: {}
-  };
+  const merged = createEmptyRollingFeatureSnapshot();
 
   for (const snapshot of snapshots) {
     for (const [key, value] of Object.entries(snapshot.eventTypeCounts)) {
@@ -208,6 +321,23 @@ export function mergeFeatureSnapshots(
     }
     for (const [key, value] of Object.entries(snapshot.hourCounts)) {
       increaseCounter(merged.hourCounts, key, value);
+    }
+  }
+
+  return merged;
+}
+
+export function mergeDailyFeatureSnapshots(
+  snapshots: DailyFeatureSnapshot[]
+): DailyFeatureSnapshot {
+  const merged: DailyFeatureSnapshot = {};
+
+  for (const snapshot of snapshots) {
+    for (const [dateKey, dailySnapshot] of Object.entries(snapshot)) {
+      merged[dateKey] = mergeFeatureSnapshots([
+        merged[dateKey] || createEmptyRollingFeatureSnapshot(),
+        dailySnapshot
+      ]);
     }
   }
 

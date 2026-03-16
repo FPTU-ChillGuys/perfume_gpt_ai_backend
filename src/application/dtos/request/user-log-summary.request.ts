@@ -35,4 +35,16 @@ export class UserLogSummaryRequest {
   @IsObject()
   featureSnapshot?: Record<string, unknown>;
 
+  /** Bản tóm tắt log theo ngày */
+  @ApiProperty({ description: 'Bản tóm tắt log theo ngày', required: false, type: Object })
+  @IsOptional()
+  @IsObject()
+  dailyLogSummary?: Record<string, string>;
+
+  /** Snapshot feature theo ngày */
+  @ApiProperty({ description: 'Feature snapshot theo ngày', required: false, type: Object })
+  @IsOptional()
+  @IsObject()
+  dailyFeatureSnapshot?: Record<string, unknown>;
+
 }

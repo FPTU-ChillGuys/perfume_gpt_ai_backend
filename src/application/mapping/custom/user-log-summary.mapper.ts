@@ -8,6 +8,8 @@ export class UserLogSummaryMapper {
       userId: entity.userId,
       logSummary: entity.logSummary,
       featureSnapshot: entity.featureSnapshot,
+      dailyLogSummary: entity.dailyLogSummary,
+      dailyFeatureSnapshot: entity.dailyFeatureSnapshot,
       totalEvents: entity.totalEvents,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt

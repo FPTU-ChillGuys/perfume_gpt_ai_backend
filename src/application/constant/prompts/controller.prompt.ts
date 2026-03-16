@@ -43,12 +43,12 @@ export const conversationTestSystemPrompt = (
 // ==================== Trend Prompts ====================
 
 /**
- * Cung cấp context: dữ liệu tóm tắt log người dùng để phân tích xu hướng.
+ * Cung cấp context yêu cầu phân tích xu hướng.
  * Hành vi phân tích và quy tắc dùng tool được điều khiển hoàn toàn
  * bởi Admin Instruction domain "trend" trong DB.
  */
-export const trendForecastingPrompt = (summaryData: string): string =>
-  `[DỮ LIỆU NHẬT KÝ NGƯỜI DÙNG ĐỂ PHÂN TÍCH XU HƯỚNG]\n${summaryData}`;
+export const trendForecastingPrompt = (contextData: string): string =>
+  `[NGỮ CẢNH YÊU CẦU PHÂN TÍCH XU HƯỚNG]\n${contextData}`;
 
 // ==================== Review Prompts ====================
 

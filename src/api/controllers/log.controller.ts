@@ -201,7 +201,7 @@ export class LogController {
 
 
   @Get('summaries')
-  @ApiOperation({ summary: 'Xem chi tiết tất cả các bản tóm tắt log người dùng' })
+  @ApiOperation({ summary: 'Xem chi tiết tất cả các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'startDate', type: Date })
   @ApiQuery({ name: 'endDate', type: Date, example: new Date() })
@@ -214,9 +214,31 @@ export class LogController {
     return { success: response.success, data: mappedResponse };
   }
 
+  /** Xem 1 bản tóm tắt log user gần nhất, gồm cả overall và daily breakdown */
+  @Get('summaries/detail/:userId')
+  @ApiOperation({ summary: 'Xem 1 bản tóm tắt log user gần nhất, gồm overall và daily breakdown' })
+  @ApiBaseResponse(UserLogSummaryResponse)
+  async getUserLogSummaryDetail(
+    @Param('userId') userId: string
+  ): Promise<BaseResponse<UserLogSummaryResponse>> {
+    const response = await this.userLogService.getUserLogSummaryByUserId(userId);
+
+    if (!response.success || !response.data) {
+      return {
+        success: false,
+        error: response.error
+      };
+    }
+
+    return {
+      success: true,
+      data: UserLogSummaryMapper.toResponse(response.data)
+    };
+  }
+
   /** Xem chi tiết các bản tóm tắt log người dùng */
   @Get('summaries/:userId')
-  @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng' })
+  @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'startDate', type: Date })
   @ApiQuery({ name: 'endDate', type: Date, example: new Date() })
@@ -257,7 +279,7 @@ export class LogController {
   /** Xem báo cáo tổng hợp summary của nhiều người dùng (không lưu DB) */
   @Get('report/summary/aggregate')
   @ApiOperation({
-    summary: 'Tổng hợp summary của nhiều người dùng (runtime only, không lưu DB)'
+    summary: 'Tổng hợp summary của nhiều người dùng (runtime only), gồm overall và daily breakdown'
   })
   @ApiBaseResponse(AggregatedUserLogSummaryResponse)
   async getAggregatedUserSummaryReport(): Promise<
@@ -277,7 +299,9 @@ export class LogController {
     const response = await this.userLogService.saveUserLogSummary(
       userLogRequest.userId,
       userLogRequest.logSummary,
-      userLogRequest.featureSnapshot
+      userLogRequest.featureSnapshot,
+      userLogRequest.dailyLogSummary,
+      userLogRequest.dailyFeatureSnapshot
     );
 
     if (!response.success) {

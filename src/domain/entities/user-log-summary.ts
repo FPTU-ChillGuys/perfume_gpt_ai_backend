@@ -23,6 +23,16 @@ export class UserLogSummary extends Common {
   @Property({ type: 'json', columnType: 'jsonb', nullable: true })
   featureSnapshot?: Record<string, unknown>;
 
+  /** Bản tóm tắt log theo ngày */
+  @ApiProperty({ description: 'Bản tóm tắt log theo ngày', required: false, type: Object })
+  @Property({ type: 'json', columnType: 'jsonb', nullable: true })
+  dailyLogSummary?: Record<string, string>;
+
+  /** Snapshot feature theo ngày */
+  @ApiProperty({ description: 'Feature snapshot theo ngày', required: false, type: Object })
+  @Property({ type: 'json', columnType: 'jsonb', nullable: true })
+  dailyFeatureSnapshot?: Record<string, unknown>;
+
   /** Tổng số event đã đưa vào summary */
   @ApiProperty({ description: 'Tổng số event đã xử lý', default: 0 })
   @Property({ default: 0 })

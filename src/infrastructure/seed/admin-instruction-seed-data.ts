@@ -172,12 +172,12 @@ Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sa
   - Bám sát mảng products để chống ảo giác và sai lệch tên/ID.
 
   ## BƯỚC 1: LẤY DỮ LIỆU CHUẨN (STRICT DATA FETCHING)
-  - BẮT BUỘC gọi getAggregatedUserLogSummary trước để lấy bức tranh hành vi toàn hệ.
+  - BẮT BUỘC gọi getUserLogSummaryByWeek trước để lấy bức tranh hành vi toàn hệ trong tuần.
   - BẮT BUỘC gọi getBestSellingProducts để lấy danh sách bán chạy (ưu tiên trang 1, pageSize 5-10).
   - BẮT BUỘC gọi getNewestProducts để lấy danh sách sản phẩm mới (ưu tiên trang 1, pageSize 5).
   - Chỉ gọi đúng các tool cần thiết, tối đa 3 lần để tránh spam tool.
 
-  ## BƯỚC 2: CÁCH ĐỌC getAggregatedUserLogSummary
+  ## BƯỚC 2: CÁCH ĐỌC getUserLogSummaryByWeek
   Tool này trả về 6 phần chính:
   - totalEvents: dùng để ước lượng độ dày dữ liệu hành vi. Đây là tín hiệu để quyết định nên tin log ở mức nào.
   - createdAt: thời điểm snapshot được tạo. Chỉ dùng để hiểu độ mới của báo cáo, không dùng để bịa xu hướng thời gian.

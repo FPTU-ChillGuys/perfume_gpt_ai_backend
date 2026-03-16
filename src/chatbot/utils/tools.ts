@@ -25,28 +25,34 @@ export class Tools {
     this.getToolsForChatbot = {
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
       // Order tools
       // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
       productDetailTabContent: this.productTool.productDetailTabContent,
-      getUserLogSummaryReport: this.logTool.getUserLogSummaryReport,
+      getAggregatedUserLogSummary: this.logTool.getAggregatedUserLogSummary,
     };
 
     this.getToolsForTrend = {
       getAllProducts: this.productTool.getAllProducts,
-      searchProduct: this.productTool.searchProduct
-    
+      searchProduct: this.productTool.searchProduct,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getAggregatedUserLogSummary : this.logTool.getAggregatedUserLogSummary
     };
 
     this.getToolsForRecomendationAndRepurchase = {
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
       getOrderDetailsWithOrdersByUserId:
         this.orderTool.getOrderDetailsWithOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
       // getUserById: this.profileTool.getUserById,
-      getUserLogSummaryReport: this.logTool.getUserLogSummaryReport,
+      getAggregatedUserLogSummary: this.logTool.getAggregatedUserLogSummary,
       getUserById: this.userTool.getUserById
     };
 
@@ -54,6 +60,8 @@ export class Tools {
       // Product tools
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
       // Order tools
       // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,

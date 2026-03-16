@@ -12,6 +12,7 @@ import {
   VariantMediaResponse,
   VariantStockResponse
 } from 'src/application/dtos/response/product-with-variants.response';
+import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -401,6 +402,155 @@ export class ProductService {
         };
       },
       'Failed to fetch product with variants',
+      true
+    );
+  }
+
+  async getNewestProductsWithVariants(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
+    return await funcHandlerAsync(
+      async () => {
+        const skip = (request.PageNumber - 1) * request.PageSize;
+        const take = request.PageSize;
+
+        const [products, totalCount] = await Promise.all([
+          this.prisma.products.findMany({
+            where: { IsDeleted: false },
+            include: productWithVariantsInclude,
+            skip,
+            take,
+            orderBy: { CreatedAt: 'desc' }
+          }),
+          this.prisma.products.count({ where: { IsDeleted: false } })
+        ]);
+
+        return {
+          success: true,
+          data: new PagedResult<ProductWithVariantsResponse>({
+            items: products.map(mapProductWithVariants),
+            pageNumber: request.PageNumber,
+            pageSize: request.PageSize,
+            totalCount,
+            totalPages: Math.ceil(totalCount / request.PageSize)
+          })
+        };
+      },
+      'Failed to fetch newest products with variants',
+      true
+    );
+  }
+
+  async getBestSellingProducts(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
+    return await funcHandlerAsync(
+      async () => {
+        const skip = (request.PageNumber - 1) * request.PageSize;
+        const take = request.PageSize;
+
+        const groupedByVariant = await this.prisma.orderDetails.groupBy({
+          by: ['VariantId'],
+          _sum: { Quantity: true }
+        });
+
+        if (groupedByVariant.length === 0) {
+          return {
+            success: true,
+            data: new PagedResult<BestSellingProductResponse>({
+              items: [],
+              pageNumber: request.PageNumber,
+              pageSize: request.PageSize,
+              totalCount: 0,
+              totalPages: 0
+            })
+          };
+        }
+
+        const variantIds = groupedByVariant.map((item) => item.VariantId);
+        const variants = await this.prisma.productVariants.findMany({
+          where: {
+            Id: { in: variantIds },
+            IsDeleted: false,
+            Products: { IsDeleted: false }
+          },
+          select: {
+            Id: true,
+            ProductId: true
+          }
+        });
+
+        const variantToProductMap = new Map(
+          variants.map((item) => [item.Id, item.ProductId])
+        );
+
+        const productSoldMap = new Map<string, number>();
+        for (const row of groupedByVariant) {
+          const productId = variantToProductMap.get(row.VariantId);
+          if (!productId) {
+            continue;
+          }
+
+          const soldQty = row._sum.Quantity ?? 0;
+          const current = productSoldMap.get(productId) ?? 0;
+          productSoldMap.set(productId, current + soldQty);
+        }
+
+        const sortedProductSales = Array.from(productSoldMap.entries()).sort(
+          (a, b) => b[1] - a[1]
+        );
+
+        const totalCount = sortedProductSales.length;
+        const pagedProductSales = sortedProductSales.slice(skip, skip + take);
+        const pagedProductIds = pagedProductSales.map(([productId]) => productId);
+
+        if (pagedProductIds.length === 0) {
+          return {
+            success: true,
+            data: new PagedResult<BestSellingProductResponse>({
+              items: [],
+              pageNumber: request.PageNumber,
+              pageSize: request.PageSize,
+              totalCount,
+              totalPages: Math.ceil(totalCount / request.PageSize)
+            })
+          };
+        }
+
+        const products = await this.prisma.products.findMany({
+          where: { Id: { in: pagedProductIds }, IsDeleted: false },
+          include: productWithVariantsInclude
+        });
+
+        const productMap = new Map(products.map((item) => [item.Id, item]));
+        const items: BestSellingProductResponse[] = pagedProductSales
+          .map(([productId, totalSoldQuantity]) => {
+            const product = productMap.get(productId);
+            if (!product) {
+              return null;
+            }
+
+            return {
+              product: mapProductWithVariants(product),
+              totalSoldQuantity
+            };
+          })
+          .filter(
+            (item): item is BestSellingProductResponse => item !== null
+          );
+
+        return {
+          success: true,
+          data: new PagedResult<BestSellingProductResponse>({
+            items,
+            pageNumber: request.PageNumber,
+            pageSize: request.PageSize,
+            totalCount,
+            totalPages: Math.ceil(totalCount / request.PageSize)
+          })
+        };
+      },
+      'Failed to fetch best selling products',
       true
     );
   }

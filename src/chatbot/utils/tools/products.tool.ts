@@ -91,6 +91,62 @@ export class ProductTool {
     }
   });
 
+  getNewestProducts: Tool = tool({
+    description: 'Get the newest products sorted by creation time descending.',
+    inputSchema: z.object({
+      pageNumber: z.number().min(1).optional().default(1),
+      pageSize: z.number().min(1).max(100).optional().default(10)
+    }),
+    execute: async (input) => {
+      return await funcHandlerAsync(
+        async () => {
+          const response = await this.productService.getNewestProductsWithVariants({
+            PageNumber: input.pageNumber,
+            PageSize: input.pageSize,
+            SortOrder: 'desc',
+            IsDescending: true
+          });
+
+          if (!response.success) {
+            return { success: false, error: 'Failed to fetch newest products.' };
+          }
+
+          return { success: true, data: response.data?.items || [] };
+        },
+        'Error occurred while fetching newest products.',
+        true
+      );
+    }
+  });
+
+  getBestSellingProducts: Tool = tool({
+    description: 'Get the best-selling products ranked by total sold quantity.',
+    inputSchema: z.object({
+      pageNumber: z.number().min(1).optional().default(1),
+      pageSize: z.number().min(1).max(100).optional().default(10)
+    }),
+    execute: async (input) => {
+      return await funcHandlerAsync(
+        async () => {
+          const response = await this.productService.getBestSellingProducts({
+            PageNumber: input.pageNumber,
+            PageSize: input.pageSize,
+            SortOrder: 'desc',
+            IsDescending: true
+          });
+
+          if (!response.success) {
+            return { success: false, error: 'Failed to fetch best-selling products.' };
+          }
+
+          return { success: true, data: response.data?.items || [] };
+        },
+        'Error occurred while fetching best-selling products.',
+        true
+      );
+    }
+  });
+
   productDetailTabContent: Tool = tool({
     description:
       'Get detailed information about a product, including its variants, specifications, and reviews.',

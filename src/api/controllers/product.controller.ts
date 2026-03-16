@@ -6,6 +6,7 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
+import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
 import { ExtendApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
@@ -59,6 +60,28 @@ export class ProductController {
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
     return this.productService.getAllProductsWithVariants(request);
+  }
+
+  /** [TEST] Lấy danh sách sản phẩm mới nhất */
+  @Public()
+  @Get('all/newest')
+  @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm mới nhất' })
+  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  async getNewestProductsWithVariants(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
+    return this.productService.getNewestProductsWithVariants(request);
+  }
+
+  /** [TEST] Lấy danh sách sản phẩm bán chạy */
+  @Public()
+  @Get('all/best-sellers')
+  @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm bán chạy' })
+  @ExtendApiBaseResponse(PagedResult<BestSellingProductResponse>)
+  async getBestSellingProducts(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
+    return this.productService.getBestSellingProducts(request);
   }
 
   /** Tìm kiếm sản phẩm bằng semantic search, trả về kèm toàn bộ variants */

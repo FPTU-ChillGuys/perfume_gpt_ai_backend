@@ -180,5 +180,30 @@ export class LogTool {
         }
     });
 
+    /**
+     * Lấy bản tóm tắt tổng hợp hành vi của nhiều user (runtime only, không lưu DB).
+     */
+    getAggregatedUserLogSummary: Tool = tool({
+        description:
+            'Get aggregated rolling log summary across multiple users. ' +
+            'Returns total events, created time, summary text, and merged feature snapshot. ' +
+            'Use this for trend context and high-level behavior analysis.',
+        inputSchema: z.object({}),
+        execute: async () => {
+            return await funcHandlerAsync(
+                async () => {
+                    const response =
+                        await this.userLogService.getAggregatedUserLogSummaryReport();
+                    if (!response.success) {
+                        return { success: false, error: 'Failed to fetch aggregated user log summary.' };
+                    }
+                    return { success: true, data: response.data };
+                },
+                'Error occurred while fetching aggregated user log summary.',
+                true
+            );
+        }
+    });
+
 
 }

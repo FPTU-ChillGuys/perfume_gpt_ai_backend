@@ -289,7 +289,7 @@ export class LogController {
       Boolean(allUserLogRequest.endDate) ||
       Boolean(allUserLogRequest.period);
 
-    return await this.userLogService.getAggregatedUserLogSummaryReport(
+    return await this.userLogService.getUserLogSummary(
       hasTimeFilter ? allUserLogRequest : undefined
     );
   }

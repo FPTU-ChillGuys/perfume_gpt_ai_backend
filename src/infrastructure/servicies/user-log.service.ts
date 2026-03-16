@@ -799,7 +799,7 @@ export class UserLogService {
     });
   }
 
-  async getAggregatedUserLogSummaryReport(
+  async getUserLogSummary(
     allUserLogRequest?: AllUserLogRequest
   ): Promise<
     BaseResponse<UserLogSummaryResponse>
@@ -1122,6 +1122,17 @@ export class UserLogService {
     );
   }
 
-  /** Tong hop log va goi AI, tra ve chuoi ket qua (dung cho controller) */
-  // AI methods moved to UserLogAIService
+  async getAllSummaryByPeriod(
+    period: PeriodEnum,
+  ): Promise<BaseResponse<UserLogSummaryResponse[] | null>> {
+    const normalizedEndDate = endOfDay(convertToUTC(new Date()));
+    const normalizedStartDate = startOfDay(
+      getFirstDateOfPeriod(period, normalizedEndDate)
+    );
+    return await this.getAllUserLogSummary({
+      period,
+      startDate: normalizedStartDate,
+      endDate: normalizedEndDate
+    });
+  }
 }

@@ -32,7 +32,7 @@ export class Tools {
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
       productDetailTabContent: this.productTool.productDetailTabContent,
-      getAggregatedUserLogSummary: this.logTool.getAggregatedUserLogSummary,
+      getUserLogSummary: this.logTool.getUserLogSummary,
     };
 
     this.getToolsForTrend = {
@@ -40,7 +40,7 @@ export class Tools {
       searchProduct: this.productTool.searchProduct,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getAggregatedUserLogSummary : this.logTool.getAggregatedUserLogSummary
+      getUserLogSummaryByWeek : this.logTool.getUserLogSummaryByWeek
     };
 
     this.getToolsForRecomendationAndRepurchase = {
@@ -52,7 +52,7 @@ export class Tools {
         this.orderTool.getOrderDetailsWithOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
       // getUserById: this.profileTool.getUserById,
-      getAggregatedUserLogSummary: this.logTool.getAggregatedUserLogSummary,
+      getUserLogSummary: this.logTool.getUserLogSummary,
       getUserById: this.userTool.getUserById
     };
 

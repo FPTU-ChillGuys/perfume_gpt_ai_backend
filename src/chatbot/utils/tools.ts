@@ -32,7 +32,7 @@ export class Tools {
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
       productDetailTabContent: this.productTool.productDetailTabContent,
-      getUserLogSummary: this.logTool.getUserLogSummary,
+      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId,
     };
 
     this.getToolsForTrend = {
@@ -54,34 +54,6 @@ export class Tools {
       // getUserById: this.profileTool.getUserById,
       getUserLogSummary: this.logTool.getUserLogSummary,
       getUserById: this.userTool.getUserById
-    };
-
-    this.getTools = {
-      // Product tools
-      getAllProducts: this.productTool.getAllProducts,
-      searchProduct: this.productTool.searchProduct,
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
-      // Order tools
-      // getAllOrders: this.orderTool.getAllOrders,
-      getOrdersByUserId: this.orderTool.getOrdersByUserId,
-      // getOrderById: this.orderTool.getOrderById,
-      getOrderDetailsWithOrdersByUserId:
-        this.orderTool.getOrderDetailsWithOrdersByUserId,
-      // getOrderReport: this.orderTool.getOrderReport,
-      // Profile tools
-      getOwnProfile: this.profileTool.getOwnProfile,
-      // Log tools
-      getUserActivityReportPerWeek: this.logTool.getUserActivityReportPerWeek,
-      // getUserActivityReportPerMonth: this.logTool.getUserActivityReportPerMonth,
-      // getUserActivityReportPerYear: this.logTool.getUserActivityReportPerYear,
-      getUserLogSummaryReport: this.logTool.getUserLogSummaryReport,
-      getUserLogSummaries: this.logTool.getUserLogSummaries,
-      // Review tools
-      getReviewsByVariantId: this.reviewTool.getReviewsByVariantId,
-      getReviewStatisticsByVariantId:
-        this.reviewTool.getReviewStatisticsByVariantId,
-      getPagedReviews: this.reviewTool.getPagedReviews
     };
   }
 }

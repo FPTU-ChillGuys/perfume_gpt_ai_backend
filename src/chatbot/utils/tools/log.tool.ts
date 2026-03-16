@@ -160,35 +160,6 @@ export class LogTool {
   });
 
   /**
-   * Lấy danh sách bản tóm tắt hành vi của user (rolling summary).
-   */
-  getUserLogSummaries: Tool = tool({
-    description:
-      'Get the saved rolling log summaries for a user. ' +
-      'Returns the user behavior snapshot including keyword counts, intent distribution, and active hours.',
-    inputSchema: z.object({
-      userId: z.string().describe('The ID of the user')
-    }),
-    execute: async (input) => {
-      return await funcHandlerAsync(
-        async () => {
-          const response =
-            await this.userLogService.getUserLogSummariesByUserId(input.userId);
-          if (!response.success) {
-            return {
-              success: false,
-              error: 'Failed to fetch user log summaries.'
-            };
-          }
-          return { success: true, data: response.data || [] };
-        },
-        'Error occurred while fetching user log summaries.',
-        true
-      );
-    }
-  });
-
-  /**
    * Lấy bản tóm tắt tổng hợp hành vi của nhiều user (runtime only, không lưu DB).
    */
   getUserLogSummary: Tool = tool({
@@ -202,6 +173,34 @@ export class LogTool {
       return await funcHandlerAsync(
         async () => {
           const response = await this.userLogService.getUserLogSummary();
+          if (!response.success) {
+            return {
+              success: false,
+              error: 'Failed to fetch aggregated user log summary.'
+            };
+          }
+          return { success: true, data: response.data };
+        },
+        'Error occurred while fetching aggregated user log summary.',
+        true
+      );
+    }
+  });
+
+  getUserLogSummaryByUserId: Tool = tool({
+    description:
+      'Get the rolling behavior summary report of a user. ' +
+      'Returns a pre-built text summary of their keywords, intents, active hours, and event types. ' +
+      'Use this for personalized recommendations and chatbot context.',
+    inputSchema: z.object({
+      userId: z.string().describe('The ID of the user')
+    }),
+    execute: async (input) => {
+      return await funcHandlerAsync(
+        async () => {
+          const response = await this.userLogService.getUserLogSummaryByUserId(
+            input.userId
+          );
           if (!response.success) {
             return {
               success: false,

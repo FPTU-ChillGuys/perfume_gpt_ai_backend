@@ -198,14 +198,14 @@ export class LogController {
     };
   }
 
-  @CacheTTL(0)
-  @UseInterceptors(CacheInterceptor)
+
   @Get('summaries')
   @ApiOperation({ summary: 'Xem chi tiết tất cả các bản tóm tắt log người dùng' })
   @ApiQuery({ name: 'userId', type: String })
   @ApiQuery({ name: 'startDate', type: Date })
   @ApiQuery({ name: 'endDate', type: Date, example: new Date() })
   @ApiBaseResponse(UserLogSummaryResponse, true)
+  @CacheTTL(1)
   async getAllUserLogsSummaries(): Promise<BaseResponse<UserLogSummaryResponse[]>> {
     const response = await this.userLogService.getAllUserLogSummary();
     const mappedResponse: UserLogSummaryResponse[] =

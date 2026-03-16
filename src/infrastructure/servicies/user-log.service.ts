@@ -543,7 +543,9 @@ export class UserLogService {
     existingSummary.logSummary = logSummary;
     existingSummary.featureSnapshot = featureSnapshot;
     existingSummary.totalEvents = totalEvents;
-    await this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
+    await this.unitOfWork.UserLogSummaryRepo
+      .getEntityManager()
+      .persistAndFlush(existingSummary);
   }
 
   /** Lay tat ca log */
@@ -685,7 +687,9 @@ export class UserLogService {
         existingSummary.logSummary = summary;
         existingSummary.featureSnapshot =
           featureSnapshot || existingSummary.featureSnapshot;
-        await this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
+        await this.unitOfWork.UserLogSummaryRepo
+          .getEntityManager()
+          .persistAndFlush(existingSummary);
         return { success: true, data: existingSummary.logSummary };
       },
       'Failed to save user log summary',
@@ -706,7 +710,9 @@ export class UserLogService {
           return { success: false, error: 'User log summary not found' };
         }
         existingSummary.logSummary = summary;
-        this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
+        await this.unitOfWork.UserLogSummaryRepo
+          .getEntityManager()
+          .persistAndFlush(existingSummary);
         return { success: true, data: existingSummary.logSummary };
 
       },

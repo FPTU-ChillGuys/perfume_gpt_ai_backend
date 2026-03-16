@@ -9,7 +9,6 @@ export class UserLogSummaryMapper {
       logSummary: entity.logSummary,
       featureSnapshot: entity.featureSnapshot,
       totalEvents: entity.totalEvents,
-      lastEventAt: entity.lastEventAt,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt
     });

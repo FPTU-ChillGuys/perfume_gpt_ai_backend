@@ -407,22 +407,70 @@ export class UserLogService {
     counters[key] = (counters[key] || 0) + amount;
   }
 
+  private extractTextFromMetadata(
+    metadata?: Record<string, unknown>
+  ): string[] {
+    if (!metadata) {
+      return [];
+    }
+
+    const pieces: string[] = [];
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    const visit = (value: unknown, depth: number): void => {
+      if (depth > 3 || value === null || value === undefined) {
+        return;
+      }
+
+      if (typeof value === 'string') {
+        const text = value.trim();
+        if (text && !uuidPattern.test(text)) {
+          pieces.push(text);
+        }
+        return;
+      }
+
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        pieces.push(String(value));
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          visit(item, depth + 1);
+        }
+        return;
+      }
+
+      if (typeof value === 'object') {
+        for (const nested of Object.values(value as Record<string, unknown>)) {
+          visit(nested, depth + 1);
+        }
+      }
+    };
+
+    visit(metadata, 0);
+    return pieces;
+  }
+
   async rebuildRollingSummaryForUser(userId: string): Promise<void> {
     if (!userId) {
       return;
     }
 
     const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
-    const lastEventAt = existingSummary?.lastEventAt;
+    const lastSummaryUpdatedAt = existingSummary?.updatedAt;
 
     const events = await this.unitOfWork.EventLogRepo.getEventLogs({
       userId,
-      startDate: lastEventAt || undefined
+      startDate: lastSummaryUpdatedAt || undefined
     });
 
     const newEvents = events
       .filter((event) =>
-        !lastEventAt || event.createdAt.getTime() > lastEventAt.getTime()
+        !lastSummaryUpdatedAt ||
+        event.createdAt.getTime() > lastSummaryUpdatedAt.getTime()
       )
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
@@ -432,13 +480,9 @@ export class UserLogService {
 
     const featureSnapshot = this.normalizeFeatureSnapshot(existingSummary?.featureSnapshot);
     let totalEvents = existingSummary?.totalEvents || 0;
-    let latestEventAt = existingSummary?.lastEventAt;
 
     for (const event of newEvents) {
       totalEvents += 1;
-      latestEventAt = !latestEventAt || latestEventAt < event.createdAt
-        ? event.createdAt
-        : latestEventAt;
 
       this.increaseCounter(featureSnapshot.eventTypeCounts, event.eventType);
       this.increaseCounter(featureSnapshot.hourCounts, String(event.createdAt.getHours()));
@@ -448,12 +492,7 @@ export class UserLogService {
         textParts.push(event.contentText);
       }
 
-      if (typeof event.metadata?.question === 'string') {
-        textParts.push(event.metadata.question as string);
-      }
-      if (typeof event.metadata?.answer === 'string') {
-        textParts.push(event.metadata.answer as string);
-      }
+      textParts.push(...this.extractTextFromMetadata(event.metadata));
 
       const normalizedText = textParts.join(' ').toLowerCase();
       const keywords = tokenizeText(normalizedText);
@@ -472,6 +511,9 @@ export class UserLogService {
       }
       if (event.eventType === EventLogEventType.QUIZ) {
         this.increaseCounter(featureSnapshot.intentCounts, 'quiz_engagement');
+      }
+      if (event.eventType === EventLogEventType.PRODUCT) {
+        this.increaseCounter(featureSnapshot.intentCounts, 'product_interest');
       }
 
       if (/men|male|nam/.test(normalizedText)) {
@@ -492,8 +534,7 @@ export class UserLogService {
         userId,
         logSummary,
         featureSnapshot,
-        totalEvents,
-        lastEventAt: latestEventAt
+        totalEvents
       });
       await this.unitOfWork.UserLogSummaryRepo.insert(newSummary);
       return;
@@ -502,7 +543,6 @@ export class UserLogService {
     existingSummary.logSummary = logSummary;
     existingSummary.featureSnapshot = featureSnapshot;
     existingSummary.totalEvents = totalEvents;
-    existingSummary.lastEventAt = latestEventAt;
     await this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
   }
 
@@ -625,8 +665,7 @@ export class UserLogService {
   async saveUserLogSummary(
     userId: string,
     summary: string,
-    featureSnapshot?: Record<string, unknown>,
-    lastEventAt?: Date
+    featureSnapshot?: Record<string, unknown>
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(
       async () => {
@@ -635,7 +674,6 @@ export class UserLogService {
           const userLogSummary = new UserLogSummary({
             userId,
             logSummary: summary,
-            lastEventAt,
             totalEvents: 0,
             featureSnapshot: featureSnapshot || {}
           });
@@ -645,7 +683,6 @@ export class UserLogService {
         }
 
         existingSummary.logSummary = summary;
-        existingSummary.lastEventAt = lastEventAt;
         existingSummary.featureSnapshot =
           featureSnapshot || existingSummary.featureSnapshot;
         await this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
@@ -669,7 +706,6 @@ export class UserLogService {
           return { success: false, error: 'User log summary not found' };
         }
         existingSummary.logSummary = summary;
-        existingSummary.lastEventAt = endDate;
         this.unitOfWork.UserLogSummaryRepo.upsert(existingSummary);
         return { success: true, data: existingSummary.logSummary };
 
@@ -1003,7 +1039,7 @@ export class UserLogService {
     );
   }
 
-  async getAllUserLogSummary(allUserLogRequest: AllUserLogRequest): Promise<BaseResponse<UserLogSummary[] | null>> {
+  async getAllUserLogSummary(): Promise<BaseResponse<UserLogSummary[] | null>> {
     return funcHandlerAsync(
       async () => {
         const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.find(
@@ -1021,10 +1057,10 @@ export class UserLogService {
     );
   }
 
-  async getAllUserLogSummaryReport(allUserLogRequest: AllUserLogRequest): Promise<BaseResponse<string | null>> {
+  async getAllUserLogSummaryReport(): Promise<BaseResponse<string | null>> {
     return funcHandlerAsync(
       async () => {
-        const summaries = await this.getAllUserLogSummary(allUserLogRequest);
+        const summaries = await this.getAllUserLogSummary();
         if (!summaries.success) {
           return { success: false, error: 'User log summary not found', data: null };
         }

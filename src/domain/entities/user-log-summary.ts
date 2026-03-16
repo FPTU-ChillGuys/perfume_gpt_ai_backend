@@ -23,11 +23,6 @@ export class UserLogSummary extends Common {
   @Property({ type: 'json', columnType: 'jsonb', nullable: true })
   featureSnapshot?: Record<string, unknown>;
 
-  /** Thời điểm event mới nhất đã phản ánh vào summary */
-  @ApiProperty({ description: 'Thời điểm event mới nhất đã được xử lý', required: false })
-  @Property({ nullable: true })
-  lastEventAt?: Date;
-
   /** Tổng số event đã đưa vào summary */
   @ApiProperty({ description: 'Tổng số event đã xử lý', default: 0 })
   @Property({ default: 0 })

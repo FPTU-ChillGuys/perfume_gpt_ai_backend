@@ -22,13 +22,13 @@ export class UserLogAIService {
   }
 
   /** Tong hop log tat ca user theo rolling summary khong dung AI */
-  async summarizeAllUserLogs(request: AllUserLogRequest): Promise<BaseResponse<string>> {
+  async summarizeAllUserLogs(): Promise<BaseResponse<string>> {
     const userIds = await this.userLogService.getAllUserIdsFromLogs();
     for (const userId of userIds) {
       await this.userLogService.rebuildRollingSummaryForUser(userId);
     }
 
-    const summaries = await this.userLogService.getAllUserLogSummary(request);
+    const summaries = await this.userLogService.getAllUserLogSummary();
     if (!summaries.success || !summaries.data) {
       return { success: false, error: 'User rolling summaries not found' };
     }

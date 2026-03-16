@@ -38,7 +38,7 @@ export class TrendService {
     allUserLogRequest: AllUserLogRequest,
     output: ZodObject = searchOutput.schema
   ): Promise<BaseResponse<string>> {
-    const summaries = await this.userLogService.getAllUserLogSummaryReport(allUserLogRequest);
+    const summaries = await this.userLogService.getAllUserLogSummaryReport();
 
     if (!summaries.success) {
       throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {

@@ -35,10 +35,4 @@ export class UserLogSummaryRequest {
   @IsObject()
   featureSnapshot?: Record<string, unknown>;
 
-  /** Thời điểm event mới nhất đã xử lý */
-  @ApiProperty({ description: 'Thời điểm event mới nhất đã xử lý', required: false })
-  @IsOptional()
-  @IsDate()
-  @Type(() => Date)
-  lastEventAt?: Date;
 }

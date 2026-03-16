@@ -19,10 +19,6 @@ export class UserLogSummaryResponse extends CommonResponse {
   @ApiProperty({ description: 'Tổng số event đã xử lý', default: 0 })
   totalEvents: number;
 
-  /** Thời điểm event mới nhất đã xử lý */
-  @ApiProperty({ description: 'Thời điểm event mới nhất đã xử lý', required: false })
-  lastEventAt?: Date;
-
   constructor(init?: Partial<UserLogSummaryResponse>) {
     super();
     Object.assign(this, init);

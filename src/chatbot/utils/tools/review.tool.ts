@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
@@ -6,6 +6,8 @@ import * as z from 'zod';
 
 @Injectable()
 export class ReviewTool {
+    private readonly logger = new Logger(ReviewTool.name);
+
     constructor(private readonly reviewService: ReviewService) { }
 
     /**
@@ -21,6 +23,7 @@ export class ReviewTool {
             variantId: z.string().describe('The ID of the product variant to fetch reviews for')
         }),
         execute: async (input) => {
+            this.logger.log(`[getReviewsByVariantId] called for variantId: ${input.variantId}`);
             return await funcHandlerAsync(
                 async () => {
                     const response = await this.reviewService.getReviewsByVariantId(input.variantId);
@@ -48,6 +51,7 @@ export class ReviewTool {
             variantId: z.string().describe('The ID of the product variant to fetch statistics for')
         }),
         execute: async (input) => {
+            this.logger.log(`[getReviewStatisticsByVariantId] called for variantId: ${input.variantId}`);
             return await funcHandlerAsync(
                 async () => {
                     const response = await this.reviewService.getReviewStatisticByVariantId(input.variantId);
@@ -88,6 +92,7 @@ export class ReviewTool {
             hasImages: z.boolean().optional().describe('Only return reviews that have attached images')
         }),
         execute: async (input) => {
+            this.logger.log(`[getPagedReviews] called`);
             return await funcHandlerAsync(
                 async () => {
                     const response = await this.reviewService.getAllReviews({

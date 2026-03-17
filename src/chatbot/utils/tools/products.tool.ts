@@ -1,8 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
-import {
-  productDetailTabsContent
-} from 'src/application/constant/productDetailTabContent';
+import { productDetailTabsContent } from 'src/application/constant/productDetailTabContent';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
@@ -10,6 +8,8 @@ import * as z from 'zod';
 
 @Injectable()
 export class ProductTool {
+  private readonly logger = new Logger(ProductTool.name);
+
   constructor(private readonly productService: ProductService) {}
 
   getAllProducts: Tool = tool({
@@ -22,6 +22,7 @@ export class ProductTool {
       isDescending: z.boolean().optional().default(false)
     }),
     execute: async (input) => {
+      this.logger.log(`[getAllProducts] called`);
       return await funcHandlerAsync(
         async () => {
           const response = await this.productService.getAllProductsWithVariants(
@@ -33,7 +34,7 @@ export class ProductTool {
               IsDescending: input.isDescending
             }
           );
-          console.log('ProductTool response:', response.data?.items);
+          this.logger.debug(`[getAllProducts] response items count: ${response.data?.items?.length ?? 0}`);
           if (!response.success) {
             return { success: false, error: 'Failed to fetch products.' };
           }
@@ -63,6 +64,7 @@ export class ProductTool {
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
+          this.logger.log(`[searchProduct] called with ${input.searches.length} search(es)`);
           // Tạo array search để search nhiều từ khóa đê tổng hợp
           let results: ProductWithVariantsResponse[] = [];
 
@@ -100,15 +102,21 @@ export class ProductTool {
     execute: async (input) => {
       return await funcHandlerAsync(
         async () => {
-          const response = await this.productService.getNewestProductsWithVariants({
-            PageNumber: input.pageNumber,
-            PageSize: input.pageSize,
-            SortOrder: 'desc',
-            IsDescending: true
-          });
+          this.logger.log(`[getNewestProducts] called`);
+
+          const response =
+            await this.productService.getNewestProductsWithVariants({
+              PageNumber: input.pageNumber,
+              PageSize: input.pageSize,
+              SortOrder: 'desc',
+              IsDescending: true
+            });
 
           if (!response.success) {
-            return { success: false, error: 'Failed to fetch newest products.' };
+            return {
+              success: false,
+              error: 'Failed to fetch newest products.'
+            };
           }
 
           return { success: true, data: response.data?.items || [] };
@@ -126,6 +134,7 @@ export class ProductTool {
       pageSize: z.number().min(1).max(100).optional().default(10)
     }),
     execute: async (input) => {
+      this.logger.log(`[getBestSellingProducts] called`);
       return await funcHandlerAsync(
         async () => {
           const response = await this.productService.getBestSellingProducts({
@@ -136,7 +145,10 @@ export class ProductTool {
           });
 
           if (!response.success) {
-            return { success: false, error: 'Failed to fetch best-selling products.' };
+            return {
+              success: false,
+              error: 'Failed to fetch best-selling products.'
+            };
           }
 
           return { success: true, data: response.data?.items || [] };
@@ -154,6 +166,7 @@ export class ProductTool {
       content: z.enum(['usageAndStorage', 'shippingAndReturn'])
     }),
     execute: async ({ content }) => {
+      this.logger.log(`[productDetailTabContent] called with content: ${content}`);
       return productDetailTabsContent[content];
     }
   });

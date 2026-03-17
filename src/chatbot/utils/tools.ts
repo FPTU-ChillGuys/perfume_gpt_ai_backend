@@ -39,7 +39,7 @@ export class Tools {
     };
 
     this.getToolsForTrend = {
-      getAllProducts: this.productTool.getAllProducts,
+      // getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,

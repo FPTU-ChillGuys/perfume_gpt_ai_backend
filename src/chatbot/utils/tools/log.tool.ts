@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
@@ -7,6 +7,8 @@ import * as z from 'zod';
 
 @Injectable()
 export class LogTool {
+  private readonly logger = new Logger(LogTool.name);
+
   constructor(private readonly userLogService: UserLogService) {}
 
   /**
@@ -26,6 +28,7 @@ export class LogTool {
         .describe('End date in ISO format, e.g. "2025-12-31T23:59:59Z"')
     }),
     execute: async (input) => {
+      this.logger.log(`[getUserActivityReportPerWeek] called for userId: ${input.userId}`);
       return await funcHandlerAsync(
         async () => {
           const response =
@@ -65,6 +68,7 @@ export class LogTool {
         .describe('End date in ISO format, e.g. "2025-12-31T23:59:59Z"')
     }),
     execute: async (input) => {
+      this.logger.log(`[getUserActivityReportPerMonth] called for userId: ${input.userId}`);
       return await funcHandlerAsync(
         async () => {
           const response =
@@ -104,6 +108,7 @@ export class LogTool {
         .describe('End date in ISO format, e.g. "2025-12-31T23:59:59Z"')
     }),
     execute: async (input) => {
+      this.logger.log(`[getUserActivityReportPerYear] called for userId: ${input.userId}`);
       return await funcHandlerAsync(
         async () => {
           const response =

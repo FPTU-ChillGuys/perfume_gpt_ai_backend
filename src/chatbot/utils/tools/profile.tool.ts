@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { ProfileResponse } from 'src/application/dtos/response/profile.response';
 import { ProfileService } from 'src/infrastructure/servicies/profile.service';
@@ -7,6 +7,8 @@ import * as z from 'zod';
 
 @Injectable()
 export class ProfileTool {
+  private readonly logger = new Logger(ProfileTool.name);
+
   constructor(private readonly profileService: ProfileService) {}
 
   getOwnProfile: Tool = tool({
@@ -16,10 +18,11 @@ export class ProfileTool {
       userId: z.string().describe('The ID of the user'),
     }),
     execute: async (input) => {
+      this.logger.log(`[getOwnProfile] called for userId: ${input.userId}`);
       return await funcHandlerAsync(
         async () => {
           const response = await this.profileService.getOwnProfile(input.userId);
-          console.log('ProfileTool - getOwnProfile response:', response.payload);
+          this.logger.debug(`[getOwnProfile] response received for userId: ${input.userId}`);
           if (!response.success) {
             return { success: false, error: 'Failed to fetch profile.' };
           }

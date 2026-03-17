@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UnitOfWork } from 'src/infrastructure/repositories/unit-of-work';
@@ -7,6 +7,8 @@ import * as z from 'zod';
 
 @Injectable()
 export class InventoryTool {
+  private readonly logger = new Logger(InventoryTool.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly unitOfWork: UnitOfWork
@@ -23,6 +25,7 @@ export class InventoryTool {
       'Use this as the primary data source for restock analysis.',
     inputSchema: z.object({}),
     execute: async () => {
+      this.logger.log(`[getInventoryStock] called`);
       return await funcHandlerAsync(
         async () => {
           const stocks = await this.prisma.stocks.findMany({
@@ -67,6 +70,7 @@ export class InventoryTool {
       'Do NOT use this to calculate sales velocity — only use for priority adjustment.',
     inputSchema: z.object({}),
     execute: async () => {
+      this.logger.log(`[getLatestTrendLogs] called`);
       return await funcHandlerAsync(
         async () => {
           const logs = await this.unitOfWork.TrendLogRepo.find(

@@ -342,23 +342,31 @@ export class UserLogService {
     const dailyLogSummary = buildDailyLogSummaryMap(dailyFeatureSnapshot);
 
     if (!existingSummary) {
+      // For new summary, createdAt should be the first event's time
+      const createdAt = newEvents.length > 0
+        ? newEvents[0].createdAt
+        : new Date();
+      
       const newSummary = new UserLogSummary({
         userId,
         logSummary,
         featureSnapshot,
         dailyLogSummary,
         dailyFeatureSnapshot,
-        totalEvents
+        totalEvents,
+        createdAt
       });
       await this.unitOfWork.UserLogSummaryRepo.insert(newSummary);
       return;
     }
 
+    // For existing summary, only update the fields, keep createdAt unchanged
     existingSummary.logSummary = logSummary;
     existingSummary.featureSnapshot = featureSnapshot;
     existingSummary.dailyLogSummary = dailyLogSummary;
     existingSummary.dailyFeatureSnapshot = dailyFeatureSnapshot;
     existingSummary.totalEvents = totalEvents;
+    // updatedAt will be auto-updated by MikroORM
     await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
       existingSummary
     );
@@ -832,16 +840,29 @@ export class UserLogService {
         const aggregatedText = buildRollingSummaryText(mergedSnapshot, totalEvents);
         const dailyLogSummary = buildDailyLogSummaryMap(mergedDailySnapshot);
 
+        // Get earliest createdAt and latest updatedAt from all summaries
+        const createdAt = new Date(
+          Math.min(
+            ...summaries.data.map((s) => s.createdAt?.getTime() || Date.now())
+          )
+        );
+        const updatedAt = new Date(
+          Math.max(
+            ...summaries.data.map((s) => s.updatedAt?.getTime() || Date.now())
+          )
+        );
+
         return {
           success: true,
           data: new UserLogSummaryResponse({
             userId: 'all',
             totalEvents,
-            createdAt: new Date(),
+            createdAt,
             logSummary: aggregatedText,
             dailyLogSummary,
             featureSnapshot: mergedSnapshot,
-            dailyFeatureSnapshot: mergedDailySnapshot
+            dailyFeatureSnapshot: mergedDailySnapshot,
+            updatedAt
           })
         };
       },

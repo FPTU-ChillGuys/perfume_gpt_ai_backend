@@ -405,12 +405,20 @@ export function buildSummaryResponseFromEvents(
 
   const totalEvents = eventLogs.length;
   const dailyLogSummary = buildDailyLogSummaryMap(dailyFeatureSnapshot);
+  
+  const now = new Date();
+  const createdAt =
+    eventLogs.length > 0
+      ? new Date(
+          Math.min(...eventLogs.map((event) => event.createdAt.getTime()))
+        )
+      : now;
   const updatedAt =
     eventLogs.length > 0
       ? new Date(
           Math.max(...eventLogs.map((event) => event.createdAt.getTime()))
         )
-      : new Date();
+      : now;
 
   return new UserLogSummaryResponse({
     userId,
@@ -419,7 +427,7 @@ export function buildSummaryResponseFromEvents(
     dailyLogSummary,
     dailyFeatureSnapshot,
     totalEvents,
-    createdAt: updatedAt,
+    createdAt,
     updatedAt
   });
 }

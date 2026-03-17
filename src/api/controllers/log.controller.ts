@@ -225,8 +225,7 @@ export class LogController {
   /** Xem chi tiết các bản tóm tắt log người dùng */
   @Get('summaries/:userId')
   @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
-  @ApiQuery({ name: 'userId', type: String })
-  @ApiQuery({ name: 'period', required: false })
+  @ApiQuery({ name: 'period', required: false, enum: PeriodEnum })
   @ApiQuery({ name: 'startDate', required: false, type: Date })
   @ApiQuery({ name: 'endDate', required: false, type: Date, example: new Date() })
   @ApiBaseResponse(UserLogSummaryResponse, true)

@@ -496,7 +496,6 @@ model Products {
   DeletedAt         DateTime?
   IsDeleted         Boolean             @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Products__IsDele__6442E2C9")
   UpdatedAt         DateTime?
-  Embedding         Bytes?              @db.VarBinary(4104)
   Gender            String              @default("N'", map: "DF__Products__Gender__607251E5") @db.NVarChar(Max)
   Origin            String              @default("N'", map: "DF__Products__Origin__6166761E") @db.NVarChar(Max)
   ReleaseYear       Int                 @default(0, map: "DF__Products__Releas__625A9A57")

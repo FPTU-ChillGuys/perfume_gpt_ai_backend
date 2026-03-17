@@ -56,17 +56,17 @@ export class InventoryService {
           ...(request.VariantId ? { VariantId: request.VariantId } : {}),
           ...(request.SearchTerm
             ? {
-              ProductVariants: {
-                Products: { Name: { contains: request.SearchTerm } }
+                ProductVariants: {
+                  Products: { Name: { contains: request.SearchTerm } }
+                }
               }
-            }
             : {}),
           ...(request.IsLowStock != null
             ? {
-              ProductVariants: {
-                Stocks: request.IsLowStock ? { isNot: null } : undefined
+                ProductVariants: {
+                  Stocks: request.IsLowStock ? { isNot: null } : undefined
+                }
               }
-            }
             : {})
         };
 
@@ -144,33 +144,33 @@ export class InventoryService {
             : {}),
           ...(request.isExpired != null
             ? {
-              ExpiryDate: request.isExpired
-                ? { lt: new Date() }
-                : { gte: new Date() }
-            }
+                ExpiryDate: request.isExpired
+                  ? { lt: new Date() }
+                  : { gte: new Date() }
+              }
             : {}),
           ...(request.variantSku ||
-            request.productName ||
-            request.volumeMl ||
-            request.concentrationName
+          request.productName ||
+          request.volumeMl ||
+          request.concentrationName
             ? {
-              ProductVariants: {
-                ...(request.variantSku
-                  ? { Sku: { contains: request.variantSku } }
-                  : {}),
-                ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
-                ...(request.productName
-                  ? { Products: { Name: { contains: request.productName } } }
-                  : {}),
-                ...(request.concentrationName
-                  ? {
-                    Concentrations: {
-                      Name: { contains: request.concentrationName }
-                    }
-                  }
-                  : {})
+                ProductVariants: {
+                  ...(request.variantSku
+                    ? { Sku: { contains: request.variantSku } }
+                    : {}),
+                  ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
+                  ...(request.productName
+                    ? { Products: { Name: { contains: request.productName } } }
+                    : {}),
+                  ...(request.concentrationName
+                    ? {
+                        Concentrations: {
+                          Name: { contains: request.concentrationName }
+                        }
+                      }
+                    : {})
+                }
               }
-            }
             : {})
         };
 
@@ -279,14 +279,15 @@ export class InventoryService {
     );
   }
 
-  async getAllInventoryLogs(type?: InventoryLogType): Promise<BaseResponse<InventoryLog[]>> {
+  async getAllInventoryLogs(
+    type?: InventoryLogType
+  ): Promise<BaseResponse<InventoryLog[]>> {
     return funcHandlerAsync(
       async () => {
         const where = type ? { type } : {};
-        const logs = await this.unitOfWork.InventoryLogRepo.find(
-          where,
-          { orderBy: { updatedAt: 'DESC' } }
-        );
+        const logs = await this.unitOfWork.InventoryLogRepo.find(where, {
+          orderBy: { updatedAt: 'DESC' }
+        });
         return { success: true, data: logs };
       },
       'Failed to fetch inventory logs',
@@ -319,7 +320,9 @@ export class InventoryService {
   async saveTrendLog(trendData: string): Promise<void> {
     try {
       const log = new TrendLog({ trendData });
-      await this.unitOfWork.TrendLogRepo.getEntityManager().persistAndFlush(log);
+      await this.unitOfWork.TrendLogRepo.getEntityManager().persistAndFlush(
+        log
+      );
     } catch (err) {
       console.error('Failed to save trend log:', err);
     }
@@ -330,94 +333,96 @@ export class InventoryService {
     if (isDataEmpty(report?.toString())) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
     }
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_INVENTORY
+      );
     const aiResponse = await this.aiHelper.textGenerateFromPrompt(
       inventoryReportPrompt(report.toString()),
       adminPrompt
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
-        service: 'AIHelper'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI inventory report',
+        {
+          service: 'AIHelper'
+        }
+      );
     }
     await this.createInventoryLog(aiResponse.data ?? 'No report generated');
     return Ok(aiResponse.data);
   }
 
-  async generateStructuredAIInventoryReport(): Promise<BaseResponse<AIInventoryReportStructuredResponse>> {
+  async generateStructuredAIInventoryReport(): Promise<
+    BaseResponse<AIInventoryReportStructuredResponse>
+  > {
     const startTime = Date.now();
     const report = await this.createReportFromBatchAndStock();
     if (isDataEmpty(report?.toString())) {
-      return Ok(new AIInventoryReportStructuredResponse({
-        report: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT,
-        generatedAt: new Date(),
-        metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
-      }));
+      return Ok(
+        new AIInventoryReportStructuredResponse({
+          report: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT,
+          generatedAt: new Date(),
+          metadata: new AIResponseMetadata({
+            processingTimeMs: Date.now() - startTime
+          })
+        })
+      );
     }
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_INVENTORY
+      );
     const aiResponse = await this.aiHelper.textGenerateFromPrompt(
       inventoryReportPrompt(report.toString()),
       adminPrompt
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
-        service: 'AIHelper'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI inventory report',
+        {
+          service: 'AIHelper'
+        }
+      );
     }
-    return Ok(new AIInventoryReportStructuredResponse({
-      report: aiResponse.data ?? '',
-      generatedAt: new Date(),
-      metadata: new AIResponseMetadata({ processingTimeMs: Date.now() - startTime })
-    }));
+    return Ok(
+      new AIInventoryReportStructuredResponse({
+        report: aiResponse.data ?? '',
+        generatedAt: new Date(),
+        metadata: new AIResponseMetadata({
+          processingTimeMs: Date.now() - startTime
+        })
+      })
+    );
   }
 
   async analyzeRestockNeeds(): Promise<BaseResponse<any>> {
-    const stockResponse = await this.getInventoryStock(
-      new InventoryStockRequest({ PageNumber: 1, PageSize: 1000 })
-    );
-    const stockItems = stockResponse.payload?.items ?? [];
-    if (stockItems.length === 0) {
-      return Ok('Không có dữ liệu tồn kho để phân tích.');
-    }
-
-    const trendLogsResponse = await this.getLatestTrendLogs(2);
-    const trendLogs = trendLogsResponse.data ?? [];
-    if (trendLogs.length === 0) {
-      return Ok('Không đủ dữ liệu xu hướng để phân tích restock. Vui lòng gọi GET /trends/summary trước.');
-    }
-
-    const latestTrend = trendLogs[0]?.trendData ?? '';
-    const previousTrend = trendLogs[1]?.trendData ?? '(Không có dữ liệu xu hướng trước đó)';
-    const restockPrompt = [
-      '[DỮ LIỆU TỒN KHO HIỆN TẠI]',
-      JSON.stringify(stockItems, null, 2),
-      '',
-      '[XU HƯỚNG MỚI NHẤT]',
-      latestTrend,
-      '',
-      '[XU HƯỚNG TRƯỚC ĐÓ]',
-      previousTrend
-    ].join('\n');
-
-    const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RESTOCK);
+    const adminPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_RESTOCK
+      );
     const aiResponse = await this.aiRestockHelper.textGenerateFromPrompt(
-      restockPrompt,
-      adminPrompt,
+      adminPrompt, // Empty prompt — all context in adminPrompt
+      '',
       Output.object({ schema: restockOutput.schema })
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI restock analysis', {
-        service: 'AIRestockHelper'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI restock analysis',
+        {
+          service: 'AIRestockHelper'
+        }
+      );
     }
 
-    const restockDataStr = typeof aiResponse.data === 'string'
-      ? aiResponse.data
-      : JSON.stringify(aiResponse.data);
-    this.createInventoryLog(restockDataStr, InventoryLogType.RESTOCK)
-      .catch(err => console.error('Failed to save restock log:', err));
+    const restockDataStr =
+      typeof aiResponse.data === 'string'
+        ? aiResponse.data
+        : JSON.stringify(aiResponse.data);
+    this.createInventoryLog(restockDataStr, InventoryLogType.RESTOCK).catch(
+      (err) => console.error('Failed to save restock log:', err)
+    );
 
     return Ok(aiResponse.data);
   }
 }
-

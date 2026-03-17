@@ -8,10 +8,12 @@ import { ReviewModule } from './review.module';
 import { UserModule } from './user.module';
 import { ReviewTool } from 'src/chatbot/utils/tools/review.tool';
 import { UserTool } from 'src/chatbot/utils/tools/user.tool';
+import { InventoryTool } from 'src/chatbot/utils/tools/inventory.tool';
+import { UnitOfWorkModule } from './unit-of-work.module';
 
 @Module({
-  imports: [ProductModule, OrderModule, ProfileModule, UserLogModule, ReviewModule, UserModule],
-  providers: [Tools, ReviewTool, UserTool],
+  imports: [ProductModule, OrderModule, ProfileModule, UserLogModule, ReviewModule, UserModule, UnitOfWorkModule],
+  providers: [Tools, ReviewTool, UserTool, InventoryTool],
   exports: [Tools]
 })
 export class ToolModule { }

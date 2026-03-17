@@ -15,7 +15,8 @@ export class AIHelper {
   constructor(
     private systemPrompt?: string,
     private tools?: ToolSet,
-    private stopWhen?: number
+    private stopWhen?: number,
+    private temperature?: number
   ) {}
 
   async textGenerateFromPrompt(
@@ -32,7 +33,8 @@ export class AIHelper {
         this.tools,
         errorMessage,
         this.stopWhen,
-        output
+        output,
+        this.temperature
       );
       return { success: true, data: text };
     }, 'Failed to generate text from prompt');
@@ -52,7 +54,8 @@ export class AIHelper {
         this.tools,
         errorMessage,
         this.stopWhen,
-        output
+        output,
+        this.temperature
       );
       return { success: true, data: text };
     }, 'Failed to generate text from messages');
@@ -72,7 +75,9 @@ export class AIHelper {
         this.tools,
         this.stopWhen,
         output,
-        errorMessage
+        errorMessage,
+        undefined,
+        this.temperature
       );
       return { success: true, data: stream };
     }, 'Failed to generate text stream from prompt');

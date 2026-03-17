@@ -6,6 +6,7 @@ import { ProfileTool } from './tools/profile.tool';
 import { LogTool } from './tools/log.tool';
 import { ReviewTool } from './tools/review.tool';
 import { UserTool } from './tools/user.tool';
+import { InventoryTool } from './tools/inventory.tool';
 
 @Injectable()
 export class Tools {
@@ -13,6 +14,7 @@ export class Tools {
   getToolsForChatbot: ToolSet;
   getToolsForTrend: ToolSet;
   getToolsForRecomendationAndRepurchase: ToolSet;
+  getToolsForRestock: ToolSet;
 
   constructor(
     private readonly productTool: ProductTool,
@@ -20,7 +22,8 @@ export class Tools {
     private readonly profileTool: ProfileTool,
     private readonly logTool: LogTool,
     private readonly reviewTool: ReviewTool,
-    private readonly userTool: UserTool
+    private readonly userTool: UserTool,
+    private readonly inventoryTool: InventoryTool
   ) {
     this.getToolsForChatbot = {
       getAllProducts: this.productTool.getAllProducts,
@@ -32,7 +35,7 @@ export class Tools {
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
       productDetailTabContent: this.productTool.productDetailTabContent,
-      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId,
+      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId
     };
 
     this.getToolsForTrend = {
@@ -40,7 +43,12 @@ export class Tools {
       searchProduct: this.productTool.searchProduct,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getUserLogSummaryByWeek : this.logTool.getUserLogSummaryByWeek
+      getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek
+    };
+
+    this.getToolsForRestock = {
+      getInventoryStock: this.inventoryTool.getInventoryStock,
+      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs
     };
 
     this.getToolsForRecomendationAndRepurchase = {

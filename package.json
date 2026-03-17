@@ -36,7 +36,8 @@
     "test:integration:watch": "jest --config ./test/jest-integration.json --runInBand --watch",
     "test:integration:cov": "jest --config ./test/jest-integration.json --runInBand --coverage",
     "test:integration:setup": "node test/integration/helpers/create-test-db.js",
-    "bullmq:delete-all-jobs": "ts-node scripts/deleteDataBullScript.ts"
+    "bullmq:delete-all-jobs": "ts-node scripts/deleteDataBullScript.ts",
+    "find-deadcode": "ts-prune"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.13",
@@ -112,6 +113,7 @@
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
+    "ts-prune": "^0.10.3",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { OrderRequest } from 'src/application/dtos/request/order.request';
 import {
@@ -12,6 +12,8 @@ import * as z from 'zod';
 
 @Injectable()
 export class OrderTool {
+  private readonly logger = new Logger(OrderTool.name);
+
   constructor(private readonly orderService: OrderService) {}
 
   getOrdersByUserId: Tool = tool({
@@ -25,13 +27,14 @@ export class OrderTool {
       isDescending: z.boolean().optional().default(false),
     }),
     execute: async (input) => {
+      this.logger.log(`[getOrdersByUserId] called for userId: ${input.userId}`);
       return await funcHandlerAsync(
         async () => {
           const response = await this.orderService.getOrdersByUserId(
             input.userId,
             new OrderRequest()
           );
-          console.log('OrderTool - getOrdersByUserId response:', response.payload?.items);
+          this.logger.debug(`[getOrdersByUserId] response items count: ${response.payload?.items?.length ?? 0}`);
           if (!response.success) {
             return { success: false, error: `Failed to fetch orders for user ${input.userId}.` };
           }
@@ -49,6 +52,7 @@ export class OrderTool {
       orderId: z.string().describe('The ID of the order'),
     }),
     execute: async (input) => {
+      this.logger.log(`[getOrderById] called for orderId: ${input.orderId}`);
       return await funcHandlerAsync(
         async () => {
           const response = await this.orderService.getOrderById(input.orderId);
@@ -71,12 +75,13 @@ export class OrderTool {
       userId: z.string().describe('The ID of the user'),
     }),
     execute: async (input) => {
+      this.logger.log(`[getOrderDetailsWithOrdersByUserId] called for userId: ${input.userId}`);
       return await funcHandlerAsync(
         async () => {
           const response = await this.orderService.getOrderDetailsWithOrdersByUserId(
             input.userId
           );
-          console.log('OrderTool - getOrderDetailsWithOrdersByUserId response:', response.data);
+          this.logger.debug(`[getOrderDetailsWithOrdersByUserId] response data count: ${Array.isArray(response.data) ? response.data.length : 0}`);
           if (!response.success) {
             return { success: false, error: `Failed to fetch order details for user ${input.userId}.` };
           }
@@ -95,12 +100,13 @@ export class OrderTool {
       userId: z.string().describe('The ID of the user'),
     }),
     execute: async (input) => {
+      this.logger.log(`[getOrderReport] called for userId: ${input.userId}`);
       return await funcHandlerAsync(
         async () => {
           const response = await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
             input.userId
           );
-          console.log('OrderTool - getOrderReport response:', response.data);
+          this.logger.debug(`[getOrderReport] response received`);
           if (!response.success) {
             return { success: false, error: `Failed to generate order report for user ${input.userId}.` };
           }

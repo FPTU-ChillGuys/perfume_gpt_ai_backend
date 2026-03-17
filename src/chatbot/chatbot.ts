@@ -16,7 +16,8 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
   tools?: ToolSet,
   errorMessage?: string,
   stopWhen?: number,
-  output?: any
+  output?: any,
+  temperature?: number
 ) {
   let retries = 2;
   while (retries >= 0) {
@@ -27,7 +28,8 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
         system: systemPrompt ? systemPrompt : undefined,
         tools: tools ? tools : undefined,
         stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
-        output: output ? output : undefined
+        output: output ? output : undefined,
+        temperature: temperature
       });
       return result.text;
     } catch (error) {
@@ -52,7 +54,8 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
   tools?: ToolSet,
   errorMessage?: string,
   stopWhen?: number,
-  output?: any
+  output?: any,
+  temperature?: number
 ) {
   let retries = 2;
   while (retries >= 0) {
@@ -64,7 +67,8 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
         system: systemPrompt ? systemPrompt : undefined,
         tools: tools ? tools : undefined,
         stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
-        output: output ? output : undefined
+        output: output ? output : undefined,
+        temperature: temperature
       });
       return result.text;
     } catch (error) {
@@ -90,7 +94,8 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
   stopWhen?: number,
   output?: any,
   errorMessage?: string,
-  onFinish?: (data) => void
+  onFinish?: (data) => void,
+  temperature?: number
 ) {
   const stream = createUIMessageStream({
     execute({ writer }) {
@@ -101,7 +106,8 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
           prompt: prompt,
           tools: tools ? tools : undefined,
           stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
-          output: output ? output : undefined
+          output: output ? output : undefined,
+          temperature: temperature
         });
         writer.merge(result.toUIMessageStream());
       } catch {
@@ -128,7 +134,8 @@ export function streamTextGenerationFromMessagesToResultWithErrorHandler(
   stopWhen?: number,
   output?: any,
   errorMessage?: string,
-  onFinish?: (data) => void
+  onFinish?: (data) => void,
+  temperature?: number
 ) {
   const stream = createUIMessageStream({
     async execute({ writer }) {
@@ -139,7 +146,8 @@ export function streamTextGenerationFromMessagesToResultWithErrorHandler(
           messages: await convertToModelMessages(messages),
           tools: tools ? tools : undefined,
           stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
-          output: output ? output : undefined
+          output: output ? output : undefined,
+          temperature: temperature
         });
         writer.merge(result.toUIMessageStream());
       } catch {

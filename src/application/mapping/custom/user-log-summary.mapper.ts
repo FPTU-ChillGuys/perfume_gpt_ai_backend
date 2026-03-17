@@ -1,17 +1,16 @@
 import { UserLogSummaryResponse } from "src/application/dtos/response/user-log-summary.response";
-import { UserSearchLogResponse } from "src/application/dtos/response/user-search-log.response";
 import { UserLogSummary } from "src/domain/entities/user-log-summary";
-import { UserSearchLog } from "src/domain/entities/user-search.log.entity";
-import { id } from "zod/v4/locales";
 
 export class UserLogSummaryMapper {
   static toResponse(entity: UserLogSummary): UserLogSummaryResponse {
     return new UserLogSummaryResponse({
       id: entity.id,
       userId: entity.userId,
-      startDate: entity.startDate,
-      endDate: entity.endDate,
       logSummary: entity.logSummary,
+      featureSnapshot: entity.featureSnapshot,
+      dailyLogSummary: entity.dailyLogSummary,
+      dailyFeatureSnapshot: entity.dailyFeatureSnapshot,
+      totalEvents: entity.totalEvents,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt
     });

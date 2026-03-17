@@ -7,13 +7,10 @@ import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
-import { UserLog } from 'src/domain/entities/user-log.entity';
-import { UserMessageLog } from 'src/domain/entities/user-message-log.entity';
-import { UserQuizLog } from 'src/domain/entities/user-quiz-log.entity';
-import { UserSearchLog } from 'src/domain/entities/user-search.log.entity';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { TrendLog } from 'src/domain/entities/trend-log.entity';
+import { EventLog } from 'src/domain/entities/event-log.entity';
 
 export const entities = [
   Conversation,
@@ -24,12 +21,9 @@ export const entities = [
   Message,
   QuizAnswer,
   UserLogSummary,
-  UserLog,
-  UserMessageLog,
-  UserQuizLog,
-  UserSearchLog,
   AIAcceptance,
   InventoryLog,
   ReviewLog,
-  TrendLog
+  TrendLog,
+  EventLog
 ];

@@ -3,7 +3,6 @@ import { AdminInstructionRepository } from './admin-instruction.repository';
 import { ConversationRepository } from './conversation.repository';
 import { QuizQuestionAnswerRepository } from './quiz-question-answer.repository';
 import { QuizQuestionRepository } from './quiz-question.repository';
-import { UserLogRepository } from './user-log.repository';
 import { UserLogSummaryRepository } from './user-log-summary.repository';
 import { AIAcceptanceRepository } from './ai-acceptance.repository';
 import { ReviewSummaryLogRepository } from './review-summary.repository';
@@ -12,6 +11,7 @@ import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { TrendLog } from 'src/domain/entities/trend-log.entity';
+import { EventLogRepository } from './event-log.repository';
 
 @Injectable()
 export class UnitOfWork {
@@ -19,7 +19,7 @@ export class UnitOfWork {
     private readonly aiConversationRepository: ConversationRepository,
     private readonly aiQuizQuestionRepository: QuizQuestionRepository,
     private readonly aiQuizQuestionAnswerRepository: QuizQuestionAnswerRepository,
-    private readonly userLogRepository: UserLogRepository,
+    private readonly eventLogRepository: EventLogRepository,
     private readonly reviewSummaryLogRepository: ReviewSummaryLogRepository,
     private readonly userLogSummaryRepository: UserLogSummaryRepository,
     private readonly aiAcceptanceRepository: AIAcceptanceRepository,
@@ -38,8 +38,8 @@ export class UnitOfWork {
   get AIQuizQuestionAnswerRepo(): QuizQuestionAnswerRepository {
     return this.aiQuizQuestionAnswerRepository;
   }
-  get UserLogRepo(): UserLogRepository {
-    return this.userLogRepository;
+  get EventLogRepo(): EventLogRepository {
+    return this.eventLogRepository;
   }
   get ReviewSummaryLogRepo(): ReviewSummaryLogRepository {
     return this.reviewSummaryLogRepository;

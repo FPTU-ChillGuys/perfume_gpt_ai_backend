@@ -1,6 +1,11 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Post, Query, UseInterceptors } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiTags
+} from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import {
@@ -14,11 +19,21 @@ import { UserLogAIService } from 'src/infrastructure/servicies/user-log-ai.servi
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
-import { UserLog } from 'src/domain/entities/user-log.entity';
-import { CacheTTL } from '@nestjs/cache-manager';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import { EventLogQueryRequest } from 'src/application/dtos/request/event-log.request';
+import { EventLog } from 'src/domain/entities/event-log.entity';
+import { EventLogPagedQueryRequest } from 'src/application/dtos/request/event-log.request';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import {
+  EventLogCreateRequest,
+  EventLogSummaryQueryRequest
+} from 'src/application/dtos/request/event-log.request';
+import { EventLogSummaryResponse } from 'src/application/dtos/response/event-log-summary.response';
+import { EventLogTimeSeriesResponse } from 'src/application/dtos/response/event-log-timeseries.response';
+import { PeriodEnum } from 'src/domain/enum/period.enum';
 
 @Role(['admin'])
-@ApiBearerAuth("jwt")
+@ApiBearerAuth('jwt')
 @ApiTags('Logs')
 @Controller('logs')
 export class LogController {
@@ -38,7 +53,10 @@ export class LogController {
   ): Promise<BaseResponse<string>> {
     // Lay va tom tat log nguoi dung
     try {
-      const response = await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
+      const response =
+        await this.userLogService.getReportAndPromptSummaryAllUsersLogs(
+          allUserLogRequest
+        );
 
       return {
         success: response.success,
@@ -68,16 +86,93 @@ export class LogController {
     };
   }
 
-
-
   /** Lấy tất cả log hoạt động người dùng */
   @CacheTTL(0)
-  @Get("all")
+  @Get('all')
   @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng' })
-  @ApiBaseResponse(Array<UserLog>)
-  async getAllUserLogs(
-  ): Promise<BaseResponse<UserLog[]>> {
-    const response = await this.userLogService.getAllLogs();
+  @ApiBaseResponse(Array<EventLog>)
+  async getAllUserLogs(): Promise<BaseResponse<EventLog[]>> {
+    const response = await this.userLogService.getAllEventLogs();
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Lấy event log dạng mới (message/search/quiz) */
+  @CacheTTL(0)
+  @Get('events')
+  @ApiOperation({ summary: 'Lấy event log dạng mới' })
+  @ApiBaseResponse(Array<EventLog>)
+  async getEventLogs(
+    @Query() request: EventLogQueryRequest
+  ): Promise<BaseResponse<EventLog[]>> {
+    const response = await this.userLogService.getEventLogs(request);
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Lấy event log dạng mới có phân trang */
+  @CacheTTL(0)
+  @Get('events/paged')
+  @ApiOperation({ summary: 'Lấy event log dạng mới có phân trang' })
+  @ApiBaseResponse(PagedResult<EventLog>)
+  async getPagedEventLogs(
+    @Query() request: EventLogPagedQueryRequest
+  ): Promise<BaseResponse<PagedResult<EventLog>>> {
+    const response = await this.userLogService.getEventLogsPaged(request);
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Tạo event log theo contract mới */
+  @Post('events')
+  @ApiOperation({ summary: 'Tạo event log theo contract mới' })
+  @ApiBody({ type: EventLogCreateRequest })
+  @ApiBaseResponse(String)
+  async createEventLog(
+    @Body() request: EventLogCreateRequest
+  ): Promise<BaseResponse<{ id: string }>> {
+    const response = await this.userLogService.createEventLog(request);
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Thống kê nhanh event log cho dashboard */
+  @Get('events/summary')
+  @ApiOperation({ summary: 'Thống kê nhanh event log cho dashboard' })
+  @ApiBaseResponse(EventLogSummaryResponse)
+  async getEventLogsSummary(
+    @Query() request: EventLogSummaryQueryRequest
+  ): Promise<BaseResponse<EventLogSummaryResponse>> {
+    const response = await this.userLogService.getEventLogsSummary(request);
+
+    return {
+      success: response.success,
+      data: response.data
+    };
+  }
+
+  /** Thống kê time-series event log cho dashboard chart */
+  @Get('events/summary/timeseries')
+  @ApiOperation({
+    summary: 'Thống kê time-series event log cho dashboard chart'
+  })
+  @ApiBaseResponse(EventLogTimeSeriesResponse)
+  async getEventLogsTimeSeries(
+    @Query() request: EventLogSummaryQueryRequest
+  ): Promise<BaseResponse<EventLogTimeSeriesResponse>> {
+    const response = await this.userLogService.getEventLogsTimeSeries(request);
 
     return {
       success: response.success,
@@ -86,13 +181,16 @@ export class LogController {
   }
 
   /** Lấy tất cả log hoạt động người dùng theo khoảng thời gian */
-  @Get("all/period")
-  @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng theo khoảng thời gian' })
-  @ApiBaseResponse(Array<UserLog>)
+  @Get('all/period')
+  @ApiOperation({
+    summary: 'Lấy tất cả log hoạt động người dùng theo khoảng thời gian'
+  })
+  @ApiBaseResponse(Array<EventLog>)
   async getUserLogsWithPeriod(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<UserLog[]>> {
-    const response = await this.userLogService.getUserLogsWithPeriod(allUserLogRequest);
+  ): Promise<BaseResponse<EventLog[]>> {
+    const response =
+      await this.userLogService.getEventLogsWithPeriod(allUserLogRequest);
 
     return {
       success: response.success,
@@ -100,75 +198,55 @@ export class LogController {
     };
   }
 
-  /** Tóm tắt log người dùng bằng AI */
-  @Get('summarize')
-  @ApiOperation({ summary: 'Tóm tắt log người dùng bằng AI' })
-  @ApiBaseResponse(String)
-  async summarizeLogs(
-    @Query() userLogRequest: UserLogRequest
-  ): Promise<BaseResponse<string>> {
-    return this.userLogAIService.summarizeUserLogs(userLogRequest);
-  }
 
-  /** Tóm tắt log của tất cả người dùng bằng AI (chú ý: có thể mất thời gian và không lưu vào DB) */
-  @Get('summarize/all')
-  @ApiOperation({ summary: 'Tóm tắt log tất cả người dùng bằng AI' })
-  @ApiBaseResponse(String)
-  async summarizeAllLogs(
+  @Get('summaries')
+  @ApiOperation({ summary: 'Xem chi tiết tất cả các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
+  @ApiQuery({ name: 'period', required: false })
+  @ApiQuery({ name: 'startDate', required: false, type: Date })
+  @ApiQuery({ name: 'endDate', required: false, type: Date })
+  @ApiBaseResponse(UserLogSummaryResponse, true)
+  @CacheTTL(1)
+  async getAllUserLogsSummaries(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<string>> {
-    return this.userLogAIService.summarizeAllUserLogs(allUserLogRequest);
-  }
+  ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
+    const hasTimeFilter =
+      Boolean(allUserLogRequest.startDate) ||
+      Boolean(allUserLogRequest.endDate) ||
+      Boolean(allUserLogRequest.period);
 
-  @Cron(CronExpression.EVERY_WEEK)
-  async summarizeLogsPerWeekWithCronJob(): Promise<BaseResponse<string>> {
-    await this.userLogAIService.summarizePerWeek();
-    return Ok('Scheduled task completed.');
-  }
+    const response = await this.userLogService.getAllUserLogSummary(
+      hasTimeFilter ? allUserLogRequest : undefined
+    );
 
-  @Get('summarize/weekly/manual')
-  @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tuần (thủ công)' })
-  @ApiBaseResponse(String)
-  async summaryLogsPerWeekManually(): Promise<BaseResponse<string>> {
-    await this.userLogAIService.summarizePerWeek();
-    return Ok('Manual log summarization completed.');
-  }
-
-  @Get('summarize/month/manual')
-  @ApiOperation({ summary: 'Tóm tắt log người dùng hàng tháng (thủ công)' })
-  @ApiBaseResponse(String)
-  async summaryLogsPerMonthManually(): Promise<BaseResponse<string>> {
-    await this.userLogAIService.summarizePerMonth();
-    return Ok('Manual log summarization completed.');
-  }
-
-  @Get('summarize/year/manual')
-  @ApiOperation({ summary: 'Tóm tắt log người dùng hàng năm (thủ công)' })
-  @ApiBaseResponse(String)
-  async summaryLogsPerYearManually(): Promise<BaseResponse<string>> {
-    await this.userLogAIService.summarizePerYear();
-    return Ok('Manual log summarization completed.');
+    return { success: response.success, data: response.data ?? [] };
   }
 
 
   /** Xem chi tiết các bản tóm tắt log người dùng */
-  @Get('summaries')
-  @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng' })
-  @ApiQuery({ name: 'userId', type: String })
-  @ApiQuery({ name: 'startDate', type: Date })
-  @ApiQuery({ name: 'endDate', type: Date, example: new Date() })
+  @Get('summaries/:userId')
+  @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
+  @ApiQuery({ name: 'period', required: false, enum: PeriodEnum })
+  @ApiQuery({ name: 'startDate', required: false, type: Date })
+  @ApiQuery({ name: 'endDate', required: false, type: Date, example: new Date() })
   @ApiBaseResponse(UserLogSummaryResponse, true)
   async getUserLogsSummariesById(
-    @Query('userId') userId: string,
-    @Query('endDate') endDate: Date,
-    @Query('startDate') startDate: Date
+    @Param('userId') userId: string,
+    @Query('period') period?: PeriodEnum,
+    @Query('endDate') endDate?: Date,
+    @Query('startDate') startDate?: Date
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
-    const response = await this.userLogService.getUserLogSummariesByUserId(
+    const singleResponse = await this.userLogService.getUserLogSummaryByUserId(
       userId,
+      period,
       startDate,
       endDate
     );
-    return response;
+
+    return {
+      success: singleResponse.success,
+      error: singleResponse.error,
+      data: singleResponse.data ? [singleResponse.data] : []
+    };
   }
 
   /** Xem báo cáo tóm tắt log người dùng theo ID */
@@ -191,6 +269,30 @@ export class LogController {
     return response;
   }
 
+  /** Xem báo cáo tổng hợp summary của nhiều người dùng (không lưu DB) */
+  @Get('report/summary/aggregate')
+  @ApiOperation({
+    summary: 'Tổng hợp summary của nhiều người dùng (runtime only), gồm overall và daily breakdown'
+  })
+  @ApiQuery({ name: 'period', required: false })
+  @ApiQuery({ name: 'startDate', required: false, type: Date })
+  @ApiQuery({ name: 'endDate', required: false, type: Date })
+  @ApiBaseResponse(UserLogSummaryResponse)
+  async getAggregatedUserSummaryReport(
+    @Query() allUserLogRequest: AllUserLogRequest
+  ): Promise<
+    BaseResponse<UserLogSummaryResponse>
+  > {
+    const hasTimeFilter =
+      Boolean(allUserLogRequest.startDate) ||
+      Boolean(allUserLogRequest.endDate) ||
+      Boolean(allUserLogRequest.period);
+
+    return await this.userLogService.getUserLogSummary(
+      hasTimeFilter ? allUserLogRequest : undefined
+    );
+  }
+
   /** Tạo bản tóm tắt log người dùng thủ công */
   @Post()
   @ApiOperation({ summary: 'Tạo bản tóm tắt log người dùng thủ công' })
@@ -201,9 +303,10 @@ export class LogController {
   ): Promise<BaseResponse<string>> {
     const response = await this.userLogService.saveUserLogSummary(
       userLogRequest.userId,
-      userLogRequest.startDate,
-      userLogRequest.endDate,
-      userLogRequest.logSummary
+      userLogRequest.logSummary,
+      userLogRequest.featureSnapshot,
+      userLogRequest.dailyLogSummary,
+      userLogRequest.dailyFeatureSnapshot
     );
 
     if (!response.success) {

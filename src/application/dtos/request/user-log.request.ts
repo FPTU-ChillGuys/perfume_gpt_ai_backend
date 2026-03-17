@@ -12,9 +12,10 @@ export class UserLogRequest {
   userId: string;
 
   /** Khoảng thời gian lọc (weekly, monthly, yearly) */
-  @ApiProperty({ description: 'Khoảng thời gian lọc', enum: PeriodEnum })
+  @ApiProperty({ description: 'Khoảng thời gian lọc', enum: PeriodEnum, required: false })
+  @IsOptional()
   @IsEnum(PeriodEnum)
-  period: PeriodEnum;
+  period: PeriodEnum = PeriodEnum.MONTHLY;
 
   /** Ngày kết thúc */
   @ApiProperty({ description: 'Ngày kết thúc', default: endOfDay(new Date()) })
@@ -37,15 +38,16 @@ export class UserLogRequest {
 /** Request lấy log hành vi tất cả người dùng */
 export class AllUserLogRequest {
   /** Khoảng thời gian lọc */
-  @ApiProperty({ description: 'Khoảng thời gian lọc', enum: PeriodEnum })
+  @ApiProperty({ description: 'Khoảng thời gian lọc', enum: PeriodEnum, required: false })
+  @IsOptional()
   @IsEnum(PeriodEnum)
-  period: PeriodEnum;
+  period: PeriodEnum = PeriodEnum.MONTHLY;
 
   /** Ngày kết thúc */
   @ApiProperty({ description: 'Ngày kết thúc' })
   @IsDate()
   @Type(() => Date)
-  endDate: Date;
+  endDate: Date = endOfDay(new Date());
 
   /** Ngày bắt đầu (tùy chọn) */
   @ApiProperty({ description: 'Ngày bắt đầu', required: false })
@@ -57,4 +59,11 @@ export class AllUserLogRequest {
   constructor(init?: Partial<AllUserLogRequest>) {
     Object.assign(this, init);
   }
+}
+
+export class AllUserLogWithForceRefreshRequest extends AllUserLogRequest {
+  /** Bắt buộc làm mới cache */
+  @ApiProperty({ description: 'Bắt buộc làm mới cache', default: false })
+  @IsOptional()
+  forceRefresh: boolean = false;
 }

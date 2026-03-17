@@ -8,6 +8,7 @@ export enum QueueName {
   AI_ACCEPTANCE_QUEUE = 'ai_acceptance_queue',
   ADMIN_INSTRUCTION_QUEUE = 'admin_instruction_queue',
   QUIZ_QUEUE = 'quiz_queue',
+  USER_LOG_SUMMARY_QUEUE = 'user_log_summary_queue',
 }
 
 export enum ConversationJobName {
@@ -16,4 +17,8 @@ export enum ConversationJobName {
 
 export enum QuizJobName {
      ADD_QUIZ_QUESTION_AND_ANSWER = 'add_quiz_question_and_answer',
+}
+
+export enum UserLogSummaryJobName {
+  UPDATE_ROLLING_SUMMARY = 'update_rolling_summary',
 }

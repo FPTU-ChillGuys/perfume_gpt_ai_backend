@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, Req, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
@@ -6,6 +6,7 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
+import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
 import { ExtendApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
@@ -14,6 +15,7 @@ import { getTokenPayloadFromRequest } from 'src/infrastructure/utils/extract-tok
 import { v4 as uuidv4 } from 'uuid';
 import { SearchRequest } from 'src/application/dtos/request/search.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dtos/request/product-log.request';
 
 @ApiTags('Products')
 @Controller('products')
@@ -46,7 +48,6 @@ export class ProductController {
       const anonymousUserId = uuidv4();
       await this.userLog.addSearchLogToUserLog(anonymousUserId, request.searchText);
     }
-    await this.userLog.addSearchLogToUserLog(userId!, request.searchText);
     return result;
   }
 
@@ -59,6 +60,28 @@ export class ProductController {
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
     return this.productService.getAllProductsWithVariants(request);
+  }
+
+  /** [TEST] Lấy danh sách sản phẩm mới nhất */
+  @Public()
+  @Get('all/newest')
+  @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm mới nhất' })
+  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  async getNewestProductsWithVariants(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
+    return this.productService.getNewestProductsWithVariants(request);
+  }
+
+  /** [TEST] Lấy danh sách sản phẩm bán chạy */
+  @Public()
+  @Get('all/best-sellers')
+  @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm bán chạy' })
+  @ExtendApiBaseResponse(PagedResult<BestSellingProductResponse>)
+  async getBestSellingProducts(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
+    return this.productService.getBestSellingProducts(request);
   }
 
   /** Tìm kiếm sản phẩm bằng semantic search, trả về kèm toàn bộ variants */
@@ -91,6 +114,44 @@ export class ProductController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string
   ): Promise<BaseResponse<ProductWithVariantsResponse>> {
     return this.productService.getProductWithVariants(id);
+  }
+
+  /** Ghi log khi người dùng click vào một sản phẩm hoặc variant */
+  @Public()
+  @Post('log/view')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ghi log khi người dùng xem / click vào product hoặc variant' })
+  async logProductView(
+    @Req() req: Request,
+    @Body() body: ProductViewLogRequest
+  ): Promise<BaseResponse<{ id: string }>> {
+    const userId = getTokenPayloadFromRequest(req)?.id ?? uuidv4();
+    const viewInfo = await this.productService.resolveProductViewInfo(
+      body.productId,
+      body.variantId
+    );
+    const id = await this.userLog.addProductViewLog(
+      userId,
+      body.productId,
+      body.variantId,
+      viewInfo.productName,
+      viewInfo.variantName
+    );
+    return { success: true, data: { id } };
+  }
+
+  /** Ghi log từ khóa tìm kiếm (chỉ log, không thực hiện tìm kiếm) */
+  @Public()
+  @Post('log/search')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ghi log từ khóa tìm kiếm (không thực hiện tìm kiếm)' })
+  async logSearchText(
+    @Req() req: Request,
+    @Body() body: SearchTextLogRequest
+  ): Promise<BaseResponse<{ id: string }>> {
+    const userId = getTokenPayloadFromRequest(req)?.id ?? uuidv4();
+    const id = await this.userLog.addSearchTextLog(userId, body.searchText);
+    return { success: true, data: { id } };
   }
 }
 

@@ -44,7 +44,7 @@ const aiRecommendationProvider: Provider = {
 
 const aiRestockProvider: Provider = {
   provide: AI_RESTOCK_HELPER,
-  useFactory: (tools: Tools) => new AIHelper(SYSTEM_PROMPT, tools.getToolsForTrend, 10),
+  useFactory: (tools: Tools) => new AIHelper(SYSTEM_PROMPT, tools.getToolsForRestock, 10, 0),
   inject: [Tools]
 };
 

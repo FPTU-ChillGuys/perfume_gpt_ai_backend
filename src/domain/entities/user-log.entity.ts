@@ -11,10 +11,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { UserMessageLog } from './user-message-log.entity';
 import { UserQuizLog } from './user-quiz-log.entity';
 import { UserSearchLog } from './user-search.log.entity';
-import { UserLogRepository } from 'src/infrastructure/repositories/user-log.repository';
 
 /** Entity lưu log hành vi người dùng (tin nhắn, quiz, tìm kiếm) */
-@Entity({repository: () => UserLogRepository})
+@Entity()
 export class UserLog extends Common {
   /** ID người dùng (có thể null cho log ẩn danh) */
   @ApiProperty({ description: 'ID người dùng', type: 'string', nullable: true })

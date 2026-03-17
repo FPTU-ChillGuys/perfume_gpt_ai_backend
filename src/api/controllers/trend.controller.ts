@@ -2,7 +2,7 @@ import { Body, Controller, Get, Inject, Param, Query, Req, UseInterceptors } fro
 import { Request } from 'express';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
-import { AllUserLogRequest } from 'src/application/dtos/request/user-log.request';
+import { AllUserLogRequest, AllUserLogWithForceRefreshRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { AITrendForecastStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
@@ -74,17 +74,16 @@ export class TrendController {
   // @UseInterceptors(CacheInterceptor)
   async createProductTrendJob(
     @Req() request: Request,
-    @Query() allUserLogRequest: AllUserLogRequest,
-    @Query('forceRefresh') forceRefresh?: boolean
+    @Query() allUserLogWithForceRefreshRequest: AllUserLogWithForceRefreshRequest,
   ): Promise<BaseResponse<{ jobId: string }>> {
     return createBackgroundJob(
       this.cacheManager,
-      () => this.getProductFromTrend(allUserLogRequest),
+      () => this.getProductFromTrend(allUserLogWithForceRefreshRequest),
       {
         type: 'trend_job',
         cacheKeyFactory: (jobId) => `trend_job_${jobId}`,
         ttlMilliseconds: cachingTrendTTL,
-        forceRefresh: forceRefresh === true || String(forceRefresh) === 'true',
+        forceRefresh: allUserLogWithForceRefreshRequest.forceRefresh === true || String(allUserLogWithForceRefreshRequest.forceRefresh) === 'true',
         cacheByRequest: true
       },
       request

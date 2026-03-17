@@ -37,6 +37,47 @@ type ReviewWithRelations = Prisma.ReviewsGetPayload<{
   include: typeof reviewInclude;
 }>;
 
+type ReviewStatus = 'Pending' | 'Approved' | 'Rejected';
+
+function deriveReviewStatus(review: Pick<ReviewWithRelations, 'ModeratedAt' | 'ModerationReason'>): ReviewStatus {
+  if (!review.ModeratedAt) {
+    return 'Pending';
+  }
+  if (review.ModerationReason && review.ModerationReason.trim().length > 0) {
+    return 'Rejected';
+  }
+  return 'Approved';
+}
+
+function buildReviewStatusWhere(status?: string): Prisma.ReviewsWhereInput {
+  switch (status) {
+    case 'Pending':
+      return { ModeratedAt: null };
+    case 'Approved':
+      return {
+        AND: [
+          { ModeratedAt: { not: null } },
+          {
+            OR: [
+              { ModerationReason: null },
+              { ModerationReason: '' },
+            ],
+          },
+        ],
+      };
+    case 'Rejected':
+      return {
+        AND: [
+          { ModeratedAt: { not: null } },
+          { ModerationReason: { not: null } },
+          { NOT: { ModerationReason: '' } },
+        ],
+      };
+    default:
+      return {};
+  }
+}
+
 function buildVariantName(review: ReviewWithRelations): string {
   const v = review.OrderDetails.ProductVariants;
   return `${v.Products.Name} ${v.VolumeMl}ml ${v.Concentrations.Name}`;
@@ -54,7 +95,7 @@ function mapToReviewResponse(review: ReviewWithRelations): ReviewResponse {
     variantName: buildVariantName(review),
     rating: review.Rating,
     comment: review.Comment,
-    status: review.Status as 'Pending' | 'Approved' | 'Rejected',
+    status: deriveReviewStatus(review),
     images: review.Media.map(
       (m): MediaResponse => ({
         id: m.Id,
@@ -83,7 +124,7 @@ function mapToReviewListItemResponse(
     variantId: review.OrderDetails.VariantId,
     variantName: buildVariantName(review),
     rating: review.Rating,
-    status: review.Status as 'Pending' | 'Approved' | 'Rejected',
+    status: deriveReviewStatus(review),
     commentPreview: review.Comment.substring(0, 100),
     imageCount: review.Media.length,
     createdAt: review.CreatedAt.toISOString()
@@ -110,7 +151,7 @@ export class ReviewService {
             ? { OrderDetails: { VariantId: request.VariantId } }
             : {}),
           ...(request.UserId ? { UserId: request.UserId } : {}),
-          ...(request.Status ? { Status: request.Status } : {}),
+          ...buildReviewStatusWhere(request.Status),
           ...(request.MinRating || request.MaxRating
             ? {
               Rating: {

@@ -11,25 +11,33 @@ import {
 } from 'src/application/dtos/response/ai-structured.response';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import {
-  ADVANCED_MATCHING_SYSTEM_PROMPT,
   trendForecastingPrompt,
   INSTRUCTION_TYPE_TREND
 } from 'src/application/constant/prompts';
-import { isDataEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/utils/insufficient-data';
 import { convertSearchOutputToProductResponse, searchOutput } from 'src/chatbot/utils/output/search.output';
 import { productOutput } from 'src/chatbot/utils/output/product.output';
 import { AIHelper } from '../helpers/ai.helper';
 import { AI_TREND_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
-import { UserLogService } from './user-log.service';
 import { InventoryService } from './inventory.service';
+
+function buildTrendAnalysisContext(
+  allUserLogRequest: AllUserLogRequest
+): string {
+  const context = {
+    period: allUserLogRequest.period ?? 'monthly',
+    startDate: allUserLogRequest.startDate?.toISOString() ?? null,
+    endDate: allUserLogRequest.endDate?.toISOString() ?? null
+  };
+
+  return JSON.stringify(context, null, 2);
+}
 
 @Injectable()
 export class TrendService {
   constructor(
     @Inject(AI_TREND_HELPER) private readonly aiHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
-    private readonly userLogService: UserLogService,
     private readonly inventoryService: InventoryService
   ) {}
 
@@ -38,17 +46,9 @@ export class TrendService {
     allUserLogRequest: AllUserLogRequest,
     output: ZodObject = searchOutput.schema
   ): Promise<BaseResponse<string>> {
-    const summaries = await this.userLogService.getAllUserLogSummaryReport(allUserLogRequest);
-
-    if (!summaries.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
-        service: 'UserLogService',
-        period: allUserLogRequest.period,
-        endpoint: 'TrendService.generateTrendSummary'
-      });
-    }
-
-    const trendPrompt = trendForecastingPrompt(summaries.data ?? '');
+    const trendPrompt = trendForecastingPrompt(
+      buildTrendAnalysisContext(allUserLogRequest)
+    );
     const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_TREND);
 
     const trendResponse = await this.aiHelper.textGenerateFromPrompt(
@@ -96,50 +96,12 @@ export class TrendService {
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<AITrendForecastStructuredResponse>> {
     const startTime = Date.now();
-
-    const reportAndPromptSummary =
-      await this.userLogService.getReportAndPromptSummaryAllUsersLogs(allUserLogRequest);
-
-    if (!reportAndPromptSummary.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to summarize user logs', {
-        service: 'UserLogService',
-        period: allUserLogRequest.period,
-        endpoint: 'TrendService.generateStructuredTrendForecast'
-      });
-    }
-
-    if (isDataEmpty(reportAndPromptSummary.data?.prompt)) {
-      const processingTimeMs = Date.now() - startTime;
-      const period = allUserLogRequest.period ?? 'custom';
-      return {
-        success: true,
-        data: new AITrendForecastStructuredResponse({
-          forecast: INSUFFICIENT_DATA_MESSAGES.TREND_FORECAST,
-          period: period.toString(),
-          analyzedLogCount: 0,
-          generatedAt: new Date(),
-          metadata: new AIResponseMetadata({ processingTimeMs })
-        })
-      };
-    }
-
-    const reportResponse = await this.aiHelper.textGenerateFromPrompt(
-      `${reportAndPromptSummary.data!.prompt}`
+    const trendPrompt = trendForecastingPrompt(
+      buildTrendAnalysisContext(allUserLogRequest)
     );
-
-    if (!reportResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', {
-        service: 'AIHelper',
-        period: allUserLogRequest.period,
-        endpoint: 'TrendService.generateStructuredTrendForecast'
-      });
-    }
-
-    const trendPrompt = trendForecastingPrompt(reportResponse.data ?? '');
     const adminPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_TREND);
-    const trendSystemPrompt = `${ADVANCED_MATCHING_SYSTEM_PROMPT}\n${adminPrompt}`;
 
-    const trendResponse = await this.aiHelper.textGenerateFromPrompt(trendPrompt, trendSystemPrompt);
+    const trendResponse = await this.aiHelper.textGenerateFromPrompt(trendPrompt, adminPrompt);
 
     if (!trendResponse.success) {
       throw new InternalServerErrorWithDetailsException('Failed to get AI trend response', {

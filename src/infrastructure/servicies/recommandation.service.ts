@@ -14,6 +14,8 @@ import { AI_RECOMMENDATION_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
 import { EmailService, EmailProduct, EmailTemplate } from './mail.service';
 import { UserService } from './user.service';
+import { OrderService } from './order.service';
+import { ProductService } from './product.service';
 
 @Injectable()
 export class RecommendationService {
@@ -24,8 +26,34 @@ export class RecommendationService {
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userService: UserService,
     private readonly emailService: EmailService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly orderService: OrderService,
+    private readonly productService: ProductService
   ) { }
+
+  private async hasPurchaseHistory(userId: string): Promise<boolean> {
+    const orderResponse = await this.orderService.getOrderDetailsWithOrdersByUserId(userId);
+    return Boolean(orderResponse.success && (orderResponse.data?.length ?? 0) > 0);
+  }
+
+  private async buildNoPurchaseFallbackResponse(): Promise<string> {
+    const newestProductsResponse = await this.productService.getNewestProductsWithVariants({
+      PageNumber: 1,
+      PageSize: 5,
+      SortOrder: 'desc',
+      IsDescending: true
+    });
+
+    const products = newestProductsResponse.success
+      ? (newestProductsResponse.data?.items ?? [])
+      : [];
+
+    return JSON.stringify({
+      message:
+        'Chúng tôi rất trân trọng sự quan tâm của Quý khách. Hiện tại hệ thống chưa ghi nhận đơn hàng trước đó, nên chúng tôi xin gửi một số gợi ý mở đầu để Quý khách khám phá phong cách hương thơm phù hợp nhất.',
+      products
+    });
+  }
 
   private async generateAIText(
     prompt: string,
@@ -70,7 +98,17 @@ export class RecommendationService {
     return Ok(text);
   }
 
-  async generateRepurchaseText(userId: string): Promise<BaseResponse<string>> {
+  async generateRepurchaseText(
+    userId: string,
+    hasPurchaseHistoryOverride?: boolean
+  ): Promise<BaseResponse<string>> {
+    const hasPurchaseHistory = hasPurchaseHistoryOverride ?? (await this.hasPurchaseHistory(userId));
+
+    if (!hasPurchaseHistory) {
+      const fallback = await this.buildNoPurchaseFallbackResponse();
+      return Ok(fallback);
+    }
+
     const promptResult = await buildCombinedPromptV5(
       INSTRUCTION_TYPE_REPURCHASE,
       this.adminInstructionService,
@@ -132,6 +170,8 @@ export class RecommendationService {
 
   async sendRepurchase(userId: string): Promise<boolean> {
     try {
+      const hasPurchaseHistory = await this.hasPurchaseHistory(userId);
+
       const userInfo = await this.userService.getUserEmailInfo(userId);
       if (!userInfo.success || !userInfo.payload) {
         this.logger.error(`Failed to get user info for user ${userId}`);
@@ -139,7 +179,7 @@ export class RecommendationService {
       }
       const { email, userName } = userInfo.payload;
 
-      const result = await this.generateRepurchaseText(userId);
+      const result = await this.generateRepurchaseText(userId, hasPurchaseHistory);
       if (!result.success) {
         this.logger.error(`Failed to generate repurchase for user ${userId}`);
         return false;
@@ -148,18 +188,33 @@ export class RecommendationService {
       const parsed = parseAIRecommendationResponse(result.data ?? '');
       const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://perfumegpt.com');
 
-      await this.emailService.sendTemplateEmail(
-        email,
-        '✨ Gợi ý mua lại sản phẩm yêu thích của bạn | PerfumeGPT',
-        EmailTemplate.REPURCHASE,
-        {
-          userName: userName || 'Khách hàng',
-          message: parsed.message,
-          products: (parsed.products as EmailProduct[]) || [],
-          frontendUrl,
-          savingsPercent: '15'
-        }
-      );
+      if (!hasPurchaseHistory) {
+        await this.emailService.sendTemplateEmail(
+          email,
+          '🌟 Gợi ý khởi đầu mùi hương dành cho bạn | PerfumeGPT',
+          EmailTemplate.RECOMMENDATION,
+          {
+            userName: userName || 'Khách hàng',
+            heading: 'Khám phá những lựa chọn phù hợp cho lần mua đầu tiên',
+            message: parsed.message,
+            products: (parsed.products as EmailProduct[]) || [],
+            frontendUrl
+          }
+        );
+      } else {
+        await this.emailService.sendTemplateEmail(
+          email,
+          '✨ Gợi ý mua lại sản phẩm yêu thích của bạn | PerfumeGPT',
+          EmailTemplate.REPURCHASE,
+          {
+            userName: userName || 'Khách hàng',
+            message: parsed.message,
+            products: (parsed.products as EmailProduct[]) || [],
+            frontendUrl,
+            savingsPercent: '15'
+          }
+        );
+      }
       this.logger.log(`Sent repurchase email to ${email} for user ${userId}`);
       return true;
     } catch (error) {

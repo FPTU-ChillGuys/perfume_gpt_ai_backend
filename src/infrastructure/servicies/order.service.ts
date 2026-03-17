@@ -81,8 +81,8 @@ function mapOrderFull(o: OrderFull): OrderResponse {
     voucherCode: o.UserVouchers?.Vouchers?.Code ?? null,
     recipientInfo: o.RecipientInfos
       ? {
-          fullName: o.RecipientInfos.FullName,
-          phone: o.RecipientInfos.Phone,
+          fullName: o.RecipientInfos.RecipientName,
+          phone: o.RecipientInfos.RecipientPhoneNumber,
           fullAddress: o.RecipientInfos.FullAddress,
         }
       : null,

@@ -60,7 +60,9 @@ type ProductWithVariantsRelations = Prisma.ProductsGetPayload<{
   include: typeof productWithVariantsInclude;
 }>;
 
-function mapProductWithVariants(p: ProductWithVariantsRelations): ProductWithVariantsResponse {
+function mapProductWithVariants(
+  p: ProductWithVariantsRelations
+): ProductWithVariantsResponse {
   return {
     id: p.Id,
     name: p.Name,
@@ -78,7 +80,7 @@ function mapProductWithVariants(p: ProductWithVariantsRelations): ProductWithVar
         attributeId: attr.AttributeId,
         valueId: attr.ValueId,
         attribute: attr.Attributes.Name,
-        description: attr.Attributes.Description,
+        description: attr.Attributes.Description ?? '',
         value: attr.AttributeValues.Value
       })
     ),
@@ -94,15 +96,18 @@ function mapProductWithVariants(p: ProductWithVariantsRelations): ProductWithVar
         status: v.Status,
         concentrationId: v.ConcentrationId,
         concentration: v.Concentrations
-          ? ({ id: v.Concentrations.Id, name: v.Concentrations.Name } satisfies ConcentrationResponse)
+          ? ({
+              id: v.Concentrations.Id,
+              name: v.Concentrations.Name
+            } satisfies ConcentrationResponse)
           : null,
         stock: v.Stocks
           ? ({
-            id: v.Stocks.Id,
-            totalQuantity: v.Stocks.TotalQuantity,
-            reservedQuantity: v.Stocks.ReservedQuantity,
-            lowStockThreshold: v.Stocks.LowStockThreshold
-          } satisfies VariantStockResponse)
+              id: v.Stocks.Id,
+              totalQuantity: v.Stocks.TotalQuantity,
+              reservedQuantity: v.Stocks.ReservedQuantity,
+              lowStockThreshold: v.Stocks.LowStockThreshold
+            } satisfies VariantStockResponse)
           : null,
         media: v.Media.map(
           (m): VariantMediaResponse => ({
@@ -119,7 +124,7 @@ function mapProductWithVariants(p: ProductWithVariantsRelations): ProductWithVar
             attributeId: attr.AttributeId,
             valueId: attr.ValueId,
             attribute: attr.Attributes.Name,
-            description: attr.Attributes.Description,
+            description: attr.Attributes.Description ?? '',
             value: attr.AttributeValues.Value
           })
         ),
@@ -146,7 +151,7 @@ function mapProduct(p: ProductWithRelations): ProductResponse {
         attributeId: attr.AttributeId,
         valueId: attr.ValueId,
         attribute: attr.Attributes.Name,
-        description: attr.Attributes.Description,
+        description: attr.Attributes.Description ?? '',
         value: attr.AttributeValues.Value
       })
     )
@@ -158,7 +163,7 @@ export class ProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService
-  ) { }
+  ) {}
 
   async getAllProducts(
     request: PagedAndSortedRequest
@@ -199,19 +204,18 @@ export class ProductService {
       async () => {
         console.log(ApiUrl().PRODUCT_URL('search/semantic'));
         const { data } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>>(
-            ApiUrl().PRODUCT_URL('search/semantic'),
-            {
-              params: {
-                searchText: searchText,
-                pageNumber: request.PageNumber ?? 1,
-                pageSize: request.PageSize ?? 10,
-                // sortBy: request.SortBy ?? '',
-                sortOrder: request.SortOrder ?? 'asc',
-                isDescending: request.IsDescending ?? false
-              }
+          this.httpService.get<
+            BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>
+          >(ApiUrl().PRODUCT_URL('search/semantic'), {
+            params: {
+              searchText: searchText,
+              pageNumber: request.PageNumber ?? 1,
+              pageSize: request.PageSize ?? 10,
+              // sortBy: request.SortBy ?? '',
+              sortOrder: request.SortOrder ?? 'asc',
+              isDescending: request.IsDescending ?? false
             }
-          )
+          })
         );
         return data;
       },
@@ -343,7 +347,7 @@ export class ProductService {
 
   /** Lấy chi tiết một sản phẩm kèm toàn bộ variants */
   async getProductWithVariants(
-    @Query("id") id: string
+    @Query('id') id: string
   ): Promise<BaseResponse<ProductWithVariantsResponse>> {
     return await funcHandlerAsync(
       async () => {
@@ -392,7 +396,8 @@ export class ProductService {
         }
 
         return {
-          success: true, data: new PagedResult<ProductWithVariantsResponse>({
+          success: true,
+          data: new PagedResult<ProductWithVariantsResponse>({
             items: products.map(mapProductWithVariants),
             pageNumber: request.PageNumber,
             pageSize: request.PageSize,
@@ -502,7 +507,9 @@ export class ProductService {
 
         const totalCount = sortedProductSales.length;
         const pagedProductSales = sortedProductSales.slice(skip, skip + take);
-        const pagedProductIds = pagedProductSales.map(([productId]) => productId);
+        const pagedProductIds = pagedProductSales.map(
+          ([productId]) => productId
+        );
 
         if (pagedProductIds.length === 0) {
           return {
@@ -535,9 +542,7 @@ export class ProductService {
               totalSoldQuantity
             };
           })
-          .filter(
-            (item): item is BestSellingProductResponse => item !== null
-          );
+          .filter((item): item is BestSellingProductResponse => item !== null);
 
         return {
           success: true,

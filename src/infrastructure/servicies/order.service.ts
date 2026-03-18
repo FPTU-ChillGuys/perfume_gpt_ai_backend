@@ -11,12 +11,16 @@ import {
   OrderResponse
 } from 'src/application/dtos/response/order.response';
 import { funcHandlerAsync } from '../utils/error-handler';
+import { CreateCartItemForAIRequest } from 'src/application/dtos/request/create-cart-item-for-ai.request';
+import { firstValueFrom } from 'rxjs';
+import { HttpService } from '@nestjs/axios';
+import ApiUrl from '../api/api_url';
 
 const orderListInclude = {
   AspNetUsers_Orders_CustomerIdToAspNetUsers: true,
   AspNetUsers_Orders_StaffIdToAspNetUsers: true,
   OrderDetails: true,
-  ShippingInfos: true,
+  ShippingInfos: true
 } satisfies Prisma.OrdersInclude;
 
 const orderDetailInclude = {
@@ -28,38 +32,50 @@ const orderDetailInclude = {
         include: {
           Products: true,
           Media: { where: { IsPrimary: true } },
-          Concentrations: true,
-        },
-      },
-    },
+          Concentrations: true
+        }
+      }
+    }
   },
   UserVouchers: {
     include: {
-      Vouchers: true,
-    },
+      Vouchers: true
+    }
   },
   RecipientInfos: true,
-  ShippingInfos: true,
+  ShippingInfos: true
 } satisfies Prisma.OrdersInclude;
 
-type OrderListItem = Prisma.OrdersGetPayload<{ include: typeof orderListInclude }>;
-type OrderFull = Prisma.OrdersGetPayload<{ include: typeof orderDetailInclude }>;
+type OrderListItem = Prisma.OrdersGetPayload<{
+  include: typeof orderListInclude;
+}>;
+type OrderFull = Prisma.OrdersGetPayload<{
+  include: typeof orderDetailInclude;
+}>;
 
 function mapOrderListItem(o: OrderListItem): OrderListItemResponse {
   return new OrderListItemResponse({
     id: o.Id,
     customerId: o.CustomerId ?? null,
-    customerName: o.AspNetUsers_Orders_CustomerIdToAspNetUsers?.FullName ?? null,
+    customerName:
+      o.AspNetUsers_Orders_CustomerIdToAspNetUsers?.FullName ?? null,
     staffId: o.StaffId ?? null,
     staffName: o.AspNetUsers_Orders_StaffIdToAspNetUsers?.FullName ?? null,
     type: o.Type as 'Online' | 'Offline' | 'Shoppe',
-    status: o.Status as 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Canceled' | 'Returned',
+    status: o.Status as
+      | 'Pending'
+      | 'Processing'
+      | 'Shipped'
+      | 'Delivered'
+      | 'Canceled'
+      | 'Returned',
     totalAmount: Number(o.TotalAmount),
     paymentStatus: o.PaymentStatus as 'Unpaid' | 'Paid' | 'Refunded',
-    shippingStatus: o.ShippingInfos?.Status != null ? Number(o.ShippingInfos.Status) : null,
+    shippingStatus:
+      o.ShippingInfos?.Status != null ? Number(o.ShippingInfos.Status) : null,
     itemCount: o.OrderDetails.length,
     createdAt: o.CreatedAt.toISOString(),
-    updatedAt: o.UpdatedAt?.toISOString() ?? null,
+    updatedAt: o.UpdatedAt?.toISOString() ?? null
   });
 }
 
@@ -67,12 +83,19 @@ function mapOrderFull(o: OrderFull): OrderResponse {
   return new OrderResponse({
     id: o.Id,
     customerId: o.CustomerId ?? null,
-    customerName: o.AspNetUsers_Orders_CustomerIdToAspNetUsers?.FullName ?? null,
+    customerName:
+      o.AspNetUsers_Orders_CustomerIdToAspNetUsers?.FullName ?? null,
     customerEmail: o.AspNetUsers_Orders_CustomerIdToAspNetUsers?.Email ?? null,
     staffId: o.StaffId ?? null,
     staffName: o.AspNetUsers_Orders_StaffIdToAspNetUsers?.FullName ?? null,
     type: o.Type as 'Online' | 'Offline' | 'Shoppe',
-    orderStatus: o.Status as 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Canceled' | 'Returned',
+    orderStatus: o.Status as
+      | 'Pending'
+      | 'Processing'
+      | 'Shipped'
+      | 'Delivered'
+      | 'Canceled'
+      | 'Returned',
     totalAmount: Number(o.TotalAmount),
     paymentStatus: o.PaymentStatus as 'Unpaid' | 'Paid' | 'Refunded',
     paidAt: o.PaidAt?.toISOString() ?? null,
@@ -83,7 +106,7 @@ function mapOrderFull(o: OrderFull): OrderResponse {
       ? {
           fullName: o.RecipientInfos.RecipientName,
           phone: o.RecipientInfos.RecipientPhoneNumber,
-          fullAddress: o.RecipientInfos.FullAddress,
+          fullAddress: o.RecipientInfos.FullAddress
         }
       : null,
     shippingInfo: o.ShippingInfos
@@ -91,7 +114,7 @@ function mapOrderFull(o: OrderFull): OrderResponse {
           carrierName: o.ShippingInfos.CarrierName,
           trackingNumber: o.ShippingInfos.TrackingNumber,
           shippingFee: Number(o.ShippingInfos.ShippingFee),
-          status: o.ShippingInfos.Status,
+          status: o.ShippingInfos.Status
         }
       : null,
     orderDetails: o.OrderDetails.map(
@@ -103,42 +126,56 @@ function mapOrderFull(o: OrderFull): OrderResponse {
           quantity: d.Quantity,
           unitPrice: Number(d.UnitPrice),
           total: Number(d.UnitPrice) * d.Quantity,
-          imageUrl: d.ProductVariants.Media[0]?.Url ?? null,
+          imageUrl: d.ProductVariants.Media[0]?.Url ?? null
         })
     ),
     createdAt: o.CreatedAt.toISOString(),
-    updatedAt: o.UpdatedAt?.toISOString() ?? null,
+    updatedAt: o.UpdatedAt?.toISOString() ?? null
   });
 }
 
-function buildOrderWhere(request: OrderRequest, customerId?: string): Prisma.OrdersWhereInput {
+function buildOrderWhere(
+  request: OrderRequest,
+  customerId?: string
+): Prisma.OrdersWhereInput {
   return {
     ...(customerId ? { CustomerId: customerId } : {}),
     ...(request.status ? { Status: request.status } : {}),
     ...(request.type ? { Type: request.type } : {}),
     ...(request.paymentStatus ? { PaymentStatus: request.paymentStatus } : {}),
-    ...((request.fromDate || request.toDate)
+    ...(request.fromDate || request.toDate
       ? {
           CreatedAt: {
             ...(request.fromDate ? { gte: new Date(request.fromDate) } : {}),
-            ...(request.toDate ? { lte: new Date(request.toDate) } : {}),
-          },
+            ...(request.toDate ? { lte: new Date(request.toDate) } : {})
+          }
         }
       : {}),
     ...(request.searchTerm
       ? {
           OR: [
-            { AspNetUsers_Orders_CustomerIdToAspNetUsers: { FullName: { contains: request.searchTerm } } },
-            { AspNetUsers_Orders_StaffIdToAspNetUsers: { FullName: { contains: request.searchTerm } } },
-          ],
+            {
+              AspNetUsers_Orders_CustomerIdToAspNetUsers: {
+                FullName: { contains: request.searchTerm }
+              }
+            },
+            {
+              AspNetUsers_Orders_StaffIdToAspNetUsers: {
+                FullName: { contains: request.searchTerm }
+              }
+            }
+          ]
         }
-      : {}),
+      : {})
   };
 }
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly httpService: HttpService
+  ) {}
 
   async getAllOrders(
     request: OrderRequest
@@ -149,8 +186,13 @@ export class OrderService {
       const take = request.PageSize;
 
       const [orders, totalCount] = await Promise.all([
-        this.prisma.orders.findMany({ where, skip, take, include: orderListInclude }),
-        this.prisma.orders.count({ where }),
+        this.prisma.orders.findMany({
+          where,
+          skip,
+          take,
+          include: orderListInclude
+        }),
+        this.prisma.orders.count({ where })
       ]);
 
       const result = new PagedResult<OrderListItemResponse>({
@@ -158,19 +200,17 @@ export class OrderService {
         pageNumber: request.PageNumber,
         pageSize: request.PageSize,
         totalCount,
-        totalPages: Math.ceil(totalCount / request.PageSize),
+        totalPages: Math.ceil(totalCount / request.PageSize)
       });
       return { success: true, payload: result };
     }, 'Failed to fetch all orders');
   }
 
-  async getOrderById(
-    orderId: string
-  ): Promise<BaseResponseAPI<OrderResponse>> {
+  async getOrderById(orderId: string): Promise<BaseResponseAPI<OrderResponse>> {
     return await funcHandlerAsync(async () => {
       const order = await this.prisma.orders.findUnique({
         where: { Id: orderId },
-        include: orderDetailInclude,
+        include: orderDetailInclude
       });
       if (!order) {
         return { success: false, error: 'Order not found' };
@@ -189,8 +229,13 @@ export class OrderService {
       const take = request.PageSize;
 
       const [orders, totalCount] = await Promise.all([
-        this.prisma.orders.findMany({ where, skip, take, include: orderListInclude }),
-        this.prisma.orders.count({ where }),
+        this.prisma.orders.findMany({
+          where,
+          skip,
+          take,
+          include: orderListInclude
+        }),
+        this.prisma.orders.count({ where })
       ]);
 
       const result = new PagedResult<OrderListItemResponse>({
@@ -198,7 +243,7 @@ export class OrderService {
         pageNumber: request.PageNumber,
         pageSize: request.PageSize,
         totalCount,
-        totalPages: Math.ceil(totalCount / request.PageSize),
+        totalPages: Math.ceil(totalCount / request.PageSize)
       });
       return { success: true, payload: result };
     }, 'Failed to fetch orders by user id');
@@ -210,7 +255,7 @@ export class OrderService {
     return await funcHandlerAsync(async () => {
       const orders = await this.prisma.orders.findMany({
         where: { CustomerId: userId },
-        include: orderDetailInclude,
+        include: orderDetailInclude
       });
       return { success: true, data: orders.map(mapOrderFull) };
     }, 'Failed to fetch order details with orders by user id');
@@ -222,7 +267,7 @@ export class OrderService {
     return await funcHandlerAsync(async () => {
       const orders = await this.prisma.orders.findMany({
         where: { CustomerId: userId },
-        include: orderDetailInclude,
+        include: orderDetailInclude
       });
       if (orders.length === 0) {
         return { success: false, error: 'No orders found for the user' };
@@ -236,5 +281,35 @@ export class OrderService {
       return { success: true, data: report };
     }, 'Failed to create order report');
   }
-}
 
+  async addCartItemsForAi(
+    request: CreateCartItemForAIRequest
+  ): Promise<BaseResponseAPI<string>> {
+    return await funcHandlerAsync(
+      async () => {
+        // Bước 1: Gọi external semantic search API để lấy danh sách sản phẩm đã được rank
+        const { data: searchResult } = await firstValueFrom(
+          this.httpService.post<BaseResponseAPI<string>>(
+            ApiUrl().CART_URL('items/add-to-cart-for-ai'),
+            {
+              userId: request.userId,
+              variantId: request.variantId,
+              quantity: request.quantity
+            }
+          )
+        );
+
+        if (!searchResult.success) {
+          return { success: false, error: searchResult.error };
+        }
+
+        return {
+          success: true,
+          payload: searchResult.payload || 'Items added to cart successfully'
+        };
+      },
+      'Failed to fetch products with variants using semantic search',
+      true
+    );
+  }
+}

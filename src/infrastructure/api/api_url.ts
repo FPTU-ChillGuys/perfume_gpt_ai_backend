@@ -7,6 +7,8 @@ export default function ApiUrl() {
 
   const ORDER_URL = (url: string) => `${BASE_URL}/orders/${url}`;
 
+  const CART_URL = (url: string) => `${BASE_URL}/cart/${url}`;
+
   const INVENTORY_URL = (url: string) => `${BASE_URL}/inventory/${url}`;
 
   const PROFILE_URL = (url: string) => `${BASE_URL}/profiles/${url}`;
@@ -18,6 +20,7 @@ export default function ApiUrl() {
     ORDER_URL,
     INVENTORY_URL,
     PROFILE_URL,
-    USER_URL
+    USER_URL,
+    CART_URL
   };
 }

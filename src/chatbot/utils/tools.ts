@@ -33,6 +33,7 @@ export class Tools {
       // Order tools
       // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
+      addCartItems: this.orderTool.addCartItems,
       getOwnProfile: this.profileTool.getOwnProfile,
       productDetailTabContent: this.productTool.productDetailTabContent,
       getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId

@@ -3,6 +3,7 @@ import { UnitOfWork } from '../repositories/unit-of-work';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
 import { Injectable } from '@nestjs/common';
 import { funcHandlerAsync } from '../utils/error-handler';
+import { AIAcceptanceSourceType } from 'src/domain/enum/ai-acceptance-source-type.enum';
 
 @Injectable()
 export class AIAcceptanceService {
@@ -10,8 +11,9 @@ export class AIAcceptanceService {
 
   async updateAIAcceptanceStatusById(
     id: string,
-    cartItemId?: string | null,
-    isAccepted: boolean = false,
+    sourceType?: AIAcceptanceSourceType,
+    sourceId?: string | null,
+    isAccepted: boolean = false
   ): Promise<BaseResponse<AIAcceptance>> {
     const userAIAcceptance = await this.unitOfWork.AIAcceptanceRepo.findOne({
       id
@@ -19,8 +21,11 @@ export class AIAcceptanceService {
 
     if (userAIAcceptance) {
       const updateData: any = { isAccepted };
-      if (cartItemId !== undefined) {
-        updateData.cartItemId = cartItemId;
+      if (sourceType !== undefined) {
+        updateData.sourceType = sourceType;
+      }
+      if (sourceId !== undefined) {
+        updateData.sourceId = sourceId;
       }
       await this.unitOfWork.AIAcceptanceRepo.assign(
         userAIAcceptance,
@@ -37,20 +42,22 @@ export class AIAcceptanceService {
     };
   }
 
-  async updateAIAcceptanceByUserIdAndCartId(
+  async updateAIAcceptanceByUserIdAndSource(
     userId: string,
-    cartItemId?: string | null,
+    sourceType: AIAcceptanceSourceType,
+    sourceId?: string | null,
     isAccepted: boolean = false
   ): Promise<BaseResponse<AIAcceptance>> {
     const userAIAcceptance = await this.unitOfWork.AIAcceptanceRepo.findOne({
       userId,
-      cartItemId
+      sourceType,
+      sourceId
     });
 
     if (userAIAcceptance) {
       const updateData: any = { isAccepted };
-      if (cartItemId !== undefined) {
-        updateData.cartItemId = cartItemId;
+      if (sourceId !== undefined) {
+        updateData.sourceId = sourceId;
       }
       await this.unitOfWork.AIAcceptanceRepo.assign(
         userAIAcceptance,
@@ -70,12 +77,14 @@ export class AIAcceptanceService {
   async createAIAcceptanceRecord(
     userId: string,
     isAccepted: boolean,
-    cartItemId?: string | null
+    sourceType: AIAcceptanceSourceType,
+    sourceId?: string | null
   ): Promise<BaseResponse<AIAcceptance>> {
     const newAIAcceptance = new AIAcceptance({
       userId,
       isAccepted,
-      cartItemId
+      sourceType,
+      sourceId
     });
     await this.unitOfWork.AIAcceptanceRepo.insert(newAIAcceptance);
     return { success: true, data: newAIAcceptance };

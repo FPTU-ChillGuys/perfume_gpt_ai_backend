@@ -15,6 +15,7 @@ export class Tools {
   getToolsForTrend: ToolSet;
   getToolsForRecomendationAndRepurchase: ToolSet;
   getToolsForRestock: ToolSet;
+  getToolsForQuiz: ToolSet;
 
   constructor(
     private readonly productTool: ProductTool,
@@ -37,6 +38,13 @@ export class Tools {
       getOwnProfile: this.profileTool.getOwnProfile,
       productDetailTabContent: this.productTool.productDetailTabContent,
       getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId
+    };
+
+    this.getToolsForQuiz = {
+      getAllProducts: this.productTool.getAllProducts,
+      searchProduct: this.productTool.searchProduct,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
     };
 
     this.getToolsForTrend = {

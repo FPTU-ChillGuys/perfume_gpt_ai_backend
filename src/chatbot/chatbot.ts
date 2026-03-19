@@ -5,6 +5,7 @@ import {
   LanguageModel,
   stepCountIs,
   streamText,
+  ToolChoice,
   ToolSet,
   UIMessage
 } from 'ai';
@@ -17,7 +18,8 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
   errorMessage?: string,
   stopWhen?: number,
   output?: any,
-  temperature?: number
+  temperature?: number,
+  toolChoice?: ToolChoice<ToolSet>
 ) {
   let retries = 2;
   while (retries >= 0) {
@@ -27,6 +29,7 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
         prompt: prompt,
         system: systemPrompt ? systemPrompt : undefined,
         tools: tools ? tools : undefined,
+        toolChoice: toolChoice ? toolChoice : undefined,
         stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
         output: output ? output : undefined,
         temperature: temperature
@@ -55,7 +58,8 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
   errorMessage?: string,
   stopWhen?: number,
   output?: any,
-  temperature?: number
+  temperature?: number,
+  toolChoice?: ToolChoice<ToolSet>
 ) {
   let retries = 2;
   while (retries >= 0) {
@@ -66,6 +70,7 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
         messages: modelMessages,
         system: systemPrompt ? systemPrompt : undefined,
         tools: tools ? tools : undefined,
+        toolChoice: toolChoice ? toolChoice : undefined,
         stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
         output: output ? output : undefined,
         temperature: temperature
@@ -95,7 +100,8 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
   output?: any,
   errorMessage?: string,
   onFinish?: (data) => void,
-  temperature?: number
+  temperature?: number,
+  toolChoice?: ToolChoice<ToolSet>
 ) {
   const stream = createUIMessageStream({
     execute({ writer }) {
@@ -105,6 +111,7 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
           system: systemPrompt ? systemPrompt : undefined,
           prompt: prompt,
           tools: tools ? tools : undefined,
+          toolChoice: toolChoice ? toolChoice : undefined,
           stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
           output: output ? output : undefined,
           temperature: temperature
@@ -135,7 +142,8 @@ export function streamTextGenerationFromMessagesToResultWithErrorHandler(
   output?: any,
   errorMessage?: string,
   onFinish?: (data) => void,
-  temperature?: number
+  temperature?: number,
+  toolChoice?: ToolChoice<ToolSet>
 ) {
   const stream = createUIMessageStream({
     async execute({ writer }) {
@@ -145,6 +153,7 @@ export function streamTextGenerationFromMessagesToResultWithErrorHandler(
           system: systemPrompt ? systemPrompt : undefined,
           messages: await convertToModelMessages(messages),
           tools: tools ? tools : undefined,
+          toolChoice: toolChoice ? toolChoice : undefined,
           stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
           output: output ? output : undefined,
           temperature: temperature

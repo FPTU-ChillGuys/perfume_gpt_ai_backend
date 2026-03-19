@@ -20,7 +20,7 @@ import { QueueName, QuizJobName } from 'src/application/constant/processor';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { AIHelper } from '../helpers/ai.helper';
-import { AI_HELPER } from '../modules/ai.module';
+import { AI_HELPER, AI_QUIZ_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
 import { UserLogService } from './user-log.service';
 import { quizPrompt } from 'src/application/constant/prompts';
@@ -32,8 +32,7 @@ import { searchOutput } from 'src/chatbot/utils/output/search.output';
 export class QuizService {
   constructor(
     private unitOfWork: UnitOfWork,
-    @InjectMapper() private mapper: Mapper,
-    @Inject(AI_HELPER) private readonly aiHelper: AIHelper,
+    @Inject(AI_QUIZ_HELPER) private readonly aiHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userLogService: UserLogService,
     @InjectQueue(QueueName.QUIZ_QUEUE) private readonly quizQueue: Queue
@@ -115,7 +114,7 @@ export class QuizService {
         { populate: ['answers'] }
       );
       const quizQuestionsResponses =
-        QuizQuestionMapper.toResponseList(quizQuestions);
+        QuizQuestionMapper.toResponseList(quizQuestions, true);
       return { success: true, data: quizQuestionsResponses };
     }, 'Failed to get quiz questions by id list');
   }

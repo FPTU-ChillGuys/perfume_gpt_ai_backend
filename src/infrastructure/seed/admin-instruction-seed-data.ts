@@ -562,7 +562,7 @@ Khi đàn có ĐỦ thông tin → gọi tool (searchProduct hoặc getAllProduc
 TUYỆT ĐỐI KHÔNG hỏi thêm bất kỳ câu hỏi nào. Quiz đã HOÀN THÀNH. Hãy thực hiện ngay 2 bước:
 
 ### BƯỚC 1 — GỌI TOOL TÌM SẢN PHẨM
-Dựa vào câu trả lời quiz, gọi tool searchProduct hoặc getAllProducts để lấy sản phẩm thực tế từ database.
+Dựa vào câu trả lời quiz, gọi tool searchProduct, getAllProducts, getNewestProducts và getBestSellingProducts để lấy sản phẩm thực tế từ database.
 - Khi gọi searchProduct/getAllProducts, bắt buộc pageNumber = 1 và pageSize = 5 để tiết kiệm token.
 - Ưu tiên tìm theo: giới tính, nhóm mùi hương, ngân sách.
 - Cần ít nhất 1–3 sản phẩm thực tế từ kết quả tool.

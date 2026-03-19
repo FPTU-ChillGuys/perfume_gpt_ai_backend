@@ -1,4 +1,4 @@
-import { ToolSet, UIMessage } from 'ai';
+import { ToolChoice, ToolSet, UIMessage } from 'ai';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
 import {
@@ -16,7 +16,8 @@ export class AIHelper {
     private systemPrompt?: string,
     private tools?: ToolSet,
     private stopWhen?: number,
-    private temperature?: number
+    private temperature?: number,
+    private toolChoice?: ToolChoice<ToolSet>
   ) {}
 
   async textGenerateFromPrompt(
@@ -34,7 +35,8 @@ export class AIHelper {
         errorMessage,
         this.stopWhen,
         output,
-        this.temperature
+        this.temperature,
+        this.toolChoice
       );
       return { success: true, data: text };
     }, 'Failed to generate text from prompt');
@@ -55,7 +57,8 @@ export class AIHelper {
         errorMessage,
         this.stopWhen,
         output,
-        this.temperature
+        this.temperature,
+        this.toolChoice
       );
       return { success: true, data: text };
     }, 'Failed to generate text from messages');
@@ -77,7 +80,8 @@ export class AIHelper {
         output,
         errorMessage,
         undefined,
-        this.temperature
+        this.temperature,
+        this.toolChoice
       );
       return { success: true, data: stream };
     }, 'Failed to generate text stream from prompt');
@@ -96,7 +100,10 @@ export class AIHelper {
       this.tools,
       this.stopWhen,
       errorMessage,
-      output
+      output,
+      undefined,
+      this.temperature,
+      this.toolChoice
     );
   }
 }

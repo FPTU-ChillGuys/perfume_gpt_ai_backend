@@ -10,6 +10,7 @@ export const AI_CONVERSATION_HELPER = 'AI_CONVERSATION_HELPER';
 export const AI_TREND_HELPER = 'AI_TREND_HELPER';
 export const AI_RECOMMENDATION_HELPER = 'AI_RECOMMENDATION_HELPER';
 export const AI_RESTOCK_HELPER = 'AI_RESTOCK_HELPER';
+export const AI_QUIZ_HELPER = 'AI_QUIZ_HELPER';
 
 // Backward-compat aliases (old token name → same string value as new)
 export const AI_SERVICE = AI_HELPER;
@@ -48,9 +49,17 @@ const aiRestockProvider: Provider = {
   inject: [Tools]
 };
 
+const aiQuizProvider: Provider = {
+  provide: AI_QUIZ_HELPER,
+  useFactory: (tools: Tools) =>
+    new AIHelper(SYSTEM_PROMPT, tools.getToolsForQuiz, 10, undefined),
+  inject: [Tools]
+};
+
+
 @Module({
   imports: [UnitOfWorkModule, ToolModule],
-  providers: [aiProvider, aiConversationProvider, aiTrendProvider, aiRecommendationProvider, aiRestockProvider],
-  exports: [aiProvider, aiConversationProvider, aiTrendProvider, aiRecommendationProvider, aiRestockProvider]
+  providers: [aiProvider, aiConversationProvider, aiTrendProvider, aiRecommendationProvider, aiRestockProvider, aiQuizProvider],
+  exports: [aiProvider, aiConversationProvider, aiTrendProvider, aiRecommendationProvider, aiRestockProvider, aiQuizProvider]
 })
 export class AIModule {}

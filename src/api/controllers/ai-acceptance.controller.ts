@@ -9,7 +9,6 @@ import {
 } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { AIAcceptanceSourceType } from 'src/domain/enum/ai-acceptance-source-type.enum';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
 import { AIAcceptanceService } from 'src/infrastructure/servicies/ai-acceptance.service';
 import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
@@ -40,41 +39,35 @@ export class AIAcceptanceController {
   @ApiOperation({ summary: 'Cập nhật trạng thái chấp nhận AI theo ID' })
   @ApiParam({ name: 'id', description: 'ID bản ghi AI acceptance' })
   @ApiQuery({ name: 'status', description: 'Trạng thái (true/false)' })
-  @ApiQuery({ name: 'sourceType', enum: AIAcceptanceSourceType, description: 'Loại nguồn acceptance', required: false })
-  @ApiQuery({ name: 'sourceId', description: 'ID thực thể theo sourceType (tùy chọn)', required: false })
+  @ApiQuery({ name: 'cartItemId', description: 'ID cart item liên quan (tùy chọn)', required: false })
   @ApiBaseResponse(AIAcceptance)
   async updateAIAcceptanceData(
     @Param('id') id: string,
-    @Query('sourceType') sourceType: AIAcceptanceSourceType,
-    @Query('sourceId') sourceId: string,
-    @Query('status') status: string
+    @Query('cartItemId') cartItemId: string,
+    @Query('status') status: boolean
   ): Promise<BaseResponse<AIAcceptance>> {
     return this.aiAcceptanceService.updateAIAcceptanceStatusById(
       id,
-      sourceType,
-      sourceId,
-      status === 'true'
+      cartItemId,
+      status
     );
   }
 
   @Put('user/:userId')
-  @ApiOperation({ summary: 'Cập nhật trạng thái chấp nhận AI theo userId + sourceType + sourceId' })
+  @ApiOperation({ summary: 'Cập nhật trạng thái chấp nhận AI theo ID người dùng và ID cart item' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   @ApiQuery({ name: 'status', description: 'Trạng thái (true/false)' })
-  @ApiQuery({ name: 'sourceType', enum: AIAcceptanceSourceType, description: 'Loại nguồn acceptance' })
-  @ApiQuery({ name: 'sourceId', description: 'ID thực thể theo sourceType (tùy chọn)', required: false })
+  @ApiQuery({ name: 'cartItemId', description: 'ID cart item liên quan (tùy chọn)', required: false })
   @ApiBaseResponse(AIAcceptance)
-  async updateAIAcceptanceDataByUserIdAndSource(
+  async updateAIAcceptanceDataByUserIdAndCartId(
     @Param('userId') userId: string,
-    @Query('sourceType') sourceType: AIAcceptanceSourceType,
-    @Query('sourceId') sourceId: string,
-    @Query('status') status: string
+    @Query('cartItemId') cartItemId: string,
+    @Query('status') status: boolean,
   ): Promise<BaseResponse<AIAcceptance>> {
-    return this.aiAcceptanceService.updateAIAcceptanceByUserIdAndSource(
+    return this.aiAcceptanceService.updateAIAcceptanceByUserIdAndCartId(
       userId,
-      sourceType,
-      sourceId,
-      status === 'true'
+      cartItemId,
+      status
     );
   }
 
@@ -130,28 +123,20 @@ export class AIAcceptanceController {
     description: 'Trạng thái chấp nhận (true/false)'
   })
   @ApiQuery({
-    name: 'sourceId',
+    name: 'cartItemId',
     required: false,
-    description: 'ID thực thể theo source type (tùy chọn)'
-  })
-  @ApiQuery({
-    name: 'sourceType',
-    required: true,
-    enum: AIAcceptanceSourceType,
-    description: 'Nguồn phát sinh acceptance'
+    description: 'ID cart item liên quan (tùy chọn)'
   })
   @ApiBaseResponse(AIAcceptance)
   async createAIAcceptanceRecord(
     @Param('userId') userId: string,
-    @Query('sourceType') sourceType: AIAcceptanceSourceType,
-    @Query('sourceId') sourceId: string,
+    @Query('cartItemId') cartItemId: string,
     @Query('status') status: string,
   ): Promise<BaseResponse<AIAcceptance>> {
     return this.aiAcceptanceService.createAIAcceptanceRecord(
       userId,
       status === 'true',
-      sourceType,
-      sourceId
+      cartItemId
     );
   }
 }

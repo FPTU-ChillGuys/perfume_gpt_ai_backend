@@ -136,18 +136,8 @@
           "length": 255,
           "mappedType": "string"
         },
-        "source_type": {
-          "name": "source_type",
-          "type": "varchar(255)",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": 255,
-          "mappedType": "string"
-        },
-        "source_id": {
-          "name": "source_id",
+        "cart_item_id": {
+          "name": "cart_item_id",
           "type": "varchar(255)",
           "unsigned": false,
           "autoincrement": false,

@@ -210,9 +210,9 @@ Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
 
   ## BƯỚC 1: LẤY DỮ LIỆU CHUẨN (STRICT DATA FETCHING)
   - BẮT BUỘC gọi getUserLogSummaryByWeek trước để lấy bức tranh hành vi toàn hệ trong tuần.
-  - BẮT BUỘC gọi getBestSellingProducts để lấy danh sách bán chạy (ưu tiên pageNumber = 1, pageSize = 5).
-  - BẮT BUỘC gọi getNewestProducts để lấy danh sách sản phẩm mới (ưu tiên pageNumber = 1, pageSize = 5).
-  - Với mọi tool product (getBestSellingProducts/getNewestProducts/getAllProducts/searchProduct), pageSize TUYỆT ĐỐI không vượt quá 5.
+  - BẮT BUỘC gọi getBestSellingProducts để lấy danh sách bán chạy (ưu tiên pageNumber = 1, pageSize = 10).
+  - BẮT BUỘC gọi getNewestProducts để lấy danh sách sản phẩm mới (ưu tiên pageNumber = 1, pageSize = 10).
+  - Với mọi tool product (getBestSellingProducts/getNewestProducts/getAllProducts/searchProduct), pageSize TUYỆT ĐỐI không vượt quá 10.
   - Chỉ gọi đúng các tool cần thiết, tối đa 3 lần để tránh spam tool.
 
   ## BƯỚC 2: CÁCH ĐỌC getUserLogSummaryByWeek
@@ -241,7 +241,7 @@ Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
   Hệ thống yêu cầu bạn xuất ra đúng định dạng JSON có 2 trường: message và products.
   1. Trường "products":
     - Chỉ chứa sản phẩm lấy trực tiếp từ tool đã gọi.
-    - Tối đa 5 sản phẩm để tránh payload quá lớn.
+    - Tối đa 10 sản phẩm để tránh payload quá lớn.
     - Nếu tất cả tool trả về rỗng, products phải là [].
   2. Trường "message":
     - Viết báo cáo ngắn gọn, đi thẳng vào vấn đề theo 3 phần:

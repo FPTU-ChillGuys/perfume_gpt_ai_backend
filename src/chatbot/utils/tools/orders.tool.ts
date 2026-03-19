@@ -7,6 +7,7 @@ import {
   OrderResponse
 } from 'src/application/dtos/response/order.response';
 import { OrderService } from 'src/infrastructure/servicies/order.service';
+import { UserService } from 'src/infrastructure/servicies/user.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
 import * as z from 'zod';
 
@@ -14,7 +15,7 @@ import * as z from 'zod';
 export class OrderTool {
   private readonly logger = new Logger(OrderTool.name);
 
-  constructor(private readonly orderService: OrderService) {}
+  constructor(private readonly orderService: OrderService, private readonly userService: UserService) {}
 
   getOrdersByUserId: Tool = tool({
     description: 'Get all orders for a specific user with pagination and sorting.',
@@ -137,6 +138,14 @@ export class OrderTool {
       this.logger.log(
         `[addCartItems] called for userId: ${input.userId} with ${input.items.length} items`
       );
+      
+      //Check user existence before processing cart additions
+      const userExists = await this.userService.isUserExistedByUserId(input.userId);
+      if (userExists.success && !userExists.payload) {
+        this.logger.warn(`[addCartItems] User ${input.userId} does not exist or does not signed up.`);
+        return { success: false, error: `User ${input.userId} not found or does not signed up..` };
+      }
+
       return await funcHandlerAsync(
         async () => {
           const results: Array<{

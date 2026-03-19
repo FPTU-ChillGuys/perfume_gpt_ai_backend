@@ -295,6 +295,12 @@ export class OrderService {
               userId: request.userId,
               variantId: request.variantId,
               quantity: request.quantity
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${process.env.PERFUME_GPT_TOKEN}`
+              }
             }
           )
         );

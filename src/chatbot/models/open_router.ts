@@ -29,6 +29,12 @@ export const gpt5Nano: LanguageModel = openrouter("openai/gpt-5-nano");
 
 export const glm47Flash: LanguageModel = openrouter("z-ai/glm-4.7-flash:nitro");
 
-export const qwen3_30b_a3b_Thinking_2507: LanguageModel = openrouter("qwen/qwen3-30b-a3b-thinking-2507:nitro");
+export const qwen3_30b: LanguageModel = openrouter("qwen/qwen3-30b-a3b");
 
 export const llama4Scout: LanguageModel = openrouter("meta-llama/llama-4-scout");
+
+export const deepSeek3_2: LanguageModel = openrouter("deepseek/deepseek-v3.2");
+
+export const ministral_8b_2512 : LanguageModel = openrouter("mistralai/ministral-8b-2512");
+
+export const ministral_14b_2512 : LanguageModel = openrouter("mistralai/ministral-14b-2512");

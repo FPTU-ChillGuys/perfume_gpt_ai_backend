@@ -17,7 +17,7 @@ export class UserService {
       async () => {
         const user = await this.prisma.aspNetUsers.findUnique({
           where: { Id: userId },
-          select: { Email: true },
+          select: { Email: true }
         });
         return { success: true, payload: user?.Email ?? null };
       },
@@ -36,9 +36,9 @@ export class UserService {
       async () => {
         const user = await this.prisma.aspNetUsers.findUnique({
           where: { Id: userId },
-          select: { Email: true, UserName: true },
+          select: { Email: true, UserName: true }
         });
-        
+
         if (!user) {
           return { success: true, payload: null };
         }
@@ -61,7 +61,7 @@ export class UserService {
     return await funcHandlerAsync(
       async () => {
         const users = await this.prisma.aspNetUsers.findMany({
-          select: { Id: true },
+          select: { Id: true }
         });
         const userIds = users.map((user) => user.Id);
         return { success: true, payload: userIds };
@@ -74,12 +74,14 @@ export class UserService {
   /**
    * Lấy thông tin user theo userId
    */
-  async getUserById(userId: string): Promise<BaseResponseAPI<{
-    id: string;
-    email: string;
-    userName: string;
-    phoneNumber?: string;
-  }>> {
+  async getUserById(userId: string): Promise<
+    BaseResponseAPI<{
+      id: string;
+      email: string;
+      userName: string;
+      phoneNumber?: string;
+    }>
+  > {
     return await funcHandlerAsync(
       async () => {
         const user = await this.prisma.aspNetUsers.findUnique({
@@ -88,10 +90,10 @@ export class UserService {
             Id: true,
             Email: true,
             UserName: true,
-            PhoneNumber: true,
+            PhoneNumber: true
           }
         });
-        
+
         if (!user) {
           return { success: false, error: `User with ID ${userId} not found` };
         }
@@ -111,5 +113,19 @@ export class UserService {
     );
   }
 
+  async isUserExistedByUserId(
+    userId: string
+  ): Promise<BaseResponseAPI<boolean>> {
+    return await funcHandlerAsync(
+      async () => {
+        const user = await this.prisma.aspNetUsers.findUnique({
+          where: { Id: userId },
+          select: { Id: true }
+        });
+        return { success: true, payload: !!user };
+      },
+      'Failed to check user existence by ID',
+      true
+    );
+  }
 }
-

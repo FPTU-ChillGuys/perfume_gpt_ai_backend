@@ -210,7 +210,7 @@ export class ProductService {
             params: {
               searchText: searchText,
               pageNumber: request.PageNumber ?? 1,
-              pageSize: request.PageSize ?? 10,
+              pageSize: request.PageSize ?? 5,
               // sortBy: request.SortBy ?? '',
               sortOrder: request.SortOrder ?? 'asc',
               isDescending: request.IsDescending ?? false

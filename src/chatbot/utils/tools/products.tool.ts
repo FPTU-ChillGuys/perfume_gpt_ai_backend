@@ -80,11 +80,10 @@ export class ProductTool {
                   IsDescending: item.isDescending
                 }
               );
-            if (response.success && response.payload?.items) {
+              if (response.success && response.payload?.items) {
               results = results.concat(response.payload.items ?? []);
             }
           }
-
           return { success: true, data: results || [] };
         },
         'Error occurred while fetching products.',

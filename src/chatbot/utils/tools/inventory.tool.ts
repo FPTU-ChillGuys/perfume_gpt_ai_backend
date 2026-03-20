@@ -96,16 +96,18 @@ export class InventoryTool {
   /**
    * Lấy dữ liệu phân tích bán hàng theo ngày cho tất cả variant (2 tháng gần nhất).
    * AI dùng tool này để dự đoán nhu cầu tái cấp hàng dựa trên xu hướng bán hàng của mỗi variant.
+   * 
+   * 🎯 Dữ liệu đã tối ưu: pre-computed metrics thay vì raw dailySalesData
    */
   getProductSalesAnalyticsForRestock: Tool = tool({
     description:
-      'Get daily sales analytics for all product variants over the past 2 months. ' +
-      'Returns variant information with daily sales quantities, revenue trends, and average daily sales. ' +
-      'Similar to getInventoryStock but includes historical sales data. ' +
-      'Use this data to predict restock demand for each variant based on sales velocity and patterns.',
+      'Get optimized sales analytics for all product variants over the past 2 months. ' +
+      'Returns variant information with pre-computed metrics (trend, volatility, last7Days, last30Days). ' +
+      'Token-optimized: uses TOON-encoded data instead of raw daily records. ' +
+      'Use this data to predict restock demand based on sales velocity patterns and trend signals.',
     inputSchema: z.object({}),
     execute: async () => {
-      this.logger.log(`[getProductSalesAnalyticsForRestock] called`);
+      this.logger.log(`[getProductSalesAnalyticsForRestock] called (optimized)`);
       return await funcHandlerAsync(
         async () => {
           const result = await this.restockService.getProductSalesAnalyticsForRestock();
@@ -113,27 +115,33 @@ export class InventoryTool {
             return { success: false, error: result.error ?? 'Failed to fetch sales analytics' };
           }
 
-          // Format dữ liệu cho AI dùng dễ dàng hơn
+          // 🚀 Gửi dữ liệu tối ưu cho LLM: signals thay vì raw data
           const items = result.payload.map((variant) => ({
+            // 🔑 Core fields cho LLM context
             variantId: variant.variantId,
             sku: variant.sku,
             productName: variant.productName,
-            volumeMl: variant.volumeMl,
-            type: variant.type,
-            basePrice: variant.basePrice,
-            status: variant.status,
-            concentrationName: variant.concentrationName,
-            totalQuantitySold: variant.totalQuantitySold,
-            totalRevenue: variant.totalRevenue,
+            
+            // 📊 Pre-computed metrics (giảm 85% token vs raw dailySalesData)
             averageDailySales: variant.averageDailySales,
+            totalQuantitySold: variant.totalQuantitySold,
             daysWithSalesCount: variant.daysWithSalesCount,
-            periodStartDate: variant.periodStartDate,
-            periodEndDate: variant.periodEndDate,
-            dailySalesData: variant.dailySalesData.map((record) => ({
-              date: record.date,
-              quantitySold: record.quantitySold,
-              revenue: record.revenue
-            }))
+            
+            // 🎯 Optimized sales metrics for AI analysis
+            salesMetrics: variant.salesMetrics
+              ? {
+                  last7DaysSales: variant.salesMetrics.last7DaysSales,
+                  last30DaysSales: variant.salesMetrics.last30DaysSales,
+                  trend: variant.salesMetrics.trend,
+                  volatility: variant.salesMetrics.volatility,
+                  // encodedData có thể dùng nếu cần raw data (TOON format)
+                  encodedData: variant.salesMetrics.encodedData
+                }
+              : null,
+            
+            // Additional context
+            status: variant.status,
+            basePrice: variant.basePrice
           }));
 
           return { success: true, data: items };

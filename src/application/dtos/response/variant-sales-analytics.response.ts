@@ -1,5 +1,49 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+/** Metrics tối ưu cho LLM - pre-computed từ dailySalesData */
+export class SalesMetrics {
+  /** Tổng bán trong 7 ngày gần nhất */
+  @ApiProperty({
+    description: 'Tổng bán trong 7 ngày gần nhất',
+    example: 25,
+    type: 'number'
+  })
+  last7DaysSales: number;
+
+  /** Tổng bán trong 30 ngày gần nhất */
+  @ApiProperty({
+    description: 'Tổng bán trong 30 ngày gần nhất',
+    example: 85,
+    type: 'number'
+  })
+  last30DaysSales: number;
+
+  /** Xu hướng bán hàng: INCREASING/STABLE/DECLINING */
+  @ApiProperty({
+    description: 'Xu hướng bán hàng',
+    enum: ['INCREASING', 'STABLE', 'DECLINING'],
+    example: 'INCREASING'
+  })
+  trend: 'INCREASING' | 'STABLE' | 'DECLINING';
+
+  /** Độ biến động: LOW/MEDIUM/HIGH */
+  @ApiProperty({
+    description: 'Độ biến động của doanh số',
+    enum: ['LOW', 'MEDIUM', 'HIGH'],
+    example: 'LOW'
+  })
+  volatility: 'LOW' | 'MEDIUM' | 'HIGH';
+
+  /** Dữ liệu bán hàng được encode bằng TOON format (tối ưu token) */
+  @ApiProperty({
+    description: 'Dữ liệu bán hàng được encode (TOON format)',
+    type: 'string',
+    nullable: true,
+    example: 'encoded_data_string'
+  })
+  encodedData: string | null;
+}
+
 /** Response cho dữ liệu bán hàng theo ngày */
 export class DailySalesRecord {
   /** Ngày bán hàng (định dạng YYYY-MM-DD) */
@@ -115,6 +159,13 @@ export class VariantSalesAnalyticsResponse {
     type: 'number'
   })
   daysWithSalesCount: number;
+
+  /** Metrics tối ưu cho LLM (pre-computed) */
+  @ApiProperty({
+    description: 'Metrics tối ưu cho LLM dự đoán restock',
+    type: () => SalesMetrics
+  })
+  salesMetrics?: SalesMetrics;
 
   constructor(init?: Partial<VariantSalesAnalyticsResponse>) {
     Object.assign(this, init);

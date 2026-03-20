@@ -6,6 +6,7 @@ import {
   DailySalesRecord
 } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { funcHandlerAsync } from '../utils/error-handler';
+import { calculateSalesMetrics } from '../utils/sales-metrics.util';
 import { Prisma } from 'generated/prisma/client';
 
 const variantInclude = {
@@ -121,6 +122,9 @@ export class RestockService {
           const averageDailySales =
             daysWithSalesCount > 0 ? totalQuantitySold / daysWithSalesCount : 0;
 
+          // Tính metrics tối ưu cho LLM
+          const salesMetrics = calculateSalesMetrics(dailySalesData);
+
           return new VariantSalesAnalyticsResponse({
             variantId: variant.Id,
             sku: variant.Sku,
@@ -136,7 +140,8 @@ export class RestockService {
             averageDailySales: Number(averageDailySales.toFixed(2)),
             periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
             periodEndDate: now.toISOString().split('T')[0],
-            daysWithSalesCount
+            daysWithSalesCount,
+            salesMetrics
           });
         });
 
@@ -238,6 +243,9 @@ export class RestockService {
             ? totalQuantitySold / daysWithSalesCount
             : 0;
 
+        // Tính metrics tối ưu cho LLM
+        const salesMetrics = calculateSalesMetrics(dailySalesData);
+
         return {
           success: true,
           payload: new VariantSalesAnalyticsResponse({
@@ -255,7 +263,8 @@ export class RestockService {
             averageDailySales: Number(averageDailySales.toFixed(2)),
             periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
             periodEndDate: now.toISOString().split('T')[0],
-            daysWithSalesCount
+            daysWithSalesCount,
+            salesMetrics
           })
         };
       },

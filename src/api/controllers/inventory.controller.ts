@@ -1,12 +1,13 @@
-import { Controller, Get, Inject, Param, Query, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Inject, Param, Query, Req, UseInterceptors } from '@nestjs/common';
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
-import * as crypto from 'crypto';
+import { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
@@ -106,18 +107,33 @@ export class InventoryController {
   @Public()
   @Get('report/ai/job')
   @ApiOperation({ summary: 'Khởi tạo job để tạo báo cáo tồn kho bằng AI' })
+  @ApiQuery({
+    name: 'forceRefresh',
+    required: false,
+    type: Boolean,
+    description: 'True để bỏ qua job đang cache và tạo job mới ngay lập tức'
+  })
   @ApiBaseResponse(String)
   @CacheTTL(CACHE_TTL_1HOUR)
   @UseInterceptors(CacheInterceptor)
-  async createInventoryReportJob(): Promise<BaseResponse<{ jobId: string }>> {
+  async createInventoryReportJob(
+    @Req() request: Request,
+    @Query('forceRefresh') forceRefresh?: boolean | string
+  ): Promise<BaseResponse<{ jobId: string }>> {
+    const forceRefreshEnabled =
+      forceRefresh === true || String(forceRefresh) === 'true';
+
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIInventoryReport(),
       {
         type: 'inventory_report_job',
         cacheKeyFactory: (jobId) => `inventory_report_job_${jobId}`,
-        ttlMilliseconds: CACHE_TTL_1HOUR
-      }
+        ttlMilliseconds: CACHE_TTL_1HOUR,
+        forceRefresh: forceRefreshEnabled,
+        cacheByRequest: true
+      },
+      request
     );
   }
 
@@ -191,18 +207,33 @@ export class InventoryController {
   @Public()
   @Get('restock/job')
   @ApiOperation({ summary: 'Khởi tạo job để phân tích nhu cầu nhập hàng (restock)' })
+  @ApiQuery({
+    name: 'forceRefresh',
+    required: false,
+    type: Boolean,
+    description: 'True để bỏ qua job đang cache và tạo job mới ngay lập tức'
+  })
   @ApiBaseResponse(String)
   @CacheTTL(CACHE_TTL_1HOUR)
   @UseInterceptors(CacheInterceptor)
-  async createRestockReportJob(): Promise<BaseResponse<{ jobId: string }>> {
+  async createRestockReportJob(
+    @Req() request: Request,
+    @Query('forceRefresh') forceRefresh?: boolean | string
+  ): Promise<BaseResponse<{ jobId: string }>> {
+    const forceRefreshEnabled =
+      forceRefresh === true || String(forceRefresh) === 'true';
+
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIRestockingNeeds(),
       {
         type: 'inventory_restock_job',
         cacheKeyFactory: (jobId) => `inventory_restock_job_${jobId}`,
-        ttlMilliseconds: CACHE_TTL_1HOUR
-      }
+        ttlMilliseconds: CACHE_TTL_1HOUR,
+        forceRefresh: forceRefreshEnabled,
+        cacheByRequest: true
+      },
+      request
     );
   }
 

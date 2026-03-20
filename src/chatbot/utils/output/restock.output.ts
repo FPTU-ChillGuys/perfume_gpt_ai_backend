@@ -4,6 +4,7 @@ import z from 'zod';
 export const restockVariantSchema = z.object({
     id: z.string(),
     sku: z.string(),
+    productName: z.string(),
     volumeMl: z.number(),
     type: z.string(),
     basePrice: z.number(),

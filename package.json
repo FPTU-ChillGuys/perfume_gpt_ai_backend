@@ -68,6 +68,7 @@
     "@prisma/adapter-mssql": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "@scalar/nestjs-api-reference": "^1.0.18",
+    "@toon-format/toon": "^2.1.0",
     "ai": "^6.0.42",
     "axios": "^1.13.5",
     "bullmq": "^5.69.3",

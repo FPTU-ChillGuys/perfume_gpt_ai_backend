@@ -21,7 +21,7 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
 import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import {
   AIInventoryReportStructuredResponse
 } from 'src/application/dtos/response/ai-structured.response';
@@ -30,6 +30,8 @@ import { InternalServerErrorWithDetailsException } from 'src/application/common/
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
 import { add } from 'date-fns';
+import { VariantSalesAnalyticsResponse } from 'src/application/dtos/response/variant-sales-analytics.response';
+import { RestockService } from 'src/infrastructure/servicies/restock.service';
 
 @Role(['admin'])
 @ApiTags('Inventory')
@@ -42,6 +44,7 @@ import { add } from 'date-fns';
 export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
+    private readonly restockService: RestockService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) { }
 
@@ -216,6 +219,33 @@ export class InventoryController {
       `inventory_restock_job_${jobId}`,
       { jobId, endpoint: 'inventory/restock/job/result/:jobId' }
     );
+  }
+
+   /** Lấy dữ liệu phân tích bán hàng tất cả variant (2 tháng gần nhất) cho tái cấp hàng */
+  @Public()
+  @Get('restock/sales-analytics')
+  @ApiOperation({
+    summary: 'Lấy dữ liệu phân tích bán hàng tất cả variant',
+    description: 'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất, sử dụng cho tool dự đoán tái cấp hàng'
+  })
+  @ExtendApiBaseResponse(VariantSalesAnalyticsResponse, true)
+  async getProductSalesAnalyticsForRestock(): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse[]>> {
+    return this.restockService.getProductSalesAnalyticsForRestock();
+  }
+
+  /** Lấy dữ liệu phân tích bán hàng cho một variant cụ thể (2 tháng gần nhất) */
+  @Public()
+  @Get('restock/sales-analytics/:id')
+  @ApiOperation({
+    summary: 'Lấy dữ liệu phân tích bán hàng một variant',
+    description: 'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất'
+  })
+  @ApiParam({ name: 'id', description: 'UUID của variant', format: 'uuid' })
+  @ExtendApiBaseResponse(VariantSalesAnalyticsResponse)
+  async getProductSalesAnalyticsById(
+    @Param('id') id: string
+  ): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse>> {
+    return this.restockService.getVariantSalesAnalyticsById(id);
   }
 
 }

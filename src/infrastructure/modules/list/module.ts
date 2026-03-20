@@ -12,6 +12,7 @@ import { ProfileModule } from "../profile.module";
 import { QuizModule } from "../quiz.module";
 import { ReviewModule } from "../review.module";
 import { ReviewAIModule } from "../review-ai.module";
+import { RestockModule } from "../restock.module";
 import { ToolModule } from "../tool.module";
 import { TrendModule } from "../trend.module";
 import { UserLogModule } from "../user-log.module";
@@ -39,4 +40,5 @@ export const modules = [
   UserModule,
   TrendModule,
   RecommendationModule,
+  RestockModule,
 ];

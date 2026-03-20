@@ -10,9 +10,10 @@ import { ReviewTool } from 'src/chatbot/utils/tools/review.tool';
 import { UserTool } from 'src/chatbot/utils/tools/user.tool';
 import { InventoryTool } from 'src/chatbot/utils/tools/inventory.tool';
 import { UnitOfWorkModule } from './unit-of-work.module';
+import { RestockModule } from './restock.module';
 
 @Module({
-  imports: [ProductModule, OrderModule, ProfileModule, UserLogModule, ReviewModule, UserModule, UnitOfWorkModule],
+  imports: [ProductModule, OrderModule, ProfileModule, UserLogModule, ReviewModule, UserModule, UnitOfWorkModule, RestockModule],
   providers: [Tools, ReviewTool, UserTool, InventoryTool],
   exports: [Tools]
 })

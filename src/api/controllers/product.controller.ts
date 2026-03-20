@@ -7,7 +7,9 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
+import { VariantSalesAnalyticsResponse } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
+import { RestockService } from 'src/infrastructure/servicies/restock.service';
 import { ExtendApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
 import { Request } from 'express';
@@ -20,7 +22,10 @@ import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dto
 @ApiTags('Products')
 @Controller('products')
 export class ProductController {
-  constructor(private productService: ProductService, private userLog: UserLogService) { }
+  constructor(
+    private productService: ProductService,
+    private userLog: UserLogService
+  ) { }
 
   /** Lấy danh sách tất cả sản phẩm */
   @Public()
@@ -153,5 +158,7 @@ export class ProductController {
     const id = await this.userLog.addSearchTextLog(userId, body.searchText);
     return { success: true, data: { id } };
   }
+
+
 }
 

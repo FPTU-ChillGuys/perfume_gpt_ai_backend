@@ -15,7 +15,7 @@ import { TrendLog } from 'src/domain/entities/trend-log.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Output } from 'ai';
 import { AIHelper } from '../helpers/ai.helper';
-import { AI_HELPER, AI_RESTOCK_HELPER } from '../modules/ai.module';
+import { AI_HELPER, AI_INVENTORY_REPORT_HELPER, AI_RESTOCK_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
 import {
   inventoryReportPrompt,
@@ -39,13 +39,13 @@ export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly unitOfWork: UnitOfWork,
-    @Inject(AI_HELPER) private readonly aiHelper: AIHelper,
+    @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService
   ) {}
 
   async getInventoryStock(
-    request: InventoryStockRequest
+    request: InventoryStockRequest 
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return await funcHandlerAsync(
       async () => {

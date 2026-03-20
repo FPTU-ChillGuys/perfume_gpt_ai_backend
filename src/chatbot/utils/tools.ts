@@ -16,6 +16,7 @@ export class Tools {
   getToolsForRecomendationAndRepurchase: ToolSet;
   getToolsForRestock: ToolSet;
   getToolsForQuiz: ToolSet;
+  getToolsForInventoryReport: ToolSet;
 
   constructor(
     private readonly productTool: ProductTool,
@@ -56,8 +57,13 @@ export class Tools {
     };
 
     this.getToolsForRestock = {
-      getInventoryStock: this.inventoryTool.getInventoryStock,
-      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs
+      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
+      getProductSalesAnalyticsForRestockz: this.inventoryTool.getProductSalesAnalyticsForRestock
+    };
+
+    this.getToolsForInventoryReport = {
+      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
+      getProductSalesAnalyticsForRestockz: this.inventoryTool.getProductSalesAnalyticsForRestock
     };
 
     this.getToolsForRecomendationAndRepurchase = {

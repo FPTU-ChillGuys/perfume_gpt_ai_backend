@@ -317,4 +317,61 @@ export class LogController {
     }
     return Ok('User log summary saved successfully');
   }
+
+  /** Rebuild rolling summary cho user cụ thể từ logs */
+  @Post('rebuild-summary/:userId')
+  @ApiOperation({ summary: 'Rebuild rolling summary cho user cụ thể từ logs' })
+  @ApiBaseResponse(String)
+  async rebuildUserSummary(
+    @Param('userId') userId: string
+  ): Promise<BaseResponse<string>> {
+    try {
+      await this.userLogService.rebuildRollingSummaryForUser(userId);
+      return Ok(`Rolling summary rebuilt successfully for user: ${userId}`);
+    } catch (error) {
+      throw new InternalServerErrorWithDetailsException(
+        `Failed to rebuild summary for user: ${userId}`,
+        { userId, error: String(error) }
+      );
+    }
+  }
+
+  /** Rebuild rolling summary cho tất cả users có logs */
+  @Post('rebuild-summary-all')
+  @ApiOperation({ summary: 'Rebuild rolling summary cho tất cả users có logs' })
+  @ApiBaseResponse(String)
+  async rebuildAllUsersSummary(): Promise<BaseResponse<string>> {
+    try {
+      const userIds = await this.userLogService.getAllUserIdsFromLogs();
+      
+      if (!userIds || userIds.length === 0) {
+        return Ok('No users found in logs');
+      }
+
+      let successCount = 0;
+      const failedUserIds: string[] = [];
+
+      for (const userId of userIds) {
+        try {
+          await this.userLogService.rebuildRollingSummaryForUser(userId);
+          successCount++;
+        } catch (error) {
+          failedUserIds.push(userId);
+          console.error(`Failed to rebuild summary for user ${userId}:`, error);
+        }
+      }
+
+      const summary = `Rebuilt summaries for ${successCount}/${userIds.length} users`;
+      const message = failedUserIds.length > 0 
+        ? `${summary}. Failed users: ${failedUserIds.join(', ')}`
+        : summary;
+
+      return Ok(message);
+    } catch (error) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to rebuild summaries for all users',
+        { error: String(error) }
+      );
+    }
+  }
 }

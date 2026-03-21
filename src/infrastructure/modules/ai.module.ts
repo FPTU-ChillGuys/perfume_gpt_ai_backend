@@ -51,7 +51,16 @@ const aiConversationProvider: Provider = {
 const aiTrendProvider: Provider = {
   provide: AI_TREND_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(SYSTEM_PROMPT, tools.getToolsForTrend, 10, undefined, undefined, aiModelForTrend),
+    new AIHelper(
+      SYSTEM_PROMPT,
+      tools.getToolsForTrend,
+      10,
+      undefined,
+      undefined,
+      aiModelForTrend,
+      undefined,
+      300000
+    ),
   inject: [Tools]
 };
 

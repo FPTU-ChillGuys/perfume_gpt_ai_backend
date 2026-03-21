@@ -19,7 +19,8 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
   stopWhen?: number,
   output?: any,
   temperature?: number,
-  toolChoice?: ToolChoice<ToolSet>
+  toolChoice?: ToolChoice<ToolSet>,
+  maxTokens?: number
 ) {
   let retries = 2;
   while (retries >= 0) {
@@ -32,7 +33,8 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
         toolChoice: toolChoice ? toolChoice : undefined,
         stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
         output: output ? output : undefined,
-        temperature: temperature
+        temperature: temperature,
+        maxOutputTokens: maxTokens
       });
       return result.text;
     } catch (error) {
@@ -59,7 +61,8 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
   stopWhen?: number,
   output?: any,
   temperature?: number,
-  toolChoice?: ToolChoice<ToolSet>
+  toolChoice?: ToolChoice<ToolSet>,
+  maxTokens?: number
 ) {
   let retries = 2;
   while (retries >= 0) {
@@ -73,7 +76,8 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
         toolChoice: toolChoice ? toolChoice : undefined,
         stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
         output: output ? output : undefined,
-        temperature: temperature
+        temperature: temperature,
+        maxOutputTokens: maxTokens
       });
       return result.text;
     } catch (error) {
@@ -101,7 +105,8 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
   errorMessage?: string,
   onFinish?: (data) => void,
   temperature?: number,
-  toolChoice?: ToolChoice<ToolSet>
+  toolChoice?: ToolChoice<ToolSet>,
+  maxTokens?: number
 ) {
   const stream = createUIMessageStream({
     execute({ writer }) {
@@ -114,7 +119,8 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
           toolChoice: toolChoice ? toolChoice : undefined,
           stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
           output: output ? output : undefined,
-          temperature: temperature
+          temperature: temperature,
+          maxOutputTokens: maxTokens
         });
         writer.merge(result.toUIMessageStream());
       } catch {
@@ -143,7 +149,8 @@ export function streamTextGenerationFromMessagesToResultWithErrorHandler(
   errorMessage?: string,
   onFinish?: (data) => void,
   temperature?: number,
-  toolChoice?: ToolChoice<ToolSet>
+  toolChoice?: ToolChoice<ToolSet>,
+  maxTokens?: number
 ) {
   const stream = createUIMessageStream({
     async execute({ writer }) {
@@ -156,7 +163,8 @@ export function streamTextGenerationFromMessagesToResultWithErrorHandler(
           toolChoice: toolChoice ? toolChoice : undefined,
           stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
           output: output ? output : undefined,
-          temperature: temperature
+          temperature: temperature,
+          maxOutputTokens: maxTokens
         });
         writer.merge(result.toUIMessageStream());
       } catch {

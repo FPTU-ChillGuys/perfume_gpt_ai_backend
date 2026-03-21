@@ -26,7 +26,8 @@ export class AIHelper {
     private temperature?: number,
     private toolChoice?: ToolChoice<ToolSet>,
     private model?: LanguageModel,
-    private promptOptimizationConfig?: PromptOptimizationConfig
+    private promptOptimizationConfig?: PromptOptimizationConfig,
+    private maxTokens?: number
   ) {}
 
   async textGenerateFromPrompt(
@@ -53,7 +54,8 @@ export class AIHelper {
         this.stopWhen,
         output,
         this.temperature,
-        this.toolChoice
+        this.toolChoice,
+        this.maxTokens
       );
       return { success: true, data: text };
     }, 'Failed to generate text from prompt');
@@ -83,7 +85,8 @@ export class AIHelper {
         this.stopWhen,
         output,
         this.temperature,
-        this.toolChoice
+        this.toolChoice,
+        this.maxTokens
       );
       return { success: true, data: text };
     }, 'Failed to generate text from messages');
@@ -106,7 +109,8 @@ export class AIHelper {
         errorMessage,
         undefined,
         this.temperature,
-        this.toolChoice
+        this.toolChoice,
+        this.maxTokens
       );
       return { success: true, data: stream };
     }, 'Failed to generate text stream from prompt');
@@ -128,7 +132,8 @@ export class AIHelper {
       output,
       undefined,
       this.temperature,
-      this.toolChoice
+      this.toolChoice,
+      this.maxTokens
     );
   }
 }

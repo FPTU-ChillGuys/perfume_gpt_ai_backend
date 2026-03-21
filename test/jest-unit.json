@@ -8,9 +8,7 @@
   },
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/src/$1",
-    "^generated/(.*)$": "<rootDir>/generated/$1",
-    "^@toon-format/toon$": "<rootDir>/test/helpers/mocks/toon-format.mock.ts",
-    "^natural$": "<rootDir>/test/helpers/mocks/natural.mock.ts"
+    "^generated/(.*)$": "<rootDir>/generated/$1"
   },
   "transformIgnorePatterns": [
     "node_modules/(?!(.pnpm|uuid)/)"

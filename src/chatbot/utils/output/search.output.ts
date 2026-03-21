@@ -41,11 +41,9 @@ export const searchOutput = {
 
 export const searchOutputSchema = searchOutput.schema;
 
-export const convertSearchOutputToProductResponse = (output: unknown): ProductResponse[] => {
+export const convertSearchOutputToProductResponse = (output: string): ProductResponse[] => {
   try {
-    const normalizedOutput =
-      typeof output === 'string' ? JSON.parse(output) : output;
-    const parsedOutput = productOutputSchema.parse(normalizedOutput);
+    const parsedOutput = productOutputSchema.parse(JSON.parse(output));
     if (!parsedOutput.products || parsedOutput.products.length === 0) {
       console.warn('[TrendProduct] AI trả về mảng products rỗng - không tìm thấy sản phẩm phù hợp.');
       return [];

@@ -32,11 +32,11 @@ export class TrendController {
   @Get('summary')
   @Public()
   @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
-  @ApiBaseResponse(Object)
+  @ApiBaseResponse(String)
   @ApiBody({ type: AllUserLogRequest })
   async summarizeLogs(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<Record<string, unknown>>> {
+  ): Promise<BaseResponse<string>> {
     return this.trendService.generateTrendSummary(allUserLogRequest);
   }
 
@@ -133,15 +133,5 @@ export class TrendController {
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<AITrendForecastStructuredResponse>> {
     return this.trendService.generateStructuredTrendForecast(allUserLogRequest);
-  }
-
-  @Get('snapshots')
-  @ApiOperation({ summary: 'Lấy snapshot xu hướng gần nhất để audit/monitoring' })
-  @ApiBaseResponse(Object)
-  async getTrendSnapshots(
-    @Query('limit') limit?: string
-  ): Promise<BaseResponse<Array<{ createdAt: Date; trendData: string }>>> {
-    const parsedLimit = limit ? Number(limit) : 5;
-    return this.trendService.getLatestTrendSnapshots(parsedLimit);
   }
 }

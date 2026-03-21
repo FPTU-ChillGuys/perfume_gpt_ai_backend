@@ -7,9 +7,7 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "moduleNameMapper": {
-    "^src/(.*)$": "<rootDir>/src/$1",
-    "^@toon-format/toon$": "<rootDir>/test/helpers/mocks/toon-format.mock.ts",
-    "^natural$": "<rootDir>/test/helpers/mocks/natural.mock.ts"
+    "^src/(.*)$": "<rootDir>/src/$1"
   },
   "transformIgnorePatterns": [
     "node_modules/(?!(.pnpm|uuid)/)"

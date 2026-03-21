@@ -10,6 +10,32 @@ export interface PromptOptimizationConfig {
 }
 
 const SHORT_GREETING_REGEX = /^(hi|hello|hey|xin chao|chao|alo)\s*[!.?]*$/i;
+const VIETNAMESE_ANSWER_HINT = 'Please answer in Vietnamese.';
+
+function isTooShortOrAmbiguous(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) {
+    return true;
+  }
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length <= 4 || normalized.length <= 24) {
+    return true;
+  }
+
+  return false;
+}
+
+function appendVietnameseAnswerHint(text: string): string {
+  const normalized = text.trim();
+  if (!normalized) {
+    return VIETNAMESE_ANSWER_HINT;
+  }
+  if (normalized.toLowerCase().includes(VIETNAMESE_ANSWER_HINT.toLowerCase())) {
+    return normalized;
+  }
+  return `${normalized}\n\n${VIETNAMESE_ANSWER_HINT}`;
+}
 
 export async function optimizePromptWithIntermediateModel(
   originalPrompt: string,
@@ -30,8 +56,9 @@ export async function optimizePromptWithIntermediateModel(
       `${customOptimizationPrompt ? `Case-specific optimization instruction:\n${customOptimizationPrompt}\n\n` : ''}` +
       `System context (reference only):\n${(systemContext || '').slice(0, 1200)}\n\n` +
         `Optimize the following prompt while keeping the same intent and domain.\n` +
-        `If the input is Vietnamese, translate it to natural English first.\n` +
-        `Output MUST be in English only.\n\n${originalPrompt}`,
+        `Keep the SAME language as input.\n` +
+        `Do NOT answer the request. Do NOT add new questions.\n` +
+        `Only rewrite for clarity and brevity.\n\n${originalPrompt}`,
       PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
       undefined,
       undefined,
@@ -73,15 +100,19 @@ export async function optimizeUserMessageWithIntermediateModel(
       return messages;
     }
 
-    // Keep very short greetings concise to avoid verbose rewrites.
-    if (SHORT_GREETING_REGEX.test(userText.trim())) {
-      const greetingWithLanguageHint = `${userText.trim()}\n\nPlease answer in Vietnamese.`;
-      logger?.debug('[PromptOptimization] Short greeting detected. Skip expansion and keep concise message.');
+    // Keep short/ambiguous user input untouched to avoid over-expansion.
+    if (
+      SHORT_GREETING_REGEX.test(userText.trim()) ||
+      isTooShortOrAmbiguous(userText)
+    ) {
+      logger?.debug(
+        '[PromptOptimization] Short or ambiguous message detected. Skip rewriting and keep original message.'
+      );
 
       const conciseMessages = [...messages];
       conciseMessages[conciseMessages.length - 1] = {
         ...lastMessage,
-        parts: [{ type: 'text', text: greetingWithLanguageHint }]
+        parts: [{ type: 'text', text: appendVietnameseAnswerHint(userText) }]
       };
 
       return conciseMessages;
@@ -92,9 +123,12 @@ export async function optimizeUserMessageWithIntermediateModel(
       `${customOptimizationPrompt ? `Case-specific optimization instruction:\n${customOptimizationPrompt}\n\n` : ''}` +
       `System context (reference only):\n${(systemContext || '').slice(0, 1200)}\n\n` +
         `Optimize the following user message so the main model can respond better.\n` +
-        `Keep the same intent and domain, and do not turn it into generic follow-up questions.\n` +
+        `Keep the same intent and domain.\n` +
         `If the input is Vietnamese, translate it to natural English first.\n` +
-        `Output MUST be in English only.\n\n${userText}`,
+        `Output MUST be in English only.\n` +
+        `Do NOT answer the user.\n` +
+        `Do NOT add new questions or request extra information.\n` +
+        `Only rewrite wording for clarity and keep length similar to original.\n\n${userText}`,
       PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
       undefined,
       undefined,
@@ -107,7 +141,7 @@ export async function optimizeUserMessageWithIntermediateModel(
     logger?.log('[PromptOptimization] Messages optimization completed');
     logger?.debug(`[PromptOptimization] Original user message: "${userText}"`);
     const finalOptimizedText = (optimizedText || userText).trim();
-    const messageWithLanguageHint = `${finalOptimizedText}\n\nPlease answer in Vietnamese.`;
+    const messageWithLanguageHint = appendVietnameseAnswerHint(finalOptimizedText);
     logger?.debug(`[PromptOptimization] Optimized user message: "${messageWithLanguageHint}"`);
 
     const optimizedMessages = [...messages];

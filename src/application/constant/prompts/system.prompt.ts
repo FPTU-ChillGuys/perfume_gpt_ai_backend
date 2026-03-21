@@ -95,8 +95,10 @@ export const PROMPT_OPTIMIZATION_SYSTEM_PROMPT = `You are a prompt optimization 
 3. Do not turn direct requests into generic follow-up question lists.
 4. Do not add fabricated details.
 5. If the input is already good, keep changes minimal.
-6. If the input is Vietnamese, translate it to natural English.
-7. Output must always be in English.
+6. Keep the same language as the input.
+7. Do not answer the user request.
+8. Do not add new questions or ask for extra information.
+9. Keep output length close to input length.
 
 ## Output
 - Return only the optimized text.

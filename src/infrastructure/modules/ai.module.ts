@@ -106,7 +106,8 @@ const aiInventoryReportProvider: Provider = {
     aiRecommendationProvider,
     aiRestockProvider,
     aiQuizProvider,
-    aiInventoryReportProvider
+    aiInventoryReportProvider,
+    aiReviewProvider
   ],
   exports: [
     aiProvider,
@@ -115,7 +116,8 @@ const aiInventoryReportProvider: Provider = {
     aiRecommendationProvider,
     aiRestockProvider,
     aiQuizProvider,
-    aiInventoryReportProvider
+    aiInventoryReportProvider,
+    aiReviewProvider
   ]
 })
 export class AIModule {}

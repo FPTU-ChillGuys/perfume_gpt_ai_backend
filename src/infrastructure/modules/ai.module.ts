@@ -4,6 +4,7 @@ import { Tools } from 'src/chatbot/utils/tools';
 import { Module, Provider } from '@nestjs/common';
 import { UnitOfWorkModule } from './unit-of-work.module';
 import { ToolModule } from './tool.module';
+import { aiModelForQuiz } from 'src/chatbot/ai-model';
 
 export const AI_HELPER = 'AI_HELPER';
 export const AI_CONVERSATION_HELPER = 'AI_CONVERSATION_HELPER';
@@ -67,7 +68,9 @@ const aiQuizProvider: Provider = {
       SYSTEM_PROMPT,
       tools.getToolsForQuiz,
       10,
-      undefined,
+      0,
+      'auto',
+      aiModelForQuiz
     ),
   inject: [Tools]
 };
@@ -75,15 +78,9 @@ const aiQuizProvider: Provider = {
 const aiReviewProvider: Provider = {
   provide: AI_REVIEW_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(
-      SYSTEM_PROMPT,
-      tools.getToolsForReview,
-      10,
-      undefined,
-    ),
+    new AIHelper(SYSTEM_PROMPT, tools.getToolsForReview, 10, undefined),
   inject: [Tools]
 };
-
 
 const aiInventoryReportProvider: Provider = {
   provide: AI_INVENTORY_REPORT_HELPER,

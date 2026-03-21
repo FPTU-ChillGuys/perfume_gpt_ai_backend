@@ -40,7 +40,7 @@ export const convertQuesAnsesToString = (
   return quesAnses
     .map(
       (qa, index) =>
-        `${index + 1}. Câu hỏi: ${qa.question}\n   Trả lời: ${qa.answer}\n`
+        `Câu ${index + 1}. Câu hỏi: ${qa.question}\n  Nội dung câu trả lời của khách hàng: ${qa.answer}\n`
     )
     .join('\n');
 };
@@ -48,8 +48,12 @@ export const convertQuesAnsesToString = (
 /**
  * Prompt phân tích kết quả quiz và đề xuất nước hoa
  *
+ * QUYẾT ĐỊNH PHÂN 2 BƯỚC:
+ * 1. PHÂN TÍCH: Xác định sở thích từ quiz data (KHÔNG GỌI TOOL)
+ * 2. GỌI TOOL: Dựa trên kết quả phân tích, gọi tool tìm sản phẩm thực tế
+ *
  * YÊU CẦU OUTPUT có cấu trúc JSON gồm 2 field:
- *   - message: lời tư vấn thân thiện (string)
+ *   - message: lời tư vấn thân thiện (string) giải thích tại sao phù hợp
  *   - products: mảng sản phẩm thực tế lấy từ kết quả tool (array)
  */
 export const quizPrompt = (
@@ -58,3 +62,5 @@ export const quizPrompt = (
 Đây là kết quả quiz tư vấn nước hoa của một khách hàng, bao gồm các câu hỏi và câu trả lời của họ để hiểu sở thích và nhu cầu của khách hàng (Và vui lòng gọi các tool đã được cung cấp để lấy dữ liệu sản phẩm thực tế, đừng dựa vào trí nhớ hoặc phỏng đoán):
 ${convertQuesAnsesToString(quesAnses)}
 `;
+
+

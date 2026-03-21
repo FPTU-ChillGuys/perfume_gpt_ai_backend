@@ -1,4 +1,4 @@
-import { ToolChoice, ToolSet, UIMessage } from 'ai';
+import { LanguageModel, ToolChoice, ToolSet, UIMessage } from 'ai';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
 import {
@@ -8,7 +8,7 @@ import {
   textGenerationFromPromptToResultWithErrorHandler
 } from 'src/chatbot/chatbot';
 import { Injectable } from '@nestjs/common';
-import { aiModels } from 'src/chatbot/ai-model';
+import { aiModel } from 'src/chatbot/ai-model';
 
 @Injectable()
 export class AIHelper {
@@ -17,7 +17,8 @@ export class AIHelper {
     private tools?: ToolSet,
     private stopWhen?: number,
     private temperature?: number,
-    private toolChoice?: ToolChoice<ToolSet>
+    private toolChoice?: ToolChoice<ToolSet>,
+    private model? : LanguageModel
   ) {}
 
   async textGenerateFromPrompt(
@@ -28,7 +29,7 @@ export class AIHelper {
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
       const text = await textGenerationFromPromptToResultWithErrorHandler(
-        aiModels,
+        this.model || aiModel,
         prompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
@@ -50,7 +51,7 @@ export class AIHelper {
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
       const text = await textGenerationFromMessagesToResultWithErrorHandler(
-        aiModels,
+        this.model || aiModel,
         messages,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
@@ -72,7 +73,7 @@ export class AIHelper {
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
       const stream = streamTextGenerationFromPromptToResultWithErrorHandler(
-        aiModels,
+        this.model || aiModel,
         prompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
@@ -94,7 +95,7 @@ export class AIHelper {
     errorMessage?: string
   ): ReadableStream<any> {
     return streamTextGenerationFromMessagesToResultWithErrorHandler(
-      aiModels,
+      this.model || aiModel,
       messages,
       this.systemPrompt + (additionalSystemPrompt ?? ''),
       this.tools,

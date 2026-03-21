@@ -20,7 +20,6 @@ export class QuizProcessor extends WorkerHost {
     try {
       switch (job.name) {
         case QuizJobName.ADD_QUIZ_QUESTION_AND_ANSWER.toString():
-          console.log('Processing quiz job with data:', job.data);
           //   Call the service method to add quiz question and answer
           const quizQuesAnsDetail = new QuizQuesAnwsRequest({
             userId: job.data.userId,

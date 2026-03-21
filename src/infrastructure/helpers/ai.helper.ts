@@ -7,18 +7,26 @@ import {
   textGenerationFromMessagesToResultWithErrorHandler,
   textGenerationFromPromptToResultWithErrorHandler
 } from 'src/chatbot/chatbot';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { aiModel } from 'src/chatbot/ai-model';
+import {
+  PromptOptimizationConfig,
+  optimizePromptWithIntermediateModel,
+  optimizeUserMessageWithIntermediateModel
+} from 'src/infrastructure/utils/prompt-optimization.util';
 
 @Injectable()
 export class AIHelper {
+  private readonly logger = new Logger(AIHelper.name);
+
   constructor(
     private systemPrompt?: string,
     private tools?: ToolSet,
     private stopWhen?: number,
     private temperature?: number,
     private toolChoice?: ToolChoice<ToolSet>,
-    private model? : LanguageModel
+    private model?: LanguageModel,
+    private promptOptimizationConfig?: PromptOptimizationConfig
   ) {}
 
   async textGenerateFromPrompt(
@@ -28,9 +36,17 @@ export class AIHelper {
     errorMessage?: string
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
+      const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
+      const optimizedPrompt = await optimizePromptWithIntermediateModel(
+        prompt,
+        this.promptOptimizationConfig,
+        this.logger,
+        systemContext
+      );
+
       const text = await textGenerationFromPromptToResultWithErrorHandler(
         this.model || aiModel,
-        prompt,
+        optimizedPrompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
         errorMessage,
@@ -50,9 +66,17 @@ export class AIHelper {
     errorMessage?: string
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
+      const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
+      const optimizedMessages = await optimizeUserMessageWithIntermediateModel(
+        messages,
+        this.promptOptimizationConfig,
+        this.logger,
+        systemContext
+      );
+
       const text = await textGenerationFromMessagesToResultWithErrorHandler(
         this.model || aiModel,
-        messages,
+        optimizedMessages,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
         errorMessage,

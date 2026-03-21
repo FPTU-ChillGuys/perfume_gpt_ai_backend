@@ -38,3 +38,6 @@ export const deepSeek3_2: LanguageModel = openrouter("deepseek/deepseek-v3.2");
 export const ministral_8b_2512 : LanguageModel = openrouter("mistralai/ministral-8b-2512");
 
 export const ministral_14b_2512 : LanguageModel = openrouter("mistralai/ministral-14b-2512");
+
+export const gemma_3n_4B : LanguageModel = openrouter("google/gemma-3n-e4b-it");
+

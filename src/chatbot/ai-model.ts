@@ -3,3 +3,5 @@ import { deepSeek3_2, geminiFlash2_5, geminiFlash3, gemma3nE4bIt, glm47Flash, gp
 export const aiModel = geminiFlash2_5;
 
 export const aiModelForQuiz = ministral_14b_2512;
+
+export const aiModelForOptimizePrompt = gemma3nE4bIt;

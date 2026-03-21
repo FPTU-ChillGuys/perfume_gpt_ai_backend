@@ -32,7 +32,19 @@ const aiProvider: Provider = {
 const aiConversationProvider: Provider = {
   provide: AI_CONVERSATION_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(SYSTEM_PROMPT, tools.getToolsForChatbot, 10),
+    new AIHelper(
+      SYSTEM_PROMPT,
+      tools.getToolsForChatbot,
+      10,
+      undefined,
+      undefined,
+      undefined,
+      {
+        enablePromptOptimization: true,
+        optimizationPrompt:
+          'Use case: conversation tu van nuoc hoa. Giu nguyen intent cua nguoi dung, khong doi sang domain khac. Neu user dang yeu cau tim/goi y san pham thi giu cau truc de model chinh co the goi tool va tra ve dung format.'
+      }
+    ),
   inject: [Tools]
 };
 

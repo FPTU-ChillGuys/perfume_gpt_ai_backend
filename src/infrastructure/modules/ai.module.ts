@@ -4,7 +4,7 @@ import { Tools } from 'src/chatbot/utils/tools';
 import { Module, Provider } from '@nestjs/common';
 import { UnitOfWorkModule } from './unit-of-work.module';
 import { ToolModule } from './tool.module';
-import { aiModelForQuiz } from 'src/chatbot/ai-model';
+import { aiModelForQuiz, aiModelForTrend } from 'src/chatbot/ai-model';
 
 export const AI_HELPER = 'AI_HELPER';
 export const AI_CONVERSATION_HELPER = 'AI_CONVERSATION_HELPER';
@@ -51,7 +51,7 @@ const aiConversationProvider: Provider = {
 const aiTrendProvider: Provider = {
   provide: AI_TREND_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(SYSTEM_PROMPT, tools.getToolsForTrend, 10),
+    new AIHelper(SYSTEM_PROMPT, tools.getToolsForTrend, 10, undefined, undefined, aiModelForTrend),
   inject: [Tools]
 };
 

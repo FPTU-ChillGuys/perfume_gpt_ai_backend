@@ -4,4 +4,6 @@ export const aiModel = geminiFlash2_5;
 
 export const aiModelForQuiz = ministral_14b_2512;
 
+export const aiModelForTrend = ministral_14b_2512;
+
 export const aiModelForOptimizePrompt = gemma3nE4bIt;

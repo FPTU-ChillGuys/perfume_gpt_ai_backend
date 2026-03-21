@@ -40,14 +40,7 @@ export class ReviewTool {
                         const encodingResult = encodeToolOutput(reviews);
                         return {
                             success: true,
-                            data: reviews,
-                            encodedData: encodingResult.encoded,
-                            compressionInfo: {
-                                reviewCount: reviews.length,
-                                originalSize: `${encodingResult.originalSize} bytes`,
-                                encodedSize: `${encodingResult.encodedSize} bytes`,
-                                compressionRatio: `${encodingResult.compressionRatio}%`
-                            }
+                            encodedData: encodingResult.encoded
                         };
                     }
                     
@@ -139,14 +132,7 @@ export class ReviewTool {
                         const encodingResult = encodeToolOutput(data);
                         return {
                             success: true,
-                            data: data,
-                            encodedData: encodingResult.encoded,
-                            compressionInfo: {
-                                reviewCount: data.length,
-                                originalSize: `${encodingResult.originalSize} bytes`,
-                                encodedSize: `${encodingResult.encodedSize} bytes`,
-                                compressionRatio: `${encodingResult.compressionRatio}%`
-                            }
+                            encodedData: encodingResult.encoded
                         };
                     }
                     

@@ -25,7 +25,7 @@ export class InventoryTool {
     description:
       'Get current inventory stock for all product variants. ' +
       'Returns each variant with totalQuantity, reservedQuantity, lowStockThreshold, and status. ' +
-      'Large datasets are TOON-compressed to optimize token usage. ' +
+      'Output is TOON-compressed to optimize token usage. ' +
       'Use this as the primary data source for restock analysis.',
     inputSchema: z.object({}),
     execute: async () => {
@@ -55,23 +55,8 @@ export class InventoryTool {
             isLowStock: s.TotalQuantity <= s.LowStockThreshold
           }));
 
-          // Encode large datasets to optimize token usage
-          if (items.length > 5) {
-            const encodingResult = encodeToolOutput(items);
-            return {
-              success: true,
-              data: items,
-              encodedData: encodingResult.encoded,
-              compressionInfo: {
-                variantCount: items.length,
-                originalSize: `${encodingResult.originalSize} bytes`,
-                encodedSize: `${encodingResult.encodedSize} bytes`,
-                compressionRatio: `${encodingResult.compressionRatio}%`
-              }
-            };
-          }
-
-          return { success: true, data: items };
+          const encodingResult = encodeToolOutput(items);
+          return { success: true, encodedData: encodingResult.encoded };
         },
         'Error occurred while fetching inventory stock.',
         true
@@ -87,6 +72,7 @@ export class InventoryTool {
     description:
       'Get the 2 most recent AI-generated trend snapshots. ' +
       'Use this to understand which product groups are trending and adjust restock priority. ' +
+      'Output is TOON-compressed to reduce token usage. ' +
       'Do NOT use this to calculate sales velocity — only use for priority adjustment.',
     inputSchema: z.object({}),
     execute: async () => {
@@ -98,12 +84,13 @@ export class InventoryTool {
             { orderBy: { createdAt: 'DESC' }, limit: 2 }
           );
 
-          const data = logs.map((l) => ({
+          const fullData = logs.map((l) => ({
             createdAt: l.createdAt,
             trendData: l.trendData
           }));
 
-          return { success: true, data };
+          const encodingResult = encodeToolOutput(fullData);
+          return { success: true, encodedData: encodingResult.encoded };
         },
         'Error occurred while fetching trend logs.',
         true
@@ -112,7 +99,7 @@ export class InventoryTool {
   });
 
   /**
-   * Lấy dữ liệu phân tích bán hàng theo ngày cho tất cả variant (2 tháng gần nhất).
+   * Lấy dữ liệu phân tích bán hàng theo ngày cho tất cả variant (1 tháng gần nhất).
    * AI dùng tool này để dự đoán nhu cầu tái cấp hàng dựa trên xu hướng bán hàng của mỗi variant.
    * 
    * 🎯 Dữ liệu đã tối ưu: pre-computed metrics thay vì raw dailySalesData
@@ -121,7 +108,7 @@ export class InventoryTool {
     description:
       'Get optimized sales analytics for all product variants over the past 2 months. ' +
       'Returns variant information with pre-computed metrics (trend, volatility, last7Days, last30Days). ' +
-      'Token-optimized: uses TOON-encoded data instead of raw daily records. ' +
+      'Output is TOON-compressed to reduce token usage. ' +
       'Use this data to predict restock demand based on sales velocity patterns and trend signals.',
     inputSchema: z.object({}),
     execute: async () => {
@@ -151,9 +138,7 @@ export class InventoryTool {
                   last7DaysSales: variant.salesMetrics.last7DaysSales,
                   last30DaysSales: variant.salesMetrics.last30DaysSales,
                   trend: variant.salesMetrics.trend,
-                  volatility: variant.salesMetrics.volatility,
-                  // encodedData có thể dùng nếu cần raw data (TOON format)
-                  encodedData: variant.salesMetrics.encodedData
+                    volatility: variant.salesMetrics.volatility
                 }
               : null,
             
@@ -162,7 +147,8 @@ export class InventoryTool {
             basePrice: variant.basePrice
           }));
 
-          return { success: true, data: items };
+          const encodingResult = encodeToolOutput(items);
+          return { success: true, encodedData: encodingResult.encoded };
         },
         'Error occurred while fetching variant sales analytics.',
         true

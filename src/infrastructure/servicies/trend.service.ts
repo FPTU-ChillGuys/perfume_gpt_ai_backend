@@ -9,17 +9,23 @@ import {
   AITrendForecastStructuredResponse,
   AIResponseMetadata
 } from 'src/application/dtos/response/ai-structured.response';
-import { ProductResponse } from 'src/application/dtos/response/product.response';
 import {
   trendForecastingPrompt,
   INSTRUCTION_TYPE_TREND
 } from 'src/application/constant/prompts';
-import { convertSearchOutputToProductResponse, searchOutput } from 'src/chatbot/utils/output/search.output';
-import { productOutput } from 'src/chatbot/utils/output/product.output';
+import { convertProductCardOutputToProducts, searchOutput } from 'src/chatbot/utils/output/search.output';
+import { productOutput, ProductCardOutputItem, ProductCardVariantOutput } from 'src/chatbot/utils/output/product.output';
 import { AIHelper } from '../helpers/ai.helper';
 import { AI_TREND_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
 import { InventoryService } from './inventory.service';
+import { RestockService } from './restock.service';
+import { ProductCardResponse, ProductCardVariantResponse } from 'src/application/dtos/response/product-card.response';
+
+type VariantSalesSignal = {
+  last30DaysSales: number;
+  totalQuantitySold: number;
+};
 
 function buildTrendAnalysisContext(
   allUserLogRequest: AllUserLogRequest
@@ -38,8 +44,103 @@ export class TrendService {
   constructor(
     @Inject(AI_TREND_HELPER) private readonly aiHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
-    private readonly inventoryService: InventoryService
+    private readonly inventoryService: InventoryService,
+    private readonly restockService: RestockService
   ) {}
+
+  private async getVariantSalesSignalMap(
+    variantIds: Set<string>
+  ): Promise<Map<string, VariantSalesSignal>> {
+    const salesSignalMap = new Map<string, VariantSalesSignal>();
+
+    if (variantIds.size === 0) {
+      return salesSignalMap;
+    }
+
+    const analyticsResult = await this.restockService.getProductSalesAnalyticsForRestock();
+    if (!analyticsResult.success || !analyticsResult.payload) {
+      console.warn('[TrendProduct] Cannot load sales analytics for variant ranking.');
+      return salesSignalMap;
+    }
+
+    for (const variant of analyticsResult.payload) {
+      if (!variantIds.has(variant.variantId)) {
+        continue;
+      }
+
+      salesSignalMap.set(variant.variantId, {
+        last30DaysSales: variant.salesMetrics?.last30DaysSales ?? -1,
+        totalQuantitySold: variant.totalQuantitySold ?? -1
+      });
+    }
+
+    return salesSignalMap;
+  }
+
+  private rankVariantsBySalesPriority(
+    variants: ProductCardVariantOutput[],
+    salesSignalMap: Map<string, VariantSalesSignal>
+  ): ProductCardVariantResponse[] {
+    return [...variants]
+      .sort((left, right) => {
+        const leftSignal = salesSignalMap.get(left.id);
+        const rightSignal = salesSignalMap.get(right.id);
+
+        const leftLast30 = leftSignal?.last30DaysSales ?? -1;
+        const rightLast30 = rightSignal?.last30DaysSales ?? -1;
+        if (rightLast30 !== leftLast30) {
+          return rightLast30 - leftLast30;
+        }
+
+        const leftTotalSold = leftSignal?.totalQuantitySold ?? -1;
+        const rightTotalSold = rightSignal?.totalQuantitySold ?? -1;
+        if (rightTotalSold !== leftTotalSold) {
+          return rightTotalSold - leftTotalSold;
+        }
+
+        if (left.basePrice !== right.basePrice) {
+          return left.basePrice - right.basePrice;
+        }
+
+        if (left.volumeMl !== right.volumeMl) {
+          return left.volumeMl - right.volumeMl;
+        }
+
+        return left.id.localeCompare(right.id);
+      })
+      .map((variant) => ({
+        id: variant.id,
+        sku: variant.sku,
+        volumeMl: variant.volumeMl,
+        basePrice: variant.basePrice
+      }));
+  }
+
+  private toTrendProductCards(
+    products: ProductCardOutputItem[],
+    salesSignalMap: Map<string, VariantSalesSignal>
+  ): ProductCardResponse[] {
+    return products
+      .map((product) => {
+        const orderedVariants = this.rankVariantsBySalesPriority(product.variants, salesSignalMap);
+        const displayVariant = orderedVariants[0];
+
+        if (!displayVariant) {
+          return null;
+        }
+
+        return {
+          id: product.id,
+          name: product.name,
+          brandName: product.brandName,
+          primaryImage: product.primaryImage,
+          variants: orderedVariants,
+          sizesCount: orderedVariants.length,
+          displayPrice: displayVariant.basePrice
+        };
+      })
+      .filter((product): product is ProductCardResponse => product !== null);
+  }
 
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
   async generateTrendSummary(
@@ -78,7 +179,7 @@ export class TrendService {
   /** Lấy product từ xu hướng người dùng */
   async getTrendProducts(
     allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<ProductResponse[]>> {
+  ): Promise<BaseResponse<ProductCardResponse[]>> {
     const trendResult = await this.generateTrendSummary(allUserLogRequest, productOutput.schema);
     if (!trendResult.success) {
       throw new InternalServerErrorWithDetailsException('Failed to get AI trend response', {
@@ -87,7 +188,14 @@ export class TrendService {
         endpoint: 'TrendService.getTrendProducts'
       });
     }
-    const products = convertSearchOutputToProductResponse(trendResult.data ?? '');
+
+    const trendProducts = convertProductCardOutputToProducts(trendResult.data);
+    const variantIds = new Set(
+      trendProducts.flatMap((product) => product.variants.map((variant) => variant.id))
+    );
+    const salesSignalMap = await this.getVariantSalesSignalMap(variantIds);
+    const products = this.toTrendProductCards(trendProducts, salesSignalMap);
+
     return Ok(products);
   }
 

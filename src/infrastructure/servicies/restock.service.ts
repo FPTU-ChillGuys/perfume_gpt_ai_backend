@@ -37,7 +37,7 @@ export class RestockService {
       async () => {
         // Tính toán thời gian 2 tháng gần nhất
         const now = new Date();
-        const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+        const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
 
         // Lấy tất cả variant không bị xóa
         const variants = await this.prisma.productVariants.findMany({

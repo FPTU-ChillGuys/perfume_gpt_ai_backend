@@ -48,14 +48,7 @@ export class ProductTool {
             const encodingResult = encodeToolOutput(items);
             return {
               success: true,
-              data: items,
-              encodedData: encodingResult.encoded,
-              compressionInfo: {
-                productCount: items.length,
-                originalSize: `${encodingResult.originalSize} bytes`,
-                encodedSize: `${encodingResult.encodedSize} bytes`,
-                compressionRatio: `${encodingResult.compressionRatio}%`
-              }
+              encodedData: encodingResult.encoded
             };
           }
           
@@ -112,14 +105,7 @@ export class ProductTool {
             const encodingResult = encodeToolOutput(results);
             return {
               success: true,
-              data: results,
-              encodedData: encodingResult.encoded,
-              compressionInfo: {
-                productCount: results.length,
-                originalSize: `${encodingResult.originalSize} bytes`,
-                encodedSize: `${encodingResult.encodedSize} bytes`,
-                compressionRatio: `${encodingResult.compressionRatio}%`
-              }
+              encodedData: encodingResult.encoded
             };
           }
           

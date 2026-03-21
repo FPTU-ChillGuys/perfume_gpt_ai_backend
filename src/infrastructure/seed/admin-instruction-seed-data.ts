@@ -216,8 +216,9 @@ Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
   - getUserLogSummaryByWeek
   - getBestSellingProducts với pageNumber=1, pageSize<=10
   - getNewestProducts với pageNumber=1, pageSize<=10
-- Khuyến nghị gọi thêm để tăng độ chính xác:
+- Bắt buộc gọi thêm để xếp hạng variant theo bán chạy:
   - getProductSalesAnalyticsForRestock
+- Khuyến nghị gọi thêm để tăng độ chính xác:
   - getLatestTrendLogs
 
 2) BUILD CANDIDATE SET
@@ -272,6 +273,16 @@ Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
 - Chỉ chứa sản phẩm có thật từ tool đã gọi.
 - Không bịa ID, tên, SKU, số liệu.
 - Tối đa 10 phần tử, nếu không có dữ liệu thì trả [].
+- Mỗi product chỉ giữ đúng các field sau:
+  - id
+  - name
+  - brandName
+  - primaryImage
+  - variants: array các object chỉ gồm id, sku, volumeMl, basePrice
+- Với mỗi product, variants phải được sắp theo ưu tiên:
+  1. variant có salesMetrics.last30DaysSales cao hơn
+  2. nếu bằng nhau, ưu tiên totalQuantitySold cao hơn
+  3. nếu vẫn bằng hoặc thiếu dữ liệu sales, ưu tiên basePrice thấp hơn
 
 ### Quy tắc message
 - Không chào hỏi dài dòng, không giải thích nội bộ hệ thống.

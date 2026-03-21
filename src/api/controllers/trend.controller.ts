@@ -9,12 +9,12 @@ import { AITrendForecastStructuredResponse } from 'src/application/dtos/response
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
-import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
 import { CACHE_TTL_1WEEK } from 'src/infrastructure/cacheable/cacheable.constants';
 import { TrendService } from 'src/infrastructure/servicies/trend.service';
+import { ProductCardResponse } from 'src/application/dtos/response/product-card.response';
 
 const cachingTrendTTL = CACHE_TTL_1WEEK;
 
@@ -42,7 +42,7 @@ export class TrendController {
 
   async getProductFromTrend(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<ProductResponse[]>> {
+  ): Promise<BaseResponse<ProductCardResponse[]>> {
     return this.trendService.getTrendProducts(allUserLogRequest);
   }
 
@@ -52,13 +52,13 @@ export class TrendController {
   @Public()
   @Get("product/caching")
   @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng (caching)' })
-  @ApiBaseResponse(ProductResponse)
+  @ApiBaseResponse(ProductCardResponse)
   @ApiBody({ type: AllUserLogRequest })
   @CacheTTL(60 * 60 * 24 * 1000)
   @UseInterceptors(CacheInterceptor)
   async getProductFromTrendCaching(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<ProductResponse[]>> {
+  ): Promise<BaseResponse<ProductCardResponse[]>> {
     const trendResult = await this.getProductFromTrend(allUserLogRequest)
     return trendResult
   }
@@ -111,13 +111,13 @@ export class TrendController {
   @Public()
   @Get("product")
   @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
-  @ApiBaseResponse(ProductResponse)
+  @ApiBaseResponse(ProductCardResponse)
   @ApiBody({ type: AllUserLogRequest })
   @CacheTTL(1) // 1 ms
   @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
   async getProductNoCaching(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<ProductResponse[]>> {
+  ): Promise<BaseResponse<ProductCardResponse[]>> {
     const trendResult = await this.getProductFromTrend(allUserLogRequest)
     return trendResult
   }

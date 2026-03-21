@@ -55,6 +55,6 @@ export const convertQuesAnsesToString = (
 export const quizPrompt = (
   quesAnses: Array<{ question: string; answer: string }>
 ): string => `
-Đây là kết quả quiz tư vấn nước hoa của một khách hàng, bao gồm các câu hỏi và câu trả lời của họ:
+Đây là kết quả quiz tư vấn nước hoa của một khách hàng, bao gồm các câu hỏi và câu trả lời của họ để hiểu sở thích và nhu cầu của khách hàng (Và vui lòng gọi các tool đã được cung cấp để lấy dữ liệu sản phẩm thực tế, đừng dựa vào trí nhớ hoặc phỏng đoán):
 ${convertQuesAnsesToString(quesAnses)}
 `;

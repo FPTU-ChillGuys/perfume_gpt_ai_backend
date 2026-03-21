@@ -17,6 +17,7 @@ export class Tools {
   getToolsForRestock: ToolSet;
   getToolsForQuiz: ToolSet;
   getToolsForInventoryReport: ToolSet;
+  getToolsForReview: ToolSet;
 
   constructor(
     private readonly productTool: ProductTool,
@@ -77,6 +78,11 @@ export class Tools {
       // getUserById: this.profileTool.getUserById,
       getUserLogSummary: this.logTool.getUserLogSummary,
       getUserById: this.userTool.getUserById
+    };
+
+    this.getToolsForReview = {
+      getReviewStatisticsByVariantId: this.reviewTool.getReviewStatisticsByVariantId,
+      getReviewsByVariantId: this.reviewTool.getReviewsByVariantId
     };
   }
 }

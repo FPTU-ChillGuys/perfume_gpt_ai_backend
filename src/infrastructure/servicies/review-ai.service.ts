@@ -9,7 +9,7 @@ import {
   AIResponseMetadata
 } from 'src/application/dtos/response/ai-structured.response';
 import { AIHelper } from '../helpers/ai.helper';
-import { AI_HELPER } from '../modules/ai.module';
+import { AI_HELPER, AI_REVIEW_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
 import { ReviewService } from './review.service';
 
@@ -18,7 +18,7 @@ export class ReviewAIService {
   constructor(
     private readonly reviewService: ReviewService,
     private readonly adminInstructionService: AdminInstructionService,
-    @Inject(AI_HELPER) private readonly aiHelper: AIHelper
+    @Inject(AI_REVIEW_HELPER) private readonly aiHelper: AIHelper
   ) {}
 
   /** Tóm tắt tất cả đánh giá bằng AI */

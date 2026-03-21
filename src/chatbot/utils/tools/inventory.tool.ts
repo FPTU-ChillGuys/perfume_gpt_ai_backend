@@ -4,6 +4,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { UnitOfWork } from 'src/infrastructure/repositories/unit-of-work';
 import { RestockService } from 'src/infrastructure/servicies/restock.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { encodeToolOutput } from '../toon-encoder.util';
 import * as z from 'zod';
 
 @Injectable()
@@ -24,6 +25,7 @@ export class InventoryTool {
     description:
       'Get current inventory stock for all product variants. ' +
       'Returns each variant with totalQuantity, reservedQuantity, lowStockThreshold, and status. ' +
+      'Large datasets are TOON-compressed to optimize token usage. ' +
       'Use this as the primary data source for restock analysis.',
     inputSchema: z.object({}),
     execute: async () => {
@@ -52,6 +54,22 @@ export class InventoryTool {
             lowStockThreshold: s.LowStockThreshold,
             isLowStock: s.TotalQuantity <= s.LowStockThreshold
           }));
+
+          // Encode large datasets to optimize token usage
+          if (items.length > 5) {
+            const encodingResult = encodeToolOutput(items);
+            return {
+              success: true,
+              data: items,
+              encodedData: encodingResult.encoded,
+              compressionInfo: {
+                variantCount: items.length,
+                originalSize: `${encodingResult.originalSize} bytes`,
+                encodedSize: `${encodingResult.encodedSize} bytes`,
+                compressionRatio: `${encodingResult.compressionRatio}%`
+              }
+            };
+          }
 
           return { success: true, data: items };
         },

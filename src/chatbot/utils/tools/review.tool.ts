@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { ReviewService } from 'src/infrastructure/servicies/review.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { encodeToolOutput } from '../toon-encoder.util';
 import * as z from 'zod';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class ReviewTool {
         description:
             'Get all customer reviews for a specific product variant. ' +
             'Returns review content, rating, user info, and attached images. ' +
+            'Large review lists are TOON-compressed to optimize token usage. ' +
             'Use this when the user asks about opinions, feedback, or reviews for a product.',
         inputSchema: z.object({
             variantId: z.string().describe('The ID of the product variant to fetch reviews for')
@@ -30,7 +32,26 @@ export class ReviewTool {
                     if (!response.success) {
                         return { success: false, error: `Failed to fetch reviews for variant ${input.variantId}.` };
                     }
-                    return { success: true, data: response.payload ?? [] };
+                    
+                    const reviews = response.payload ?? [];
+                    
+                    // Encode large datasets to optimize token usage
+                    if (Array.isArray(reviews) && reviews.length > 5) {
+                        const encodingResult = encodeToolOutput(reviews);
+                        return {
+                            success: true,
+                            data: reviews,
+                            encodedData: encodingResult.encoded,
+                            compressionInfo: {
+                                reviewCount: reviews.length,
+                                originalSize: `${encodingResult.originalSize} bytes`,
+                                encodedSize: `${encodingResult.encodedSize} bytes`,
+                                compressionRatio: `${encodingResult.compressionRatio}%`
+                            }
+                        };
+                    }
+                    
+                    return { success: true, data: reviews };
                 },
                 'Error occurred while fetching reviews.',
                 true
@@ -75,6 +96,7 @@ export class ReviewTool {
             'Get a paginated list of reviews with optional filters. ' +
             'Can filter by variantId, userId, approval status (Pending/Approved/Rejected), ' +
             'minimum/maximum rating, or whether the review has images. ' +
+            'Large datasets are TOON-compressed to optimize token usage. ' +
             'Use this when the user wants to browse or compare multiple reviews.',
         inputSchema: z.object({
             pageNumber: z.number().min(1).optional().default(1),
@@ -110,7 +132,25 @@ export class ReviewTool {
                     if (!response.success) {
                         return { success: false, error: 'Failed to fetch paged reviews.' };
                     }
-                    return { success: true, data: response.payload ?? null };
+                    
+                    const data = response.payload ?? null;
+                    // If payload is an array, optionally encode it
+                    if (Array.isArray(data) && data.length > 5) {
+                        const encodingResult = encodeToolOutput(data);
+                        return {
+                            success: true,
+                            data: data,
+                            encodedData: encodingResult.encoded,
+                            compressionInfo: {
+                                reviewCount: data.length,
+                                originalSize: `${encodingResult.originalSize} bytes`,
+                                encodedSize: `${encodingResult.encodedSize} bytes`,
+                                compressionRatio: `${encodingResult.compressionRatio}%`
+                            }
+                        };
+                    }
+                    
+                    return { success: true, data };
                 },
                 'Error occurred while fetching paged reviews.',
                 true

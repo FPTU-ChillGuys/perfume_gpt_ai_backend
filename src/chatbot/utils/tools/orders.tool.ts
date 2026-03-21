@@ -9,6 +9,7 @@ import {
 import { OrderService } from 'src/infrastructure/servicies/order.service';
 import { UserService } from 'src/infrastructure/servicies/user.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { encodeToolOutput } from '../toon-encoder.util';
 import * as z from 'zod';
 
 @Injectable()
@@ -18,7 +19,8 @@ export class OrderTool {
   constructor(private readonly orderService: OrderService, private readonly userService: UserService) {}
 
   getOrdersByUserId: Tool = tool({
-    description: 'Get all orders for a specific user with pagination and sorting.',
+    description: 'Get all orders for a specific user with pagination and sorting. ' +
+      'Returns orders with TOON compression for large datasets to optimize token usage.',
     inputSchema: z.object({
       userId: z.string().describe('The ID of the user'),
       pageNumber: z.number().min(1).optional().default(1),
@@ -39,7 +41,26 @@ export class OrderTool {
           if (!response.success) {
             return { success: false, error: `Failed to fetch orders for user ${input.userId}.` };
           }
-          return { success: true, data: response.payload?.items || [] };
+          
+          const items = response.payload?.items || [];
+          
+          // Encode large datasets to optimize token usage
+          if (items.length > 5) {
+            const encodingResult = encodeToolOutput(items);
+            return {
+              success: true,
+              data: items,
+              encodedData: encodingResult.encoded,
+              compressionInfo: {
+                itemCount: items.length,
+                originalSize: `${encodingResult.originalSize} bytes`,
+                encodedSize: `${encodingResult.encodedSize} bytes`,
+                compressionRatio: `${encodingResult.compressionRatio}%`
+              }
+            };
+          }
+          
+          return { success: true, data: items };
         },
         'Error occurred while fetching user orders.',
         true
@@ -71,7 +92,8 @@ export class OrderTool {
 
   getOrderDetailsWithOrdersByUserId: Tool = tool({
     description:
-      'Get all detailed order information for a user including items, amounts, and status.',
+      'Get all detailed order information for a user including items, amounts, and status. ' +
+      'Large datasets are TOON-compressed to optimize token usage.',
     inputSchema: z.object({
       userId: z.string().describe('The ID of the user'),
     }),
@@ -86,7 +108,26 @@ export class OrderTool {
           if (!response.success) {
             return { success: false, error: `Failed to fetch order details for user ${input.userId}.` };
           }
-          return { success: true, data: response.data || [] };
+          
+          const data = response.data || [];
+          
+          // Encode large datasets to optimize token usage
+          if (Array.isArray(data) && data.length > 5) {
+            const encodingResult = encodeToolOutput(data);
+            return {
+              success: true,
+              data: data,
+              encodedData: encodingResult.encoded,
+              compressionInfo: {
+                itemCount: data.length,
+                originalSize: `${encodingResult.originalSize} bytes`,
+                encodedSize: `${encodingResult.encodedSize} bytes`,
+                compressionRatio: `${encodingResult.compressionRatio}%`
+              }
+            };
+          }
+          
+          return { success: true, data };
         },
         'Error occurred while fetching order details.',
         true

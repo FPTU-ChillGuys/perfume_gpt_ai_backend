@@ -4,6 +4,7 @@ import { productDetailTabsContent } from 'src/application/constant/productDetail
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
 import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { encodeToolOutput } from '../toon-encoder.util';
 import * as z from 'zod';
 
 @Injectable()
@@ -13,7 +14,8 @@ export class ProductTool {
   constructor(private readonly productService: ProductService) {}
 
   getAllProducts: Tool = tool({
-    description: 'Get a list of all products available in the store.',
+    description: 'Get a list of all products available in the store. ' +
+      'Large product lists are TOON-compressed to optimize token usage.',
     inputSchema: z.object({
       pageNumber: z.number().min(1).optional().default(1),
       pageSize: z.number().min(1).max(100).optional().default(10),
@@ -38,7 +40,26 @@ export class ProductTool {
           if (!response.success) {
             return { success: false, error: 'Failed to fetch products.' };
           }
-          return { success: true, data: response.data?.items || [] };
+          
+          const items = response.data?.items || [];
+          
+          // Encode large datasets to optimize token usage
+          if (items.length > 5) {
+            const encodingResult = encodeToolOutput(items);
+            return {
+              success: true,
+              data: items,
+              encodedData: encodingResult.encoded,
+              compressionInfo: {
+                productCount: items.length,
+                originalSize: `${encodingResult.originalSize} bytes`,
+                encodedSize: `${encodingResult.encodedSize} bytes`,
+                compressionRatio: `${encodingResult.compressionRatio}%`
+              }
+            };
+          }
+          
+          return { success: true, data: items };
         },
         'Error occurred while fetching products.',
         true
@@ -47,7 +68,8 @@ export class ProductTool {
   });
 
   searchProduct: Tool = tool({
-    description: 'Get a list of all products available in the store.',
+    description: 'Search and get a list of products from the store. ' +
+      'Large result sets are TOON-compressed to optimize token usage.',
     inputSchema: z.object({
       searches: z.array(
         z.object({
@@ -84,6 +106,23 @@ export class ProductTool {
               results = results.concat(response.payload.items ?? []);
             }
           }
+          
+          // Encode large result sets to optimize token usage
+          if (results.length > 5) {
+            const encodingResult = encodeToolOutput(results);
+            return {
+              success: true,
+              data: results,
+              encodedData: encodingResult.encoded,
+              compressionInfo: {
+                productCount: results.length,
+                originalSize: `${encodingResult.originalSize} bytes`,
+                encodedSize: `${encodingResult.encodedSize} bytes`,
+                compressionRatio: `${encodingResult.compressionRatio}%`
+              }
+            };
+          }
+          
           return { success: true, data: results || [] };
         },
         'Error occurred while fetching products.',

@@ -46,25 +46,29 @@ export class Tools {
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
       getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts
     };
 
     this.getToolsForTrend = {
-      // getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek
+      getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek,
+      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
+      getProductSalesAnalyticsForRestock:
+        this.inventoryTool.getProductSalesAnalyticsForRestock
     };
 
     this.getToolsForRestock = {
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
-      getProductSalesAnalyticsForRestockz: this.inventoryTool.getProductSalesAnalyticsForRestock
+      getProductSalesAnalyticsForRestockz:
+        this.inventoryTool.getProductSalesAnalyticsForRestock
     };
 
     this.getToolsForInventoryReport = {
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
-      getProductSalesAnalyticsForRestockz: this.inventoryTool.getProductSalesAnalyticsForRestock
+      getProductSalesAnalyticsForRestockz:
+        this.inventoryTool.getProductSalesAnalyticsForRestock
     };
 
     this.getToolsForRecomendationAndRepurchase = {
@@ -81,7 +85,8 @@ export class Tools {
     };
 
     this.getToolsForReview = {
-      getReviewStatisticsByVariantId: this.reviewTool.getReviewStatisticsByVariantId,
+      getReviewStatisticsByVariantId:
+        this.reviewTool.getReviewStatisticsByVariantId,
       getReviewsByVariantId: this.reviewTool.getReviewsByVariantId
     };
   }

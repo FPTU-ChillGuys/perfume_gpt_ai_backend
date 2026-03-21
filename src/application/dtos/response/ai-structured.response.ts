@@ -67,6 +67,13 @@ export class AITrendForecastStructuredResponse {
   @ApiProperty({ description: 'Nội dung dự báo xu hướng' })
   forecast: string;
 
+  /** Danh sách item đã chấm điểm trend */
+  @ApiProperty({
+    description: 'Danh sách sản phẩm đã được xếp hạng theo trend score',
+    type: () => [AITrendItemStructuredResponse]
+  })
+  trendItems: AITrendItemStructuredResponse[];
+
   /** Khoảng thời gian phân tích */
   @ApiProperty({ description: 'Khoảng thời gian phân tích' })
   period: string;
@@ -84,6 +91,54 @@ export class AITrendForecastStructuredResponse {
   metadata?: AIResponseMetadata;
 
   constructor(init?: Partial<AITrendForecastStructuredResponse>) {
+    Object.assign(this, init);
+  }
+}
+
+export class AITrendSignalStructuredResponse {
+  @ApiProperty({ description: 'Tên tín hiệu', example: 'BEST_SELLER_SUPPORT' })
+  code: string;
+
+  @ApiProperty({ description: 'Mô tả tín hiệu', example: 'Sản phẩm có hỗ trợ từ dữ liệu bán chạy.' })
+  description: string;
+
+  constructor(init?: Partial<AITrendSignalStructuredResponse>) {
+    Object.assign(this, init);
+  }
+}
+
+export class AITrendItemStructuredResponse {
+  @ApiProperty({ description: 'ID sản phẩm', format: 'uuid' })
+  productId: string;
+
+  @ApiProperty({ description: 'Tên sản phẩm' })
+  productName: string;
+
+  @ApiProperty({ description: 'ID variant đại diện', format: 'uuid', nullable: true })
+  variantId: string | null;
+
+  @ApiProperty({ description: 'Điểm trend (0-100)', example: 82 })
+  trendScore: number;
+
+  @ApiProperty({ description: 'Độ tin cậy (0-100)', example: 76 })
+  confidence: number;
+
+  @ApiProperty({ description: 'Nhãn hiển thị trend', example: 'Rising' })
+  badgeType: string;
+
+  @ApiProperty({
+    description: 'Các tín hiệu chính dùng để giải thích vì sao sản phẩm trend',
+    type: () => [AITrendSignalStructuredResponse]
+  })
+  signals: AITrendSignalStructuredResponse[];
+
+  @ApiProperty({ description: 'Tổng bán 7 ngày gần nhất', example: 35 })
+  last7DaysSales: number;
+
+  @ApiProperty({ description: 'Tổng bán 30 ngày gần nhất', example: 110 })
+  last30DaysSales: number;
+
+  constructor(init?: Partial<AITrendItemStructuredResponse>) {
     Object.assign(this, init);
   }
 }

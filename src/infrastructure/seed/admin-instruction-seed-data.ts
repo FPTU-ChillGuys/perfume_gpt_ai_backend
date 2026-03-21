@@ -212,8 +212,10 @@ Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
   - BẮT BUỘC gọi getUserLogSummaryByWeek trước để lấy bức tranh hành vi toàn hệ trong tuần.
   - BẮT BUỘC gọi getBestSellingProducts để lấy danh sách bán chạy (ưu tiên pageNumber = 1, pageSize = 10).
   - BẮT BUỘC gọi getNewestProducts để lấy danh sách sản phẩm mới (ưu tiên pageNumber = 1, pageSize = 10).
+  - KHI CẦN xác thực động lượng bán: gọi thêm getProductSalesAnalyticsForRestock để đọc tín hiệu last7DaysSales/last30DaysSales, trend, volatility.
+  - KHI CẦN đối chiếu snapshot gần nhất: gọi thêm getLatestTrendLogs.
   - Với mọi tool product (getBestSellingProducts/getNewestProducts/getAllProducts/searchProduct), pageSize TUYỆT ĐỐI không vượt quá 10.
-  - Chỉ gọi đúng các tool cần thiết, tối đa 3 lần để tránh spam tool.
+  - Chỉ gọi đúng các tool cần thiết, tối đa 5 lần để tránh spam tool.
 
   ## BƯỚC 2: CÁCH ĐỌC getUserLogSummaryByWeek
   Tool này trả về 6 phần chính:
@@ -256,7 +258,8 @@ Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
       - Nếu dữ liệu log toàn hệ mỏng, phải ghi rõ đây là tín hiệu tạm thời thay vì khẳng định chắc chắn.
 
   ## TỰ KIỂM TRA TRƯỚC KHI TRẢ KẾT QUẢ
-      - Đã gọi đúng getAggregatedUserLogSummary, getBestSellingProducts và getNewestProducts chưa?
+      - Đã gọi đúng getUserLogSummaryByWeek, getBestSellingProducts và getNewestProducts chưa?
+    - Nếu dùng thêm tín hiệu sâu, đã gọi đúng getProductSalesAnalyticsForRestock hoặc getLatestTrendLogs chưa?
   - Đã đọc đúng vai trò của totalEvents, logSummary, featureSnapshot, dailyLogSummary và dailyFeatureSnapshot chưa?
   - Khi dữ liệu ít, message có chuyển trọng tâm sang best-seller/newest và nói rõ độ tin cậy chưa?
   - Có sản phẩm nào trong message không tồn tại trong products không?

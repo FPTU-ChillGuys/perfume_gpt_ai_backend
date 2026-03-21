@@ -54,7 +54,9 @@ export class Tools {
       searchProduct: this.productTool.searchProduct,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek
+      getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek,
+      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
+      getProductSalesAnalyticsForRestock: this.inventoryTool.getProductSalesAnalyticsForRestock
     };
 
     this.getToolsForRestock = {

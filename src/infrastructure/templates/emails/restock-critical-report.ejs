@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Critical Restock Report</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f6f8fb;
+        color: #1f2937;
+      }
+      .wrapper {
+        max-width: 720px;
+        margin: 24px auto;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .header {
+        background: #0f172a;
+        color: #ffffff;
+        padding: 20px 24px;
+      }
+      .content {
+        padding: 20px 24px;
+      }
+      .badge {
+        display: inline-block;
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 4px 10px;
+        margin-bottom: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+      }
+      th,
+      td {
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 10px 6px;
+        font-size: 14px;
+        vertical-align: top;
+      }
+      th {
+        color: #334155;
+        background: #f8fafc;
+      }
+      .muted {
+        color: #64748b;
+        font-size: 13px;
+      }
+      .footer {
+        padding: 16px 24px 24px;
+      }
+      .btn {
+        display: inline-block;
+        text-decoration: none;
+        background: #b91c1c;
+        color: #ffffff;
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="header">
+        <h2 style="margin: 0">Daily Critical Restock Report</h2>
+      </div>
+
+      <div class="content">
+        <div class="badge">Critical Alerts: <%= criticalCount %></div>
+        <p>Hello <%= userName %>,</p>
+        <p>The system detected <strong><%= criticalCount %></strong> critical SKU(s) that require immediate restock action.</p>
+        <p class="muted">Generated at: <%= generatedAt %></p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>SKU</th>
+              <th>Current Stock</th>
+              <th>Threshold</th>
+              <th>Issue</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% items.forEach((item) => { %>
+            <tr>
+              <td><%= item.product %></td>
+              <td><%= item.sku %></td>
+              <td><strong><%= item.stock %></strong></td>
+              <td><%= item.threshold %></td>
+              <td><%= item.issue %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="footer">
+        <a class="btn" href="<%= frontendUrl %>">Open Inventory Dashboard</a>
+        <p class="muted" style="margin-top: 14px">This is an automated email. Please do not reply.</p>
+      </div>
+    </div>
+  </body>
+</html>

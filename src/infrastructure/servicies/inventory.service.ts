@@ -34,6 +34,20 @@ import {
 } from 'src/application/dtos/response/ai-structured.response';
 import { restockOutput } from 'src/chatbot/utils/output/restock.output';
 
+type RestockVariantResult = {
+  id: string;
+  sku: string;
+  productName: string;
+  volumeMl: number;
+  type: string;
+  basePrice: number;
+  status: string;
+  concentrationName: string | null;
+  totalQuantity: number;
+  reservedQuantity: number;
+  suggestedRestockQuantity: number;
+};
+
 @Injectable()
 export class InventoryService {
   constructor(
@@ -43,6 +57,76 @@ export class InventoryService {
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService
   ) {}
+
+  private async ensureCriticalLowStockIncluded(
+    restockData: unknown
+  ): Promise<{ variants: RestockVariantResult[] }> {
+    const safeData =
+      typeof restockData === 'object' && restockData !== null
+        ? (restockData as { variants?: RestockVariantResult[] })
+        : {};
+    const currentVariants = Array.isArray(safeData.variants)
+      ? [...safeData.variants]
+      : [];
+
+    const criticalStocks = await this.prisma.stocks.findMany({
+      where: {
+        ProductVariants: {
+          IsDeleted: false,
+          Products: { IsDeleted: false }
+        },
+        TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold }
+      },
+      include: {
+        ProductVariants: {
+          include: {
+            Products: true,
+            Concentrations: true
+          }
+        }
+      }
+    });
+
+    if (criticalStocks.length === 0) {
+      return { variants: currentVariants };
+    }
+
+    const existingIds = new Set(currentVariants.map((item) => item.id));
+    for (const stock of criticalStocks) {
+      if (existingIds.has(stock.VariantId)) {
+        continue;
+      }
+
+      const status = stock.ProductVariants.Status;
+      const isInactive = status === 'Inactive' || status === 'Discontinue';
+      const suggestedRestockQuantity = isInactive
+        ? 0
+        : Math.max(stock.LowStockThreshold * 2 - stock.TotalQuantity, stock.LowStockThreshold * 2);
+
+      currentVariants.push({
+        id: stock.VariantId,
+        sku: stock.ProductVariants.Sku,
+        productName: stock.ProductVariants.Products.Name,
+        volumeMl: stock.ProductVariants.VolumeMl,
+        type: stock.ProductVariants.Type,
+        basePrice: Number(stock.ProductVariants.BasePrice),
+        status,
+        concentrationName: stock.ProductVariants.Concentrations.Name,
+        totalQuantity: stock.TotalQuantity,
+        reservedQuantity: stock.ReservedQuantity,
+        suggestedRestockQuantity
+      });
+    }
+
+    currentVariants.sort((left, right) => {
+      if (right.suggestedRestockQuantity !== left.suggestedRestockQuantity) {
+        return right.suggestedRestockQuantity - left.suggestedRestockQuantity;
+      }
+      return left.totalQuantity - right.totalQuantity;
+    });
+
+    return { variants: currentVariants };
+  }
 
   async getInventoryStock(
     request: InventoryStockRequest 
@@ -415,14 +499,14 @@ export class InventoryService {
       );
     }
 
-    const restockDataStr =
-      typeof aiResponse.data === 'string'
-        ? aiResponse.data
-        : JSON.stringify(aiResponse.data);
+    const normalizedResult = await this.ensureCriticalLowStockIncluded(
+      aiResponse.data
+    );
+    const restockDataStr = JSON.stringify(normalizedResult);
     this.createInventoryLog(restockDataStr, InventoryLogType.RESTOCK).catch(
       (err) => console.error('Failed to save restock log:', err)
     );
 
-    return Ok(aiResponse.data);
+    return Ok(normalizedResult);
   }
 }

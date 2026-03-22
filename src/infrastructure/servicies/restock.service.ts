@@ -26,6 +26,7 @@ export interface ProductVariantSalesCandidate {
   volumeMl: number;
   basePrice: number;
   status: string;
+  isCriticalStock: boolean;
   totalQuantitySold: number;
   averageDailySales: number;
   last7DaysSales: number;
@@ -37,6 +38,7 @@ export interface ProductVariantSalesCandidate {
 export interface ProductSalesAnalyticsCandidate {
   productName: string;
   variantCount: number;
+  hasCriticalStock: boolean;
   totalQuantitySold: number;
   averageDailySales: number;
   last7DaysSales: number;
@@ -82,7 +84,8 @@ export class RestockService {
   private buildProductCandidates(
     variants: VariantSalesAnalyticsResponse[],
     mode: CandidateMode,
-    limit: number
+    limit: number,
+    criticalVariantIds: Set<string> = new Set<string>()
   ): ProductSalesAnalyticsCandidate[] {
     const byProduct = new Map<string, ProductSalesAnalyticsCandidate>();
 
@@ -93,7 +96,7 @@ export class RestockService {
 
       const shouldInclude = mode === 'trend'
         ? (last30DaysSales > 0 || totalQuantitySold > 0)
-        : totalQuantitySold > 0;
+        : (totalQuantitySold > 0 || criticalVariantIds.has(variant.variantId));
 
       if (!shouldInclude) {
         continue;
@@ -103,6 +106,7 @@ export class RestockService {
       const current = byProduct.get(key) ?? {
         productName: variant.productName,
         variantCount: 0,
+        hasCriticalStock: false,
         totalQuantitySold: 0,
         averageDailySales: 0,
         last7DaysSales: 0,
@@ -113,6 +117,8 @@ export class RestockService {
       };
 
       current.variantCount += 1;
+      current.hasCriticalStock =
+        current.hasCriticalStock || criticalVariantIds.has(variant.variantId);
       current.totalQuantitySold += totalQuantitySold;
       current.averageDailySales += variant.averageDailySales ?? 0;
       current.last7DaysSales += last7DaysSales;
@@ -123,6 +129,7 @@ export class RestockService {
         volumeMl: variant.volumeMl,
         basePrice: variant.basePrice,
         status: variant.status,
+        isCriticalStock: criticalVariantIds.has(variant.variantId),
         totalQuantitySold,
         averageDailySales: variant.averageDailySales ?? 0,
         last7DaysSales,
@@ -162,12 +169,79 @@ export class RestockService {
 
     return candidates
       .sort((left, right) => {
+        if (left.hasCriticalStock !== right.hasCriticalStock) {
+          return Number(right.hasCriticalStock) - Number(left.hasCriticalStock);
+        }
         if (right.totalQuantitySold !== left.totalQuantitySold) {
           return right.totalQuantitySold - left.totalQuantitySold;
         }
         return right.last30DaysSales - left.last30DaysSales;
       })
-      .slice(0, limit);
+      .slice(0, Math.max(limit, candidates.filter((item) => item.hasCriticalStock).length));
+  }
+
+  private async getCriticalLowStockVariants(
+    knownVariantIds: Set<string>
+  ): Promise<{ variants: VariantSalesAnalyticsResponse[]; ids: Set<string> }> {
+    const stocks = await this.prisma.stocks.findMany({
+      where: {
+        ProductVariants: {
+          IsDeleted: false,
+          Products: { IsDeleted: false }
+        },
+        TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold }
+      },
+      include: {
+        ProductVariants: {
+          include: {
+            Products: true,
+            Concentrations: true
+          }
+        }
+      }
+    });
+
+    const ids = new Set<string>();
+    const variants: VariantSalesAnalyticsResponse[] = [];
+    const now = new Date();
+    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+
+    for (const stock of stocks) {
+      const variantId = stock.VariantId;
+      ids.add(variantId);
+      if (knownVariantIds.has(variantId)) {
+        continue;
+      }
+
+      variants.push(
+        new VariantSalesAnalyticsResponse({
+          variantId,
+          sku: stock.ProductVariants.Sku,
+          productName: stock.ProductVariants.Products.Name,
+          volumeMl: stock.ProductVariants.VolumeMl,
+          type: stock.ProductVariants.Type,
+          basePrice: Number(stock.ProductVariants.BasePrice),
+          status: stock.ProductVariants.Status,
+          concentrationName: stock.ProductVariants.Concentrations.Name,
+          dailySalesData: [],
+          totalQuantitySold: 0,
+          totalRevenue: 0,
+          averageDailySales: 0,
+          periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
+          periodEndDate: now.toISOString().split('T')[0],
+          daysWithSalesCount: 0,
+          salesMetrics: {
+            last7DaysSales: 0,
+            last30DaysSales: 0,
+            trend: 'STABLE',
+            volatility: 'LOW',
+            encodedData: null
+          }
+        })
+      );
+    }
+
+    return { variants, ids };
   }
 
   async getProductSalesAnalyticsForTrendCandidates(
@@ -198,9 +272,20 @@ export class RestockService {
       };
     }
 
+    const knownVariantIds = new Set(
+      analyticsResult.payload.map((item) => item.variantId)
+    );
+    const criticalVariants = await this.getCriticalLowStockVariants(knownVariantIds);
+    const enrichedVariants = [...analyticsResult.payload, ...criticalVariants.variants];
+
     return {
       success: true,
-      payload: this.buildProductCandidates(analyticsResult.payload, 'restock', limit)
+      payload: this.buildProductCandidates(
+        enrichedVariants,
+        'restock',
+        limit,
+        criticalVariants.ids
+      )
     };
   }
 

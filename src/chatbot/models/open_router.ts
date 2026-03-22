@@ -45,3 +45,5 @@ export const gpt5_4nano : LanguageModel = openrouter("openai/gpt-5.4-nano");
 
 export const grok_4_1_fast : LanguageModel = openrouter("x-ai/grok-4.1-fast");
 
+export const llama_3_1_8b_instruct : LanguageModel = openrouter("meta-llama/llama-3.1-8b-instruct")
+

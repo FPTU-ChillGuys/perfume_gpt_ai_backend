@@ -4,7 +4,7 @@ import { Tools } from 'src/chatbot/utils/tools';
 import { Module, Provider } from '@nestjs/common';
 import { UnitOfWorkModule } from './unit-of-work.module';
 import { ToolModule } from './tool.module';
-import { aiModelForQuiz, aiModelForTrend } from 'src/chatbot/ai-model';
+import { aiModelForQuiz, aiModelForRestock, aiModelForTrend } from 'src/chatbot/ai-model';
 
 export const AI_HELPER = 'AI_HELPER';
 export const AI_CONVERSATION_HELPER = 'AI_CONVERSATION_HELPER';
@@ -78,7 +78,7 @@ const aiRecommendationProvider: Provider = {
 const aiRestockProvider: Provider = {
   provide: AI_RESTOCK_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(SYSTEM_PROMPT, tools.getToolsForRestock, 10, 0),
+    new AIHelper(SYSTEM_PROMPT, tools.getToolsForRestock, 10, 0, 'auto', aiModelForRestock, undefined, 300000),
   inject: [Tools]
 };
 

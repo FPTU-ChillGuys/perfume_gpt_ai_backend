@@ -18,6 +18,34 @@ type VariantWithRelations = Prisma.ProductVariantsGetPayload<{
   include: typeof variantInclude;
 }>;
 
+type CandidateMode = 'trend' | 'restock';
+
+export interface ProductVariantSalesCandidate {
+  variantId: string;
+  sku: string;
+  volumeMl: number;
+  basePrice: number;
+  status: string;
+  totalQuantitySold: number;
+  averageDailySales: number;
+  last7DaysSales: number;
+  last30DaysSales: number;
+  trend: 'INCREASING' | 'STABLE' | 'DECLINING';
+  volatility: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface ProductSalesAnalyticsCandidate {
+  productName: string;
+  variantCount: number;
+  totalQuantitySold: number;
+  averageDailySales: number;
+  last7DaysSales: number;
+  last30DaysSales: number;
+  salesTrend: 'INCREASING' | 'STABLE' | 'DECLINING';
+  volatility: 'LOW' | 'MEDIUM' | 'HIGH';
+  variants: ProductVariantSalesCandidate[];
+}
+
 /**
  * Service xử lý dữ liệu phân tích bán hàng variant để dự đoán tái cấp hàng
  * Lấy dữ liệu bán hàng từ 2 tháng gần nhất
@@ -25,6 +53,156 @@ type VariantWithRelations = Prisma.ProductVariantsGetPayload<{
 @Injectable()
 export class RestockService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private inferAggregateTrend(last7DaysSales: number, last30DaysSales: number): 'INCREASING' | 'STABLE' | 'DECLINING' {
+    if (last30DaysSales <= 0) {
+      return 'STABLE';
+    }
+
+    const baseline = last30DaysSales / 4;
+    if (last7DaysSales > baseline * 1.15) {
+      return 'INCREASING';
+    }
+    if (last7DaysSales < baseline * 0.85) {
+      return 'DECLINING';
+    }
+    return 'STABLE';
+  }
+
+  private inferAggregateVolatility(values: Array<'LOW' | 'MEDIUM' | 'HIGH'>): 'LOW' | 'MEDIUM' | 'HIGH' {
+    if (values.includes('HIGH')) {
+      return 'HIGH';
+    }
+    if (values.includes('MEDIUM')) {
+      return 'MEDIUM';
+    }
+    return 'LOW';
+  }
+
+  private buildProductCandidates(
+    variants: VariantSalesAnalyticsResponse[],
+    mode: CandidateMode,
+    limit: number
+  ): ProductSalesAnalyticsCandidate[] {
+    const byProduct = new Map<string, ProductSalesAnalyticsCandidate>();
+
+    for (const variant of variants) {
+      const last7DaysSales = variant.salesMetrics?.last7DaysSales ?? 0;
+      const last30DaysSales = variant.salesMetrics?.last30DaysSales ?? 0;
+      const totalQuantitySold = variant.totalQuantitySold ?? 0;
+
+      const shouldInclude = mode === 'trend'
+        ? (last30DaysSales > 0 || totalQuantitySold > 0)
+        : totalQuantitySold > 0;
+
+      if (!shouldInclude) {
+        continue;
+      }
+
+      const key = variant.productName;
+      const current = byProduct.get(key) ?? {
+        productName: variant.productName,
+        variantCount: 0,
+        totalQuantitySold: 0,
+        averageDailySales: 0,
+        last7DaysSales: 0,
+        last30DaysSales: 0,
+        salesTrend: 'STABLE',
+        volatility: 'LOW',
+        variants: []
+      };
+
+      current.variantCount += 1;
+      current.totalQuantitySold += totalQuantitySold;
+      current.averageDailySales += variant.averageDailySales ?? 0;
+      current.last7DaysSales += last7DaysSales;
+      current.last30DaysSales += last30DaysSales;
+      current.variants.push({
+        variantId: variant.variantId,
+        sku: variant.sku,
+        volumeMl: variant.volumeMl,
+        basePrice: variant.basePrice,
+        status: variant.status,
+        totalQuantitySold,
+        averageDailySales: variant.averageDailySales ?? 0,
+        last7DaysSales,
+        last30DaysSales,
+        trend: variant.salesMetrics?.trend ?? 'STABLE',
+        volatility: variant.salesMetrics?.volatility ?? 'LOW'
+      });
+
+      byProduct.set(key, current);
+    }
+
+    const candidates = Array.from(byProduct.values()).map((item) => {
+      item.salesTrend = this.inferAggregateTrend(item.last7DaysSales, item.last30DaysSales);
+      item.volatility = this.inferAggregateVolatility(item.variants.map((variant) => variant.volatility));
+      item.averageDailySales = Number(item.averageDailySales.toFixed(2));
+      item.variants.sort((left, right) => {
+        if (right.last30DaysSales !== left.last30DaysSales) {
+          return right.last30DaysSales - left.last30DaysSales;
+        }
+        if (right.totalQuantitySold !== left.totalQuantitySold) {
+          return right.totalQuantitySold - left.totalQuantitySold;
+        }
+        return left.basePrice - right.basePrice;
+      });
+      return item;
+    });
+
+    if (mode === 'trend') {
+      return candidates
+        .sort((left, right) => {
+          const leftScore = left.last30DaysSales * 2 + left.last7DaysSales * 3 + left.totalQuantitySold;
+          const rightScore = right.last30DaysSales * 2 + right.last7DaysSales * 3 + right.totalQuantitySold;
+          return rightScore - leftScore;
+        })
+        .slice(0, limit);
+    }
+
+    return candidates
+      .sort((left, right) => {
+        if (right.totalQuantitySold !== left.totalQuantitySold) {
+          return right.totalQuantitySold - left.totalQuantitySold;
+        }
+        return right.last30DaysSales - left.last30DaysSales;
+      })
+      .slice(0, limit);
+  }
+
+  async getProductSalesAnalyticsForTrendCandidates(
+    limit = 15
+  ): Promise<BaseResponseAPI<ProductSalesAnalyticsCandidate[]>> {
+    const analyticsResult = await this.getProductSalesAnalyticsForRestock();
+    if (!analyticsResult.success || !analyticsResult.payload) {
+      return {
+        success: false,
+        error: analyticsResult.error ?? 'Failed to fetch trend sales analytics candidates'
+      };
+    }
+
+    return {
+      success: true,
+      payload: this.buildProductCandidates(analyticsResult.payload, 'trend', limit)
+    };
+  }
+
+  async getProductSalesAnalyticsForRestockCandidates(
+    limit = 20
+  ): Promise<BaseResponseAPI<ProductSalesAnalyticsCandidate[]>> {
+    const analyticsResult = await this.getProductSalesAnalyticsForRestock();
+    if (!analyticsResult.success || !analyticsResult.payload) {
+      return {
+        success: false,
+        error: analyticsResult.error ?? 'Failed to fetch restock sales analytics candidates'
+      };
+    }
+
+    return {
+      success: true,
+      payload: this.buildProductCandidates(analyticsResult.payload, 'restock', limit)
+    };
+  }
 
   /**
    * Lấy tất cả variant với dữ liệu bán hàng theo ngày (2 tháng gần nhất)

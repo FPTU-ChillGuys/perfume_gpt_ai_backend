@@ -55,19 +55,19 @@ export class Tools {
       getBestSellingProducts: this.productTool.getBestSellingProducts,
       getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek,
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
-      getProductSalesAnalyticsForRestock:
-        this.inventoryTool.getProductSalesAnalyticsForRestock
+      getProductSalesAnalyticsForTrend:
+        this.inventoryTool.getProductSalesAnalyticsForTrend
     };
 
     this.getToolsForRestock = {
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
-      getProductSalesAnalyticsForRestockz:
+      getProductSalesAnalyticsForRestock:
         this.inventoryTool.getProductSalesAnalyticsForRestock
     };
 
     this.getToolsForInventoryReport = {
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
-      getProductSalesAnalyticsForRestockz:
+      getProductSalesAnalyticsForRestock:
         this.inventoryTool.getProductSalesAnalyticsForRestock
     };
 

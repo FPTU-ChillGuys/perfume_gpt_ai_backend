@@ -10,6 +10,8 @@ import * as z from 'zod';
 @Injectable()
 export class InventoryTool {
   private readonly logger = new Logger(InventoryTool.name);
+  private readonly trendAnalyticsProductLimit = 15;
+  private readonly restockAnalyticsProductLimit = 20;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -99,58 +101,70 @@ export class InventoryTool {
   });
 
   /**
-   * Lấy dữ liệu phân tích bán hàng theo ngày cho tất cả variant (1 tháng gần nhất).
-   * AI dùng tool này để dự đoán nhu cầu tái cấp hàng dựa trên xu hướng bán hàng của mỗi variant.
+   * Lấy danh sách sản phẩm có khả năng trend dựa trên sales analytics.
+   * Chỉ lấy tối đa 15 sản phẩm để giảm token cho luồng trend.
+   */
+  getProductSalesAnalyticsForTrend: Tool = tool({
+    description:
+      'Get top 15 trend-candidate products from sales analytics. ' +
+      'Each candidate includes aggregated product sales signals and prioritized variant list. ' +
+      'Output is TOON-compressed to reduce token usage.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      this.logger.log(`[getProductSalesAnalyticsForTrend] called`);
+      return await funcHandlerAsync(
+        async () => {
+          const result = await this.restockService.getProductSalesAnalyticsForTrendCandidates(
+            this.trendAnalyticsProductLimit
+          );
+          if (!result.success || !result.payload) {
+            return {
+              success: false,
+              error: result.error ?? 'Failed to fetch trend analytics candidates'
+            };
+          }
+
+          const encodingResult = encodeToolOutput(result.payload);
+          return { success: true, encodedData: encodingResult.encoded };
+        },
+        'Error occurred while fetching trend sales analytics candidates.',
+        true
+      );
+    }
+  });
+
+  /**
+   * Lấy danh sách sản phẩm cần restock dựa trên sales analytics.
+   * Chỉ lấy tối đa 20 sản phẩm có sales > 0, sản phẩm không cần restock sẽ không xuất hiện.
    * 
-   * 🎯 Dữ liệu đã tối ưu: pre-computed metrics thay vì raw dailySalesData
+   * 🎯 Dữ liệu đã tối ưu: product-level candidates thay vì toàn bộ variant.
    */
   getProductSalesAnalyticsForRestock: Tool = tool({
     description:
-      'Get optimized sales analytics for all product variants over the past 2 months. ' +
-      'Returns variant information with pre-computed metrics (trend, volatility, last7Days, last30Days). ' +
+      'Get top 20 restock-candidate products from sales analytics. ' +
+      'Products with no restock need are excluded from output. ' +
+      'Each candidate includes aggregated product sales signals and prioritized variant list. ' +
       'Output is TOON-compressed to reduce token usage. ' +
       'Use this data to predict restock demand based on sales velocity patterns and trend signals.',
     inputSchema: z.object({}),
     execute: async () => {
-      this.logger.log(`[getProductSalesAnalyticsForRestock] called (optimized)`);
+      this.logger.log(`[getProductSalesAnalyticsForRestock] called`);
       return await funcHandlerAsync(
         async () => {
-          const result = await this.restockService.getProductSalesAnalyticsForRestock();
+          const result = await this.restockService.getProductSalesAnalyticsForRestockCandidates(
+            this.restockAnalyticsProductLimit
+          );
           if (!result.success || !result.payload) {
-            return { success: false, error: result.error ?? 'Failed to fetch sales analytics' };
+            return {
+              success: false,
+              error: result.error ?? 'Failed to fetch restock analytics candidates'
+            };
           }
 
-          // 🚀 Gửi dữ liệu tối ưu cho LLM: signals thay vì raw data
-          const items = result.payload.map((variant) => ({
-            // 🔑 Core fields cho LLM context
-            variantId: variant.variantId,
-            sku: variant.sku,
-            productName: variant.productName,
-            
-            // 📊 Pre-computed metrics (giảm 85% token vs raw dailySalesData)
-            averageDailySales: variant.averageDailySales,
-            totalQuantitySold: variant.totalQuantitySold,
-            daysWithSalesCount: variant.daysWithSalesCount,
-            
-            // 🎯 Optimized sales metrics for AI analysis
-            salesMetrics: variant.salesMetrics
-              ? {
-                  last7DaysSales: variant.salesMetrics.last7DaysSales,
-                  last30DaysSales: variant.salesMetrics.last30DaysSales,
-                  trend: variant.salesMetrics.trend,
-                    volatility: variant.salesMetrics.volatility
-                }
-              : null,
-            
-            // Additional context
-            status: variant.status,
-            basePrice: variant.basePrice
-          }));
-
-          const encodingResult = encodeToolOutput(items);
+          const encodingResult = encodeToolOutput(result.payload);
           return { success: true, encodedData: encodingResult.encoded };
         },
-        'Error occurred while fetching variant sales analytics.',
+        'Error occurred while fetching restock sales analytics candidates.',
         true
       );
     }

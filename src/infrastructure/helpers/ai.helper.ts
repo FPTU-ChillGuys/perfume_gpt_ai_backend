@@ -19,6 +19,63 @@ import {
 export class AIHelper {
   private readonly logger = new Logger(AIHelper.name);
 
+  private resolveModel(): LanguageModel {
+    return this.model || aiModel;
+  }
+
+  private resolveModelName(model: LanguageModel): string {
+    const modelInfo = model as Record<string, unknown>;
+    const candidate = modelInfo.modelId ?? modelInfo.model ?? modelInfo.id;
+    return typeof candidate === 'string' && candidate.length > 0
+      ? candidate
+      : 'unknown-model';
+  }
+
+  private createRequestId(prefix: string): string {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  private logStart(
+    requestId: string,
+    operation: string,
+    modelName: string,
+    metadata: string
+  ): number {
+    const startedAt = Date.now();
+    this.logger.log(
+      `[AI][START] requestId=${requestId} op=${operation} model=${modelName} ${metadata}`
+    );
+    return startedAt;
+  }
+
+  private logDone(
+    requestId: string,
+    operation: string,
+    modelName: string,
+    startedAt: number,
+    metadata?: string
+  ): void {
+    const durationMs = Date.now() - startedAt;
+    this.logger.log(
+      `[AI][DONE] requestId=${requestId} op=${operation} model=${modelName} durationMs=${durationMs}${metadata ? ` ${metadata}` : ''}`
+    );
+  }
+
+  private logError(
+    requestId: string,
+    operation: string,
+    modelName: string,
+    startedAt: number,
+    error: unknown
+  ): void {
+    const durationMs = Date.now() - startedAt;
+    const errorMessage =
+      error instanceof Error ? error.message : JSON.stringify(error);
+    this.logger.error(
+      `[AI][ERROR] requestId=${requestId} op=${operation} model=${modelName} durationMs=${durationMs} message=${errorMessage}`
+    );
+  }
+
   constructor(
     private systemPrompt?: string,
     private tools?: ToolSet,
@@ -37,27 +94,57 @@ export class AIHelper {
     errorMessage?: string
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
-      const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
-      const optimizedPrompt = await optimizePromptWithIntermediateModel(
-        prompt,
-        this.promptOptimizationConfig,
-        this.logger,
-        systemContext
+      const requestId = this.createRequestId('prompt');
+      const model = this.resolveModel();
+      const modelName = this.resolveModelName(model);
+      const startedAt = this.logStart(
+        requestId,
+        'textGenerateFromPrompt',
+        modelName,
+        `promptLength=${prompt.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
       );
 
-      const text = await textGenerationFromPromptToResultWithErrorHandler(
-        this.model || aiModel,
-        optimizedPrompt,
-        this.systemPrompt + (additionalSystemPrompt ?? ''),
-        this.tools,
-        errorMessage,
-        this.stopWhen,
-        output,
-        this.temperature,
-        this.toolChoice,
-        this.maxTokens
-      );
-      return { success: true, data: text };
+      const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
+      try {
+        const optimizedPrompt = await optimizePromptWithIntermediateModel(
+          prompt,
+          this.promptOptimizationConfig,
+          this.logger,
+          systemContext
+        );
+
+        const text = await textGenerationFromPromptToResultWithErrorHandler(
+          model,
+          optimizedPrompt,
+          this.systemPrompt + (additionalSystemPrompt ?? ''),
+          this.tools,
+          errorMessage,
+          this.stopWhen,
+          output,
+          this.temperature,
+          this.toolChoice,
+          this.maxTokens
+        );
+
+        this.logDone(
+          requestId,
+          'textGenerateFromPrompt',
+          modelName,
+          startedAt,
+          `outputLength=${text?.length ?? 0}`
+        );
+
+        return { success: true, data: text };
+      } catch (error) {
+        this.logError(
+          requestId,
+          'textGenerateFromPrompt',
+          modelName,
+          startedAt,
+          error
+        );
+        throw error;
+      }
     }, 'Failed to generate text from prompt');
   }
 
@@ -68,27 +155,57 @@ export class AIHelper {
     errorMessage?: string
   ): Promise<BaseResponse<string>> {
     return await funcHandlerAsync(async () => {
-      const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
-      const optimizedMessages = await optimizeUserMessageWithIntermediateModel(
-        messages,
-        this.promptOptimizationConfig,
-        this.logger,
-        systemContext
+      const requestId = this.createRequestId('messages');
+      const model = this.resolveModel();
+      const modelName = this.resolveModelName(model);
+      const startedAt = this.logStart(
+        requestId,
+        'textGenerateFromMessages',
+        modelName,
+        `messageCount=${messages.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
       );
 
-      const text = await textGenerationFromMessagesToResultWithErrorHandler(
-        this.model || aiModel,
-        optimizedMessages,
-        this.systemPrompt + (additionalSystemPrompt ?? ''),
-        this.tools,
-        errorMessage,
-        this.stopWhen,
-        output,
-        this.temperature,
-        this.toolChoice,
-        this.maxTokens
-      );
-      return { success: true, data: text };
+      const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
+      try {
+        const optimizedMessages = await optimizeUserMessageWithIntermediateModel(
+          messages,
+          this.promptOptimizationConfig,
+          this.logger,
+          systemContext
+        );
+
+        const text = await textGenerationFromMessagesToResultWithErrorHandler(
+          model,
+          optimizedMessages,
+          this.systemPrompt + (additionalSystemPrompt ?? ''),
+          this.tools,
+          errorMessage,
+          this.stopWhen,
+          output,
+          this.temperature,
+          this.toolChoice,
+          this.maxTokens
+        );
+
+        this.logDone(
+          requestId,
+          'textGenerateFromMessages',
+          modelName,
+          startedAt,
+          `outputLength=${text?.length ?? 0}`
+        );
+
+        return { success: true, data: text };
+      } catch (error) {
+        this.logError(
+          requestId,
+          'textGenerateFromMessages',
+          modelName,
+          startedAt,
+          error
+        );
+        throw error;
+      }
     }, 'Failed to generate text from messages');
   }
 
@@ -99,19 +216,34 @@ export class AIHelper {
     errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
     return funcHandler(() => {
+      const requestId = this.createRequestId('stream-prompt');
+      const model = this.resolveModel();
+      const modelName = this.resolveModelName(model);
+      const startedAt = this.logStart(
+        requestId,
+        'textGenerateStreamFromPrompt',
+        modelName,
+        `promptLength=${prompt.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
+      );
+
       const stream = streamTextGenerationFromPromptToResultWithErrorHandler(
-        this.model || aiModel,
+        model,
         prompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
         this.tools,
         this.stopWhen,
         output,
         errorMessage,
-        undefined,
+        () => this.logDone(requestId, 'textGenerateStreamFromPrompt', modelName, startedAt),
         this.temperature,
         this.toolChoice,
         this.maxTokens
       );
+
+      this.logger.log(
+        `[AI][STREAM] requestId=${requestId} op=textGenerateStreamFromPrompt model=${modelName} status=opened`
+      );
+
       return { success: true, data: stream };
     }, 'Failed to generate text stream from prompt');
   }
@@ -122,15 +254,29 @@ export class AIHelper {
     output?: any,
     errorMessage?: string
   ): ReadableStream<any> {
+    const requestId = this.createRequestId('stream-messages');
+    const model = this.resolveModel();
+    const modelName = this.resolveModelName(model);
+    const startedAt = this.logStart(
+      requestId,
+      'textGenerateStreamFromMessages',
+      modelName,
+      `messageCount=${messages.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
+    );
+
+    this.logger.log(
+      `[AI][STREAM] requestId=${requestId} op=textGenerateStreamFromMessages model=${modelName} status=opened`
+    );
+
     return streamTextGenerationFromMessagesToResultWithErrorHandler(
-      this.model || aiModel,
+      model,
       messages,
       this.systemPrompt + (additionalSystemPrompt ?? ''),
       this.tools,
       this.stopWhen,
       errorMessage,
       output,
-      undefined,
+      () => this.logDone(requestId, 'textGenerateStreamFromMessages', modelName, startedAt),
       this.temperature,
       this.toolChoice,
       this.maxTokens

@@ -4,6 +4,8 @@ export const aiModel = geminiFlash2_5;
 
 export const aiModelForQuiz = grok_4_1_fast;
 
-export const aiModelForTrend = ministral_14b_2512;
+export const aiModelForTrend = gpt5_4nano;
+
+export const aiModelForRestock = gpt5_4nano;
 
 export const aiModelForOptimizePrompt = gemma3nE4bIt;

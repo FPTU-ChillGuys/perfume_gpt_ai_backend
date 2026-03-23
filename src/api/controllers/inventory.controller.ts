@@ -203,7 +203,7 @@ export class InventoryController {
   @ApiOperation({ summary: 'Lấy chi tiết báo cáo tồn kho theo ID' })
   @ApiBaseResponse(InventoryLog)
   async getInventoryLogById(
-    @Query('id') id: string
+    @Param('id') id: string
   ): Promise<BaseResponse<InventoryLog>> {
     return this.inventoryService.getInventoryLogById(id);
   }
@@ -239,6 +239,16 @@ export class InventoryController {
     response.setHeader('Content-Type', 'application/pdf');
     response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     return new StreamableFile(fileBuffer);
+  }
+
+  @Get('restock/logs/:id/pdf')
+  @ApiOperation({ summary: 'Convert log restock theo ID sang PDF (không dùng AI)' })
+  @ApiParam({ name: 'id', description: 'ID của restock log cần convert' })
+  async convertRestockLogToPdf(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<StreamableFile> {
+    return this.convertInventoryLogToPdf(id, response);
   }
 
   //Tao email cảnh bảo stock

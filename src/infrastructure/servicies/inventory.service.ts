@@ -50,6 +50,10 @@ type RestockVariantResult = {
   suggestedRestockQuantity: number;
 };
 
+type RestockLogPayload = {
+  variants?: RestockVariantResult[];
+};
+
 @Injectable()
 export class InventoryService {
   constructor(
@@ -424,19 +428,21 @@ export class InventoryService {
 
         const title =
           log.type === InventoryLogType.RESTOCK
-            ? 'Bao cao phan tich restock'
-            : 'Bao cao ton kho';
+            ? 'Báo cáo phân tích nhập hàng'
+            : 'Báo cáo tồn kho';
         const generatedAt = new Date().toISOString();
+
+        const reportBody = this.buildMarkdownFromInventoryLog(log);
         const markdownContent = [
           `# ${title}`,
           '',
           `- Log ID: ${id}`,
-          `- Loai log: ${log.type}`,
-          `- Thoi diem convert: ${generatedAt}`,
+          `- Loại log: ${log.type}`,
+          `- Thời điểm convert: ${generatedAt}`,
           '',
           '---',
           '',
-          `${(log.inventoryLog || '').trim() || 'Khong co noi dung bao cao.'}`
+          reportBody
         ].join('\n');
 
         await fs.promises.writeFile(markdownPath, markdownContent, 'utf8');
@@ -474,6 +480,76 @@ export class InventoryService {
       },
       'Failed to convert inventory log markdown to pdf'
     );
+  }
+
+  private buildMarkdownFromInventoryLog(log: InventoryLog): string {
+    const rawContent = (log.inventoryLog || '').trim();
+    if (!rawContent) {
+      return 'Không có nội dung báo cáo.';
+    }
+
+    if (log.type !== InventoryLogType.RESTOCK) {
+      return rawContent;
+    }
+
+    const parsedPayload = this.tryParseJson(rawContent) as RestockLogPayload | null;
+    const variants = Array.isArray(parsedPayload?.variants)
+      ? parsedPayload?.variants
+      : [];
+
+    if (variants.length === 0) {
+      return [
+        '## Chi tiết log nhập hàng',
+        '',
+        'Không có dữ liệu variants hợp lệ trong log RESTOCK.'
+      ].join('\n');
+    }
+
+    const tableHeader =
+      '| SKU | Tên sản phẩm | Volume | Type | Giá | Tồn kho | Đã đặt | Gợi ý nhập |';
+    const tableSeparator =
+      '| --- | --- | --- | --- | --- | --- | --- | --- |';
+    const tableRows = variants.map((variant) => {
+      const sku = this.escapeMarkdownCell(variant.sku);
+      const productName = this.escapeMarkdownCell(variant.productName);
+      const volume = `${Number(variant.volumeMl || 0)}ml`;
+      const type = this.escapeMarkdownCell(variant.type || '-');
+      const basePrice = this.formatCurrencyVnd(Number(variant.basePrice || 0));
+      const stock = Number(variant.totalQuantity || 0);
+      const reserved = Number(variant.reservedQuantity || 0);
+      const suggested = Number(variant.suggestedRestockQuantity || 0);
+
+      return `| ${sku} | ${productName} | ${volume} | ${type} | ${basePrice} | ${stock} | ${reserved} | ${suggested} |`;
+    });
+
+    return [
+      '## Chi tiết log nhập hàng',
+      '',
+      `Tổng số SKU cần xử lý: ${variants.length}`,
+      '',
+      tableHeader,
+      tableSeparator,
+      ...tableRows
+    ].join('\n');
+  }
+
+  private tryParseJson(input: string): unknown | null {
+    try {
+      return JSON.parse(input);
+    } catch {
+      return null;
+    }
+  }
+
+  private escapeMarkdownCell(value: string): string {
+    return String(value || '-')
+      .replace(/\|/g, '\\|')
+      .replace(/\r?\n/g, ' ')
+      .trim();
+  }
+
+  private formatCurrencyVnd(value: number): string {
+    return `${new Intl.NumberFormat('vi-VN').format(Math.round(value))} d`;
   }
 
   /** Lấy N trend log mới nhất (sắp xếp theo thời gian tạo giảm dần) */

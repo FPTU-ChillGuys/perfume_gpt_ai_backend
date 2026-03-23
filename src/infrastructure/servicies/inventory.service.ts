@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from 'generated/prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
@@ -387,6 +389,91 @@ export class InventoryService {
       }
       return { success: true, data: log };
     }, 'Failed to fetch inventory log');
+  }
+
+  async convertInventoryLogMarkdownToPdf(
+    id: string
+  ): Promise<
+    BaseResponse<{
+      fileName: string;
+      absolutePath: string;
+      generatedAt: string;
+      logType: InventoryLogType;
+    }>
+  > {
+    return funcHandlerAsync(
+      async () => {
+        const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
+        if (!log) {
+          return { success: false, error: 'Inventory log not found' };
+        }
+
+        const converterRoot = path.join(process.cwd(), 'md-pdf-converter');
+        const outputDir = path.join(converterRoot, 'outputs');
+        const stylePath = path.join(
+          converterRoot,
+          'styles',
+          'inventory-report.css'
+        );
+        await fs.promises.mkdir(outputDir, { recursive: true });
+
+        const markdownFileName = `inventory-log-${id}.md`;
+        const pdfFileName = `inventory-log-${id}.pdf`;
+        const markdownPath = path.join(outputDir, markdownFileName);
+        const pdfPath = path.join(outputDir, pdfFileName);
+
+        const title =
+          log.type === InventoryLogType.RESTOCK
+            ? 'Bao cao phan tich restock'
+            : 'Bao cao ton kho';
+        const generatedAt = new Date().toISOString();
+        const markdownContent = [
+          `# ${title}`,
+          '',
+          `- Log ID: ${id}`,
+          `- Loai log: ${log.type}`,
+          `- Thoi diem convert: ${generatedAt}`,
+          '',
+          '---',
+          '',
+          `${(log.inventoryLog || '').trim() || 'Khong co noi dung bao cao.'}`
+        ].join('\n');
+
+        await fs.promises.writeFile(markdownPath, markdownContent, 'utf8');
+
+        const { mdToPdf } = await import('md-to-pdf');
+        const hasStyleFile = await fs.promises
+          .access(stylePath, fs.constants.F_OK)
+          .then(() => true)
+          .catch(() => false);
+
+        const result = await mdToPdf(
+          { path: markdownPath },
+          {
+            dest: pdfPath,
+            stylesheet: hasStyleFile ? [stylePath] : []
+          }
+        );
+
+        if (!result || !result.filename) {
+          return {
+            success: false,
+            error: 'Failed to convert markdown to pdf'
+          };
+        }
+
+        return {
+          success: true,
+          data: {
+            fileName: pdfFileName,
+            absolutePath: pdfPath,
+            generatedAt,
+            logType: log.type
+          }
+        };
+      },
+      'Failed to convert inventory log markdown to pdf'
+    );
   }
 
   /** Lấy N trend log mới nhất (sắp xếp theo thời gian tạo giảm dần) */

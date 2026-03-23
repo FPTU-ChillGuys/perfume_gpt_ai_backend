@@ -1,7 +1,21 @@
-import { Controller, Get, Inject, Param, Query, Req, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  InternalServerErrorException,
+  NotFoundException,
+  Param,
+  Query,
+  Req,
+  Res,
+  StreamableFile,
+  UseInterceptors
+} from '@nestjs/common';
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Request } from 'express';
+import { Response } from 'express';
+import * as fs from 'fs';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -192,6 +206,39 @@ export class InventoryController {
     @Query('id') id: string
   ): Promise<BaseResponse<InventoryLog>> {
     return this.inventoryService.getInventoryLogById(id);
+  }
+
+  @Get('report/logs/:id/pdf')
+  @ApiOperation({ summary: 'Convert markdown report theo ID sang PDF (không dùng AI)' })
+  @ApiParam({ name: 'id', description: 'ID của inventory log cần convert' })
+  async convertInventoryLogToPdf(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<StreamableFile> {
+    const converted = await this.inventoryService.convertInventoryLogMarkdownToPdf(
+      id
+    );
+
+    if (!converted.success) {
+      if (converted.error === 'Inventory log not found') {
+        throw new NotFoundException(converted.error);
+      }
+      throw new InternalServerErrorException(
+        converted.error || 'Failed to convert markdown to pdf'
+      );
+    }
+
+    const filePath = converted.data?.absolutePath;
+    const fileName = converted.data?.fileName || `inventory-log-${id}.pdf`;
+
+    if (!filePath) {
+      throw new InternalServerErrorException('PDF file path is empty');
+    }
+
+    const fileBuffer = await fs.promises.readFile(filePath);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    return new StreamableFile(fileBuffer);
   }
 
   //Tao email cảnh bảo stock

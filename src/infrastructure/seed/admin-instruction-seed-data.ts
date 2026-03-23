@@ -144,40 +144,42 @@ Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sa
 
 ## ĐỊNH DẠNG OUTPUT (BẮT BUỘC)
 Trả về đúng báo cáo Markdown, không trả JSON, không thêm lời mở đầu rườm rà.
+- TOÀN BỘ nội dung báo cáo phải viết bằng tiếng Việt tự nhiên, dễ hiểu cho đội vận hành.
+- KHÔNG dùng tiêu đề tiếng Anh, KHÔNG dùng câu tiếng Anh, KHÔNG trộn Việt-Anh.
 
 Bắt buộc có 5 phần theo thứ tự:
 
-### 1) Summary KPI
+### 1) Tóm tắt KPI
 Dùng bảng markdown 2 cột:
-| Metric | Value |
+| Chỉ số | Giá trị |
 
 Bao gồm tối thiểu các metric:
-- Total SKU
-- Low Stock Count
-- Expired Batch Count
-- Near Expiry Batch Count
-- Critical Alerts
+- Tổng SKU
+- Số SKU sắp hết hàng
+- Số batch đã hết hạn
+- Số batch cận hạn
+- Số cảnh báo nghiêm trọng
 
-### 2) Critical Alerts
+### 2) Cảnh báo nghiêm trọng
 Dùng bảng markdown:
-| Product | SKU | Stock | Threshold | Expiry | Issue | Action |
+| Sản phẩm | SKU | Tồn kho | Ngưỡng cảnh báo | Hạn dùng | Vấn đề | Hành động |
 
 Chỉ liệt kê item cần xử lý ngay.
-Nếu không có dữ liệu critical, ghi đúng 1 dòng: "No critical alerts".
+Nếu không có dữ liệu critical, ghi đúng 1 dòng: "Không có cảnh báo nghiêm trọng".
 
-### 3) Warning Alerts
+### 3) Cảnh báo theo dõi
 Dùng bảng markdown:
-| Product | SKU | Stock | Threshold | Expiry | Risk | Action |
+| Sản phẩm | SKU | Tồn kho | Ngưỡng cảnh báo | Hạn dùng | Mức rủi ro | Hành động |
 
-Nếu không có warning, ghi đúng 1 dòng: "No warning alerts".
+Nếu không có warning, ghi đúng 1 dòng: "Không có cảnh báo cần theo dõi".
 
-### 4) Inventory Health
+### 4) Sức khỏe tồn kho
 Dùng bảng markdown:
-| SKU | Product | Stock | Threshold | Status |
+| SKU | Sản phẩm | Tồn kho | Ngưỡng cảnh báo | Trạng thái |
 
-Status chỉ dùng một trong ba giá trị: CRITICAL, WARNING, NORMAL.
+Trạng thái chỉ dùng một trong ba giá trị tiếng Việt: NGHIÊM TRỌNG, CẦN THEO DÕI, ỔN ĐỊNH.
 
-### 5) Recommendations
+### 5) Khuyến nghị hành động
 Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
 
 ## QUY TẮC NGHIỆP VỤ

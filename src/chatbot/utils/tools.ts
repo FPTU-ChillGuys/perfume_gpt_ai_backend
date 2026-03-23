@@ -46,7 +46,8 @@ export class Tools {
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
       getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getInventoryStock: this.inventoryTool.getInventoryStock
     };
 
     this.getToolsForTrend = {

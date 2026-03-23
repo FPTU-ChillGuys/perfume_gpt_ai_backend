@@ -611,16 +611,19 @@ TUYỆT ĐỐI KHÔNG hỏi thêm bất kỳ câu hỏi nào. Quiz đã HOÀN TH
 Dựa vào kết quả phân tích bước 1, gọi tool searchProduct, getAllProducts, getNewestProducts hoặc getBestSellingProducts để lấy sản phẩm thực tế từ database.
 - Khi gọi searchProduct/getAllProducts, bắt buộc pageNumber = 1 và pageSize = 5 để tiết kiệm token.
 - Ưu tiên tìm theo: giới tính, nhóm mùi hương, ngân sách.
-- Cần ít nhất 1–3 sản phẩm thực tế từ kết quả tool.
+- Cần lấy danh sách ứng viên trước, sau đó **BẮT BUỘC** gọi thêm getInventoryStock để kiểm tra tồn kho theo SKU variant.
+- Chỉ giữ sản phẩm có **ít nhất 1 variant còn hàng** (totalQuantity > 0). Nếu tất cả variant của sản phẩm đều totalQuantity <= 0 thì loại sản phẩm đó.
 - **TUYỆT ĐỐI KHÔNG** dựa vào trí nhớ hoặc phỏng đoán — chỉ dùng kết quả tool trả về.
 
 ### BƯỚC 3 — TRẢ VỀ JSON CÓ CẤU TRÚC
 Trả về JSON gồm đúng 2 field:
 - **"message"**: Lời tư vấn thân thiện bằng tiếng Việt. Giải thích tại sao các sản phẩm phù hợp với sở thích quiz (dựa trên BƯỚC 1). Gợi ý nồng độ phù hợp (EDT/EDP/Parfum). KHÔNG liệt kê tên sản phẩm trong message.
-- **"products"**: Mảng 1–3 sản phẩm THỰC TẾ từ kết quả tool (BƯỚC 2), mỗi phần tử có đủ: id, name, description, brandName, categoryName, primaryImage, attributes.
+- **"products"**: Mảng 1–5 sản phẩm THỰC TẾ từ kết quả tool (BƯỚC 2), mỗi phần tử chỉ gồm: id, name, brandName, primaryImage, variants (variants chỉ gồm id, sku, volumeMl, basePrice).
 
 ## QUY TẮC BẮT BUỘC
 - Trường "products" PHẢI chứa dữ liệu thực từ tool call (BƯỚC 2) — KHÔNG được để mảng rỗng nếu tool đã trả về sản phẩm.
+- Trường "products" tối đa 5 phần tử; nếu có nhiều ứng viên thì chọn 5 sản phẩm phù hợp nhất theo quiz.
+- KHÔNG đưa vào products bất kỳ sản phẩm hết hàng hoàn toàn (mọi variant đều totalQuantity <= 0).
 - id sản phẩm phải lấy chính xác từ kết quả tool (UUID thực), KHÔNG tự tạo.
 - QUY TẮC GIÁ (ANTI-HALLUCINATION):
   - Chỉ được nêu giá nếu sản phẩm từ tool có trường giá rõ ràng (basePrice/price).

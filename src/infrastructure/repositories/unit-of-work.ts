@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { AdminInstructionRepository } from './admin-instruction.repository';
 import { ConversationRepository } from './conversation.repository';
-import { QuizQuestionAnswerRepository } from './quiz-question-answer.repository';
-import { QuizQuestionRepository } from './quiz-question.repository';
+import { SurveyQuestionAnswerRepository } from './survey-question-answer.repository';
+import { SurveyQuestionRepository } from './survey-question.repository';
 import { UserLogSummaryRepository } from './user-log-summary.repository';
 import { AIAcceptanceRepository } from './ai-acceptance.repository';
 import { ReviewSummaryLogRepository } from './review-summary.repository';
@@ -17,8 +17,8 @@ import { EventLogRepository } from './event-log.repository';
 export class UnitOfWork {
   constructor(
     private readonly aiConversationRepository: ConversationRepository,
-    private readonly aiQuizQuestionRepository: QuizQuestionRepository,
-    private readonly aiQuizQuestionAnswerRepository: QuizQuestionAnswerRepository,
+    private readonly aiSurveyQuestionRepository: SurveyQuestionRepository,
+    private readonly aiSurveyQuestionAnswerRepository: SurveyQuestionAnswerRepository,
     private readonly eventLogRepository: EventLogRepository,
     private readonly reviewSummaryLogRepository: ReviewSummaryLogRepository,
     private readonly userLogSummaryRepository: UserLogSummaryRepository,
@@ -32,11 +32,11 @@ export class UnitOfWork {
   get AIConversationRepo(): ConversationRepository {
     return this.aiConversationRepository;
   }
-  get AIQuizQuestionRepo(): QuizQuestionRepository {
-    return this.aiQuizQuestionRepository;
+  get AISurveyQuestionRepo(): SurveyQuestionRepository {
+    return this.aiSurveyQuestionRepository;
   }
-  get AIQuizQuestionAnswerRepo(): QuizQuestionAnswerRepository {
-    return this.aiQuizQuestionAnswerRepository;
+  get AISurveyQuestionAnswerRepo(): SurveyQuestionAnswerRepository {
+    return this.aiSurveyQuestionAnswerRepository;
   }
   get EventLogRepo(): EventLogRepository {
     return this.eventLogRepository;

@@ -11,7 +11,7 @@
 export const generateSummaryPrompt = (
   searchContents: string,
   messageContents: string,
-  quizContents: string,
+  surveyContents: string,
   startDate: Date,
   endDate: Date
 ): string => {
@@ -22,14 +22,14 @@ export const generateSummaryPrompt = (
   if (messageContents) {
     prompt += `Tin nhắn: ${messageContents}\n`;
   }
-  if (quizContents) {
-    prompt += `Câu trả lời quiz: ${quizContents}\n`;
+  if (surveyContents) {
+    prompt += `Câu trả lời survey: ${surveyContents}\n`;
   }
   prompt += `Hãy cung cấp một bản tóm tắt ngắn gọn về các hoạt động của người dùng trong giai đoạn này.`;
   return prompt;
 };
 
-// ==================== Quiz Prompts ====================
+// ==================== Survey Prompts ====================
 
 /**
  * Chuyển đổi danh sách câu hỏi-trả lời thành chuỗi
@@ -46,20 +46,20 @@ export const convertQuesAnsesToString = (
 };
 
 /**
- * Prompt phân tích kết quả quiz và đề xuất nước hoa
+ * Prompt phân tích kết quả survey và đề xuất nước hoa
  *
  * QUYẾT ĐỊNH PHÂN 2 BƯỚC:
- * 1. PHÂN TÍCH: Xác định sở thích từ quiz data (KHÔNG GỌI TOOL)
+ * 1. PHÂN TÍCH: Xác định sở thích từ survey data (KHÔNG GỌI TOOL)
  * 2. GỌI TOOL: Dựa trên kết quả phân tích, gọi tool tìm sản phẩm thực tế
  *
  * YÊU CẦU OUTPUT có cấu trúc JSON gồm 2 field:
  *   - message: lời tư vấn thân thiện (string) giải thích tại sao phù hợp
  *   - products: mảng sản phẩm thực tế lấy từ kết quả tool (array)
  */
-export const quizPrompt = (
+export const surveyPrompt = (
   quesAnses: Array<{ question: string; answer: string }>
 ): string => `
-Đây là kết quả quiz tư vấn nước hoa của một khách hàng, bao gồm các câu hỏi và câu trả lời của họ để hiểu sở thích và nhu cầu của khách hàng (Và vui lòng gọi các tool đã được cung cấp để lấy dữ liệu sản phẩm thực tế, đừng dựa vào trí nhớ hoặc phỏng đoán):
+Đây là kết quả survey tư vấn nước hoa của một khách hàng, bao gồm các câu hỏi và câu trả lời của họ để hiểu sở thích và nhu cầu của khách hàng (Và vui lòng gọi các tool đã được cung cấp để lấy dữ liệu sản phẩm thực tế, đừng dựa vào trí nhớ hoặc phỏng đoán):
 ${convertQuesAnsesToString(quesAnses)}
 `;
 

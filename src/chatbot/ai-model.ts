@@ -2,7 +2,7 @@ import { deepSeek3_2, geminiFlash2_5, geminiFlash3, gemma3nE4bIt, glm47Flash, gp
 
 export const aiModel = gpt5_4nano;
 
-export const aiModelForQuiz = grok_4_1_fast;
+export const aiModelForSurvey = grok_4_1_fast;
 
 export const aiModelForTrend = gpt5_4nano;
 

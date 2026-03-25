@@ -1,13 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { QuizAnswerRequest } from './quiz-answer.request';
-import { QuestionType } from 'src/domain/entities/quiz-question.entity';
+import { SurveyAnswerRequest } from './survey-answer.request';
+import { QuestionType } from 'src/domain/entities/survey-question.entity';
 
-/** Request tạo câu hỏi quiz mới */
-export class QuizQuestionRequest {
+/** Request tạo câu hỏi survey mới */
+export class SurveyQuestionRequest {
   /** Nội dung câu hỏi */
-  @ApiProperty({ description: 'Nội dung câu hỏi quiz' })
+  @ApiProperty({ description: 'Nội dung câu hỏi survey' })
   @IsString()
   @IsNotEmpty()
   question!: string;
@@ -19,14 +19,14 @@ export class QuizQuestionRequest {
   questionType?: QuestionType;
 
   /** Danh sách câu trả lời */
-  @ApiProperty({ description: 'Danh sách câu trả lời', type: [QuizAnswerRequest] })
+  @ApiProperty({ description: 'Danh sách câu trả lời', type: [SurveyAnswerRequest] })
   @IsArray()
   @ArrayMinSize(1, { message: 'Cần ít nhất 1 câu trả lời' })
   @ValidateNested({ each: true })
-  @Type(() => QuizAnswerRequest)
-  answers!: QuizAnswerRequest[];
+  @Type(() => SurveyAnswerRequest)
+  answers!: SurveyAnswerRequest[];
 
-  constructor(init?: Partial<QuizQuestionRequest>) {
+  constructor(init?: Partial<SurveyQuestionRequest>) {
     Object.assign(this, init);
   }
 }

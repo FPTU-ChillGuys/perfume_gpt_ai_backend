@@ -32,8 +32,8 @@ export const INSTRUCTION_TYPE_LOG = 'log';
 /** Loại instruction cho chatbot conversation */
 export const INSTRUCTION_TYPE_CONVERSATION = 'conversation';
 
-/** Loại instruction cho quiz tư vấn nước hoa */
-export const INSTRUCTION_TYPE_QUIZ = 'quiz';
+/** Loại instruction cho survey tư vấn nước hoa */
+export const INSTRUCTION_TYPE_SURVEY = 'survey';
 
 /** Loại instruction cho phân tích nhu cầu nhập hàng (restock) */
 export const INSTRUCTION_TYPE_RESTOCK = 'restock';
@@ -48,7 +48,7 @@ export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_REPURCHASE,
   INSTRUCTION_TYPE_LOG,
   INSTRUCTION_TYPE_CONVERSATION,
-  INSTRUCTION_TYPE_QUIZ,
+  INSTRUCTION_TYPE_SURVEY,
   INSTRUCTION_TYPE_RESTOCK
 ] as const;
 

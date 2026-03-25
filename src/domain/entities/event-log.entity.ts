@@ -30,7 +30,7 @@ export class EventLog extends Common {
   contentText?: string;
 
   @ApiProperty({
-    description: 'Metadata dạng JSONB cho quiz và dữ liệu mở rộng',
+    description: 'Metadata dạng JSONB cho survey và dữ liệu mở rộng',
     nullable: true,
     type: Object
   })

@@ -100,7 +100,7 @@ export class LogController {
     };
   }
 
-  /** Lấy event log dạng mới (message/search/quiz) */
+  /** Lấy event log dạng mới (message/search/survey) */
   @CacheTTL(0)
   @Get('events')
   @ApiOperation({ summary: 'Lấy event log dạng mới' })

@@ -80,12 +80,12 @@ export class EventLogCreateRequest {
   entityId?: string;
 
   @ApiProperty({ description: 'Text payload cho message/search', required: false, nullable: true })
-  @ValidateIf((obj) => obj.eventType !== EventLogEventType.QUIZ)
+  @ValidateIf((obj) => obj.eventType !== EventLogEventType.SURVEY)
   @IsString()
   contentText?: string;
 
-  @ApiProperty({ description: 'Metadata JSONB cho quiz/extra', required: false, nullable: true, type: Object })
-  @ValidateIf((obj) => obj.eventType === EventLogEventType.QUIZ || obj.metadata !== undefined)
+  @ApiProperty({ description: 'Metadata JSONB cho survey/extra', required: false, nullable: true, type: Object })
+  @ValidateIf((obj) => obj.eventType === EventLogEventType.SURVEY || obj.metadata !== undefined)
   @IsObject()
   metadata?: Record<string, unknown>;
 }

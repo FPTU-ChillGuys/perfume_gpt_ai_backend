@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CommonResponse } from './common/common.response';
-import { QuizAnswerResponse } from './quiz-answer.response';
-import { QuestionType } from 'src/domain/entities/quiz-question.entity';
+import { SurveyAnswerResponse } from './survey-answer.response';
+import { QuestionType } from 'src/domain/entities/survey-question.entity';
 
-/** Response câu hỏi quiz */
-export class QuizQuestionResponse extends CommonResponse {
+/** Response câu hỏi survey */
+export class SurveyQuestionResponse extends CommonResponse {
   /** Loại câu hỏi */
   @ApiProperty({ description: 'Loại câu hỏi', enum: QuestionType, required: false })
   questionType?: QuestionType;
@@ -14,10 +14,10 @@ export class QuizQuestionResponse extends CommonResponse {
   question?: string;
 
   /** Danh sách câu trả lời */
-  @ApiProperty({ description: 'Danh sách câu trả lời', type: () => [QuizAnswerResponse], required: false })
-  answers?: QuizAnswerResponse[];
+  @ApiProperty({ description: 'Danh sách câu trả lời', type: () => [SurveyAnswerResponse], required: false })
+  answers?: SurveyAnswerResponse[];
 
-  constructor(init?: Partial<QuizQuestionResponse>) {
+  constructor(init?: Partial<SurveyQuestionResponse>) {
     super();
     Object.assign(this, init);
   }

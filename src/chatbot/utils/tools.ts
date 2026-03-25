@@ -15,7 +15,7 @@ export class Tools {
   getToolsForTrend: ToolSet;
   getToolsForRecomendationAndRepurchase: ToolSet;
   getToolsForRestock: ToolSet;
-  getToolsForQuiz: ToolSet;
+  getToolsForSurvey: ToolSet;
   getToolsForInventoryReport: ToolSet;
   getToolsForReview: ToolSet;
 
@@ -42,7 +42,7 @@ export class Tools {
       getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId
     };
 
-    this.getToolsForQuiz = {
+    this.getToolsForSurvey = {
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
       getNewestProducts: this.productTool.getNewestProducts,

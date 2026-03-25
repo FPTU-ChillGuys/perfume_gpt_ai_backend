@@ -9,7 +9,7 @@ import { MappingModule } from "../mapping.module";
 import { OrderModule } from "../order.module";
 import { ProductModule } from "../product.module";
 import { ProfileModule } from "../profile.module";
-import { QuizModule } from "../quiz.module";
+import { SurveyModule } from "../survey.module";
 import { ReviewModule } from "../review.module";
 import { ReviewAIModule } from "../review-ai.module";
 import { RestockModule } from "../restock.module";
@@ -22,7 +22,7 @@ import { RecommendationModule } from "../recommendation.module";
 
 export const modules = [
   ConversationModule,
-  QuizModule,
+  SurveyModule,
   ProductModule,
   ToolModule,
   MappingModule,

@@ -2,7 +2,7 @@ import { SqlEntityRepository } from '@mikro-orm/postgresql';
 import { Injectable } from '@nestjs/common';
 import { EventLog } from 'src/domain/entities/event-log.entity';
 import { Message } from 'src/domain/entities/message.entity';
-import { QuizQuestionAnswerDetail } from 'src/domain/entities/quiz-question-answer-detail.entity';
+import { SurveyQuestionAnswerDetail } from 'src/domain/entities/survey-question-answer-detail.entity';
 import { EventLogEntityType } from 'src/domain/enum/event-log-entity-type.enum';
 import { EventLogEventType } from 'src/domain/enum/event-log-event-type.enum';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -68,17 +68,17 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
     });
   }
 
-  async createQuizEventsFromDetails(
+  async createSurveyEventsFromDetails(
     userId: string,
-    quizQuesAnsDetails: QuizQuestionAnswerDetail[]
+    surveyQuesAnsDetails: SurveyQuestionAnswerDetail[]
   ): Promise<string[]> {
-    const detailIds = quizQuesAnsDetails.map((item) => item.id);
+    const detailIds = surveyQuesAnsDetails.map((item) => item.id);
     if (!detailIds.length) {
       return [];
     }
 
     const existingEventLogs = await this.find({
-      eventType: EventLogEventType.QUIZ,
+      eventType: EventLogEventType.SURVEY,
       entityId: { $in: detailIds }
     });
 
@@ -88,14 +88,14 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
         .filter((id): id is string => typeof id === 'string')
     );
 
-    const eventLogs = quizQuesAnsDetails
+    const eventLogs = surveyQuesAnsDetails
       .filter((detail) => !existingDetailIds.has(detail.id))
       .map(
         (detail) =>
           new EventLog({
             userId,
-            eventType: EventLogEventType.QUIZ,
-            entityType: EventLogEntityType.QUIZ,
+            eventType: EventLogEventType.SURVEY,
+            entityType: EventLogEntityType.SURVEY,
             entityId: detail.id,
             metadata: {
               questionId: detail.question?.id,

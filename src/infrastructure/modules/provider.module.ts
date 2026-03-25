@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ProductController } from 'src/api/controllers/product.controller';
-import { QuizController } from 'src/api/controllers/quiz.controller';
+import { SurveyController } from 'src/api/controllers/survey.controller';
 import { AIController } from 'src/api/controllers/ai/ai.controller';
 import { LogController } from 'src/api/controllers/log.controller';
 import { ConversationController } from 'src/api/controllers/conversation.controller';
@@ -45,7 +45,7 @@ const registerQueue = BullModule.registerQueue(
   }),],
   controllers: [
     ProductController,
-    QuizController,
+    SurveyController,
     AIController,
     LogController,
     ConversationController,

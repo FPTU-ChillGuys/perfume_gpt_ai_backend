@@ -367,7 +367,7 @@
           "enumItems": [
             "message",
             "search",
-            "quiz",
+            "survey",
             "product"
           ],
           "mappedType": "enum"
@@ -382,7 +382,7 @@
           "enumItems": [
             "conversation",
             "search",
-            "quiz",
+            "survey",
             "product"
           ],
           "mappedType": "enum"
@@ -712,11 +712,11 @@
           "mappedType": "string"
         }
       },
-      "name": "quiz_question",
+      "name": "survey_question",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "quiz_question_pkey",
+          "keyName": "survey_question_pkey",
           "columnNames": [
             "id"
           ],
@@ -791,11 +791,11 @@
           "mappedType": "uuid"
         }
       },
-      "name": "quiz_answer",
+      "name": "survey_answer",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "quiz_answer_pkey",
+          "keyName": "survey_answer_pkey",
           "columnNames": [
             "id"
           ],
@@ -807,16 +807,16 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "quiz_answer_question_id_foreign": {
-          "constraintName": "quiz_answer_question_id_foreign",
+        "survey_answer_question_id_foreign": {
+          "constraintName": "survey_answer_question_id_foreign",
           "columnNames": [
             "question_id"
           ],
-          "localTableName": "public.quiz_answer",
+          "localTableName": "public.survey_answer",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.quiz_question",
+          "referencedTableName": "public.survey_question",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         }
@@ -876,11 +876,11 @@
           "mappedType": "string"
         }
       },
-      "name": "quiz_question_answer",
+      "name": "survey_question_answer",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "quiz_question_answer_pkey",
+          "keyName": "survey_question_answer_pkey",
           "columnNames": [
             "id"
           ],
@@ -964,11 +964,11 @@
           "mappedType": "uuid"
         }
       },
-      "name": "quiz_question_answer_detail",
+      "name": "survey_question_answer_detail",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "quiz_question_answer_detail_pkey",
+          "keyName": "survey_question_answer_detail_pkey",
           "columnNames": [
             "id"
           ],
@@ -980,42 +980,42 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "quiz_question_answer_detail_question_id_foreign": {
-          "constraintName": "quiz_question_answer_detail_question_id_foreign",
+        "survey_question_answer_detail_question_id_foreign": {
+          "constraintName": "survey_question_answer_detail_question_id_foreign",
           "columnNames": [
             "question_id"
           ],
-          "localTableName": "public.quiz_question_answer_detail",
+          "localTableName": "public.survey_question_answer_detail",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.quiz_question",
+          "referencedTableName": "public.survey_question",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         },
-        "quiz_question_answer_detail_answer_id_foreign": {
-          "constraintName": "quiz_question_answer_detail_answer_id_foreign",
+        "survey_question_answer_detail_answer_id_foreign": {
+          "constraintName": "survey_question_answer_detail_answer_id_foreign",
           "columnNames": [
             "answer_id"
           ],
-          "localTableName": "public.quiz_question_answer_detail",
+          "localTableName": "public.survey_question_answer_detail",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.quiz_answer",
+          "referencedTableName": "public.survey_answer",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         },
-        "quiz_question_answer_detail_ques_ans_id_foreign": {
-          "constraintName": "quiz_question_answer_detail_ques_ans_id_foreign",
+        "survey_question_answer_detail_ques_ans_id_foreign": {
+          "constraintName": "survey_question_answer_detail_ques_ans_id_foreign",
           "columnNames": [
             "ques_ans_id"
           ],
-          "localTableName": "public.quiz_question_answer_detail",
+          "localTableName": "public.survey_question_answer_detail",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.quiz_question_answer",
+          "referencedTableName": "public.survey_question_answer",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         }

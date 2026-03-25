@@ -4,14 +4,14 @@ import { Tools } from 'src/chatbot/utils/tools';
 import { Module, Provider } from '@nestjs/common';
 import { UnitOfWorkModule } from './unit-of-work.module';
 import { ToolModule } from './tool.module';
-import { aiModelForQuiz, aiModelForRestock, aiModelForReview, aiModelForTrend } from 'src/chatbot/ai-model';
+import { aiModelForSurvey, aiModelForRestock, aiModelForReview, aiModelForTrend } from 'src/chatbot/ai-model';
 
 export const AI_HELPER = 'AI_HELPER';
 export const AI_CONVERSATION_HELPER = 'AI_CONVERSATION_HELPER';
 export const AI_TREND_HELPER = 'AI_TREND_HELPER';
 export const AI_RECOMMENDATION_HELPER = 'AI_RECOMMENDATION_HELPER';
 export const AI_RESTOCK_HELPER = 'AI_RESTOCK_HELPER';
-export const AI_QUIZ_HELPER = 'AI_QUIZ_HELPER';
+export const AI_SURVEY_HELPER = 'AI_SURVEY_HELPER';
 export const AI_INVENTORY_REPORT_HELPER = 'AI_INVENTORY_REPORT_HELPER';
 export const AI_REVIEW_HELPER = 'AI_REVIEW_HELPER';
 
@@ -82,16 +82,16 @@ const aiRestockProvider: Provider = {
   inject: [Tools]
 };
 
-const aiQuizProvider: Provider = {
-  provide: AI_QUIZ_HELPER,
+const aiSurveyProvider: Provider = {
+  provide: AI_SURVEY_HELPER,
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      tools.getToolsForQuiz,
+      tools.getToolsForSurvey,
       10,
       0,
       'auto',
-      aiModelForQuiz
+      aiModelForSurvey
     ),
   inject: [Tools]
 };
@@ -123,7 +123,7 @@ const aiInventoryReportProvider: Provider = {
     aiTrendProvider,
     aiRecommendationProvider,
     aiRestockProvider,
-    aiQuizProvider,
+    aiSurveyProvider,
     aiInventoryReportProvider,
     aiReviewProvider
   ],
@@ -133,7 +133,7 @@ const aiInventoryReportProvider: Provider = {
     aiTrendProvider,
     aiRecommendationProvider,
     aiRestockProvider,
-    aiQuizProvider,
+    aiSurveyProvider,
     aiInventoryReportProvider,
     aiReviewProvider
   ]

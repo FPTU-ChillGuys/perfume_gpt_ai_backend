@@ -166,8 +166,8 @@ export function applyEventToFeatureSnapshot(
   if (/gift|qua tang|quà tặng/.test(normalizedText)) {
     increaseCounter(featureSnapshot.intentCounts, 'gift');
   }
-  if (event.eventType === EventLogEventType.QUIZ) {
-    increaseCounter(featureSnapshot.intentCounts, 'quiz_engagement');
+  if (event.eventType === EventLogEventType.SURVEY) {
+    increaseCounter(featureSnapshot.intentCounts, 'survey_engagement');
   }
   if (event.eventType === EventLogEventType.PRODUCT) {
     increaseCounter(featureSnapshot.intentCounts, 'product_interest');
@@ -248,7 +248,7 @@ export function buildRollingSummaryText(
 export function buildContentSectionsFromEvents(eventLogs: EventLog[]): {
   searchContents: string;
   messageContents: string;
-  quizContents: string;
+  surveyContents: string;
   count: number;
 } {
   const searchLogs = eventLogs.filter(
@@ -257,8 +257,8 @@ export function buildContentSectionsFromEvents(eventLogs: EventLog[]): {
   const messageLogs = eventLogs.filter(
     (log) => log.eventType === EventLogEventType.MESSAGE
   );
-  const quizLogs = eventLogs.filter(
-    (log) => log.eventType === EventLogEventType.QUIZ
+  const surveyLogs = eventLogs.filter(
+    (log) => log.eventType === EventLogEventType.SURVEY
   );
 
   const searchContents =
@@ -281,7 +281,7 @@ export function buildContentSectionsFromEvents(eventLogs: EventLog[]): {
       .filter(Boolean)
       .join(';\n');
 
-  const quizContents = quizLogs
+  const surveyContents = surveyLogs
     .map((log) => {
       const question =
         typeof log.metadata?.question === 'string'
@@ -300,8 +300,8 @@ export function buildContentSectionsFromEvents(eventLogs: EventLog[]): {
   return {
     searchContents,
     messageContents,
-    quizContents,
-    count: searchLogs.length + messageLogs.length + quizLogs.length
+    surveyContents,
+    count: searchLogs.length + messageLogs.length + surveyLogs.length
   };
 }
 
@@ -351,11 +351,11 @@ export function mergeDailyFeatureSnapshots(
 export function convertUserLogsToReport(
   searchContents: string,
   messageContents: string,
-  quizContents: string,
+  surveyContents: string,
   startDate: Date,
   endDate: Date
 ): string {
-  return `User activity summary from ${startOfDay(new Date(startDate))} to ${endOfDay(new Date(endDate))}:\n\nSearch Activities: ${searchContents}\n\nMessages: ${messageContents}\n\nQuiz Answers: ${quizContents}\n`;
+  return `User activity summary from ${startOfDay(new Date(startDate))} to ${endOfDay(new Date(endDate))}:\n\nSearch Activities: ${searchContents}\n\nMessages: ${messageContents}\n\nSurvey Answers: ${surveyContents}\n`;
 }
 
 export function getFirstDateOfPeriod(period: PeriodEnum, endDate: Date): Date {

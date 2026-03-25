@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 
-/** Request chi tiết câu hỏi - câu trả lời quiz */
-export class QuizQuesAnsDetailRequest {
+/** Request chi tiết câu hỏi - câu trả lời survey */
+export class SurveyQuesAnsDetailRequest {
   /** ID câu hỏi */
-  @ApiProperty({ description: 'ID câu hỏi quiz', format: 'uuid' })
+  @ApiProperty({ description: 'ID câu hỏi survey', format: 'uuid' })
   @IsUUID()
   questionId: string;
 
@@ -13,7 +13,7 @@ export class QuizQuesAnsDetailRequest {
   @IsUUID()
   answerId: string;
 
-  constructor(init?: Partial<QuizQuesAnsDetailRequest>) {
+  constructor(init?: Partial<SurveyQuesAnsDetailRequest>) {
     Object.assign(this, init);
   }
 }

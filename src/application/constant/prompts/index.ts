@@ -31,7 +31,7 @@ export {
 export {
   generateSummaryPrompt,
   convertQuesAnsesToString,
-  quizPrompt
+  surveyPrompt
 } from './service.prompt';
 
 // Admin instruction type constants

@@ -7,10 +7,10 @@ import {
   type Mapper
 } from '@automapper/core';
 import { Message } from 'src/domain/entities/message.entity';
-import { QuizQuestionRequest } from '../dtos/request/quiz-question.request';
-import { QuizAnswerRequest } from '../dtos/request/quiz-answer.request';
-import { QuizAnswer } from 'src/domain/entities/quiz-answer.entity';
-import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
+import { SurveyQuestionRequest } from '../dtos/request/survey-question.request';
+import { SurveyAnswerRequest } from '../dtos/request/survey-answer.request';
+import { SurveyAnswer } from 'src/domain/entities/survey-answer.entity';
+import { SurveyQuestion } from 'src/domain/entities/survey-question.entity';
 
 export class ChatProfile extends AutomapperProfile {
   constructor(@InjectMapper() mapper: Mapper) {
@@ -21,8 +21,8 @@ export class ChatProfile extends AutomapperProfile {
     return (mapper: Mapper) => {
       createMap(
         mapper,
-        QuizAnswerRequest,
-        QuizAnswer,
+        SurveyAnswerRequest,
+        SurveyAnswer,
         forMember((dest) => dest.question, ignore()),
         forMember(
           (dest) => dest.answer,
@@ -31,8 +31,8 @@ export class ChatProfile extends AutomapperProfile {
       );
       createMap(
         mapper,
-        QuizQuestionRequest,
-        QuizQuestion,
+        SurveyQuestionRequest,
+        SurveyQuestion,
         forMember((dest) => dest.answers, ignore()),
         forMember(
           (dest) => dest.question,

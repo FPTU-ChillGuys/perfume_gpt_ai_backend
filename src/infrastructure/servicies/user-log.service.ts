@@ -211,8 +211,8 @@ export class UserLogService {
         const searchCount = eventLogs.filter(
           (log) => log.eventType === EventLogEventType.SEARCH
         ).length;
-        const quizCount = eventLogs.filter(
-          (log) => log.eventType === EventLogEventType.QUIZ
+        const surveyCount = eventLogs.filter(
+          (log) => log.eventType === EventLogEventType.SURVEY
         ).length;
 
         return {
@@ -224,7 +224,7 @@ export class UserLogService {
             totalCount: eventLogs.length,
             messageCount,
             searchCount,
-            quizCount
+            surveyCount
           }
         };
       },
@@ -263,7 +263,7 @@ export class UserLogService {
             totalCount: 0,
             messageCount: 0,
             searchCount: 0,
-            quizCount: 0
+            surveyCount: 0
           };
 
           existingBucket.totalCount += 1;
@@ -271,8 +271,8 @@ export class UserLogService {
             existingBucket.messageCount += 1;
           } else if (eventLog.eventType === EventLogEventType.SEARCH) {
             existingBucket.searchCount += 1;
-          } else if (eventLog.eventType === EventLogEventType.QUIZ) {
-            existingBucket.quizCount += 1;
+          } else if (eventLog.eventType === EventLogEventType.SURVEY) {
+            existingBucket.surveyCount += 1;
           }
 
           buckets.set(bucketKey, existingBucket);
@@ -468,18 +468,18 @@ export class UserLogService {
     return id;
   }
 
-  async addQuizQuesAnsDetailToUserLog(
+  async addSurveyQuesAnsDetailToUserLog(
     userId: string,
-    quizQuesAnsId: string
+    surveyQuesAnsId: string
   ): Promise<string[]> {
-    const quizQuesAnsDetail =
-      await this.unitOfWork.AIQuizQuestionAnswerRepo.findOne({
-        id: quizQuesAnsId
+    const surveyQuesAnsDetail =
+      await this.unitOfWork.AISurveyQuestionAnswerRepo.findOne({
+        id: surveyQuesAnsId
       });
 
-    const ids = await this.unitOfWork.EventLogRepo.createQuizEventsFromDetails(
+    const ids = await this.unitOfWork.EventLogRepo.createSurveyEventsFromDetails(
       userId,
-      quizQuesAnsDetail?.details.getItems() || []
+      surveyQuesAnsDetail?.details.getItems() || []
     );
 
     if (ids.length) {
@@ -649,19 +649,19 @@ export class UserLogService {
           return { success: false, error: 'User log not found' };
         }
 
-        const { searchContents, messageContents, quizContents, count } =
+        const { searchContents, messageContents, surveyContents, count } =
           buildContentSectionsFromEvents(eventLogs);
 
         console.log(`User ID: ${userLogRequest.userId}`);
         console.log(`Search Contents: ${searchContents}`);
         console.log(`Message Contents: ${messageContents}`);
-        console.log(`Quiz Contents: ${quizContents}`);
+        console.log(`Survey Contents: ${surveyContents}`);
 
         // Tao prompt de tong hop log
         const prompt = generateSummaryPrompt(
           searchContents,
           messageContents,
-          quizContents,
+          surveyContents,
           startOfDay(convertToUTC(userLogRequest.startDate!)),
           endOfDay(convertToUTC(userLogRequest.endDate))
         );
@@ -670,7 +670,7 @@ export class UserLogService {
         const response = convertUserLogsToReport(
           searchContents,
           messageContents,
-          quizContents,
+          surveyContents,
           startOfDay(convertToUTC(userLogRequest.startDate!)),
           endOfDay(convertToUTC(userLogRequest.endDate))
         );
@@ -716,20 +716,20 @@ export class UserLogService {
         let response = '';
 
         for (const [userId, userEventLogs] of groupedByUserId.entries()) {
-          const { searchContents, messageContents, quizContents } =
+          const { searchContents, messageContents, surveyContents } =
             buildContentSectionsFromEvents(userEventLogs);
 
           console.log(`User ID: ${userId}`);
           console.log(`Search Contents: ${searchContents}`);
           console.log(`Message Contents: ${messageContents}`);
-          console.log(`Quiz Contents: ${quizContents}`);
+          console.log(`Survey Contents: ${surveyContents}`);
 
           // Tao prompt de tong hop log
           prompt +=
             generateSummaryPrompt(
               searchContents,
               messageContents,
-              quizContents,
+              surveyContents,
               startOfDay(convertToUTC(allUserLogRequest.startDate!)),
               endOfDay(convertToUTC(allUserLogRequest.endDate))
             ) + '\n';
@@ -738,7 +738,7 @@ export class UserLogService {
             convertUserLogsToReport(
               searchContents,
               messageContents,
-              quizContents,
+              surveyContents,
               startOfDay(convertToUTC(allUserLogRequest.startDate!)),
               endOfDay(convertToUTC(allUserLogRequest.endDate))
             ) + '\n';

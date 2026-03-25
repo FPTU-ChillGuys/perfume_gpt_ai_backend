@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CommonResponse } from "./common/common.response";
 
-/** Response chi tiết câu hỏi - câu trả lời quiz */
-export class QuizQuestionAnswerDetailResponse extends CommonResponse {
+/** Response chi tiết câu hỏi - câu trả lời survey */
+export class SurveyQuestionAnswerDetailResponse extends CommonResponse {
 
     /** ID câu hỏi */
     @ApiProperty({ description: 'ID câu hỏi', format: 'uuid' })

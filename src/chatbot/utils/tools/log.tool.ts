@@ -13,12 +13,12 @@ export class LogTool {
 
   /**
    * Lấy báo cáo hoạt động của một user trong khoảng thời gian.
-   * AI dùng tool này để hiểu user đã làm gì gần đây (search, chat, quiz).
+   * AI dùng tool này để hiểu user đã làm gì gần đây (search, chat, survey).
    */
   getUserActivityReportPerWeek: Tool = tool({
     description:
       'Get a text activity report for a specific user within a week. ' +
-      'Returns a summary of their searches, messages, and quiz answers. ' +
+      'Returns a summary of their searches, messages, and survey answers. ' +
       'Use this to personalize recommendations or understand user behavior.' +
       'Tốt nhất là dùng cho phần tích trend.',
     inputSchema: z.object({
@@ -53,12 +53,12 @@ export class LogTool {
 
   /**
    * Lấy báo cáo hoạt động của một user trong khoảng thời gian.
-   * AI dùng tool này để hiểu user đã làm gì gần đây (search, chat, quiz).
+   * AI dùng tool này để hiểu user đã làm gì gần đây (search, chat, survey).
    */
   getUserActivityReportPerMonth: Tool = tool({
     description:
       'Get a text activity report for a specific user within a month. ' +
-      'Returns a summary of their searches, messages, and quiz answers. ' +
+      'Returns a summary of their searches, messages, and survey answers. ' +
       'Use this to personalize recommendations or understand user behavior.' +
       'Tốt nhất là dùng cho phần tích trend.',
     inputSchema: z.object({
@@ -93,12 +93,12 @@ export class LogTool {
 
   /**
    * Lấy báo cáo hoạt động của một user trong khoảng thời gian.
-   * AI dùng tool này để hiểu user đã làm gì gần đây (search, chat, quiz).
+   * AI dùng tool này để hiểu user đã làm gì gần đây (search, chat, survey).
    */
   getUserActivityReportPerYear: Tool = tool({
     description:
       'Get a text activity report for a specific user within a year. ' +
-      'Returns a summary of their searches, messages, and quiz answers. ' +
+      'Returns a summary of their searches, messages, and survey answers. ' +
       'Use this to personalize recommendations or understand user behavior.' +
       'Nên dùng cho trend và phân tích.',
     inputSchema: z.object({

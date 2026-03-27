@@ -280,7 +280,7 @@ export class ProductService {
         });
         return { success: true, payload: result };
       },
-      'Failed to fetch products using AI search',
+      'Failed to fetch products using semantic search v2',
       true
     );
   }

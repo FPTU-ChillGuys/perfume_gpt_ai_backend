@@ -109,10 +109,10 @@ export class ProductController {
     return result;
   }
 
-  /** Tìm kiếm sản phẩm bằng AI extraction */
+  /** Tìm kiếm sản phẩm bằng semantic search v2 (AI extraction) */
   @Public()
-  @Get('ai-search')
-  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng AI extraction' })
+  @Get('search/v2')
+  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search v2 (AI extraction)' })
   @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
   async getProductsByAiSearch(
     @Req() req: Request,

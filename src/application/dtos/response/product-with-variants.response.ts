@@ -108,6 +108,14 @@ export class ProductVariantResponse {
     @ApiProperty({ description: 'Danh sách thuộc tính variant', type: () => [ProductAttributeResponse] })
     attributes!: ProductAttributeResponse[];
 
+    /** Độ lưu hương (Longevity) */
+    @ApiPropertyOptional({ description: 'Độ lưu hương (Longevity)', example: 8 })
+    longevity?: number;
+
+    /** Độ tỏa hương (Sillage) */
+    @ApiPropertyOptional({ description: 'Độ tỏa hương (Sillage)', example: 2 })
+    sillage?: number;
+
     /** Ngày tạo */
     @ApiProperty({ description: 'Ngày tạo' })
     createdAt!: string;
@@ -154,6 +162,14 @@ export class ProductWithVariantsResponse {
     /** Danh sách biến thể */
     @ApiProperty({ description: 'Danh sách biến thể', type: () => [ProductVariantResponse] })
     variants!: ProductVariantResponse[];
+
+    /** Danh sách nốt hương */
+    @ApiProperty({ description: 'Danh sách nốt hương', type: [String] })
+    scentNotes!: string[];
+
+    /** Danh sách nhóm hương */
+    @ApiProperty({ description: 'Danh sách nhóm hương', type: [String] })
+    olfactoryFamilies!: string[];
 
     /** Danh sách thuộc tính cấp sản phẩm */
     @ApiProperty({ description: 'Danh sách thuộc tính sản phẩm', type: () => [ProductAttributeResponse] })

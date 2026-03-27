@@ -54,6 +54,12 @@ const productWithVariantsInclude = {
         include: { Attributes: true, AttributeValues: true }
       }
     }
+  },
+  ProductNoteMaps: {
+    include: { ScentNotes: true }
+  },
+  ProductFamilyMaps: {
+    include: { OlfactoryFamilies: true }
   }
 } satisfies Prisma.ProductsInclude;
 
@@ -75,7 +81,9 @@ function mapProductWithVariants(
     primaryImage: p.Media[0]?.Url ?? null,
     createdAt: p.CreatedAt.toISOString(),
     updatedAt: p.UpdatedAt?.toISOString() ?? null,
-    attributes: p.ProductAttributes.map(
+    scentNotes: p.ProductNoteMaps?.map((n: any) => n.ScentNotes?.Name).filter(Boolean) || [],
+    olfactoryFamilies: p.ProductFamilyMaps?.map((f: any) => f.OlfactoryFamilies?.Name).filter(Boolean) || [],
+    attributes: (p.ProductAttributes ?? []).map(
       (attr): ProductAttributeResponse => ({
         id: attr.Id,
         attributeId: attr.AttributeId,
@@ -85,7 +93,7 @@ function mapProductWithVariants(
         value: attr.AttributeValues.Value
       })
     ),
-    variants: p.ProductVariants.map(
+    variants: (p.ProductVariants ?? []).map(
       (v): ProductVariantResponse => ({
         id: v.Id,
         productId: v.ProductId,
@@ -110,7 +118,7 @@ function mapProductWithVariants(
             lowStockThreshold: v.Stocks.LowStockThreshold
           } satisfies VariantStockResponse)
           : null,
-        media: v.Media.map(
+        media: (v.Media ?? []).map(
           (m): VariantMediaResponse => ({
             id: m.Id,
             url: m.Url,
@@ -119,7 +127,7 @@ function mapProductWithVariants(
             displayOrder: m.DisplayOrder
           })
         ),
-        attributes: v.ProductAttributes.map(
+        attributes: (v.ProductAttributes ?? []).map(
           (attr): ProductAttributeResponse => ({
             id: attr.Id,
             attributeId: attr.AttributeId,
@@ -129,6 +137,8 @@ function mapProductWithVariants(
             value: attr.AttributeValues.Value
           })
         ),
+        longevity: v.Longevity,
+        sillage: v.Sillage,
         createdAt: v.CreatedAt.toISOString(),
         updatedAt: v.UpdatedAt?.toISOString() ?? null
       })
@@ -146,7 +156,7 @@ function mapProduct(p: ProductWithRelations): ProductResponse {
     categoryName: p.Categories.Name,
     description: p.Description ?? '',
     primaryImage: p.Media[0]?.Url ?? null,
-    attributes: p.ProductAttributes.map(
+    attributes: (p.ProductAttributes ?? []).map(
       (attr): ProductAttributeResponse => ({
         id: attr.Id,
         attributeId: attr.AttributeId,

@@ -245,6 +245,14 @@ export class SearchQueryService {
             });
         }
 
+        // 10. Performance filters (Longevity & Sillage)
+        if (obj.minLongevity !== undefined) {
+            filters.push({ range: { longevity: { gte: obj.minLongevity } } });
+        }
+        if (obj.minSillage !== undefined) {
+            filters.push({ range: { sillage: { gte: obj.minSillage } } });
+        }
+
         return {
             bool: {
                 must: mustClauses.length > 0 ? mustClauses : undefined,

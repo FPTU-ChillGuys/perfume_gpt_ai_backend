@@ -242,6 +242,8 @@ export class SearchService {
             scentNotes: p.ProductNoteMaps?.map((s: any) => s.ScentNotes?.Name),
             olfactoryFamilies: p.ProductFamilyMaps?.map((f: any) => f.OlfactoryFamilies?.Name),
             variantPrices: p.ProductVariants?.map((v: any) => parseFloat(v.BasePrice)),
+            longevity: p.ProductVariants?.map((v: any) => v.Longevity).filter((v: any) => v !== undefined),
+            sillage: p.ProductVariants?.map((v: any) => v.Sillage).filter((v: any) => v !== undefined),
             // Embedding logic could be added here if needed
         };
 

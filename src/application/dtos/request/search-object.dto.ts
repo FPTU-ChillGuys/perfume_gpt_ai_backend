@@ -74,4 +74,14 @@ export class SearchObjectDto {
     @IsString()
     @IsOptional()
     description?: string;
+
+    @ApiProperty({ description: 'Độ lưu hương tối thiểu (longevity)', required: false, example: 6 })
+    @IsNumber()
+    @IsOptional()
+    minLongevity?: number;
+
+    @ApiProperty({ description: 'Độ tỏa hương tối thiểu (sillage)', required: false, example: 2 })
+    @IsNumber()
+    @IsOptional()
+    minSillage?: number;
 }

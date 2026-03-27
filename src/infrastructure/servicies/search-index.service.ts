@@ -112,6 +112,10 @@ export class SearchIndexService implements OnModuleInit {
                             analyzer: 'vi_perfume_analyzer',
                         },
                         releaseYear: { type: 'integer' },
+                        description: {
+                            type: 'text',
+                            analyzer: 'vi_perfume_analyzer',
+                        },
                         attributes: {
                             type: 'text',
                             analyzer: 'vi_perfume_analyzer',

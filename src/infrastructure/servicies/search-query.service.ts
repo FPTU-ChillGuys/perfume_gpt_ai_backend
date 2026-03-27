@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { QueryDslQueryContainer } from '@elastic/elasticsearch/lib/api/types';
-import { SearchObjectDto, GenderIntent } from '../../application/dtos/request/search-object.dto';
-
-@Injectable()
+import { SearchObjectDto } from 'src/application/dtos/request/search-object.dto';
+import { embed } from 'ai';
+import { embeddingModel } from 'src/chatbot/ai-model';
 export class SearchQueryService {
     /**
      * Builds the main search query with multiple layers (Exact, Semantic, Discovery, Typo, Technical)
@@ -131,6 +131,77 @@ export class SearchQueryService {
     }
 
     /**
+     * Builds a complex Elasticsearch query with kNN for Hybrid Search
+     */
+    async buildHybridQuery(searchText: string, obj: SearchObjectDto): Promise<{ query: QueryDslQueryContainer, knn?: any }> {
+        const mustClauses: QueryDslQueryContainer[] = [];
+        const shouldClauses: QueryDslQueryContainer[] = [];
+        const filters: QueryDslQueryContainer[] = [];
+
+        // 1. Generate Query Embedding
+        let queryEmbedding: number[] | undefined;
+        try {
+            const { embedding } = await embed({
+                model: embeddingModel,
+                value: searchText,
+            });
+            queryEmbedding = embedding;
+        } catch (error) {
+            console.error('[ES] Error generating query embedding:', error);
+        }
+
+        // 2. Build filters from SearchObject (Intent)
+        if (obj.brand) {
+            mustClauses.push({ match: { brand: { query: obj.brand, boost: 2.0 } } });
+        }
+        if (obj.gender) {
+            filters.push({ term: { gender: obj.gender } });
+        }
+        if (obj.minPrice !== undefined || obj.maxPrice !== undefined) {
+            const range: any = {};
+            if (obj.minPrice !== undefined) range.gte = obj.minPrice;
+            if (obj.maxPrice !== undefined) range.lte = obj.maxPrice;
+            filters.push({ range: { variantPrices: range } });
+        }
+        if (obj.notes && obj.notes.length > 0) {
+            obj.notes.forEach(note => {
+                shouldClauses.push({ match: { scentNotes: { query: note, boost: 1.5 } } });
+            });
+        }
+        if (obj.families && obj.families.length > 0) {
+            obj.families.forEach(family => {
+                shouldClauses.push({ match: { olfactoryFamilies: { query: family, boost: 1.0 } } });
+            });
+        }
+        if (obj.minLongevity !== undefined) {
+            filters.push({ range: { longevity: { gte: obj.minLongevity } } });
+        }
+        if (obj.minSillage !== undefined) {
+            filters.push({ range: { sillage: { gte: obj.minSillage } } });
+        }
+
+        const query: QueryDslQueryContainer = {
+            bool: {
+                must: mustClauses.length > 0 ? mustClauses : undefined,
+                should: shouldClauses.length > 0 ? shouldClauses : undefined,
+                filter: filters.length > 0 ? filters : undefined,
+                minimum_should_match: (shouldClauses.length > 0 && mustClauses.length === 0) ? 1 : undefined
+            }
+        };
+
+        const knn: any | undefined = queryEmbedding ? {
+            field: 'embedding',
+            query_vector: queryEmbedding,
+            k: 50,
+            num_candidates: 100,
+            filter: filters.length > 0 ? filters : undefined,
+            boost: 1.0
+        } : undefined;
+
+        return { query, knn };
+    }
+
+    /**
      * Builds a complex Elasticsearch query from a structured SearchObject extracted by AI
      */
     buildQueryFromSearchObject(obj: SearchObjectDto): QueryDslQueryContainer {
@@ -239,7 +310,7 @@ export class SearchQueryService {
             shouldClauses.push({
                 multi_match: {
                     query: descriptionParts.join(' '),
-                    fields: ['attributes', 'concentrations', 'name', 'brand'],
+                    fields: ['attributes', 'concentrations', 'name', 'brand', 'description'],
                     boost: 1.0
                 }
             });

@@ -5,6 +5,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { SearchQueryService } from './search-query.service';
 import { SearchAiService } from './search-ai.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
+import { embed } from 'ai';
+import { embeddingModel } from 'src/chatbot/ai-model';
 
 @Injectable()
 export class SearchService {
@@ -138,18 +140,20 @@ export class SearchService {
         // 1. Extract structured search object using AI
         const searchObject = await this.searchAiService.extractSearchObject(searchText);
 
-        // 2. Build ES query from structured object
-        this.logger.log(`[ES-AI] Building query for extracted object...`);
-        const query = this.searchQueryService.buildQueryFromSearchObject(searchObject);
+        // 2. Build Hybrid Query (Filters + Vector)
+        const { query, knn } = await this.searchQueryService.buildHybridQuery(searchText, searchObject);
 
-        const from = (request.PageNumber - 1) * request.PageSize;
+        this.logger.log(`[ES] Executing Hybrid Search...`);
+        // console.log(`[ES] Query: ${JSON.stringify(query, null, 2)}`);
+        // if (knn) console.log(`[ES] kNN: ${JSON.stringify(knn, null, 2)}`);
 
         try {
             const response = await this.elasticsearchService.search({
                 index: this.indexName,
-                from,
+                query,
+                knn: knn as any,
                 size: request.PageSize,
-                query: query,
+                from: (request.PageNumber - 1) * request.PageSize,
                 sort: [{ _score: { order: 'desc' } }] as any,
             });
 
@@ -234,6 +238,7 @@ export class SearchService {
             genderSearch: p.Gender === 'Male' ? 'Nam' : p.Gender === 'Female' ? 'Nữ' : 'Unisex',
             origin: p.Origin,
             releaseYear: p.ReleaseYear,
+            description: p.Description,
             attributes: p.ProductAttributes?.map((a: any) => a.AttributeValues?.Value),
             concentrations: p.ProductVariants?.map((v: any) => v.Concentrations?.Name).filter(Boolean),
             volumes: p.ProductVariants?.map((v: any) => v.VolumeMl),
@@ -244,8 +249,29 @@ export class SearchService {
             variantPrices: p.ProductVariants?.map((v: any) => parseFloat(v.BasePrice)),
             longevity: p.ProductVariants?.map((v: any) => v.Longevity).filter((v: any) => v !== undefined),
             sillage: p.ProductVariants?.map((v: any) => v.Sillage).filter((v: any) => v !== undefined),
-            // Embedding logic could be added here if needed
         };
+
+        // Generate embedding for semantic search
+        try {
+            const textToEmbed = `
+                Product: ${document.name}. 
+                Brand: ${document.brand}. 
+                Category: ${document.category}. 
+                Description: ${document.description ?? ''}. 
+                Notes: ${document.scentNotes?.join(', ') ?? ''}. 
+                Families: ${document.olfactoryFamilies?.join(', ') ?? ''}.
+                Attributes: ${document.attributes?.join(', ') ?? ''}.
+            `.replace(/\s+/g, ' ').trim();
+
+            const { embedding } = await embed({
+                model: embeddingModel,
+                value: textToEmbed,
+            });
+
+            (document as any).embedding = embedding;
+        } catch (error) {
+            this.logger.error(`[ES] Error generating embedding for product ${p.Id}:`, error);
+        }
 
         try {
             await this.elasticsearchService.index({

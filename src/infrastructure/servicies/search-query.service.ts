@@ -250,7 +250,7 @@ export class SearchQueryService {
                 must: mustClauses.length > 0 ? mustClauses : undefined,
                 should: shouldClauses.length > 0 ? shouldClauses : undefined,
                 filter: filters.length > 0 ? filters : undefined,
-                minimum_should_match: shouldClauses.length > 0 ? 1 : undefined
+                minimum_should_match: (shouldClauses.length > 0 && mustClauses.length === 0) ? 1 : undefined
             }
         };
     }

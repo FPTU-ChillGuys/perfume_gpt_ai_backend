@@ -6,10 +6,12 @@ import { SearchQueryService } from '../servicies/search-query.service';
 import { SearchService } from '../servicies/search.service';
 import { SearchAiService } from '../servicies/search-ai.service';
 import { AdminInstructionModule } from './admin-instruction.module';
+import { PrismaModule } from '../../prisma/prisma.module';
 
 @Module({
     imports: [
         AdminInstructionModule,
+        PrismaModule,
         ElasticsearchModule.registerAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({

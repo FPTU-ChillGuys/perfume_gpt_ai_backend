@@ -144,6 +144,11 @@ export class SearchQueryService {
             const { embedding } = await embed({
                 model: embeddingModel,
                 value: searchText,
+                providerOptions: {
+                    openai: {
+                        dimensions: 1024, // optional, number of dimensions for the embedding
+                    }
+                },
             });
             queryEmbedding = embedding;
         } catch (error) {
@@ -168,11 +173,53 @@ export class SearchQueryService {
                 shouldClauses.push({ match: { scentNotes: { query: note, boost: 1.5 } } });
             });
         }
+        if (obj.topNotes && obj.topNotes.length > 0) {
+            obj.topNotes.forEach(note => {
+                shouldClauses.push({ match: { top_notes: { query: note, boost: 2.0 } } });
+            });
+        }
+        if (obj.middleNotes && obj.middleNotes.length > 0) {
+            obj.middleNotes.forEach(note => {
+                shouldClauses.push({ match: { middle_notes: { query: note, boost: 1.8 } } });
+            });
+        }
+        if (obj.baseNotes && obj.baseNotes.length > 0) {
+            obj.baseNotes.forEach(note => {
+                shouldClauses.push({ match: { base_notes: { query: note, boost: 1.8 } } });
+            });
+        }
         if (obj.families && obj.families.length > 0) {
             obj.families.forEach(family => {
                 shouldClauses.push({ match: { olfactoryFamilies: { query: family, boost: 1.0 } } });
             });
         }
+
+        // Categorized Attribute Filters
+        if (obj.occasion) {
+            filters.push({ match: { attr_occasion: { query: obj.occasion, boost: 1.2 } } });
+        }
+        if (obj.weatherSeason) {
+            filters.push({ match: { attr_weather_season: { query: obj.weatherSeason, boost: 1.2 } } });
+        }
+        if (obj.ageGroup) {
+            filters.push({ match: { attr_age_group: { query: obj.ageGroup, boost: 1.2 } } });
+        }
+        if (obj.style) {
+            filters.push({ match: { attr_style: { query: obj.style, boost: 1.2 } } });
+        }
+        if (obj.scentCharacter) {
+            filters.push({ match: { attr_scent_character: { query: obj.scentCharacter, boost: 1.2 } } });
+        }
+        if (obj.timeOfDay) {
+            filters.push({ match: { attr_time_of_day: { query: obj.timeOfDay, boost: 1.2 } } });
+        }
+        if (obj.giftSuitability) {
+            filters.push({ match: { attr_gift_suitability: { query: obj.giftSuitability, boost: 1.2 } } });
+        }
+        if (obj.skinType) {
+            filters.push({ match: { attr_skin_type: { query: obj.skinType, boost: 1.2 } } });
+        }
+
         if (obj.minLongevity !== undefined) {
             filters.push({ range: { longevity: { gte: obj.minLongevity } } });
         }
@@ -314,6 +361,32 @@ export class SearchQueryService {
                     boost: 1.0
                 }
             });
+        }
+
+        // Categorized Attribute Filters
+        if (obj.occasion) {
+            filters.push({ match: { attr_occasion: { query: obj.occasion, boost: 1.2 } } });
+        }
+        if (obj.weatherSeason) {
+            filters.push({ match: { attr_weather_season: { query: obj.weatherSeason, boost: 1.2 } } });
+        }
+        if (obj.ageGroup) {
+            filters.push({ match: { attr_age_group: { query: obj.ageGroup, boost: 1.2 } } });
+        }
+        if (obj.style) {
+            filters.push({ match: { attr_style: { query: obj.style, boost: 1.2 } } });
+        }
+        if (obj.scentCharacter) {
+            filters.push({ match: { attr_scent_character: { query: obj.scentCharacter, boost: 1.2 } } });
+        }
+        if (obj.timeOfDay) {
+            filters.push({ match: { attr_time_of_day: { query: obj.timeOfDay, boost: 1.2 } } });
+        }
+        if (obj.giftSuitability) {
+            filters.push({ match: { attr_gift_suitability: { query: obj.giftSuitability, boost: 1.2 } } });
+        }
+        if (obj.skinType) {
+            filters.push({ match: { attr_skin_type: { query: obj.skinType, boost: 1.2 } } });
         }
 
         // 10. Performance filters (Longevity & Sillage)

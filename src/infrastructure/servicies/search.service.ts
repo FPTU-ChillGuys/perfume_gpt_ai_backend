@@ -244,12 +244,32 @@ export class SearchService {
             volumes: p.ProductVariants?.map((v: any) => v.VolumeMl),
             skus: p.ProductVariants?.map((v: any) => v.Sku),
             barcodes: p.ProductVariants?.map((v: any) => v.Barcode),
-            scentNotes: p.ProductNoteMaps?.map((s: any) => s.ScentNotes?.Name),
-            olfactoryFamilies: p.ProductFamilyMaps?.map((f: any) => f.OlfactoryFamilies?.Name),
+            scentNotes: p.ProductNoteMaps?.map((nm: any) => nm.ScentNotes?.Name),
+            top_notes: p.ProductNoteMaps?.filter((nm: any) => nm.NoteType === 'Top').map((nm: any) => nm.ScentNotes?.Name),
+            middle_notes: p.ProductNoteMaps?.filter((nm: any) => nm.NoteType === 'Middle').map((nm: any) => nm.ScentNotes?.Name),
+            base_notes: p.ProductNoteMaps?.filter((nm: any) => nm.NoteType === 'Base').map((nm: any) => nm.ScentNotes?.Name),
+            olfactoryFamilies: p.ProductFamilyMaps?.map((fm: any) => fm.OlfactoryFamilies?.Name),
             variantPrices: p.ProductVariants?.map((v: any) => parseFloat(v.BasePrice)),
             longevity: p.ProductVariants?.map((v: any) => v.Longevity).filter((v: any) => v !== undefined),
             sillage: p.ProductVariants?.map((v: any) => v.Sillage).filter((v: any) => v !== undefined),
         };
+
+        // Categorize attributes based on InternalCode (occasion, age_group, etc.)
+        if (p.ProductAttributes) {
+            p.ProductAttributes.forEach((pa: any) => {
+                const code = pa.Attributes?.InternalCode;
+                const val = pa.AttributeValues?.Value;
+                if (code && val) {
+                    const fieldName = `attr_${code.toLowerCase()}`;
+                    if (!(document as any)[fieldName]) {
+                        (document as any)[fieldName] = [];
+                    }
+                    if (!(document as any)[fieldName].includes(val)) {
+                        (document as any)[fieldName].push(val);
+                    }
+                }
+            });
+        }
 
         // Generate embedding for semantic search
         try {
@@ -266,6 +286,11 @@ export class SearchService {
             const { embedding } = await embed({
                 model: embeddingModel,
                 value: textToEmbed,
+                providerOptions: {
+                    openai: {
+                        dimensions: 1024, // optional, number of dimensions for the embedding
+                    }
+                },
             });
 
             (document as any).embedding = embedding;

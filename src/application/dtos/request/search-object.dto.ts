@@ -38,6 +38,24 @@ export class SearchObjectDto {
     @IsOptional()
     maxPrice?: number;
 
+    @ApiProperty({ description: 'Nốt hương đầu', required: false, type: [String] })
+    @IsArray()
+    @IsString({ each: true })
+    @IsOptional()
+    topNotes?: string[];
+
+    @ApiProperty({ description: 'Nốt hương giữa', required: false, type: [String] })
+    @IsArray()
+    @IsString({ each: true })
+    @IsOptional()
+    middleNotes?: string[];
+
+    @ApiProperty({ description: 'Nốt hương cuối', required: false, type: [String] })
+    @IsArray()
+    @IsString({ each: true })
+    @IsOptional()
+    baseNotes?: string[];
+
     @ApiProperty({ description: 'Các nốt hương (scent notes)', required: false, type: [String] })
     @IsArray()
     @IsString({ each: true })
@@ -60,12 +78,47 @@ export class SearchObjectDto {
     @IsOptional()
     volume?: number;
 
-    @ApiProperty({ description: 'Dịp sử dụng (Hẹn hò, đi làm, đi tiệc...)', required: false })
+    @ApiProperty({ description: 'Dịp sử dụng (đi tiệc, đi làm, ...)', required: false })
     @IsString()
     @IsOptional()
     occasion?: string;
 
-    @ApiProperty({ description: 'Mùa sử dụng (Xuân, Hạ, Thu, Đông)', required: false })
+    @ApiProperty({ description: 'Thời tiết/Mùa phù hợp', required: false })
+    @IsString()
+    @IsOptional()
+    weatherSeason?: string;
+
+    @ApiProperty({ description: 'Nhóm tuổi phù hợp', required: false })
+    @IsString()
+    @IsOptional()
+    ageGroup?: string;
+
+    @ApiProperty({ description: 'Phong cách', required: false })
+    @IsString()
+    @IsOptional()
+    style?: string;
+
+    @ApiProperty({ description: 'Đặc tính mùi hương', required: false })
+    @IsString()
+    @IsOptional()
+    scentCharacter?: string;
+
+    @ApiProperty({ description: 'Thời điểm trong ngày', required: false })
+    @IsString()
+    @IsOptional()
+    timeOfDay?: string;
+
+    @ApiProperty({ description: 'Phù hợp làm quà tặng', required: false })
+    @IsString()
+    @IsOptional()
+    giftSuitability?: string;
+
+    @ApiProperty({ description: 'Loại da phù hợp', required: false })
+    @IsString()
+    @IsOptional()
+    skinType?: string;
+
+    @ApiProperty({ description: 'Mùa sử dụng', required: false })
     @IsString()
     @IsOptional()
     season?: string;

@@ -4,9 +4,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SearchIndexService } from '../servicies/search-index.service';
 import { SearchQueryService } from '../servicies/search-query.service';
 import { SearchService } from '../servicies/search.service';
+import { SearchAiService } from '../servicies/search-ai.service';
+import { AdminInstructionModule } from './admin-instruction.module';
 
 @Module({
     imports: [
+        AdminInstructionModule,
         ElasticsearchModule.registerAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
@@ -17,7 +20,7 @@ import { SearchService } from '../servicies/search.service';
             inject: [ConfigService],
         }),
     ],
-    providers: [SearchService, SearchQueryService, SearchIndexService],
-    exports: [ElasticsearchModule, SearchService, SearchQueryService, SearchIndexService],
+    providers: [SearchService, SearchQueryService, SearchIndexService, SearchAiService],
+    exports: [ElasticsearchModule, SearchService, SearchQueryService, SearchIndexService, SearchAiService],
 })
 export class SearchModule { }

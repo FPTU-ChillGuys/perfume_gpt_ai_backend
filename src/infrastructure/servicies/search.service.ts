@@ -3,6 +3,7 @@ import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SearchQueryService } from './search-query.service';
+import { SearchAiService } from './search-ai.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class SearchService {
         private readonly elasticsearchService: ElasticsearchService,
         private readonly configService: ConfigService,
         private readonly searchQueryService: SearchQueryService,
+        private readonly searchAiService: SearchAiService,
         private readonly prisma: PrismaService,
     ) {
         this.indexName = this.configService.get<string>('ELASTICSEARCH_INDEX_NAME') || 'products';
@@ -123,6 +125,43 @@ export class SearchService {
             };
         } catch (error) {
             this.logger.error(`[ES] Search failed:`, error);
+            return { items: [], totalCount: 0 };
+        }
+    }
+
+    /**
+     * Search products using AI to extract structured intents
+     */
+    async searchWithAi(searchText: string, request: PagedAndSortedRequest) {
+        if (!searchText) return { items: [], totalCount: 0 };
+
+        // 1. Extract structured search object using AI
+        const searchObject = await this.searchAiService.extractSearchObject(searchText);
+
+        // 2. Build ES query from structured object
+        const query = this.searchQueryService.buildQueryFromSearchObject(searchObject);
+
+        const from = (request.PageNumber - 1) * request.PageSize;
+
+        try {
+            const response = await this.elasticsearchService.search({
+                index: this.indexName,
+                from,
+                size: request.PageSize,
+                query: query,
+                sort: [{ _score: { order: 'desc' } }] as any,
+            });
+
+            const total = typeof response.hits.total === 'number' ? response.hits.total : (response.hits.total as any)?.value ?? 0;
+            const items = response.hits.hits.map(hit => hit._source);
+
+            return {
+                items,
+                totalCount: total,
+                extractedObject: searchObject
+            };
+        } catch (error) {
+            this.logger.error(`[ES-AI] Search failed:`, error);
             return { items: [], totalCount: 0 };
         }
     }

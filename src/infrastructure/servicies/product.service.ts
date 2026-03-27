@@ -206,7 +206,7 @@ export class ProductService {
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const { items, totalCount } = await this.searchService.searchProducts(searchText, request);
+        const { items, totalCount } = await this.searchService.searchWithAi(searchText, request);
 
         // Enrich the items with full variant info from Prisma
         const productIds = items.map((p: any) => p.id);

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { QueryDslQueryContainer } from '@elastic/elasticsearch/lib/api/types';
+import { SearchObjectDto, GenderIntent } from '../../application/dtos/request/search-object.dto';
 
 @Injectable()
 export class SearchQueryService {
@@ -70,7 +71,7 @@ export class SearchQueryService {
         shouldClauses.push({
             multi_match: {
                 query: searchText,
-                fields: ['volumes', 'skus^5', 'barcodes^5'],
+                fields: ['scentNotes', 'skus^5', 'barcodes^5'],
                 operator: 'or',
                 type: 'best_fields',
             },
@@ -127,5 +128,130 @@ export class SearchQueryService {
         }
 
         return filters;
+    }
+
+    /**
+     * Builds a complex Elasticsearch query from a structured SearchObject extracted by AI
+     */
+    buildQueryFromSearchObject(obj: SearchObjectDto): QueryDslQueryContainer {
+        const mustClauses: QueryDslQueryContainer[] = [];
+        const shouldClauses: QueryDslQueryContainer[] = [];
+        const filters: QueryDslQueryContainer[] = [];
+
+        // 1. Brand match (Strong filter/must)
+        if (obj.brand) {
+            mustClauses.push({
+                match: {
+                    brand: {
+                        query: obj.brand,
+                        boost: 5.0
+                    }
+                }
+            });
+        }
+
+        // 2. Product Name match
+        if (obj.productName) {
+            shouldClauses.push({
+                match: {
+                    name: {
+                        query: obj.productName,
+                        boost: 10.0
+                    }
+                }
+            });
+        }
+
+        // 3. Category match
+        if (obj.category) {
+            shouldClauses.push({
+                match: {
+                    category: {
+                        query: obj.category,
+                        boost: 3.0
+                    }
+                }
+            });
+        }
+
+        // 4. Gender filter
+        if (obj.gender) {
+            filters.push({ term: { gender: obj.gender } });
+        }
+
+        // 5. Price range filter
+        if (obj.minPrice !== undefined || obj.maxPrice !== undefined) {
+            const range: any = {};
+            if (obj.minPrice !== undefined) range.gte = obj.minPrice;
+            if (obj.maxPrice !== undefined) range.lte = obj.maxPrice;
+            filters.push({ range: { variantPrices: range } });
+        }
+
+        // 6. Scent Notes (Should)
+        if (obj.notes && obj.notes.length > 0) {
+            obj.notes.forEach(note => {
+                shouldClauses.push({
+                    match: {
+                        scentNotes: {
+                            query: note,
+                            boost: 2.0
+                        }
+                    }
+                });
+            });
+        }
+
+        // 7. Olfactory Families (Should)
+        if (obj.families && obj.families.length > 0) {
+            obj.families.forEach(family => {
+                shouldClauses.push({
+                    match: {
+                        olfactoryFamilies: {
+                            query: family,
+                            boost: 1.5
+                        }
+                    }
+                });
+            });
+        }
+
+        // 8. Volume awareness
+        if (obj.volume) {
+            shouldClauses.push({
+                term: {
+                    volumes: {
+                        value: obj.volume,
+                        boost: 5.0
+                    }
+                }
+            });
+        }
+
+        // 9. Concentration, Occasion, Season, Description (Combined should)
+        const descriptionParts = [
+            obj.concentration,
+            obj.occasion,
+            obj.season,
+            obj.description
+        ].filter(Boolean) as string[];
+
+        if (descriptionParts.length > 0) {
+            shouldClauses.push({
+                multi_match: {
+                    query: descriptionParts.join(' '),
+                    fields: ['attributes', 'concentrations', 'name', 'brand'],
+                    boost: 1.0
+                }
+            });
+        }
+
+        return {
+            bool: {
+                must: mustClauses.length > 0 ? mustClauses : undefined,
+                should: shouldClauses.length > 0 ? shouldClauses : undefined,
+                filter: filters.length > 0 ? filters : undefined,
+                minimum_should_match: shouldClauses.length > 0 ? 1 : undefined
+            }
+        };
     }
 }

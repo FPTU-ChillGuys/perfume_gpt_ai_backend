@@ -159,6 +159,11 @@ export class ProductController {
     return { success: true, data: { id } };
   }
 
-
+  /** Đồng bộ hóa tất cả sản phẩm vào Elasticsearch */
+  @Public()
+  @Post('sync')
+  @ApiOperation({ summary: 'Đồng bộ hóa tất cả sản phẩm vào Elasticsearch' })
+  async syncProducts(): Promise<BaseResponseAPI<{ success: boolean; message: string }>> {
+    return this.productService.syncAllProductsToIndex();
+  }
 }
-

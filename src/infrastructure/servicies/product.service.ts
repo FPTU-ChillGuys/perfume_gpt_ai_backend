@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Query } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Query } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import {
@@ -20,6 +20,7 @@ import { Prisma } from 'generated/prisma/client';
 import ApiUrl from '../api/api_url';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
+import { SearchService } from './search.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 
 const productInclude = {
@@ -97,17 +98,17 @@ function mapProductWithVariants(
         concentrationId: v.ConcentrationId,
         concentration: v.Concentrations
           ? ({
-              id: v.Concentrations.Id,
-              name: v.Concentrations.Name
-            } satisfies ConcentrationResponse)
+            id: v.Concentrations.Id,
+            name: v.Concentrations.Name
+          } satisfies ConcentrationResponse)
           : null,
         stock: v.Stocks
           ? ({
-              id: v.Stocks.Id,
-              totalQuantity: v.Stocks.TotalQuantity,
-              reservedQuantity: v.Stocks.ReservedQuantity,
-              lowStockThreshold: v.Stocks.LowStockThreshold
-            } satisfies VariantStockResponse)
+            id: v.Stocks.Id,
+            totalQuantity: v.Stocks.TotalQuantity,
+            reservedQuantity: v.Stocks.ReservedQuantity,
+            lowStockThreshold: v.Stocks.LowStockThreshold
+          } satisfies VariantStockResponse)
           : null,
         media: v.Media.map(
           (m): VariantMediaResponse => ({
@@ -160,10 +161,13 @@ function mapProduct(p: ProductWithRelations): ProductResponse {
 
 @Injectable()
 export class ProductService {
+  private readonly logger = new Logger(ProductService.name);
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly httpService: HttpService
-  ) {}
+    private readonly httpService: HttpService,
+    private readonly searchService: SearchService,
+  ) { }
 
   async getAllProducts(
     request: PagedAndSortedRequest
@@ -202,24 +206,32 @@ export class ProductService {
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        console.log(ApiUrl().PRODUCT_URL('search/semantic'));
-        const { data } = await firstValueFrom(
-          this.httpService.get<
-            BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>
-          >(ApiUrl().PRODUCT_URL('search/semantic'), {
-            params: {
-              searchText: searchText,
-              pageNumber: request.PageNumber ?? 1,
-              pageSize: request.PageSize ?? 5,
-              // sortBy: request.SortBy ?? '',
-              sortOrder: request.SortOrder ?? 'asc',
-              isDescending: request.IsDescending ?? false
-            }
-          })
-        );
-        return data;
+        const { items, totalCount } = await this.searchService.searchProducts(searchText, request);
+
+        // Enrich the items with full variant info from Prisma
+        const productIds = items.map((p: any) => p.id);
+        const productsFromDb = await this.prisma.products.findMany({
+          where: { Id: { in: productIds }, IsDeleted: false },
+          include: productWithVariantsInclude
+        });
+
+        // Maintain the order from Elasticsearch
+        const productMap = new Map(productsFromDb.map(p => [p.Id, p]));
+        const enrichedItems = productIds
+          .map(id => productMap.get(id))
+          .filter(p => !!p)
+          .map(p => mapProductWithVariants(p as ProductWithVariantsRelations));
+
+        const result = new PagedResult<ProductWithVariantsResponse>({
+          items: enrichedItems,
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / request.PageSize)
+        });
+        return { success: true, payload: result };
       },
-      'Failed to fetch products',
+      'Failed to fetch products using semantic search',
       true
     );
   }
@@ -232,69 +244,21 @@ export class ProductService {
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
+    // Both methods now essentially do the same thing with the internal SearchService
+    const result = await this.getProductsUsingSemanticSearch(searchText, request);
+    return {
+      success: result.success,
+      data: result.payload
+    };
+  }
+
+  async syncAllProductsToIndex() {
     return await funcHandlerAsync(
       async () => {
-        // Bước 1: Gọi external semantic search API để lấy danh sách sản phẩm đã được rank
-        const { data: searchResult } = await firstValueFrom(
-          this.httpService.get<BaseResponseAPI<PagedResult<ProductResponse>>>(
-            ApiUrl().PRODUCT_URL('search/semantic'),
-            {
-              params: {
-                searchText: searchText,
-                pageNumber: request.PageNumber ?? 1,
-                pageSize: request.PageSize ?? 10,
-                // sortBy: request.SortBy ?? '',
-                sortOrder: request.SortOrder ?? 'asc',
-                isDescending: request.IsDescending ?? false
-              }
-            }
-          )
-        );
-
-        const rankedItems = searchResult?.payload?.items ?? [];
-        const totalCount = searchResult?.payload?.totalCount ?? 0;
-        const totalPages = searchResult?.payload?.totalPages ?? 0;
-
-        if (rankedItems.length === 0) {
-          return {
-            success: true,
-            data: new PagedResult<ProductWithVariantsResponse>({
-              items: [],
-              pageNumber: request.PageNumber ?? 1,
-              pageSize: request.PageSize ?? 10,
-              totalCount: 0,
-              totalPages: 0
-            })
-          };
-        }
-
-        // Bước 2: Lấy danh sách ID theo thứ tự ranking
-        const rankedIds = rankedItems.map((p) => p.id);
-
-        // Bước 3: Query Prisma để enrich variants (không quan tâm thứ tự DB trả về)
-        const products = await this.prisma.products.findMany({
-          where: { Id: { in: rankedIds }, IsDeleted: false },
-          include: productWithVariantsInclude
-        });
-
-        // Bước 4: Sắp xếp lại theo đúng thứ tự ranking của semantic search
-        const productMap = new Map(products.map((p) => [p.Id, p]));
-        const orderedProducts = rankedIds
-          .map((id) => productMap.get(id))
-          .filter((p): p is NonNullable<typeof p> => p !== undefined);
-
-        return {
-          success: true,
-          data: new PagedResult<ProductWithVariantsResponse>({
-            items: orderedProducts.map(mapProductWithVariants),
-            pageNumber: request.PageNumber ?? 1,
-            pageSize: request.PageSize ?? 10,
-            totalCount,
-            totalPages
-          })
-        };
+        await this.searchService.syncAllProducts();
+        return { success: true, message: 'Products sync triggered successfully' };
       },
-      'Failed to fetch products with variants using semantic search',
+      'Failed to sync products to index',
       true
     );
   }

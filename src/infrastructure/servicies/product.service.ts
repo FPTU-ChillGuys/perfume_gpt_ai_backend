@@ -206,6 +206,45 @@ export class ProductService {
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(
       async () => {
+        const { items, totalCount } = await this.searchService.searchProducts(searchText, request);
+
+        // Enrich the items with full variant info from Prisma
+        const productIds = items.map((p: any) => p.id);
+        const productsFromDb = await this.prisma.products.findMany({
+          where: { Id: { in: productIds }, IsDeleted: false },
+          include: productWithVariantsInclude
+        });
+
+        // Maintain the order from Elasticsearch
+        const productMap = new Map(productsFromDb.map(p => [p.Id, p]));
+        const enrichedItems = productIds
+          .map(id => productMap.get(id))
+          .filter(p => !!p)
+          .map(p => mapProductWithVariants(p as ProductWithVariantsRelations));
+
+        const result = new PagedResult<ProductWithVariantsResponse>({
+          items: enrichedItems,
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / request.PageSize)
+        });
+        return { success: true, payload: result };
+      },
+      'Failed to fetch products using heuristic semantic search',
+      true
+    );
+  }
+
+  /**
+   * Search sản phẩm sử dụng AI để trích xuất intent (brand, price, gender, notes, etc.)
+   */
+  async getProductsUsingAiSearch(
+    searchText: string,
+    request: PagedAndSortedRequest
+  ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
+    return await funcHandlerAsync(
+      async () => {
         const { items, totalCount } = await this.searchService.searchWithAi(searchText, request);
 
         // Enrich the items with full variant info from Prisma
@@ -231,7 +270,7 @@ export class ProductService {
         });
         return { success: true, payload: result };
       },
-      'Failed to fetch products using semantic search',
+      'Failed to fetch products using AI search',
       true
     );
   }

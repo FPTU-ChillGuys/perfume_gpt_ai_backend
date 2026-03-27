@@ -139,6 +139,7 @@ export class SearchService {
         const searchObject = await this.searchAiService.extractSearchObject(searchText);
 
         // 2. Build ES query from structured object
+        this.logger.log(`[ES-AI] Building query for extracted object...`);
         const query = this.searchQueryService.buildQueryFromSearchObject(searchObject);
 
         const from = (request.PageNumber - 1) * request.PageSize;

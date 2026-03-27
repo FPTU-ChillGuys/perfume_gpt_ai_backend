@@ -11,3 +11,5 @@ export const aiModelForRestock = gpt5_4nano;
 export const aiModelForReview = llama_3_1_8b_instruct;
 
 export const aiModelForOptimizePrompt = gemma3nE4bIt;
+
+export const aiModelForSearch = gemma3nE4bIt;

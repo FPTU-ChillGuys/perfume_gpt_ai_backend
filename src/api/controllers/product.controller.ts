@@ -109,6 +109,26 @@ export class ProductController {
     return result;
   }
 
+  /** Tìm kiếm sản phẩm bằng AI extraction */
+  @Public()
+  @Get('ai-search')
+  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng AI extraction' })
+  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  async getProductsByAiSearch(
+    @Req() req: Request,
+    @Query() request: SearchRequest
+  ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
+    const result = await this.productService.getProductsUsingAiSearch(
+      request.searchText,
+      request
+    );
+    // Ghi log tìm kiếm
+    const userId = getTokenPayloadFromRequest(req)?.id;
+    const logId = userId ?? uuidv4();
+    await this.userLog.addSearchLogToUserLog(logId, request.searchText);
+    return result;
+  }
+
   /** [TEST] Lấy chi tiết một sản phẩm kèm toàn bộ variants */
   @Public()
   @Get(':id/with-variants')

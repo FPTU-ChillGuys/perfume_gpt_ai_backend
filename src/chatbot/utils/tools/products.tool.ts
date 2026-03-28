@@ -215,6 +215,7 @@ export class ProductTool {
     execute: async (analysis) => {
       this.logger.log(`[queryProducts] Executing structured query...`);
       const result = await this.productService.getProductsByStructuredQuery(analysis);
+      this.logger.log(`[queryProducts] Found ${result.data?.items?.length} products.`);
       return result.data;
     }
   });

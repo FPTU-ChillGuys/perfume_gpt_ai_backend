@@ -25,6 +25,10 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
   let retries = 2;
   while (retries >= 0) {
     try {
+      if (!prompt) {
+        console.error(`[chatbot] textGenerationFromPrompt: prompt is empty or undefined`);
+        return errorMessage || 'Prompt is required';
+      }
       const result = await generateText({
         model: model,
         prompt: prompt,
@@ -36,7 +40,7 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
         temperature: temperature,
         maxOutputTokens: maxTokens
       });
-      return output ? JSON.stringify((result as any).object) : result.text;
+      return result.text;
     } catch (error) {
       console.error(`Error in TextGenerationFromPrompt (Remaining retries: ${retries}):`, error);
       if (retries === 0) {
@@ -79,7 +83,7 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
         temperature: temperature,
         maxOutputTokens: maxTokens
       });
-      return output ? JSON.stringify((result as any).object) : result.text;
+      return result.text;
     } catch (error) {
       console.error(`Error in TextGenerationFromMessages (Remaining retries: ${retries}):`, error);
       if (retries === 0) {

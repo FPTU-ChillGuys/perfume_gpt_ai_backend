@@ -25,11 +25,29 @@ export function injectAnalysisToLastUserMessage(
 
     if (lastUserMessageIndex !== undefined) {
         const originalMessage = finalMessages[lastUserMessageIndex];
+        const originalContent = (originalMessage as any).content || '';
 
-        // Create a new message object with the injected analysis
+        // Create the injected text
+        const injectedText = `[USER_REQUEST_ANALYSIS]\n${JSON.stringify(analysis, null, 2)}\n\n[USER_MESSAGE]\n${originalContent}`;
+
+        // Update parts if they exist (Vercel AI SDK 4.x/6.x multi-turn compatibility)
+        const originalParts = (originalMessage as any).parts;
+        let newParts = originalParts;
+
+        if (Array.isArray(originalParts)) {
+            newParts = originalParts.map((part: any) => {
+                if (part.type === 'text') {
+                    return { ...part, text: injectedText };
+                }
+                return part;
+            });
+        }
+
+        // Create a new message object with the injected analysis in both places
         finalMessages[lastUserMessageIndex] = {
             ...originalMessage,
-            content: `[USER_REQUEST_ANALYSIS]\n${JSON.stringify(analysis, null, 2)}\n\n[USER_MESSAGE]\n${(originalMessage as any).content}`
+            content: injectedText,
+            parts: newParts
         } as any;
     }
 

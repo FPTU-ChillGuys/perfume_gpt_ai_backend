@@ -14,7 +14,11 @@ export class ConversationAnalysisService {
 
     async analyze(message: string): Promise<AnalysisObject | null> {
         try {
-            this.logger.log('[ConversationAnalysis] Starting single message analysis...');
+            this.logger.log(`[ConversationAnalysis] Starting single message analysis... Message length: ${message?.length ?? 'undefined'}`);
+            if (!message) {
+                this.logger.warn('[ConversationAnalysis] Message is empty or undefined');
+                return null;
+            }
 
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
@@ -24,7 +28,7 @@ export class ConversationAnalysisService {
                 'Failed to analyze conversation intent',
                 10,
                 Output.object(analysisOutput),
-                0 // Zero temperature for absolute consistency
+                0.3 // Zero temperature for absolute consistency
             );
 
             if (!result) {

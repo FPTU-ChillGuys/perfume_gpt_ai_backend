@@ -175,7 +175,10 @@ export class AIHelper {
         if (this.promptOptimizationConfig?.enablePromptOptimization && this.analysisService && finalMessages.length > 0) {
           const lastUserMessage = [...finalMessages].reverse().find(m => m.role === 'user');
           if (lastUserMessage) {
-            const analysis = await this.analysisService.analyze((lastUserMessage as any).content);
+            const messageText = lastUserMessage.parts.find(p => p.type === 'text')?.text || '';
+            this.logger.debug(`[AIHelper] Analyzing message: "${messageText.substring(0, 50)}..."`);
+
+            const analysis = await this.analysisService.analyze(messageText);
             if (analysis) {
               this.logger.log(`[AIHelper] Injecting structured analysis using utility. Intent: ${analysis.intent}`);
               finalMessages = injectAnalysisToLastUserMessage(messages, analysis);

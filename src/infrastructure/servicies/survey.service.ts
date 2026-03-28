@@ -26,7 +26,7 @@ import { UserLogService } from './user-log.service';
 import { surveyPrompt } from 'src/application/constant/prompts';
 import { SurveyQuestionAnswer } from 'src/domain/entities/survey-question-answer.entity';
 import { INSTRUCTION_TYPE_SURVEY } from 'src/application/constant/prompts/admin-instruction-types';
-import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { conversationOutput, searchOutput } from 'src/chatbot/utils/output/search.output';
 
 @Injectable()
 export class SurveyService {
@@ -36,7 +36,7 @@ export class SurveyService {
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userLogService: UserLogService,
     @InjectQueue(QueueName.SURVEY_QUEUE) private readonly surveyQueue: Queue
-  ) {}
+  ) { }
 
   async addSurveyQues(
     question: SurveyQuestionRequest
@@ -306,7 +306,7 @@ export class SurveyService {
     await this.userLogService.addSurveyQuesAnsDetailToUserLog(userId, savedSurveyQuesAnsResponse.data.id);
 
     const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt, Output.object(searchOutput));
+    const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt, Output.object(conversationOutput));
 
     if (!aiResponse.success) {
       throw new InternalServerErrorWithDetailsException(
@@ -350,7 +350,7 @@ export class SurveyService {
     await this.surveyQueue.add(SurveyJobName.ADD_SURVEY_QUESTION_AND_ANSWER, { userId, details: surveyAnswers });
 
     const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt, Output.object(searchOutput));
+    const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt, Output.object(conversationOutput));
 
     if (!aiResponse.success) {
       throw new InternalServerErrorWithDetailsException(

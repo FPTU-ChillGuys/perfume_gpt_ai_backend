@@ -7,7 +7,7 @@ import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/co
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Output, UIMessage } from 'ai';
-import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { conversationOutput, searchOutput } from 'src/chatbot/utils/output/search.output';
 import { ADVANCED_MATCHING_SYSTEM_PROMPT, conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
 import { addMessageToMessages, convertToMessages, overrideMessagesToConversation } from 'src/infrastructure/utils/message-helper';
 import { buildCombinedPromptV5 } from 'src/infrastructure/utils/prompt-builder';
@@ -243,7 +243,7 @@ export class ConversationService {
     const message = await this.aiHelper.textGenerateFromMessages(
       convertedMessages,
       systemPrompt,
-      Output.object(searchOutput)
+      Output.object(conversationOutput)
     );
 
     if (!message.success) {

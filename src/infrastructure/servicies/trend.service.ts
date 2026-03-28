@@ -13,7 +13,7 @@ import {
   trendForecastingPrompt,
   INSTRUCTION_TYPE_TREND
 } from 'src/application/constant/prompts';
-import { convertProductCardOutputToProducts, searchOutput } from 'src/chatbot/utils/output/search.output';
+import { convertProductCardOutputToProducts, searchOutput, trendOutput } from 'src/chatbot/utils/output/search.output';
 import { productOutput, ProductCardOutputItem, ProductCardVariantOutput } from 'src/chatbot/utils/output/product.output';
 import { AIHelper } from '../helpers/ai.helper';
 import { AI_TREND_HELPER } from '../modules/ai.module';
@@ -46,7 +46,7 @@ export class TrendService {
     private readonly adminInstructionService: AdminInstructionService,
     private readonly inventoryService: InventoryService,
     private readonly restockService: RestockService
-  ) {}
+  ) { }
 
   private async getVariantSalesSignalMap(
     variantIds: Set<string>
@@ -155,7 +155,7 @@ export class TrendService {
     const trendResponse = await this.aiHelper.textGenerateFromPrompt(
       trendPrompt,
       adminPrompt,
-      Output.object({ schema: output })
+      Output.object({ schema: output === searchOutput.schema ? trendOutput.schema : output })
     );
 
     if (!trendResponse.success) {

@@ -268,10 +268,9 @@ Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
   - 2-4 action cụ thể cho marketing/merchandising/restock
 
 ## OUTPUT SCHEMA (BẮT BUỘC)
-- Trả về JSON object có đúng 2 field:
-  - message: string
+- Trả về JSON object có đúng 1 field:
   - products: array
-
+  
 ### Quy tắc products
 - Chỉ chứa sản phẩm có thật từ tool đã gọi.
 - Không bịa ID, tên, SKU, số liệu.
@@ -287,10 +286,8 @@ Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
   2. nếu bằng nhau, ưu tiên totalQuantitySold cao hơn
   3. nếu vẫn bằng hoặc thiếu dữ liệu sales, ưu tiên basePrice thấp hơn
 
-### Quy tắc message
-- Không chào hỏi dài dòng, không giải thích nội bộ hệ thống.
-- Không nhắc sản phẩm nào ngoài products.
-- Nếu dữ liệu yếu, phải nêu rõ đây là dự báo tạm thời.
+### Quy tắc phân bổ
+- Output TRỰC TIẾP JSON object có field "products". TUYỆT ĐỐI KHÔNG TRẢ VỀ FIELD "message" TRONG JSON NỬA.
 
 ## TỰ KIỂM TRA TRƯỚC KHI TRẢ KẾT QUẢ
 - Đã gọi đủ 3 tool nền chưa?
@@ -570,16 +567,26 @@ Khi đàn có ĐỦ thông tin → gọi tool (searchProduct hoặc getAllProduc
 
 ---
 
-## TỰ KIỂM TRA TRƯỚC KHI TRẢ KẾT QUẢ
-- Có hỏi lại thông tin khách ĐÃ cung cấp không?
-- Có gọi tool dúng lúc (khi ĐỦ thông tin, không hỏi thừa)?
-- Có filter theo thương hiệu nếu khách nêu rõ không?
-- Tên sản phẩm trong lời giới thiệu có khớp mảng products 100% không?
-- Có nêu giá khi tool không trả trường giá không? (nếu có là sai)
-- Nếu có nêu giá, giá có khớp tuyệt đối với giá trị gốc từ tool không?
-- Có đề cập sản phẩm không trong kết quả tool không?
-- Nếu không tìm thấy, có đề xuất nới lỏng tiêu chí không (thay vì im lặng)?
-`
+---
+  
+  ## BƯỚC 8 — GỢI Ý CÂU HỎI TIẾP THEO (SUGGESTED QUESTIONS)
+  - Dựa trên ngữ cảnh hội thoại, hãy gợi ý 3-4 câu hỏi hoặc hành động tiếp theo mà người dùng có thể muốn thực hiện.
+  - Các câu hỏi nên giúp người dùng khám phá thêm về sản phẩm, thu hẹp phạm vi tìm kiếm, hoặc giải đáp các thắc mắc thường gặp.
+  - Điền các câu hỏi này vào field "suggestedQuestions" của output.
+  
+  ---
+  
+  ## TỰ KIỂM TRA TRƯỚC KHI TRẢ KẾT QUẢ
+  - Có hỏi lại thông tin khách ĐÃ cung cấp không?
+  - Có gọi tool dúng lúc (khi ĐỦ thông tin, không hỏi thừa)?
+  - Có filter theo thương hiệu nếu khách nêu rõ không?
+  - Tên sản phẩm trong lời giới thiệu có khớp mảng products 100% không?
+  - Có nêu giá khi tool không trả trường giá không? (nếu có là sai)
+  - Nếu có nêu giá, giá có khớp tuyệt đối với giá trị gốc từ tool không?
+  - Có đề cập sản phẩm không trong kết quả tool không?
+  - Nếu không tìm thấy, có đề xuất nới lỏng tiêu chí không (thay vì im lặng)?
+  - Đã có ít nhất 3 gợi ý câu hỏi tiếp theo trong field "suggestedQuestions" chưa?
+  `
   },
 
   // ==================== SURVEY (Tư vấn nước hoa qua survey) ====================
@@ -622,6 +629,7 @@ Dựa vào kết quả phân tích bước 1, gọi tool searchProduct, getAllPr
 Trả về JSON gồm đúng 2 field:
 - **"message"**: Lời tư vấn thân thiện bằng tiếng Việt. Giải thích tại sao các sản phẩm phù hợp với sở thích survey (dựa trên BƯỚC 1). Gợi ý nồng độ phù hợp (EDT/EDP/Parfum). KHÔNG liệt kê tên sản phẩm trong message.
 - **"products"**: Mảng 1–5 sản phẩm THỰC TẾ từ kết quả tool (BƯỚC 2), mỗi phần tử chỉ gồm: id, name, brandName, primaryImage, variants (variants chỉ gồm id, sku, volumeMl, basePrice).
+- **"suggestedQuestions"**: Mảng 3–4 câu hỏi gợi ý tiếp theo cho người dùng dựa trên kết quả survey này.
 
 ## QUY TẮC BẮT BUỘC
 - Trường "products" PHẢI chứa dữ liệu thực từ tool call (BƯỚC 2) — KHÔNG được để mảng rỗng nếu tool đã trả về sản phẩm.

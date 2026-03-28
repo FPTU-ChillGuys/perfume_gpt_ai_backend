@@ -20,6 +20,7 @@ export interface AIRecommendationResponse {
       concentrationName: string;
     }>;
   }>;
+  suggestedQuestions?: string[];
 }
 
 /**
@@ -35,7 +36,8 @@ export function parseAIRecommendationResponse(
     const parsed = JSON.parse(response);
     return {
       message: parsed.message || response,
-      products: parsed.products || []
+      products: parsed.products || [],
+      suggestedQuestions: parsed.suggestedQuestions || []
     };
   } catch (error) {
     // Nếu không parse được, treat toàn bộ response là message

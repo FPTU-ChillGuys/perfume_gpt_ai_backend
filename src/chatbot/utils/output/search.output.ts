@@ -9,7 +9,23 @@ export const searchOutput = {
   })
 };
 
+export const conversationOutput = {
+  schema: z.object({
+    message: z.string(),
+    products: z.array(productCardOutputItemSchema),
+    suggestedQuestions: z.array(z.string()).describe('Gợi ý 3-4 câu hỏi tiếp theo cho người dùng dựa trên ngữ cảnh hội thoại')
+  })
+};
+
+export const trendOutput = {
+  schema: z.object({
+    products: z.array(productCardOutputItemSchema)
+  })
+};
+
 export const searchOutputSchema = searchOutput.schema;
+export const conversationOutputSchema = conversationOutput.schema;
+export const trendOutputSchema = trendOutput.schema;
 
 export const convertProductCardOutputToProducts = (output: unknown): ProductCardOutputItem[] => {
   try {

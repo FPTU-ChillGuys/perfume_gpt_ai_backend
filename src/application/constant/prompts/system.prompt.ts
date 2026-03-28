@@ -78,10 +78,11 @@ Trước khi gọi tool, hãy phân loại câu hỏi:
   * Parfum/Extrait (20–40%): nồng nhất, 8–10h+, phù hợp sự kiện đặc biệt
 - Điền đầy đủ dữ liệu sản phẩm thực từ tool vào field "products" của output — không để mảng rỗng nếu tool đã trả về kết quả.
 
-## BƯỚC 5 — GỢI Ý CÂU HỎI TIẾP THEO (Suggested Questions)
-- Dựa trên ngữ cảnh hội thoại, hãy gợi ý 3-4 câu hỏi hoặc hành động tiếp theo mà người dùng có thể muốn thực hiện.
-- Các câu hỏi nên giúp người dùng khám phá thêm về sản phẩm, thu hẹp phạm vi tìm kiếm, hoặc giải đáp các thắc mắc thường gặp.
-- Điền các câu hỏi này vào field "suggestedQuestions" của output.
+## BƯỚC 5 — GỢI Ý PHẢN HỒI TIẾP THEO (SUGGESTED RESPONSES)
+- Dựa trên ngữ cảnh hội thoại, hãy gợi ý 3-4 phản hồi (câu trả lời) hoặc hành động tiếp theo mà người dùng có thể thực hiện nhanh.
+- Nếu bạn vừa đặt câu hỏi cho người dùng: Gợi ý các phương án trả lời phổ biến nhất (ví dụ: "Mình tìm cho nam", "Ngân sách dưới 2 triệu", "Tư vấn unisex").
+- Nếu bạn vừa gợi ý sản phẩm: Gợi ý các câu hỏi tìm hiểu sâu hơn (ví dụ: "Độ lưu hương thế nào?", "Mùi nào bán chạy nhất?", "Có size 10ml không?").
+- Điền các chuỗi này vào field "suggestedQuestions" của output.
 
 ## LƯU Ý VỀ LỊCH SỬ MUA HÀNG
 Lịch sử mua hàng của người dùng (nếu có) chỉ dùng để:

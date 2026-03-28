@@ -569,10 +569,11 @@ Khi đàn có ĐỦ thông tin → gọi tool (searchProduct hoặc getAllProduc
 
 ---
   
-  ## BƯỚC 8 — GỢI Ý CÂU HỎI TIẾP THEO (SUGGESTED QUESTIONS)
-  - Dựa trên ngữ cảnh hội thoại, hãy gợi ý 3-4 câu hỏi hoặc hành động tiếp theo mà người dùng có thể muốn thực hiện.
-  - Các câu hỏi nên giúp người dùng khám phá thêm về sản phẩm, thu hẹp phạm vi tìm kiếm, hoặc giải đáp các thắc mắc thường gặp.
-  - Điền các câu hỏi này vào field "suggestedQuestions" của output.
+  ## BƯỚC 8 — GỢI Ý PHẢN HỒI TIẾP THEO (SUGGESTED RESPONSES)
+  - Dựa trên ngữ cảnh, hãy gợi ý 3-4 phản hồi nhanh (quick replies) hoặc hành động phù hợp nhất.
+  - Nếu AI đang hỏi thông tin (giới tính, ngân sách...): Gợi ý các câu trả lời mẫu để khách click chọn nhanh (vd: "Nam", "Dưới 1 triệu").
+  - Nếu AI vừa đề xuất sản phẩm: Gợi ý các câu hỏi sâu hơn (vd: "Độ lưu hương thế nào?", "Tư vấn mùi tương tự").
+  - Điền vào field "suggestedQuestions".
   
   ---
   
@@ -585,7 +586,7 @@ Khi đàn có ĐỦ thông tin → gọi tool (searchProduct hoặc getAllProduc
   - Nếu có nêu giá, giá có khớp tuyệt đối với giá trị gốc từ tool không?
   - Có đề cập sản phẩm không trong kết quả tool không?
   - Nếu không tìm thấy, có đề xuất nới lỏng tiêu chí không (thay vì im lặng)?
-  - Đã có ít nhất 3 gợi ý câu hỏi tiếp theo trong field "suggestedQuestions" chưa?
+  - Đã có ít nhất 3 gợi ý phản hồi trong field "suggestedQuestions" chưa?
   `
   },
 
@@ -629,7 +630,7 @@ Dựa vào kết quả phân tích bước 1, gọi tool searchProduct, getAllPr
 Trả về JSON gồm đúng 2 field:
 - **"message"**: Lời tư vấn thân thiện bằng tiếng Việt. Giải thích tại sao các sản phẩm phù hợp với sở thích survey (dựa trên BƯỚC 1). Gợi ý nồng độ phù hợp (EDT/EDP/Parfum). KHÔNG liệt kê tên sản phẩm trong message.
 - **"products"**: Mảng 1–5 sản phẩm THỰC TẾ từ kết quả tool (BƯỚC 2), mỗi phần tử chỉ gồm: id, name, brandName, primaryImage, variants (variants chỉ gồm id, sku, volumeMl, basePrice).
-- **"suggestedQuestions"**: Mảng 3–4 câu hỏi gợi ý tiếp theo cho người dùng dựa trên kết quả survey này.
+- **"suggestedQuestions"**: Mảng 3–4 gợi ý phản hồi nhanh cho người dùng (vd: "Tư vấn chi tiết sản phẩm đầu tiên", "Tìm mùi nào nam tính hơn").
 
 ## QUY TẮC BẮT BUỘC
 - Trường "products" PHẢI chứa dữ liệu thực từ tool call (BƯỚC 2) — KHÔNG được để mảng rỗng nếu tool đã trả về sản phẩm.

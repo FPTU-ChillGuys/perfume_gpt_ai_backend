@@ -4,9 +4,9 @@ import { deepSeek3_2, geminiFlash2_5, geminiFlash3, geminiFlash3_1, gemma3nE4bIt
 
 export const embeddingModel: EmbeddingModel = openai.embedding('text-embedding-3-small');
 
-export const aiModel = deepSeek3_2;
+export const aiModel = geminiFlash2_5;
 
-export const aiModelForSurvey = grok_4_1_fast;
+export const aiModelForSurvey = gpt5_4nano;
 
 export const aiModelForTrend = gpt5_4nano;
 
@@ -14,6 +14,6 @@ export const aiModelForRestock = gpt5_4nano;
 
 export const aiModelForReview = llama_3_1_8b_instruct;
 
-export const aiModelForOptimizePrompt = deepSeek3_2;
+export const aiModelForOptimizePrompt = geminiFlash2_5;
 
 export const aiModelForSearch = geminiFlash2_5;

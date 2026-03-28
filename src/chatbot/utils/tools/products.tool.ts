@@ -85,7 +85,7 @@ export class ProductTool {
 
           for (const item of input.searches) {
             const response =
-              await this.productService.getProductsUsingSemanticSearch(
+              await this.productService.getProductsUsingAiSearch(
                 item.searchText,
                 {
                   PageNumber: item.pageNumber,

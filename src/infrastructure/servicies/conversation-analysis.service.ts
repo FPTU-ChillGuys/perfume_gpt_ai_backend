@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { UIMessage } from 'ai';
+import { Output } from 'ai';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
-import { textGenerationFromMessagesToResultWithErrorHandler } from 'src/chatbot/chatbot';
+import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
 import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { Tools } from 'src/chatbot/utils/tools';
 import { analysisOutput, AnalysisObject } from 'src/chatbot/utils/output/analysis.output';
@@ -12,19 +12,19 @@ export class ConversationAnalysisService {
 
     constructor(private readonly tools: Tools) { }
 
-    async analyze(messages: UIMessage[]): Promise<AnalysisObject | null> {
+    async analyze(message: string): Promise<AnalysisObject | null> {
         try {
-            this.logger.log('[ConversationAnalysis] Starting analysis...');
+            this.logger.log('[ConversationAnalysis] Starting single message analysis...');
 
-            const result = await textGenerationFromMessagesToResultWithErrorHandler(
+            const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
-                messages,
+                message,
                 CONVERSATION_ANALYSIS_SYSTEM_PROMPT,
                 this.tools.getToolsForAnalysis,
                 'Failed to analyze conversation intent',
                 10,
-                analysisOutput,
-                0.3 // Lower temperature for more consistent JSON
+                Output.object(analysisOutput),
+                0 // Zero temperature for absolute consistency
             );
 
             if (!result) {

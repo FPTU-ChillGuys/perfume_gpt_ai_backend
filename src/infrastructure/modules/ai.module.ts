@@ -1,3 +1,5 @@
+import { SearchModule } from './search.module';
+import { ConversationAnalysisService } from '../servicies/conversation-analysis.service';
 import { SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { AIHelper } from '../helpers/ai.helper';
 import { Tools } from 'src/chatbot/utils/tools';
@@ -117,12 +119,10 @@ const aiInventoryReportProvider: Provider = {
   inject: [Tools]
 };
 
-import { SearchModule } from './search.module';
-import { ConversationAnalysisService } from '../servicies/conversation-analysis.service';
-
 @Module({
   imports: [UnitOfWorkModule, ToolModule, SearchModule],
   providers: [
+    ConversationAnalysisService,
     aiProvider,
     aiConversationProvider,
     // ...
@@ -134,6 +134,7 @@ import { ConversationAnalysisService } from '../servicies/conversation-analysis.
     aiReviewProvider
   ],
   exports: [
+    ConversationAnalysisService,
     aiProvider,
     aiConversationProvider,
     aiTrendProvider,

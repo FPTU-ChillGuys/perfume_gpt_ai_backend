@@ -36,7 +36,7 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
         temperature: temperature,
         maxOutputTokens: maxTokens
       });
-      return result.text;
+      return output ? JSON.stringify((result as any).object) : result.text;
     } catch (error) {
       console.error(`Error in TextGenerationFromPrompt (Remaining retries: ${retries}):`, error);
       if (retries === 0) {

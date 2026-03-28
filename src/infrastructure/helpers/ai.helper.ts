@@ -1,4 +1,5 @@
 import { LanguageModel, ToolChoice, ToolSet, UIMessage } from 'ai';
+import { injectAnalysisToLastUserMessage } from 'src/chatbot/utils/message-injection.util';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
 import {
@@ -171,11 +172,14 @@ export class AIHelper {
       try {
         let finalMessages = messages;
 
-        if (this.promptOptimizationConfig?.enablePromptOptimization && this.analysisService) {
-          const analysis = await this.analysisService.analyze(messages);
-          if (analysis) {
-            this.logger.log(`[AIHelper] Structured analysis used. Intent: ${analysis.intent}`);
-            systemContext += `\n\n[USER_REQUEST_ANALYSIS]\n${JSON.stringify(analysis, null, 2)}\n`;
+        if (this.promptOptimizationConfig?.enablePromptOptimization && this.analysisService && finalMessages.length > 0) {
+          const lastUserMessage = [...finalMessages].reverse().find(m => m.role === 'user');
+          if (lastUserMessage) {
+            const analysis = await this.analysisService.analyze((lastUserMessage as any).content);
+            if (analysis) {
+              this.logger.log(`[AIHelper] Injecting structured analysis using utility. Intent: ${analysis.intent}`);
+              finalMessages = injectAnalysisToLastUserMessage(messages, analysis);
+            }
           }
         }
 

@@ -194,4 +194,28 @@ export class ProductTool {
       return productDetailTabsContent[content];
     }
   });
+
+  queryProducts: Tool = tool({
+    description: 'Query products using structured logic (DNF), sorting, and budget constraints.',
+    inputSchema: z.object({
+      logic: z.array(z.union([z.string(), z.array(z.string())])).describe('DNF logic for attributes.'),
+      sorting: z.object({
+        field: z.enum(['Price', 'Sales', 'Newest', 'Relevance', 'Name']).default('Relevance'),
+        isDescending: z.boolean().default(true)
+      }).optional(),
+      budget: z.object({
+        min: z.number().optional(),
+        max: z.number().optional()
+      }).optional(),
+      pagination: z.object({
+        pageNumber: z.number().default(1),
+        pageSize: z.number().default(10)
+      }).optional(),
+    }),
+    execute: async (analysis) => {
+      this.logger.log(`[queryProducts] Executing structured query...`);
+      const result = await this.productService.getProductsByStructuredQuery(analysis);
+      return result.data;
+    }
+  });
 }

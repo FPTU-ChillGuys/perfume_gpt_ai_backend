@@ -7,12 +7,14 @@ import { LogTool } from './tools/log.tool';
 import { ReviewTool } from './tools/review.tool';
 import { UserTool } from './tools/user.tool';
 import { InventoryTool } from './tools/inventory.tool';
+import { MasterDataTool } from './tools/master-data.tool';
 
 @Injectable()
 export class Tools {
   getTools: ToolSet;
   getToolsForChatbot: ToolSet;
   getToolsForTrend: ToolSet;
+  getToolsForAnalysis: ToolSet;
   getToolsForRecomendationAndRepurchase: ToolSet;
   getToolsForRestock: ToolSet;
   getToolsForSurvey: ToolSet;
@@ -26,14 +28,16 @@ export class Tools {
     private readonly logTool: LogTool,
     private readonly reviewTool: ReviewTool,
     private readonly userTool: UserTool,
-    private readonly inventoryTool: InventoryTool
+    private readonly inventoryTool: InventoryTool,
+    private readonly masterDataTool: MasterDataTool
   ) {
     this.getToolsForChatbot = {
       getAllProducts: this.productTool.getAllProducts,
-      searchProduct: this.productTool.searchProduct,
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
-      // Order tools
+      // searchProduct: this.productTool.searchProduct,
+      queryProducts: this.productTool.queryProducts,
+      // getNewestProducts: this.productTool.getNewestProducts,
+      // getBestSellingProducts: this.productTool.getBestSellingProducts,
+      // // Order tools
       // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
       addCartItems: this.orderTool.addCartItems,
@@ -42,9 +46,15 @@ export class Tools {
       getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId
     };
 
+    this.getToolsForAnalysis = {
+      searchMasterData: this.masterDataTool.searchMasterData,
+      getAvailableAttributes: this.masterDataTool.getAvailableAttributes
+    };
+
     this.getToolsForSurvey = {
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
+      queryProducts: this.productTool.queryProducts,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
       getInventoryStock: this.inventoryTool.getInventoryStock
@@ -52,6 +62,7 @@ export class Tools {
 
     this.getToolsForTrend = {
       searchProduct: this.productTool.searchProduct,
+      queryProducts: this.productTool.queryProducts,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
       getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek,
@@ -75,6 +86,7 @@ export class Tools {
     this.getToolsForRecomendationAndRepurchase = {
       getAllProducts: this.productTool.getAllProducts,
       searchProduct: this.productTool.searchProduct,
+      queryProducts: this.productTool.queryProducts,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
       getOrderDetailsWithOrdersByUserId:

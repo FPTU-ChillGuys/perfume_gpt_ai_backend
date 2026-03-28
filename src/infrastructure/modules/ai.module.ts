@@ -31,7 +31,7 @@ const aiProvider: Provider = {
 
 const aiConversationProvider: Provider = {
   provide: AI_CONVERSATION_HELPER,
-  useFactory: (tools: Tools) =>
+  useFactory: (tools: Tools, analysisService: ConversationAnalysisService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       tools.getToolsForChatbot,
@@ -43,9 +43,11 @@ const aiConversationProvider: Provider = {
         enablePromptOptimization: true,
         optimizationPrompt:
           'Use case: conversation tu van nuoc hoa. Giu nguyen intent cua nguoi dung, khong doi sang domain khac. Neu user dang yeu cau tim/goi y san pham thi giu cau truc de model chinh co the goi tool va tra ve dung format.'
-      }
+      },
+      undefined,
+      analysisService
     ),
-  inject: [Tools]
+  inject: [Tools, ConversationAnalysisService]
 };
 
 const aiTrendProvider: Provider = {
@@ -115,11 +117,15 @@ const aiInventoryReportProvider: Provider = {
   inject: [Tools]
 };
 
+import { SearchModule } from './search.module';
+import { ConversationAnalysisService } from '../servicies/conversation-analysis.service';
+
 @Module({
-  imports: [UnitOfWorkModule, ToolModule],
+  imports: [UnitOfWorkModule, ToolModule, SearchModule],
   providers: [
     aiProvider,
     aiConversationProvider,
+    // ...
     aiTrendProvider,
     aiRecommendationProvider,
     aiRestockProvider,

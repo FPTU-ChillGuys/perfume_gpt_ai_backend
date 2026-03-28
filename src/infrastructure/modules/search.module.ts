@@ -8,6 +8,9 @@ import { SearchAiService } from '../servicies/search-ai.service';
 import { AdminInstructionModule } from './admin-instruction.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 
+import { MasterDataService } from '../servicies/master-data.service';
+import { ConversationAnalysisService } from '../servicies/conversation-analysis.service';
+
 @Module({
     imports: [
         AdminInstructionModule,
@@ -22,7 +25,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
             inject: [ConfigService],
         }),
     ],
-    providers: [SearchService, SearchQueryService, SearchIndexService, SearchAiService],
-    exports: [ElasticsearchModule, SearchService, SearchQueryService, SearchIndexService, SearchAiService],
+    providers: [SearchService, SearchQueryService, SearchIndexService, SearchAiService, MasterDataService, ConversationAnalysisService],
+    exports: [ElasticsearchModule, SearchService, SearchQueryService, SearchIndexService, SearchAiService, MasterDataService, ConversationAnalysisService],
 })
 export class SearchModule { }

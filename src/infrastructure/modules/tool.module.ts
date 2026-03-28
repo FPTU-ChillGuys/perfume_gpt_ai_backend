@@ -11,10 +11,12 @@ import { UserTool } from 'src/chatbot/utils/tools/user.tool';
 import { InventoryTool } from 'src/chatbot/utils/tools/inventory.tool';
 import { UnitOfWorkModule } from './unit-of-work.module';
 import { RestockModule } from './restock.module';
+import { MasterDataTool } from 'src/chatbot/utils/tools/master-data.tool';
+import { SearchModule } from './search.module';
 
 @Module({
-  imports: [ProductModule, OrderModule, ProfileModule, UserLogModule, ReviewModule, UserModule, UnitOfWorkModule, RestockModule],
-  providers: [Tools, ReviewTool, UserTool, InventoryTool],
+  imports: [ProductModule, OrderModule, ProfileModule, UserLogModule, ReviewModule, UserModule, UnitOfWorkModule, RestockModule, SearchModule],
+  providers: [Tools, ReviewTool, UserTool, InventoryTool, MasterDataTool],
   exports: [Tools]
 })
 export class ToolModule { }

@@ -572,4 +572,92 @@ export class ProductService {
       true
     );
   }
+
+  async getProductsByStructuredQuery(
+    analysis: any // Should be AnalysisObject but keeping any for simplicity in import
+  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
+    return await funcHandlerAsync(async () => {
+      const { logic, sorting, budget, pagination } = analysis;
+      const skip = ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 10);
+      const take = pagination?.pageSize || 10;
+
+      // Build OR conditions (Outer array)
+      const orConditions: Prisma.ProductsWhereInput[] = (logic || []).map((group: any) => {
+        const andItems = Array.isArray(group) ? group : [group];
+
+        // Build AND conditions (Inner array/group)
+        const andConditions: Prisma.ProductsWhereInput[] = andItems.map((item: string) => {
+          return {
+            OR: [
+              { Name: { contains: item } },
+              { Brands: { Name: { contains: item } } },
+              { Categories: { Name: { contains: item } } },
+              { ProductNoteMaps: { some: { ScentNotes: { Name: { contains: item } } } } },
+              { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains: item } } } } },
+              { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } },
+              { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } } } }
+            ]
+          };
+        });
+
+        return { AND: andConditions };
+      });
+
+      const where: Prisma.ProductsWhereInput = {
+        IsDeleted: false,
+        AND: [
+          orConditions.length > 0 ? { OR: orConditions } : {},
+          budget ? {
+            ProductVariants: {
+              some: {
+                IsDeleted: false,
+                BasePrice: {
+                  gte: budget.min ? Number(budget.min) : undefined,
+                  lte: budget.max ? Number(budget.max) : undefined
+                }
+              }
+            }
+          } : {}
+        ]
+      };
+
+      // Sorting logic (Basic implementation)
+      let orderBy: Prisma.ProductsOrderByWithRelationInput = { CreatedAt: 'desc' };
+      if (sorting) {
+        switch (sorting.field) {
+          case 'Price':
+            // Sorting by variant price in findMany is tricky, default to CreatedAt for now
+            break;
+          case 'Newest':
+            orderBy = { CreatedAt: 'desc' };
+            break;
+          case 'Name':
+            orderBy = { Name: sorting.isDescending ? 'desc' : 'asc' };
+            break;
+        }
+      }
+
+      const [products, totalCount] = await Promise.all([
+        this.prisma.products.findMany({
+          where,
+          include: productWithVariantsInclude,
+          skip,
+          take,
+          orderBy
+        }),
+        this.prisma.products.count({ where })
+      ]);
+
+      return {
+        success: true,
+        data: new PagedResult<ProductWithVariantsResponse>({
+          items: products.map(mapProductWithVariants),
+          pageNumber: pagination?.pageNumber || 1,
+          pageSize: pagination?.pageSize || 10,
+          totalCount,
+          totalPages: Math.ceil(totalCount / (pagination?.pageSize || 10))
+        })
+      };
+    }, 'Failed to fetch products by structured query');
+  }
 }

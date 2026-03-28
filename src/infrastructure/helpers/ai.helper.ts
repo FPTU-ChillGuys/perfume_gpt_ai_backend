@@ -11,9 +11,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { aiModel } from 'src/chatbot/ai-model';
 import {
   PromptOptimizationConfig,
-  optimizePromptWithIntermediateModel,
-  optimizeUserMessageWithIntermediateModel
+  optimizePromptWithIntermediateModel
 } from 'src/infrastructure/utils/prompt-optimization.util';
+import { ConversationAnalysisService } from '../servicies/conversation-analysis.service';
 
 @Injectable()
 export class AIHelper {
@@ -84,8 +84,9 @@ export class AIHelper {
     private toolChoice?: ToolChoice<ToolSet>,
     private model?: LanguageModel,
     private promptOptimizationConfig?: PromptOptimizationConfig,
-    private maxTokens?: number
-  ) {}
+    private maxTokens?: number,
+    private readonly analysisService?: ConversationAnalysisService
+  ) { }
 
   async textGenerateFromPrompt(
     prompt: string,
@@ -165,19 +166,23 @@ export class AIHelper {
         `messageCount=${messages.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
       );
 
-      const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
+
+      let systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
       try {
-        const optimizedMessages = await optimizeUserMessageWithIntermediateModel(
-          messages,
-          this.promptOptimizationConfig,
-          this.logger,
-          systemContext
-        );
+        let finalMessages = messages;
+
+        if (this.promptOptimizationConfig?.enablePromptOptimization && this.analysisService) {
+          const analysis = await this.analysisService.analyze(messages);
+          if (analysis) {
+            this.logger.log(`[AIHelper] Structured analysis used. Intent: ${analysis.intent}`);
+            systemContext += `\n\n[USER_REQUEST_ANALYSIS]\n${JSON.stringify(analysis, null, 2)}\n`;
+          }
+        }
 
         const text = await textGenerationFromMessagesToResultWithErrorHandler(
           model,
-          optimizedMessages,
-          this.systemPrompt + (additionalSystemPrompt ?? ''),
+          finalMessages,
+          systemContext,
           this.tools,
           errorMessage,
           this.stopWhen,

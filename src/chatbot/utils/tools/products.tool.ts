@@ -11,7 +11,7 @@ import * as z from 'zod';
 export class ProductTool {
   private readonly logger = new Logger(ProductTool.name);
 
-  constructor(private readonly productService: ProductService) {}
+  constructor(private readonly productService: ProductService) { }
 
   getAllProducts: Tool = tool({
     description: 'Get a list of all products available in the store. ' +
@@ -40,9 +40,9 @@ export class ProductTool {
           if (!response.success) {
             return { success: false, error: 'Failed to fetch products.' };
           }
-          
+
           const items = response.data?.items || [];
-          
+
           // Encode large datasets to optimize token usage
           if (items.length > 5) {
             const encodingResult = encodeToolOutput(items);
@@ -51,7 +51,7 @@ export class ProductTool {
               encodedData: encodingResult.encoded
             };
           }
-          
+
           return { success: true, data: items };
         },
         'Error occurred while fetching products.',
@@ -95,11 +95,11 @@ export class ProductTool {
                   IsDescending: item.isDescending
                 }
               );
-              if (response.success && response.payload?.items) {
+            if (response.success && response.payload?.items) {
               results = results.concat(response.payload.items ?? []);
             }
           }
-          
+
           // Encode large result sets to optimize token usage
           if (results.length > 5) {
             const encodingResult = encodeToolOutput(results);
@@ -108,7 +108,7 @@ export class ProductTool {
               encodedData: encodingResult.encoded
             };
           }
-          
+
           return { success: true, data: results || [] };
         },
         'Error occurred while fetching products.',

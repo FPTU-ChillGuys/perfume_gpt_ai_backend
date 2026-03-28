@@ -138,4 +138,4 @@ const aiInventoryReportProvider: Provider = {
     aiReviewProvider
   ]
 })
-export class AIModule {}
+export class AIModule { }

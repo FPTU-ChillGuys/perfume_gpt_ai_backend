@@ -5,10 +5,11 @@ import { AdminInstructionModule } from './admin-instruction.module';
 import { UserLogModule } from './user-log.module';
 import { InventoryModule } from './inventory.module';
 import { RestockModule } from './restock.module';
+import { ProductModule } from './product.module';
 
 @Module({
-  imports: [AIModule, AdminInstructionModule, UserLogModule, InventoryModule, RestockModule],
+  imports: [AIModule, AdminInstructionModule, UserLogModule, InventoryModule, RestockModule, ProductModule],
   providers: [TrendService],
   exports: [TrendService]
 })
-export class TrendModule {}
+export class TrendModule { }

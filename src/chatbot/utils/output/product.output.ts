@@ -17,7 +17,10 @@ export const productCardOutputItemSchema = z.object({
 
 export const productOutput = {
     schema: z.object({
-        products: z.array(productCardOutputItemSchema)
+        products: z.array(productCardOutputItemSchema).optional(),
+        productTemp: z.object({
+            ids: z.array(z.string())
+        }).optional().describe('Danh sách productId tạm thời thu thập từ tool items để hệ thống tự động hydrate')
     })
 };
 

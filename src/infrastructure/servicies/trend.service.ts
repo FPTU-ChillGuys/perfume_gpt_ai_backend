@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ProductService } from './product.service';
 import { Output } from 'ai';
 import { ZodObject } from 'zod';
 import { AllUserLogRequest } from 'src/application/dtos/request/user-log.request';
@@ -45,8 +46,11 @@ export class TrendService {
     @Inject(AI_TREND_HELPER) private readonly aiHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
     private readonly inventoryService: InventoryService,
-    private readonly restockService: RestockService
+    private readonly restockService: RestockService,
+    private readonly productService: ProductService
   ) { }
+
+  private readonly logger = new Logger(TrendService.name);
 
   private async getVariantSalesSignalMap(
     variantIds: Set<string>
@@ -166,14 +170,34 @@ export class TrendService {
       });
     }
 
-    const trendData = typeof trendResponse.data === 'string'
-      ? trendResponse.data
-      : JSON.stringify(trendResponse.data);
-    this.inventoryService.saveTrendLog(trendData).catch((err) => {
+    let trendDataFinal = trendResponse.data ?? '';
+    try {
+      const data = typeof trendDataFinal === 'string' ? JSON.parse(trendDataFinal) : trendDataFinal;
+
+      // Ensure products array is always present for frontend
+      if (!data.products) data.products = [];
+
+      if (data.productTemp?.ids?.length > 0) {
+        const hydratedProducts = await this.productService.getProductsByIdsForOutput(data.productTemp.ids);
+        if (hydratedProducts.success) {
+          data.products = hydratedProducts.data;
+        }
+      }
+
+      trendDataFinal = typeof trendResponse.data === 'string' ? JSON.stringify(data) : data;
+    } catch (e) {
+      this.logger.error('Failed to hydrate trend products from productTemp', e);
+    }
+
+    const trendDataLog = typeof trendDataFinal === 'string'
+      ? trendDataFinal
+      : JSON.stringify(trendDataFinal);
+
+    this.inventoryService.saveTrendLog(trendDataLog).catch((err) => {
       console.error('Failed to save trend log:', err);
     });
 
-    return Ok(trendResponse.data);
+    return Ok(trendDataFinal);
   }
 
   /** Lấy product từ xu hướng người dùng */

@@ -5,21 +5,30 @@ import { productOutputSchema, productCardOutputItemSchema, ProductCardOutputItem
 export const searchOutput = {
   schema: z.object({
     message: z.string(),
-    products: z.array(productCardOutputItemSchema)
+    products: z.array(productCardOutputItemSchema).optional(),
+    productTemp: z.object({
+      ids: z.array(z.string())
+    }).optional().describe('Danh sách productId tạm thời thu thập từ tool items để hệ thống tự động hydrate')
   })
 };
 
 export const conversationOutput = {
   schema: z.object({
     message: z.string(),
-    products: z.array(productCardOutputItemSchema),
+    products: z.array(productCardOutputItemSchema).optional(),
+    productTemp: z.object({
+      ids: z.array(z.string())
+    }).optional().describe('Danh sách productId tạm thời thu thập từ tool items để hệ thống tự động hydrate'),
     suggestedQuestions: z.array(z.string()).describe('Gợi ý 3-4 câu hỏi tiếp theo cho người dùng dựa trên ngữ cảnh hội thoại')
   })
 };
 
 export const trendOutput = {
   schema: z.object({
-    products: z.array(productCardOutputItemSchema)
+    products: z.array(productCardOutputItemSchema).optional(),
+    productTemp: z.object({
+      ids: z.array(z.string())
+    }).optional().describe('Danh sách productId tạm thời thu thập từ tool items để hệ thống tự động hydrate')
   })
 };
 

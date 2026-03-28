@@ -2,7 +2,7 @@ import { UnitOfWork } from '../repositories/unit-of-work';
 import { funcHandlerAsync } from '../utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Conversation } from 'src/domain/entities/conversation.entity';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/common/conversation.dto';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
@@ -28,15 +28,18 @@ import {
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 import { UserLogService } from './user-log.service';
+import { ProductService } from './product.service';
 
 @Injectable()
 export class ConversationService {
+  private readonly logger = new Logger(ConversationService.name);
   constructor(
     private unitOfWork: UnitOfWork,
     @Inject(AI_CONVERSATION_HELPER) private readonly aiHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userLogService: UserLogService,
-    @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue
+    @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue,
+    private readonly productService: ProductService
   ) { }
 
   async addConversation(
@@ -253,10 +256,32 @@ export class ConversationService {
       );
     }
 
+    // Hydrate products from productTemp if present
+    let finalMessageData = message.data || '';
+    if (message.success && finalMessageData) {
+      try {
+        const data = typeof finalMessageData === 'string' ? JSON.parse(finalMessageData) : finalMessageData;
+
+        // Ensure products array is always present for frontend
+        if (!data.products) data.products = [];
+
+        if (data.productTemp?.ids?.length > 0) {
+          const hydratedProducts = await this.productService.getProductsByIdsForOutput(data.productTemp.ids);
+          if (hydratedProducts.success) {
+            data.products = hydratedProducts.data;
+          }
+        }
+
+        finalMessageData = JSON.stringify(data);
+      } catch (e) {
+        this.logger.error('Failed to hydrate products from productTemp', e);
+      }
+    }
+
     const responseConversation = overrideMessagesToConversation(
       conversationId || '',
       userId || '',
-      addMessageToMessages(message.data || '', conversationMessages || [])
+      addMessageToMessages(finalMessageData, conversationMessages || [])
     );
 
     await this.conversationQueue.add(

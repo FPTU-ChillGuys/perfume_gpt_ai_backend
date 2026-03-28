@@ -22,6 +22,7 @@ import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { SearchService } from './search.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { ProductCardOutputItem } from 'src/chatbot/utils/output/product.output';
 
 const productInclude = {
   Brands: true,
@@ -659,5 +660,49 @@ export class ProductService {
         })
       };
     }, 'Failed to fetch products by structured query');
+  }
+
+  async getProductsByIdsForOutput(ids: string[]): Promise<BaseResponse<ProductCardOutputItem[]>> {
+    return await funcHandlerAsync(async () => {
+      if (!ids || ids.length === 0) return { success: true, data: [] };
+
+      const products = await this.prisma.products.findMany({
+        where: {
+          Id: { in: ids },
+          IsDeleted: false
+        },
+        include: {
+          Brands: true,
+          Media: { where: { IsPrimary: true } },
+          ProductVariants: {
+            where: { IsDeleted: false }
+          }
+        }
+      });
+
+      // Maintain order of IDs passed by the AI
+      const productMap = new Map(products.map(p => [p.Id, p]));
+
+      const mappedProducts: ProductCardOutputItem[] = ids
+        .map(id => productMap.get(id))
+        .filter((p): p is NonNullable<typeof p> => !!p)
+        .map(p => ({
+          id: p.Id,
+          name: p.Name,
+          brandName: p.Brands.Name,
+          primaryImage: p.Media[0]?.Url || null,
+          variants: (p.ProductVariants || []).map(v => ({
+            id: v.Id,
+            sku: v.Sku,
+            volumeMl: v.VolumeMl,
+            basePrice: Number(v.BasePrice) // Convert Decimal to number
+          }))
+        }));
+
+      return {
+        success: true,
+        data: mappedProducts
+      };
+    }, 'Failed to fetch products for AI output cards');
   }
 }

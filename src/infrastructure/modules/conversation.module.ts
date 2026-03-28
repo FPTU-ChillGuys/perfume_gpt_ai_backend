@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConversationService } from '../servicies/conversation.service';
 import { UnitOfWorkModule } from './unit-of-work.module';
 import { AIModule } from './ai.module';
+import { ProductModule } from './product.module';
 import { AdminInstructionModule } from './admin-instruction.module';
 import { QueueName } from 'src/application/constant/processor';
 import { UserLogModule } from './user-log.module';
@@ -11,6 +12,7 @@ import { UserLogModule } from './user-log.module';
   imports: [
     UnitOfWorkModule,
     AIModule,
+    ProductModule,
     AdminInstructionModule,
     UserLogModule,
     BullModule.registerQueue({ name: QueueName.CONVERSATION_QUEUE })
@@ -18,4 +20,4 @@ import { UserLogModule } from './user-log.module';
   providers: [ConversationService],
   exports: [ConversationService]
 })
-export class ConversationModule {}
+export class ConversationModule { }

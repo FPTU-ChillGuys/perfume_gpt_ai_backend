@@ -32,7 +32,7 @@ export class Tools {
     private readonly masterDataTool: MasterDataTool
   ) {
     this.getToolsForChatbot = {
-      getAllProducts: this.productTool.getAllProducts,
+      // getAllProducts: this.productTool.getAllProducts,
       // searchProduct: this.productTool.searchProduct,
       queryProducts: this.productTool.queryProducts,
       getNewestProducts: this.productTool.getNewestProducts,

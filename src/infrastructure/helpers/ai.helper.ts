@@ -1,5 +1,4 @@
 import { LanguageModel, Schema, ToolChoice, ToolSet, UIMessage } from 'ai';
-import { injectAnalysisToLastUserMessage } from 'src/chatbot/utils/message-injection.util';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
 import {
@@ -15,7 +14,6 @@ import {
   PromptOptimizationConfig,
   optimizePromptWithIntermediateModel
 } from 'src/infrastructure/utils/prompt-optimization.util';
-import { ConversationAnalysisService } from '../servicies/conversation-analysis.service';
 
 @Injectable()
 export class AIHelper {
@@ -86,8 +84,7 @@ export class AIHelper {
     private toolChoice?: ToolChoice<ToolSet>,
     private model?: LanguageModel,
     private promptOptimizationConfig?: PromptOptimizationConfig,
-    private maxTokens?: number,
-    private readonly analysisService?: ConversationAnalysisService
+    private maxTokens?: number
   ) { }
 
   async textGenerateFromPrompt(
@@ -172,27 +169,6 @@ export class AIHelper {
       let systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
       try {
         let finalMessages = messages;
-
-        if (this.promptOptimizationConfig?.enablePromptOptimization && this.analysisService && finalMessages.length > 0) {
-          const lastUserMessage = [...finalMessages].reverse().find(m => m.role === 'user');
-          if (lastUserMessage) {
-            const messageText = lastUserMessage.parts.find(p => p.type === 'text')?.text || '';
-
-            // Extract previous messages as context (excluding the last one)
-            const previousMessages = messages
-              .filter(m => m !== lastUserMessage)
-              .map(m => `${m.role}: ${m.parts.find(p => p.type === 'text')?.text || ''}`)
-              .join('\n');
-
-            this.logger.debug(`[AIHelper] Analyzing message with context. Current: "${messageText.substring(0, 50)}..."`);
-
-            const analysis = await this.analysisService.analyze(messageText, previousMessages);
-            if (analysis) {
-              this.logger.log(`[AIHelper] Injecting structured analysis using utility. Intent: ${analysis.intent}`);
-              finalMessages = injectAnalysisToLastUserMessage(messages, analysis);
-            }
-          }
-        }
 
         const text = await textGenerationFromMessagesToResultWithErrorHandler(
           model,

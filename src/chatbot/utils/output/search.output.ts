@@ -1,41 +1,29 @@
 import { Output } from 'ai';
 import z from 'zod';
-import { productOutputSchema, productCardOutputItemSchema, ProductCardOutputItem } from './product.output';
+import { productOutputSchema, productCardOutputItemSchema, ProductCardOutputItem, productTempItemSchema } from './product.output';
 
 export const searchOutput = {
   schema: z.object({
     message: z.string(),
-    products: z.array(productCardOutputItemSchema).optional(),
-    productTemp: z.array(z.object({
-      id: z.string(),
-      name: z.string().optional(),
-      variants: z.array(z.object({ id: z.string(), price: z.number() })).optional()
-    })).optional().describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
-  })
+    products: z.array(productCardOutputItemSchema).nullable(),
+    productTemp: z.array(productTempItemSchema).nullable()
+  }).describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
 };
 
 export const conversationOutput = {
   schema: z.object({
     message: z.string(),
-    products: z.array(productCardOutputItemSchema).optional(),
-    productTemp: z.array(z.object({
-      id: z.string(),
-      name: z.string().optional(),
-      variants: z.array(z.object({ id: z.string(), price: z.number() })).optional()
-    })).optional().describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate'),
+    products: z.array(productCardOutputItemSchema).nullable(),
+    productTemp: z.array(productTempItemSchema).nullable(),
     suggestedQuestions: z.array(z.string()).describe('Gợi ý 3-4 câu hỏi tiếp theo cho người dùng dựa trên ngữ cảnh hội thoại')
   })
 };
 
 export const trendOutput = {
   schema: z.object({
-    products: z.array(productCardOutputItemSchema).optional(),
-    productTemp: z.array(z.object({
-      id: z.string(),
-      name: z.string().optional(),
-      variants: z.array(z.object({ id: z.string(), price: z.number() })).optional()
-    })).optional().describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
-  })
+    products: z.array(productCardOutputItemSchema).nullable(),
+    productTemp: z.array(productTempItemSchema).nullable()
+  }).describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
 };
 
 export const searchOutputSchema = searchOutput.schema;

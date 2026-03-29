@@ -11,6 +11,7 @@ import { conversationOutput, conversationOutputSchema, searchOutput } from 'src/
 import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
 import { addMessageToMessages, convertToMessages, overrideMessagesToConversation } from 'src/infrastructure/utils/message-helper';
 import { buildCombinedPromptV5 } from 'src/infrastructure/utils/prompt-builder';
+import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIHelper } from '../helpers/ai.helper';
 import { AI_CONVERSATION_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
@@ -261,13 +262,17 @@ export class ConversationService {
 
       if (searchResponse.success && searchResponse.data) {
         const products = searchResponse.data.items;
-        searchResultsStr = JSON.stringify(products.map(p => ({
+        const minimalProducts = products.map(p => ({
           id: p.id,
           name: p.name,
           brand: p.brandName,
           category: p.categoryName,
+          attributes: p.attributes.map(a => `${a.attribute}: ${a.value}`),
+          scentNotes: p.scentNotes,
+          olfactoryFamilies: p.olfactoryFamilies,
           variants: p.variants.map(v => ({ id: v.id, volume: v.volumeMl, price: v.basePrice }))
-        })));
+        }));
+        searchResultsStr = encodeToolOutput(minimalProducts).encoded;
 
         // Inject search results into context for Main AI
         const injectionMessage: UIMessage = {

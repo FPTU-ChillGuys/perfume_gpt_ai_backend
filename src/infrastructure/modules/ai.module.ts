@@ -33,7 +33,7 @@ const aiProvider: Provider = {
 
 const aiConversationProvider: Provider = {
   provide: AI_CONVERSATION_HELPER,
-  useFactory: (tools: Tools, analysisService: ConversationAnalysisService) =>
+  useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
       tools.getToolsForChatbot,
@@ -45,11 +45,9 @@ const aiConversationProvider: Provider = {
         enablePromptOptimization: true,
         optimizationPrompt:
           'Use case: conversation tu van nuoc hoa. Giu nguyen intent cua nguoi dung, khong doi sang domain khac. Neu user dang yeu cau tim/goi y san pham thi giu cau truc de model chinh co the goi tool va tra ve dung format.'
-      },
-      undefined,
-      analysisService
+      }
     ),
-  inject: [Tools, ConversationAnalysisService]
+  inject: [Tools]
 };
 
 const aiTrendProvider: Provider = {

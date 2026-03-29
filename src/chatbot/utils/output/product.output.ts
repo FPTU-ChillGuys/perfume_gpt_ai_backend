@@ -15,15 +15,17 @@ export const productCardOutputItemSchema = z.object({
     variants: z.array(productCardVariantOutputSchema)
 });
 
+export const productTempItemSchema = z.object({
+    id: z.string(),
+    name: z.string().nullable(),
+    variants: z.array(z.object({ id: z.string(), price: z.number() })).nullable()
+});
+
 export const productOutput = {
     schema: z.object({
-        products: z.array(productCardOutputItemSchema).optional(),
-        productTemp: z.array(z.object({
-            id: z.string(),
-            name: z.string().optional(),
-            variants: z.array(z.object({ id: z.string(), price: z.number() })).optional()
-        })).optional().describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
-    })
+        products: z.array(productCardOutputItemSchema).nullable(),
+        productTemp: z.array(productTempItemSchema).nullable()
+    }).describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
 };
 
 export const productOutputSchema = productOutput.schema;

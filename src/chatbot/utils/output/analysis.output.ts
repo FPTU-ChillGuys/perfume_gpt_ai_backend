@@ -5,27 +5,27 @@ export const analysisOutputSchema = z.object({
         .describe('The core intent of the user message.'),
     logic: z.array(z.union([z.string(), z.array(z.string())]))
         .describe('Disjunctive Normal Form (DNF) logic for product attributes. e.g. [["Chanel", "Nước hoa nữ"], "Dior"] means (Chanel AND Nước hoa nữ) OR Dior.'),
-    productNames: z.array(z.string()).optional()
+    productNames: z.array(z.string()).nullable()
         .describe('Explicit list of product names mentioned by the user (e.g. ["Bleu de Chanel", "Sauvage"]).'),
     sorting: z.object({
-        field: z.enum(['Price', 'Sales', 'Volume', 'Newest', 'Relevance', 'Name']).default('Relevance'),
-        isDescending: z.boolean().default(true)
-    }).optional(),
+        field: z.enum(['Price', 'Sales', 'Volume', 'Newest', 'Relevance', 'Name']),
+        isDescending: z.boolean()
+    }).nullable(),
     budget: z.object({
-        min: z.number().optional(),
-        max: z.number().optional()
-    }).optional(),
+        min: z.number().nullable(),
+        max: z.number().nullable()
+    }).nullable(),
     pagination: z.object({
-        pageNumber: z.number().default(1),
-        pageSize: z.number().default(10)
-    }).optional(),
+        pageNumber: z.number(),
+        pageSize: z.number()
+    }).nullable(),
     originalRequestVietnamese: z.string().describe('The user\'s original message in Vietnamese.'),
     normalizationMetadata: z.array(z.object({
         original: z.string().describe('The raw keyword from the user.'),
         corrected: z.string().describe('The normalized keyword as found in the database.'),
         type: z.enum(['brand', 'category', 'note', 'family', 'attribute', 'product', 'unknown']),
         isNormalized: z.boolean().describe('Whether a matching official term was found.')
-    })).optional().describe('Log of keyword normalization/correction process.'),
+    })).nullable().describe('Log of keyword normalization/correction process.'),
     explanation: z.string().describe('Short explanation of the analysis in Vietnamese (visible to main AI only).')
 });
 

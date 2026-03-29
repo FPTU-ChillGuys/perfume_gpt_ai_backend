@@ -16,18 +16,18 @@ import * as z from 'zod';
 export class OrderTool {
   private readonly logger = new Logger(OrderTool.name);
 
-  constructor(private readonly orderService: OrderService, private readonly userService: UserService) {}
+  constructor(private readonly orderService: OrderService, private readonly userService: UserService) { }
 
   getOrdersByUserId: Tool = tool({
     description: 'Get all orders for a specific user with pagination and sorting. ' +
       'Returns orders with TOON compression for large datasets to optimize token usage.',
     inputSchema: z.object({
       userId: z.string().describe('The ID of the user'),
-      pageNumber: z.number().min(1).optional().default(1),
-      pageSize: z.number().min(1).max(100).optional().default(10),
-      sortBy: z.string().optional(),
-      sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
-      isDescending: z.boolean().optional().default(false),
+      pageNumber: z.number().min(1),
+      pageSize: z.number().min(1).max(100),
+      sortBy: z.string().nullable(),
+      sortOrder: z.enum(['asc', 'desc']),
+      isDescending: z.boolean(),
     }),
     execute: async (input) => {
       this.logger.log(`[getOrdersByUserId] called for userId: ${input.userId}`);
@@ -41,9 +41,9 @@ export class OrderTool {
           if (!response.success) {
             return { success: false, error: `Failed to fetch orders for user ${input.userId}.` };
           }
-          
+
           const items = response.payload?.items || [];
-          
+
           // Encode large datasets to optimize token usage
           if (items.length > 5) {
             const encodingResult = encodeToolOutput(items);
@@ -52,7 +52,7 @@ export class OrderTool {
               encodedData: encodingResult.encoded
             };
           }
-          
+
           return { success: true, data: items };
         },
         'Error occurred while fetching user orders.',
@@ -101,9 +101,9 @@ export class OrderTool {
           if (!response.success) {
             return { success: false, error: `Failed to fetch order details for user ${input.userId}.` };
           }
-          
+
           const data = response.data || [];
-          
+
           // Encode large datasets to optimize token usage
           if (Array.isArray(data) && data.length > 5) {
             const encodingResult = encodeToolOutput(data);
@@ -112,7 +112,7 @@ export class OrderTool {
               encodedData: encodingResult.encoded
             };
           }
-          
+
           return { success: true, data };
         },
         'Error occurred while fetching order details.',
@@ -165,7 +165,7 @@ export class OrderTool {
       this.logger.log(
         `[addCartItems] called for userId: ${input.userId} with ${input.items.length} items`
       );
-      
+
       //Check user existence before processing cart additions
       const userExists = await this.userService.isUserExistedByUserId(input.userId);
       if (userExists.success && !userExists.payload) {
@@ -236,9 +236,8 @@ export class OrderTool {
               totalItems: input.items.length,
               successful: results,
               failed: errors,
-              summary: `Successfully added ${results.length} of ${input.items.length} items to cart.${
-                errors.length > 0 ? ` ${errors.length} item(s) failed to add.` : ''
-              }`,
+              summary: `Successfully added ${results.length} of ${input.items.length} items to cart.${errors.length > 0 ? ` ${errors.length} item(s) failed to add.` : ''
+                }`,
             },
           };
         },

@@ -48,9 +48,7 @@ export class Tools {
     };
 
     this.getToolsForAnalysis = {
-      normalizeKeyword: this.masterDataTool.normalizeKeyword,
       searchMasterData: this.masterDataTool.searchMasterData,
-      getAvailableAttributes: this.masterDataTool.getAvailableAttributes
     };
 
     this.getToolsForSurvey = {

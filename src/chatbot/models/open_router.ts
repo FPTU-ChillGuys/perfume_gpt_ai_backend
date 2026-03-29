@@ -49,3 +49,7 @@ export const llama_3_1_8b_instruct: LanguageModel = openrouter("meta-llama/llama
 
 export const mistral_small_2603: LanguageModel = openrouter("mistralai/mistral-small-2603")
 
+export const trinityMiniFree: LanguageModel = openrouter("arcee-ai/trinity-mini:free")
+
+export const gptOss20b: LanguageModel = openrouter("openai/gpt-oss-20b")
+

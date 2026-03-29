@@ -674,8 +674,8 @@ export class ProductService {
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(async () => {
       const { logic, sorting, budget, pagination, productNames } = analysis;
-      const skip = ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 10);
-      const take = pagination?.pageSize || 10;
+      const skip = ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 5);
+      const take = pagination?.pageSize || 5;
 
       // Build Name-specific conditions
       const nameConditions: Prisma.ProductsWhereInput[] = (productNames || []).map((name: string) => ({

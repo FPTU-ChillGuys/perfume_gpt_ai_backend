@@ -105,7 +105,7 @@ export async function objectGenerationFromMessagesToResultWithErrorHandler<T>(
   model: LanguageModel,
   messages: UIMessage[],
   systemPrompt?: string,
-  output?: Schema<T> | { schema: Schema<T> },
+  output?: any,
   errorMessage?: string,
   temperature?: number,
   maxTokens?: number
@@ -118,7 +118,7 @@ export async function objectGenerationFromMessagesToResultWithErrorHandler<T>(
         model: model,
         messages: modelMessages,
         system: systemPrompt ? systemPrompt : undefined,
-        output: output ? (output as any).schema || output : undefined,
+        schema: output,
         temperature: temperature,
         maxOutputTokens: maxTokens
       });

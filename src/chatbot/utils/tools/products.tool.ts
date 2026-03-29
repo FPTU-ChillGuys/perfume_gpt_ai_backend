@@ -26,11 +26,11 @@ export class ProductTool {
     description: 'Get a list of all products available in the store. ' +
       'Large product lists are TOON-compressed to optimize token usage.',
     inputSchema: z.object({
-      pageNumber: z.number().min(1).optional().default(1),
-      pageSize: z.number().min(1).max(100).optional().default(10),
-      sortBy: z.string().optional(),
-      sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
-      isDescending: z.boolean().optional().default(false)
+      pageNumber: z.number().min(1),
+      pageSize: z.number().min(1).max(100),
+      sortBy: z.string().nullable(),
+      sortOrder: z.enum(['asc', 'desc']),
+      isDescending: z.boolean()
     }),
     execute: async (input) => {
       this.logger.log(`[getAllProducts] called`);
@@ -77,12 +77,12 @@ export class ProductTool {
       searches: z.array(
         z.object({
           searchText: z.string(),
-          pageNumber: z.number().min(1).optional().default(1),
-          pageSize: z.number().min(1).max(100).optional().default(10),
-          sortBy: z.string().optional(),
-          sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
-          isDescending: z.boolean().optional().default(false),
-          searchTerms: z.array(z.string()).optional().default([])
+          pageNumber: z.number().min(1),
+          pageSize: z.number().min(1).max(100),
+          sortBy: z.string().nullable(),
+          sortOrder: z.enum(['asc', 'desc']),
+          isDescending: z.boolean(),
+          searchTerms: z.array(z.string())
         })
       )
     }),
@@ -132,8 +132,8 @@ export class ProductTool {
   getNewestProducts: Tool = tool({
     description: 'Get the newest products sorted by creation time descending. Results are TOON-encoded.',
     inputSchema: z.object({
-      pageNumber: z.number().min(1).optional().default(1),
-      pageSize: z.number().min(1).max(100).optional().default(10)
+      pageNumber: z.number().min(1),
+      pageSize: z.number().min(1).max(100)
     }),
     execute: async (input) => {
       return await funcHandlerAsync(
@@ -167,8 +167,8 @@ export class ProductTool {
   getBestSellingProducts: Tool = tool({
     description: 'Get the best-selling products ranked by total sold quantity. Results are TOON-encoded.',
     inputSchema: z.object({
-      pageNumber: z.number().min(1).optional().default(1),
-      pageSize: z.number().min(1).max(100).optional().default(10)
+      pageNumber: z.number().min(1),
+      pageSize: z.number().min(1).max(100)
     }),
     execute: async (input) => {
       this.logger.log(`[getBestSellingProducts] called`);
@@ -200,8 +200,8 @@ export class ProductTool {
   getLeastSellingProducts: Tool = tool({
     description: 'Get the least-selling products (including those with zero sales). Results are TOON-encoded.',
     inputSchema: z.object({
-      pageNumber: z.number().min(1).optional().default(1),
-      pageSize: z.number().min(1).max(100).optional().default(10)
+      pageNumber: z.number().min(1),
+      pageSize: z.number().min(1).max(100)
     }),
     execute: async (input) => {
       this.logger.log(`[getLeastSellingProducts] called`);
@@ -247,17 +247,17 @@ export class ProductTool {
     inputSchema: z.object({
       logic: z.array(z.union([z.string(), z.array(z.string())])).describe('DNF logic for attributes.'),
       sorting: z.object({
-        field: z.enum(['Price', 'Sales', 'Newest', 'Relevance', 'Name']).default('Relevance'),
-        isDescending: z.boolean().default(true)
-      }).optional(),
+        field: z.enum(['Price', 'Sales', 'Newest', 'Relevance', 'Name']),
+        isDescending: z.boolean()
+      }).nullable(),
       budget: z.object({
-        min: z.number().optional(),
-        max: z.number().optional()
-      }).optional(),
+        min: z.number().nullable(),
+        max: z.number().nullable()
+      }).nullable(),
       pagination: z.object({
-        pageNumber: z.number().default(1),
-        pageSize: z.number().default(10)
-      }).optional(),
+        pageNumber: z.number(),
+        pageSize: z.number()
+      }).nullable(),
     }),
     execute: async (analysis) => {
       this.logger.log(`[queryProducts] Executing structured query: ${JSON.stringify(analysis, null, 2)}`);

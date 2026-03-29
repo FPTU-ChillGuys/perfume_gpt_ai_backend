@@ -15,7 +15,7 @@ import { encode } from '@toon-format/toon';
 export function encodeToolOutput<T extends any[] | object>(
   data: T,
   shouldEncode?: boolean
-): { 
+): {
   encoded: string;
   originalSize: number;
   encodedSize: number;
@@ -24,7 +24,7 @@ export function encodeToolOutput<T extends any[] | object>(
   const jsonString = JSON.stringify(data);
   const originalSize = jsonString.length;
 
-  const encoded = encode(jsonString);
+  const encoded = encode(data);
   const encodedSize = encoded.length;
 
   return {
@@ -45,7 +45,7 @@ export function encodeToolOutput<T extends any[] | object>(
 export function encodeItemArray<T extends object>(
   items: T[],
   readableFields?: (keyof T)[]
-): { 
+): {
   encoded: string;
   readable?: Pick<T, any>[];
   compressionRatio: number;

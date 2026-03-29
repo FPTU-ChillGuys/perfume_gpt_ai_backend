@@ -582,12 +582,12 @@ export class ProductService {
       const skip = ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 10);
       const take = pagination?.pageSize || 10;
 
-      // Build Name-specific conditions if productNames are provided
+      // Build Name-specific conditions
       const nameConditions: Prisma.ProductsWhereInput[] = (productNames || []).map((name: string) => ({
         Name: { contains: name }
       }));
 
-      // Purity check: Filter out generic or price-related keywords that AI might have leaked into 'logic'
+      // Purity check: Filter out generic or price-related keywords
       const purifiedLogic = (logic || []).map((group: any) => {
         const andItems = Array.isArray(group) ? group : [group];
         const filtered = andItems.filter((item: string) => {
@@ -598,25 +598,20 @@ export class ProductService {
         return filtered.length > 0 ? filtered : null;
       }).filter(group => group !== null);
 
-      // Build OR conditions (Outer array)
+      // Build OR conditions
       const orConditions: Prisma.ProductsWhereInput[] = purifiedLogic.map((group: any) => {
         const andItems = group;
-
-        // Build AND conditions (Inner array/group)
-        const andConditions: Prisma.ProductsWhereInput[] = andItems.map((item: string) => {
-          return {
-            OR: [
-              { Name: { contains: item } },
-              { Brands: { Name: { contains: item } } },
-              { Categories: { Name: { contains: item } } },
-              { ProductNoteMaps: { some: { ScentNotes: { Name: { contains: item } } } } },
-              { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains: item } } } } },
-              { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } },
-              { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } } } }
-            ]
-          };
-        });
-
+        const andConditions: Prisma.ProductsWhereInput[] = andItems.map((item: string) => ({
+          OR: [
+            { Name: { contains: item } },
+            { Brands: { Name: { contains: item } } },
+            { Categories: { Name: { contains: item } } },
+            { ProductNoteMaps: { some: { ScentNotes: { Name: { contains: item } } } } },
+            { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains: item } } } } },
+            { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } },
+            { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } } } }
+          ]
+        }));
         return { AND: andConditions };
       });
 
@@ -639,19 +634,23 @@ export class ProductService {
         ]
       };
 
-      // Sorting logic (Basic implementation)
+      // Sorting logic
       let orderBy: Prisma.ProductsOrderByWithRelationInput = { CreatedAt: 'desc' };
       if (sorting) {
+        const direction = sorting.isDescending ? 'desc' : 'asc';
         switch (sorting.field) {
-          case 'Price':
-            // Sorting by variant price in findMany is tricky, default to CreatedAt for now
-            break;
           case 'Newest':
-            orderBy = { CreatedAt: 'desc' };
+            orderBy = { CreatedAt: direction };
             break;
           case 'Name':
-            orderBy = { Name: sorting.isDescending ? 'desc' : 'asc' };
+            orderBy = { Name: direction };
             break;
+          case 'Price':
+          case 'Volume':
+          case 'Sales':
+          default:
+            // Aggregate sorting (_min, _max) on relations is not supported by current Prisma version/setup
+            orderBy = { CreatedAt: 'desc' };
         }
       }
 
@@ -670,10 +669,10 @@ export class ProductService {
         success: true,
         data: new PagedResult<ProductWithVariantsResponse>({
           items: products.map(mapProductWithVariants),
-          pageNumber: pagination?.pageNumber || 1,
-          pageSize: pagination?.pageSize || 10,
+          pageNumber: (pagination?.pageNumber || 1),
+          pageSize: take,
           totalCount,
-          totalPages: Math.ceil(totalCount / (pagination?.pageSize || 10))
+          totalPages: Math.ceil(totalCount / take)
         })
       };
     }, 'Failed to fetch products by structured query');

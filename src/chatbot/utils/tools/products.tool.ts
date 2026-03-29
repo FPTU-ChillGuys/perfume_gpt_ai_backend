@@ -130,7 +130,7 @@ export class ProductTool {
   });
 
   getNewestProducts: Tool = tool({
-    description: 'Get the newest products sorted by creation time descending.',
+    description: 'Get the newest products sorted by creation time descending. Results are TOON-encoded.',
     inputSchema: z.object({
       pageNumber: z.number().min(1).optional().default(1),
       pageSize: z.number().min(1).max(100).optional().default(10)
@@ -155,7 +155,8 @@ export class ProductTool {
             };
           }
 
-          return { success: true, data: (response.data?.items || []).map(this.mapToMinimalProduct) };
+          const items = (response.data?.items || []).map(this.mapToMinimalProduct);
+          return { success: true, ...encodeToolOutput(items) };
         },
         'Error occurred while fetching newest products.',
         true
@@ -164,7 +165,7 @@ export class ProductTool {
   });
 
   getBestSellingProducts: Tool = tool({
-    description: 'Get the best-selling products ranked by total sold quantity.',
+    description: 'Get the best-selling products ranked by total sold quantity. Results are TOON-encoded.',
     inputSchema: z.object({
       pageNumber: z.number().min(1).optional().default(1),
       pageSize: z.number().min(1).max(100).optional().default(10)
@@ -187,7 +188,8 @@ export class ProductTool {
             };
           }
 
-          return { success: true, data: (response.data?.items || []).map(this.mapToMinimalProduct) };
+          const items = (response.data?.items || []).map(this.mapToMinimalProduct);
+          return { success: true, ...encodeToolOutput(items) };
         },
         'Error occurred while fetching best-selling products.',
         true
@@ -208,7 +210,7 @@ export class ProductTool {
   });
 
   queryProducts: Tool = tool({
-    description: 'Query products using structured logic (DNF), sorting, and budget constraints.',
+    description: 'Query products using structured logic (DNF), sorting, and budget constraints. Results are TOON-encoded.',
     inputSchema: z.object({
       logic: z.array(z.union([z.string(), z.array(z.string())])).describe('DNF logic for attributes.'),
       sorting: z.object({
@@ -228,10 +230,11 @@ export class ProductTool {
       this.logger.log(`[queryProducts] Executing structured query: ${JSON.stringify(analysis, null, 2)}`);
       const result = await this.productService.getProductsByStructuredQuery(analysis);
       this.logger.log(`[queryProducts] Found ${result.data?.items?.length} products.`);
-      const items = result.data?.items || [];
+      const items = (result.data?.items || []).map(this.mapToMinimalProduct);
       return {
         ...result.data,
-        items: items.map(this.mapToMinimalProduct)
+        ...encodeToolOutput(items),
+        items: undefined // Remove unencoded items
       };
     }
   });

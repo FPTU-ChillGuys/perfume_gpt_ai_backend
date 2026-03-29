@@ -1,8 +1,9 @@
-import { LanguageModel, ToolChoice, ToolSet, UIMessage } from 'ai';
+import { LanguageModel, Schema, ToolChoice, ToolSet, UIMessage } from 'ai';
 import { injectAnalysisToLastUserMessage } from 'src/chatbot/utils/message-injection.util';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandler, funcHandlerAsync } from '../utils/error-handler';
 import {
+  objectGenerationFromMessagesToResultWithErrorHandler,
   streamTextGenerationFromMessagesToResultWithErrorHandler,
   streamTextGenerationFromPromptToResultWithErrorHandler,
   textGenerationFromMessagesToResultWithErrorHandler,
@@ -300,5 +301,63 @@ export class AIHelper {
       this.toolChoice,
       this.maxTokens
     );
+  }
+
+  async objectGenerateFromMessages<T>(
+    messages: UIMessage[],
+    output: Schema<T> | { schema: Schema<T> },
+    additionalSystemPrompt?: string,
+    errorMessage?: string
+  ): Promise<BaseResponse<T>> {
+    return await funcHandlerAsync(async () => {
+      const requestId = this.createRequestId('object-messages');
+      const model = this.resolveModel();
+      const modelName = this.resolveModelName(model);
+      const startedAt = this.logStart(
+        requestId,
+        'objectGenerateFromMessages',
+        modelName,
+        `messageCount=${messages.length} hasOutputSchema=${!!output}`
+      );
+
+      const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
+      try {
+        const object = await objectGenerationFromMessagesToResultWithErrorHandler<T>(
+          model,
+          messages,
+          systemContext,
+          output,
+          errorMessage,
+          this.temperature,
+          this.maxTokens
+        );
+
+        this.logDone(
+          requestId,
+          'objectGenerateFromMessages',
+          modelName,
+          startedAt,
+          `success=${!!object}`
+        );
+
+        if (!object) {
+          return {
+            success: false,
+            error: errorMessage || 'Failed to generate object'
+          };
+        }
+
+        return { success: true, data: object };
+      } catch (error) {
+        this.logError(
+          requestId,
+          'objectGenerateFromMessages',
+          modelName,
+          startedAt,
+          error
+        );
+        throw error;
+      }
+    }, 'Failed to generate object from messages');
   }
 }

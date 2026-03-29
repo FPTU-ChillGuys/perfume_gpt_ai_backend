@@ -1,8 +1,10 @@
 import {
   convertToModelMessages,
   createUIMessageStream,
+  generateObject,
   generateText,
   LanguageModel,
+  Schema,
   stepCountIs,
   streamText,
   ToolChoice,
@@ -97,6 +99,39 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
       retries--;
     }
   }
+}
+
+export async function objectGenerationFromMessagesToResultWithErrorHandler<T>(
+  model: LanguageModel,
+  messages: UIMessage[],
+  systemPrompt?: string,
+  output?: Schema<T> | { schema: Schema<T> },
+  errorMessage?: string,
+  temperature?: number,
+  maxTokens?: number
+): Promise<T | null> {
+  let retries = 2;
+  while (retries >= 0) {
+    try {
+      const modelMessages = await convertToModelMessages(messages);
+      const result = await generateObject({
+        model: model,
+        messages: modelMessages,
+        system: systemPrompt ? systemPrompt : undefined,
+        output: output ? (output as any).schema || output : undefined,
+        temperature: temperature,
+        maxOutputTokens: maxTokens
+      });
+      return result.object as T;
+    } catch (error) {
+      console.error(`Error in ObjectGenerationFromMessages (Remaining retries: ${retries}):`, error);
+      if (retries === 0) {
+        return null;
+      }
+      retries--;
+    }
+  }
+  return null;
 }
 
 export function streamTextGenerationFromPromptToResultWithErrorHandler(

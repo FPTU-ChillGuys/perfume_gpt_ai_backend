@@ -8,7 +8,7 @@ export const analysisOutputSchema = z.object({
     productNames: z.array(z.string()).optional()
         .describe('Explicit list of product names mentioned by the user (e.g. ["Bleu de Chanel", "Sauvage"]).'),
     sorting: z.object({
-        field: z.enum(['Price', 'Sales', 'Newest', 'Relevance', 'Name']).default('Relevance'),
+        field: z.enum(['Price', 'Sales', 'Volume', 'Newest', 'Relevance', 'Name']).default('Relevance'),
         isDescending: z.boolean().default(true)
     }).optional(),
     budget: z.object({
@@ -20,6 +20,12 @@ export const analysisOutputSchema = z.object({
         pageSize: z.number().default(10)
     }).optional(),
     originalRequestVietnamese: z.string().describe('The user\'s original message in Vietnamese.'),
+    normalizationMetadata: z.array(z.object({
+        original: z.string().describe('The raw keyword from the user.'),
+        corrected: z.string().describe('The normalized keyword as found in the database.'),
+        type: z.enum(['brand', 'category', 'note', 'family', 'attribute', 'product', 'unknown']),
+        isNormalized: z.boolean().describe('Whether a matching official term was found.')
+    })).optional().describe('Log of keyword normalization/correction process.'),
     explanation: z.string().describe('Short explanation of the analysis in Vietnamese (visible to main AI only).')
 });
 

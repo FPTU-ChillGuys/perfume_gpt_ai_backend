@@ -34,9 +34,9 @@ export class Tools {
     this.getToolsForChatbot = {
       // getAllProducts: this.productTool.getAllProducts,
       // searchProduct: this.productTool.searchProduct,
-      queryProducts: this.productTool.queryProducts,
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      // queryProducts: this.productTool.queryProducts,
+      // getNewestProducts: this.productTool.getNewestProducts,
+      // getBestSellingProducts: this.productTool.getBestSellingProducts,
       // // Order tools
       // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
@@ -47,6 +47,7 @@ export class Tools {
     };
 
     this.getToolsForAnalysis = {
+      normalizeKeyword: this.masterDataTool.normalizeKeyword,
       searchMasterData: this.masterDataTool.searchMasterData,
       getAvailableAttributes: this.masterDataTool.getAvailableAttributes
     };

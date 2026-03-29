@@ -7,13 +7,14 @@ import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/co
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Output, UIMessage } from 'ai';
-import { conversationOutput, searchOutput } from 'src/chatbot/utils/output/search.output';
+import { conversationOutput, conversationOutputSchema, searchOutput } from 'src/chatbot/utils/output/search.output';
 import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
 import { addMessageToMessages, convertToMessages, overrideMessagesToConversation } from 'src/infrastructure/utils/message-helper';
 import { buildCombinedPromptV5 } from 'src/infrastructure/utils/prompt-builder';
 import { AIHelper } from '../helpers/ai.helper';
 import { AI_CONVERSATION_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
+import { ConversationAnalysisService } from './conversation-analysis.service';
 import { ConversationJobName, QueueName } from 'src/application/constant/processor';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -39,7 +40,8 @@ export class ConversationService {
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userLogService: UserLogService,
     @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue,
-    private readonly productService: ProductService
+    private readonly productService: ProductService,
+    private readonly analysisService: ConversationAnalysisService
   ) { }
 
   async addConversation(
@@ -238,71 +240,99 @@ export class ConversationService {
     combinedPrompt: string,
     endpoint: string
   ): Promise<ConversationDto> {
+    // Phase 1: Intermediate Analysis
+    const lastUserMessage = [...convertedMessages].reverse().find(m => m.role === 'user');
+    const messageText = lastUserMessage?.parts.find(p => p.type === 'text')?.text || '';
+    const previousContext = convertedMessages
+      .filter(m => m !== lastUserMessage)
+      .map(m => `${m.role}: ${m.parts.find(p => p.type === 'text')?.text || ''}`)
+      .join('\n');
+
+    this.logger.log(`[processAiChatResponse] Analyzing message: "${messageText.substring(0, 50)}..."`);
+    const analysis = await this.analysisService.analyze(messageText, previousContext);
+
+    let finalMessages = convertedMessages;
+    let searchResultsStr = '';
+
+    // Phase 2: Backend Search (if intent is Search or Consult)
+    if (analysis && (analysis.intent === 'Search' || analysis.intent === 'Consult')) {
+      this.logger.log(`[processAiChatResponse] Performing structured search for: ${analysis.explanation}`);
+      const searchResponse = await this.productService.getProductsByStructuredQuery(analysis);
+
+      if (searchResponse.success && searchResponse.data) {
+        const products = searchResponse.data.items;
+        searchResultsStr = JSON.stringify(products.map(p => ({
+          id: p.id,
+          name: p.name,
+          brand: p.brandName,
+          category: p.categoryName,
+          variants: p.variants.map(v => ({ id: v.id, volume: v.volumeMl, price: v.basePrice }))
+        })));
+
+        // Inject search results into context for Main AI
+        const injectionMessage: UIMessage = {
+          id: uuid(),
+          role: 'system',
+          parts: [{ type: 'text', text: `SEARCH_RESULTS: ${searchResultsStr}` }]
+        };
+        finalMessages = [...convertedMessages, injectionMessage];
+      }
+    }
+
+    // Phase 3: Main AI Structured Response
     const systemPrompt = conversationSystemPrompt(
       adminInstruction || '',
       combinedPrompt
     );
 
+    this.logger.log(`[processAiChatResponse] Generating structured response using textGenerate...`);
     const message = await this.aiHelper.textGenerateFromMessages(
-      convertedMessages,
+      finalMessages,
       systemPrompt,
       Output.object(conversationOutput)
     );
 
-    if (!message.success) {
+    if (!message.success || !message.data) {
       throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
+        'Failed to get structured AI response',
         { userId, conversationId, service: 'AIHelper', endpoint }
       );
     }
 
-    // Hydrate products from productTemp if present
-    let finalMessageData = message.data || '';
-    if (message.success && finalMessageData) {
-      try {
-        const aiResponse = typeof finalMessageData === 'string' ? JSON.parse(finalMessageData) : finalMessageData;
+    const aiResponse = typeof message.data === 'string' ? JSON.parse(message.data) : message.data;
 
-        // Ensure products array is always present for frontend
-        if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
-          const productTemp = aiResponse.productTemp as any[];
-          const ids = productTemp.map(item => item.id).filter(id => !!id);
+    // Hydrate products if productTemp is present (ensures full object integrity for frontend)
+    if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
+      const productTemp = aiResponse.productTemp;
+      const ids = productTemp.map(item => item.id).filter(id => !!id);
 
-          if (ids.length > 0) {
-            const productResponse = await this.productService.getProductsByIdsForOutput(ids);
-            if (productResponse.success && productResponse.data) {
-              let hydratedProducts = productResponse.data;
-
-              // Map recommendations by product ID for efficient filtering
-              const recommendationsMap = new Map<string, string[]>();
-              productTemp.forEach(item => {
-                if (item.id && item.variants && Array.isArray(item.variants)) {
-                  recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
-                }
-              });
-
-              // Apply per-product variant filtering
-              hydratedProducts = hydratedProducts.map(product => {
-                const recommendedVariantIds = recommendationsMap.get(product.id);
-                if (recommendedVariantIds && recommendedVariantIds.length > 0) {
-                  const variantIdsSet = new Set(recommendedVariantIds);
-                  return {
-                    ...product,
-                    variants: (product.variants || []).filter(v => variantIdsSet.has(v.id))
-                  };
-                }
-                return product;
-              }).filter(product => product.variants && product.variants.length > 0);
-
-              aiResponse.products = hydratedProducts;
+      if (ids.length > 0) {
+        const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+        if (productResponse.success && productResponse.data) {
+          const hydratedProducts = productResponse.data;
+          const recommendationsMap = new Map<string, string[]>();
+          productTemp.forEach(item => {
+            if (item.id && item.variants && Array.isArray(item.variants)) {
+              recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
             }
-          }
-        }
+          });
 
-        finalMessageData = JSON.stringify(aiResponse);
-      } catch (e) {
-        this.logger.error('Failed to hydrate products from productTemp', e);
+          aiResponse.products = hydratedProducts.map(product => {
+            const recommendedVariantIds = recommendationsMap.get(product.id);
+            if (recommendedVariantIds && recommendedVariantIds.length > 0) {
+              const variantIdsSet = new Set(recommendedVariantIds);
+              return {
+                ...product,
+                variants: (product.variants || []).filter(v => variantIdsSet.has(v.id))
+              };
+            }
+            return product;
+          }).filter(product => product.variants && product.variants.length > 0);
+        }
       }
     }
+
+    const finalMessageData = JSON.stringify(aiResponse);
 
     const responseConversation = overrideMessagesToConversation(
       conversationId || '',

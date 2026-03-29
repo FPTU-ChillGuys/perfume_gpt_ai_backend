@@ -90,11 +90,11 @@ export class MasterDataService {
 
         const scored = items.map(item => ({
             ...item,
-            score: JaroWinklerDistance(keyword.toLowerCase(), item.name.toLowerCase(), { ignoreCase: true })
+            score: JaroWinklerDistance(keyword.toLowerCase(), item.name.toLowerCase(), { ignoreCase: true }),
+            keyword: keyword,
         }));
 
         return scored
-            .filter(x => x.score > 0.5) // Lower threshold for misspelled words
             .sort((a, b) => b.score - a.score)
             .slice(0, 5);
     }

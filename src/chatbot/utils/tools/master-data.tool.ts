@@ -73,8 +73,9 @@ export class MasterDataTool {
             type: z.enum(['brand', 'category', 'note', 'family', 'attribute']),
         }),
         execute: async ({ keyword, type }) => {
-            this.logger.log(`[normalizeKeyword] keyword: \${keyword}, type: \${type}`);
+            this.logger.log(`[normalizeKeyword] keyword: ${keyword}, type: ${type}`);
             const results = await this.masterDataService.fuzzySearch(keyword, type);
+            this.logger.log(`[normalizeKeyword] Found ${results.length} matching items.`);
             return encodeToolOutput(results);
         }
     });

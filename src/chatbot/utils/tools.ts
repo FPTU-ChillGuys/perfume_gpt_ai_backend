@@ -42,7 +42,7 @@ export class Tools {
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
       addCartItems: this.orderTool.addCartItems,
       getOwnProfile: this.profileTool.getOwnProfile,
-      productDetailTabContent: this.productTool.productDetailTabContent,
+      getStaticProductPolicy: this.productTool.getStaticProductPolicy,
       getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId
     };
 

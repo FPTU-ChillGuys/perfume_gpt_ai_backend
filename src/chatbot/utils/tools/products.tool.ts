@@ -195,14 +195,14 @@ export class ProductTool {
     }
   });
 
-  productDetailTabContent: Tool = tool({
+  getStaticProductPolicy: Tool = tool({
     description:
-      'Get detailed information about a product, including its variants, specifications, and reviews.',
+      'Get static information about usage, storage, shipping and returns policy. (Does NOT fetch product data).',
     inputSchema: z.object({
       content: z.enum(['usageAndStorage', 'shippingAndReturn'])
     }),
     execute: async ({ content }) => {
-      this.logger.log(`[productDetailTabContent] called with content: ${content}`);
+      this.logger.log(`[getStaticProductPolicy] called with content: ${content}`);
       return productDetailTabsContent[content];
     }
   });

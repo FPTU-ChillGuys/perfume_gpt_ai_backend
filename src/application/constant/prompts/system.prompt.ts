@@ -42,12 +42,22 @@ Bạn sẽ nhận được một đối tượng JSON gồm:
 1. **Duy trì ngữ cảnh (Contextual Persistence)**: 
    - Nếu \`currentMessage\` thiếu thông tin (vd: "Tìm loại khác", "Rẻ hơn tí"), hãy dựa vào \`previousMessages\` để biết họ đang tìm gì (vd: nước hoa nam, thương hiệu Chanel).
 2. Xác định Intent: Search, Consult, Compare, Greeting, Chat.
-3. Trích xuất Logic DNF (logic field):
+3. **Trích xuất Logic DNF (logic field)**:
    - Mảng các nhóm điều kiện (OR). Mỗi nhóm là AND (string hoặc array).
-   - **Dịch thuật song song (Translation & DB Mapping)**: Database sử dụng tiếng Anh cho Category và Gender. Hãy luôn đính kèm bản dịch tương ứng trong 'logic':
+   - **QUY TẮC CỐT LÕI (IMPORTANT)**: 
+     * CHỈ đưa vào \`logic\` các từ khóa đã được xác nhận (Brand, Category, Note, Family, Attribute) thông qua tool \`searchMasterData\`.
+     * TUYỆT ĐỐI KHÔNG đưa các từ khóa chung chung như "nước hoa", "perfume", "dầu thơm" vào \`logic\`.
+     * TUYỆT ĐỐI KHÔNG đưa các chuỗi so sánh giá (vd: "price<1M", "dưới 500k") vào \`logic\`. Các thông tin này PHẢI được xử lý qua field \`budget\`.
+   - **Dịch thuật song song (Translation & DB Mapping)**: Database sử dụng tiếng Anh cho Category và Gender. Hãy luôn đính kèm bản dịch tương ứng trong \`logic\`:
      * Nam -> ["Nam", "Men", "For Men"]
      * Nữ -> ["Nữ", "Women", "For Women"]
      * Unisex -> ["Unisex"]
+
+4. **Trích xuất Ngân sách (budget field)**:
+   - Nếu người dùng nhắc đến giá (vd: "dưới 1 triệu", "khoảng 500k-1tr", "trên 2 triệu"):
+     * Trích xuất con số chính xác vào \`min\` và \`max\`.
+     * Ví dụ: "dưới 1 triệu" -> \`budget: { max: 1000000 }\`.
+     * Ví dụ: "khoảng 500k đến 1tr5" -> \`budget: { min: 500000, max: 1500000 }\`.
      * Ví dụ: Nếu khách tìm "nước hoa nam", logic nên có: ["For Men", "Men", "Nam"].
 4. Trích xuất Tên Sản Phẩm (productNames field): Trích xuất tên perfume cụ thể.
 5. Sorting & Budget: Trích xuất tiêu chí sắp xếp và khoảng giá.

@@ -587,9 +587,20 @@ export class ProductService {
         Name: { contains: name }
       }));
 
-      // Build OR conditions (Outer array)
-      const orConditions: Prisma.ProductsWhereInput[] = (logic || []).map((group: any) => {
+      // Purity check: Filter out generic or price-related keywords that AI might have leaked into 'logic'
+      const purifiedLogic = (logic || []).map((group: any) => {
         const andItems = Array.isArray(group) ? group : [group];
+        const filtered = andItems.filter((item: string) => {
+          const lower = item.toLowerCase();
+          return !['nước hoa', 'perfume', 'dầu thơm', 'price', 'budget', 'gian hàng', 'giá'].includes(lower) &&
+            !lower.includes('price<') && !lower.includes('price>');
+        });
+        return filtered.length > 0 ? filtered : null;
+      }).filter(group => group !== null);
+
+      // Build OR conditions (Outer array)
+      const orConditions: Prisma.ProductsWhereInput[] = purifiedLogic.map((group: any) => {
+        const andItems = group;
 
         // Build AND conditions (Inner array/group)
         const andConditions: Prisma.ProductsWhereInput[] = andItems.map((item: string) => {

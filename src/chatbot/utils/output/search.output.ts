@@ -6,10 +6,11 @@ export const searchOutput = {
   schema: z.object({
     message: z.string(),
     products: z.array(productCardOutputItemSchema).optional(),
-    productTemp: z.object({
-      ids: z.array(z.string()),
-      names: z.array(z.string()).optional()
-    }).optional().describe('Danh sách productId và tên sản phẩm tạm thời để hệ thống tự động hydrate')
+    productTemp: z.array(z.object({
+      id: z.string(),
+      name: z.string().optional(),
+      variants: z.array(z.object({ id: z.string(), price: z.number() })).optional()
+    })).optional().describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
   })
 };
 
@@ -17,10 +18,11 @@ export const conversationOutput = {
   schema: z.object({
     message: z.string(),
     products: z.array(productCardOutputItemSchema).optional(),
-    productTemp: z.object({
-      ids: z.array(z.string()),
-      names: z.array(z.string()).optional()
-    }).optional().describe('Danh sách productId và tên sản phẩm tạm thời để hệ thống tự động hydrate'),
+    productTemp: z.array(z.object({
+      id: z.string(),
+      name: z.string().optional(),
+      variants: z.array(z.object({ id: z.string(), price: z.number() })).optional()
+    })).optional().describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate'),
     suggestedQuestions: z.array(z.string()).describe('Gợi ý 3-4 câu hỏi tiếp theo cho người dùng dựa trên ngữ cảnh hội thoại')
   })
 };
@@ -28,10 +30,11 @@ export const conversationOutput = {
 export const trendOutput = {
   schema: z.object({
     products: z.array(productCardOutputItemSchema).optional(),
-    productTemp: z.object({
-      ids: z.array(z.string()),
-      names: z.array(z.string()).optional()
-    }).optional().describe('Danh sách productId và tên sản phẩm tạm thời để hệ thống tự động hydrate')
+    productTemp: z.array(z.object({
+      id: z.string(),
+      name: z.string().optional(),
+      variants: z.array(z.object({ id: z.string(), price: z.number() })).optional()
+    })).optional().describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
   })
 };
 

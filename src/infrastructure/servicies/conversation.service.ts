@@ -260,21 +260,45 @@ export class ConversationService {
     let finalMessageData = message.data || '';
     if (message.success && finalMessageData) {
       try {
-        const data = typeof finalMessageData === 'string' ? JSON.parse(finalMessageData) : finalMessageData;
+        const aiResponse = typeof finalMessageData === 'string' ? JSON.parse(finalMessageData) : finalMessageData;
 
         // Ensure products array is always present for frontend
-        if (!data.products) data.products = [];
+        if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
+          const productTemp = aiResponse.productTemp as any[];
+          const ids = productTemp.map(item => item.id).filter(id => !!id);
 
-        if (data.productTemp?.ids?.length > 0) {
-          const hydratedProducts = await this.productService.getProductsByIdsForOutput(data.productTemp.ids);
-          if (hydratedProducts.success && hydratedProducts.data) {
-            // When IDs are present, we use the hydrated products directly.
-            // Hydrated products from the database already contain the correct names.
-            data.products = hydratedProducts.data;
+          if (ids.length > 0) {
+            const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+            if (productResponse.success && productResponse.data) {
+              let hydratedProducts = productResponse.data;
+
+              // Map recommendations by product ID for efficient filtering
+              const recommendationsMap = new Map<string, string[]>();
+              productTemp.forEach(item => {
+                if (item.id && item.variants && Array.isArray(item.variants)) {
+                  recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
+                }
+              });
+
+              // Apply per-product variant filtering
+              hydratedProducts = hydratedProducts.map(product => {
+                const recommendedVariantIds = recommendationsMap.get(product.id);
+                if (recommendedVariantIds && recommendedVariantIds.length > 0) {
+                  const variantIdsSet = new Set(recommendedVariantIds);
+                  return {
+                    ...product,
+                    variants: (product.variants || []).filter(v => variantIdsSet.has(v.id))
+                  };
+                }
+                return product;
+              }).filter(product => product.variants && product.variants.length > 0);
+
+              aiResponse.products = hydratedProducts;
+            }
           }
         }
 
-        finalMessageData = JSON.stringify(data);
+        finalMessageData = JSON.stringify(aiResponse);
       } catch (e) {
         this.logger.error('Failed to hydrate products from productTemp', e);
       }

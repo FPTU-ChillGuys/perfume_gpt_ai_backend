@@ -4,7 +4,7 @@ import { deepSeek3_2, geminiFlash2_5, geminiFlash3, geminiFlash3_1, gemma3nE4bIt
 
 export const embeddingModel: EmbeddingModel = openai.embedding('text-embedding-3-small');
 
-export const aiModel = ministral_8b_2512;
+export const aiModel = geminiFlash2_5;
 
 export const aiModelForSurvey = gpt5_4nano;
 

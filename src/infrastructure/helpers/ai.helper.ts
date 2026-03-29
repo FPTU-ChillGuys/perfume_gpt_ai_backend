@@ -176,9 +176,16 @@ export class AIHelper {
           const lastUserMessage = [...finalMessages].reverse().find(m => m.role === 'user');
           if (lastUserMessage) {
             const messageText = lastUserMessage.parts.find(p => p.type === 'text')?.text || '';
-            this.logger.debug(`[AIHelper] Analyzing message: "${messageText.substring(0, 50)}..."`);
 
-            const analysis = await this.analysisService.analyze(messageText);
+            // Extract previous messages as context (excluding the last one)
+            const previousMessages = messages
+              .filter(m => m !== lastUserMessage)
+              .map(m => `${m.role}: ${m.parts.find(p => p.type === 'text')?.text || ''}`)
+              .join('\n');
+
+            this.logger.debug(`[AIHelper] Analyzing message with context. Current: "${messageText.substring(0, 50)}..."`);
+
+            const analysis = await this.analysisService.analyze(messageText, previousMessages);
             if (analysis) {
               this.logger.log(`[AIHelper] Injecting structured analysis using utility. Intent: ${analysis.intent}`);
               finalMessages = injectAnalysisToLastUserMessage(messages, analysis);

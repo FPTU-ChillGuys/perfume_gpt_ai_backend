@@ -578,9 +578,14 @@ export class ProductService {
     analysis: any // Should be AnalysisObject but keeping any for simplicity in import
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(async () => {
-      const { logic, sorting, budget, pagination } = analysis;
+      const { logic, sorting, budget, pagination, productNames } = analysis;
       const skip = ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 10);
       const take = pagination?.pageSize || 10;
+
+      // Build Name-specific conditions if productNames are provided
+      const nameConditions: Prisma.ProductsWhereInput[] = (productNames || []).map((name: string) => ({
+        Name: { contains: name }
+      }));
 
       // Build OR conditions (Outer array)
       const orConditions: Prisma.ProductsWhereInput[] = (logic || []).map((group: any) => {
@@ -607,6 +612,7 @@ export class ProductService {
       const where: Prisma.ProductsWhereInput = {
         IsDeleted: false,
         AND: [
+          nameConditions.length > 0 ? { OR: nameConditions } : {},
           orConditions.length > 0 ? { OR: orConditions } : {},
           budget ? {
             ProductVariants: {

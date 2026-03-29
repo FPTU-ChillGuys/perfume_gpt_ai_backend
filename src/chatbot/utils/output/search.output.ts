@@ -7,8 +7,9 @@ export const searchOutput = {
     message: z.string(),
     products: z.array(productCardOutputItemSchema).optional(),
     productTemp: z.object({
-      ids: z.array(z.string())
-    }).optional().describe('Danh sách productId tạm thời thu thập từ tool items để hệ thống tự động hydrate')
+      ids: z.array(z.string()),
+      names: z.array(z.string()).optional()
+    }).optional().describe('Danh sách productId và tên sản phẩm tạm thời để hệ thống tự động hydrate')
   })
 };
 
@@ -17,8 +18,9 @@ export const conversationOutput = {
     message: z.string(),
     products: z.array(productCardOutputItemSchema).optional(),
     productTemp: z.object({
-      ids: z.array(z.string())
-    }).optional().describe('Danh sách productId tạm thời thu thập từ tool items để hệ thống tự động hydrate'),
+      ids: z.array(z.string()),
+      names: z.array(z.string()).optional()
+    }).optional().describe('Danh sách productId và tên sản phẩm tạm thời để hệ thống tự động hydrate'),
     suggestedQuestions: z.array(z.string()).describe('Gợi ý 3-4 câu hỏi tiếp theo cho người dùng dựa trên ngữ cảnh hội thoại')
   })
 };
@@ -27,8 +29,9 @@ export const trendOutput = {
   schema: z.object({
     products: z.array(productCardOutputItemSchema).optional(),
     productTemp: z.object({
-      ids: z.array(z.string())
-    }).optional().describe('Danh sách productId tạm thời thu thập từ tool items để hệ thống tự động hydrate')
+      ids: z.array(z.string()),
+      names: z.array(z.string()).optional()
+    }).optional().describe('Danh sách productId và tên sản phẩm tạm thời để hệ thống tự động hydrate')
   })
 };
 

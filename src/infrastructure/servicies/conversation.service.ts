@@ -8,7 +8,7 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Output, UIMessage } from 'ai';
 import { conversationOutput, searchOutput } from 'src/chatbot/utils/output/search.output';
-import { ADVANCED_MATCHING_SYSTEM_PROMPT, conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
+import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
 import { addMessageToMessages, convertToMessages, overrideMessagesToConversation } from 'src/infrastructure/utils/message-helper';
 import { buildCombinedPromptV5 } from 'src/infrastructure/utils/prompt-builder';
 import { AIHelper } from '../helpers/ai.helper';
@@ -239,7 +239,7 @@ export class ConversationService {
     endpoint: string
   ): Promise<ConversationDto> {
     const systemPrompt = conversationSystemPrompt(
-      adminInstruction || ADVANCED_MATCHING_SYSTEM_PROMPT,
+      adminInstruction || '',
       combinedPrompt
     );
 
@@ -267,7 +267,9 @@ export class ConversationService {
 
         if (data.productTemp?.ids?.length > 0) {
           const hydratedProducts = await this.productService.getProductsByIdsForOutput(data.productTemp.ids);
-          if (hydratedProducts.success) {
+          if (hydratedProducts.success && hydratedProducts.data) {
+            // When IDs are present, we use the hydrated products directly.
+            // Hydrated products from the database already contain the correct names.
             data.products = hydratedProducts.data;
           }
         }

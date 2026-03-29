@@ -12,17 +12,22 @@ export class ConversationAnalysisService {
 
     constructor(private readonly tools: Tools) { }
 
-    async analyze(message: string): Promise<AnalysisObject | null> {
+    async analyze(currentMessage: string, previousMessages?: string): Promise<AnalysisObject | null> {
         try {
-            this.logger.log(`[ConversationAnalysis] Starting single message analysis... Message length: ${message?.length ?? 'undefined'}`);
-            if (!message) {
-                this.logger.warn('[ConversationAnalysis] Message is empty or undefined');
+            this.logger.log(`[ConversationAnalysis] Starting context-aware analysis...`);
+            if (!currentMessage) {
+                this.logger.warn('[ConversationAnalysis] Current message is empty or undefined');
                 return null;
             }
 
+            const input = JSON.stringify({
+                previousMessages: previousMessages || 'No previous context.',
+                currentMessage: currentMessage
+            });
+
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
-                message,
+                input,
                 CONVERSATION_ANALYSIS_SYSTEM_PROMPT,
                 this.tools.getToolsForAnalysis,
                 'Failed to analyze conversation intent',

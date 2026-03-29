@@ -35,15 +35,17 @@ export const llama4Scout: LanguageModel = openrouter("meta-llama/llama-4-scout")
 
 export const deepSeek3_2: LanguageModel = openrouter("deepseek/deepseek-v3.2");
 
-export const ministral_8b_2512 : LanguageModel = openrouter("mistralai/ministral-8b-2512");
+export const ministral_8b_2512: LanguageModel = openrouter("mistralai/ministral-8b-2512");
 
-export const ministral_14b_2512 : LanguageModel = openrouter("mistralai/ministral-14b-2512");
+export const ministral_14b_2512: LanguageModel = openrouter("mistralai/ministral-14b-2512");
 
-export const gemma_3n_4B : LanguageModel = openrouter("google/gemma-3n-e4b-it");
+export const gemma_3n_4B: LanguageModel = openrouter("google/gemma-3n-e4b-it");
 
-export const gpt5_4nano : LanguageModel = openrouter("openai/gpt-5.4-nano");
+export const gpt5_4nano: LanguageModel = openrouter("openai/gpt-5.4-nano");
 
-export const grok_4_1_fast : LanguageModel = openrouter("x-ai/grok-4.1-fast");
+export const grok_4_1_fast: LanguageModel = openrouter("x-ai/grok-4.1-fast");
 
-export const llama_3_1_8b_instruct : LanguageModel = openrouter("meta-llama/llama-3.1-8b-instruct")
+export const llama_3_1_8b_instruct: LanguageModel = openrouter("meta-llama/llama-3.1-8b-instruct")
+
+export const mistral_small_2603: LanguageModel = openrouter("mistralai/mistral-small-2603")
 

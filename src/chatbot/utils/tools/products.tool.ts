@@ -13,6 +13,15 @@ export class ProductTool {
 
   constructor(private readonly productService: ProductService) { }
 
+  private mapToMinimalProduct(product: any) {
+    return {
+      id: product.id,
+      name: product.name,
+      brandName: product.brandName,
+      categoryName: product.categoryName
+    };
+  }
+
   getAllProducts: Tool = tool({
     description: 'Get a list of all products available in the store. ' +
       'Large product lists are TOON-compressed to optimize token usage.',
@@ -42,17 +51,18 @@ export class ProductTool {
           }
 
           const items = response.data?.items || [];
+          const minimalItems = items.map(this.mapToMinimalProduct);
 
           // Encode large datasets to optimize token usage
-          if (items.length > 5) {
-            const encodingResult = encodeToolOutput(items);
+          if (minimalItems.length > 5) {
+            const encodingResult = encodeToolOutput(minimalItems);
             return {
               success: true,
               encodedData: encodingResult.encoded
             };
           }
 
-          return { success: true, data: items };
+          return { success: true, data: minimalItems };
         },
         'Error occurred while fetching products.',
         true
@@ -100,16 +110,18 @@ export class ProductTool {
             }
           }
 
+          const minimalResults = results.map(this.mapToMinimalProduct);
+
           // Encode large result sets to optimize token usage
-          if (results.length > 5) {
-            const encodingResult = encodeToolOutput(results);
+          if (minimalResults.length > 5) {
+            const encodingResult = encodeToolOutput(minimalResults);
             return {
               success: true,
               encodedData: encodingResult.encoded
             };
           }
 
-          return { success: true, data: results || [] };
+          return { success: true, data: minimalResults || [] };
         },
         'Error occurred while fetching products.',
         true
@@ -143,7 +155,7 @@ export class ProductTool {
             };
           }
 
-          return { success: true, data: response.data?.items || [] };
+          return { success: true, data: (response.data?.items || []).map(this.mapToMinimalProduct) };
         },
         'Error occurred while fetching newest products.',
         true
@@ -175,7 +187,7 @@ export class ProductTool {
             };
           }
 
-          return { success: true, data: response.data?.items || [] };
+          return { success: true, data: (response.data?.items || []).map(this.mapToMinimalProduct) };
         },
         'Error occurred while fetching best-selling products.',
         true
@@ -213,10 +225,36 @@ export class ProductTool {
       }).optional(),
     }),
     execute: async (analysis) => {
-      this.logger.log(`[queryProducts] Executing structured query...`);
+      this.logger.log(`[queryProducts] Executing structured query: ${JSON.stringify(analysis, null, 2)}`);
       const result = await this.productService.getProductsByStructuredQuery(analysis);
       this.logger.log(`[queryProducts] Found ${result.data?.items?.length} products.`);
-      return result.data;
+      const items = result.data?.items || [];
+      return {
+        ...result.data,
+        items: items.map(this.mapToMinimalProduct)
+      };
+    }
+  });
+
+  getProductDetail: Tool = tool({
+    description: 'Get full detailed information for specific products by their IDs. ' +
+      'Use this tool after finding candidate products to get their descriptions, scent notes, and variants.',
+    inputSchema: z.object({
+      productIds: z.array(z.string().uuid()).describe('Array of product IDs to fetch details for.')
+    }),
+    execute: async ({ productIds }) => {
+      this.logger.log(`[getProductDetail] called for ${productIds.length} products`);
+      return await funcHandlerAsync(
+        async () => {
+          const response = await this.productService.getProductsByIdsForOutput(productIds);
+          if (!response.success) {
+            return { success: false, error: 'Failed to fetch product details.' };
+          }
+          return { success: true, data: response.data };
+        },
+        'Error occurred while fetching product details.',
+        true
+      );
     }
   });
 }

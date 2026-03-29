@@ -5,6 +5,8 @@ export const analysisOutputSchema = z.object({
         .describe('The core intent of the user message.'),
     logic: z.array(z.union([z.string(), z.array(z.string())]))
         .describe('Disjunctive Normal Form (DNF) logic for product attributes. e.g. [["Chanel", "Nước hoa nữ"], "Dior"] means (Chanel AND Nước hoa nữ) OR Dior.'),
+    productNames: z.array(z.string()).optional()
+        .describe('Explicit list of product names mentioned by the user (e.g. ["Bleu de Chanel", "Sauvage"]).'),
     sorting: z.object({
         field: z.enum(['Price', 'Sales', 'Newest', 'Relevance', 'Name']).default('Relevance'),
         isDescending: z.boolean().default(true)

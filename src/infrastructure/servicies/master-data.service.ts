@@ -53,4 +53,15 @@ export class MasterDataService {
             take: 20,
         });
     }
+
+    async searchProducts(keyword: string) {
+        return this.prisma.products.findMany({
+            where: { Name: { contains: keyword } },
+            select: {
+                Id: true,
+                Name: true,
+            },
+            take: 10,
+        });
+    }
 }

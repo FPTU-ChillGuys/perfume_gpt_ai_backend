@@ -20,7 +20,7 @@ export class RestockReportEmailService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService
-  ) {}
+  ) { }
 
   private isCriticalStock(totalQuantity: number, lowStockThreshold: number): boolean {
     const criticalThreshold = Math.max(1, Math.floor(lowStockThreshold * 0.5));
@@ -169,7 +169,7 @@ export class RestockReportEmailService {
     };
   }
 
-  @Cron('0 0 8 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  // @Cron('0 0 8 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async runDailyCriticalRestockReport(): Promise<void> {
     this.logger.log('[DailyCriticalRestockReport] Cron job started');
     try {

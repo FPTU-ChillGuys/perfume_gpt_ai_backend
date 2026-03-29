@@ -544,9 +544,10 @@ export class ProductService {
         });
 
         const productMap = new Map(products.map((item) => [item.Id, item]));
-        const items: BestSellingProductResponse[] = pagedProductSales
-          .map(([productId, totalSoldQuantity]) => {
+        const items: BestSellingProductResponse[] = pagedProductIds
+          .map((productId) => {
             const product = productMap.get(productId);
+            const totalSoldQuantity = productSoldMap.get(productId) || 0;
             if (!product) {
               return null;
             }
@@ -570,6 +571,100 @@ export class ProductService {
         };
       },
       'Failed to fetch best selling products',
+      true
+    );
+  }
+
+  async getLeastSellingProducts(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
+    return await funcHandlerAsync(
+      async () => {
+        const skip = (request.PageNumber - 1) * request.PageSize;
+        const take = request.PageSize;
+
+        const groupedByVariant = await this.prisma.orderDetails.groupBy({
+          by: ['VariantId'],
+          _sum: { Quantity: true }
+        });
+
+        // For least selling, we also want to consider products that have NEVER been sold (Quantity = 0)
+        const allProducts = await this.prisma.products.findMany({
+          where: { IsDeleted: false },
+          select: { Id: true }
+        });
+
+        const productSoldMap = new Map<string, number>(allProducts.map(p => [p.Id, 0]));
+
+        if (groupedByVariant.length > 0) {
+          const variantIds = groupedByVariant.map((item) => item.VariantId);
+          const variants = await this.prisma.productVariants.findMany({
+            where: { Id: { in: variantIds }, IsDeleted: false, Products: { IsDeleted: false } },
+            select: { Id: true, ProductId: true }
+          });
+
+          const variantToProductMap = new Map(variants.map((item) => [item.Id, item.ProductId]));
+
+          for (const row of groupedByVariant) {
+            const productId = variantToProductMap.get(row.VariantId);
+            if (!productId) continue;
+            const soldQty = row._sum.Quantity ?? 0;
+            const current = productSoldMap.get(productId) ?? 0;
+            productSoldMap.set(productId, current + soldQty);
+          }
+        }
+
+        const sortedProductSales = Array.from(productSoldMap.entries()).sort(
+          (a, b) => a[1] - b[1] // Ascending order for least selling
+        );
+
+        const totalCount = sortedProductSales.length;
+        const pagedProductSales = sortedProductSales.slice(skip, skip + take);
+        const pagedProductIds = pagedProductSales.map(([productId]) => productId);
+
+        if (pagedProductIds.length === 0) {
+          return {
+            success: true,
+            data: new PagedResult<BestSellingProductResponse>({
+              items: [],
+              pageNumber: request.PageNumber,
+              pageSize: request.PageSize,
+              totalCount,
+              totalPages: 1
+            })
+          };
+        }
+
+        const products = await this.prisma.products.findMany({
+          where: { Id: { in: pagedProductIds }, IsDeleted: false },
+          include: productWithVariantsInclude
+        });
+
+        const productMap = new Map(products.map((item) => [item.Id, item]));
+        const items: BestSellingProductResponse[] = pagedProductIds
+          .map((productId) => {
+            const product = productMap.get(productId);
+            const totalSoldQuantity = productSoldMap.get(productId) || 0;
+            if (!product) return null;
+            return {
+              product: mapProductWithVariants(product),
+              totalSoldQuantity
+            };
+          })
+          .filter((item): item is BestSellingProductResponse => item !== null);
+
+        return {
+          success: true,
+          data: new PagedResult<BestSellingProductResponse>({
+            items,
+            pageNumber: request.PageNumber,
+            pageSize: request.PageSize,
+            totalCount,
+            totalPages: Math.ceil(totalCount / request.PageSize)
+          })
+        };
+      },
+      'Failed to fetch least selling products',
       true
     );
   }

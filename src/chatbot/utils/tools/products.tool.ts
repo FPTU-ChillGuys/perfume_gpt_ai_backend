@@ -197,6 +197,39 @@ export class ProductTool {
     }
   });
 
+  getLeastSellingProducts: Tool = tool({
+    description: 'Get the least-selling products (including those with zero sales). Results are TOON-encoded.',
+    inputSchema: z.object({
+      pageNumber: z.number().min(1).optional().default(1),
+      pageSize: z.number().min(1).max(100).optional().default(10)
+    }),
+    execute: async (input) => {
+      this.logger.log(`[getLeastSellingProducts] called`);
+      return await funcHandlerAsync(
+        async () => {
+          const response = await this.productService.getLeastSellingProducts({
+            PageNumber: input.pageNumber,
+            PageSize: input.pageSize,
+            SortOrder: 'asc',
+            IsDescending: false
+          });
+
+          if (!response.success) {
+            return {
+              success: false,
+              error: 'Failed to fetch least-selling products.'
+            };
+          }
+
+          const items = (response.data?.items || []).map(this.mapToMinimalProduct);
+          return { success: true, ...encodeToolOutput(items) };
+        },
+        'Error occurred while fetching least-selling products.',
+        true
+      );
+    }
+  });
+
   getStaticProductPolicy: Tool = tool({
     description:
       'Get static information about usage, storage, shipping and returns policy. (Does NOT fetch product data).',

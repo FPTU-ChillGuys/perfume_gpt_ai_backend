@@ -35,8 +35,9 @@ export class Tools {
       // getAllProducts: this.productTool.getAllProducts,
       // searchProduct: this.productTool.searchProduct,
       // queryProducts: this.productTool.queryProducts,
-      // getNewestProducts: this.productTool.getNewestProducts,
-      // getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getLeastSellingProducts: this.productTool.getLeastSellingProducts,
       // // Order tools
       // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,

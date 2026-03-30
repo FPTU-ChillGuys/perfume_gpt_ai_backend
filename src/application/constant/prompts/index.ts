@@ -8,6 +8,7 @@ export {
   SYSTEM_PROMPT,
   PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
   CONVERSATION_ANALYSIS_SYSTEM_PROMPT,
+  SURVEY_ANALYSIS_SYSTEM_PROMPT,
 } from './system.prompt';
 
 // Controller prompts
@@ -23,7 +24,10 @@ export {
   orderSummaryPrompt,
   inventoryReportPrompt,
   recommendationReportPrompt,
-  recommendationSummaryPrompt
+  recommendationSummaryPrompt,
+  surveyContextPrompt,
+  surveyProductContextPrompt,
+  surveyRecommendationSystemPrompt
 } from './controller.prompt';
 
 // Service prompts

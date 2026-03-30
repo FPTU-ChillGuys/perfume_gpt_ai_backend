@@ -2,9 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Output } from 'ai';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
-import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
+import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, SURVEY_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { Tools } from 'src/chatbot/tools';
 import { analysisOutput, AnalysisObject } from 'src/chatbot/output/analysis.output';
+import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 
 @Injectable()
 export class AiAnalysisService {
@@ -46,6 +47,41 @@ export class AiAnalysisService {
             return analysis;
         } catch (error) {
             this.logger.error('[AiAnalysis] Analysis failed', error);
+            return null;
+        }
+    }
+
+    async analyzeSurvey(quesAnses: Array<{ question: string; answer: string }>): Promise<AnalysisObject | null> {
+        try {
+            this.logger.log(`[AiAnalysis] Analyzing survey Q&A...`);
+            if (!quesAnses || quesAnses.length === 0) {
+                this.logger.warn('[AiAnalysis] Survey Q&A is empty');
+                return null;
+            }
+
+            const input = encodeToolOutput(quesAnses).encoded;
+
+            const result = await textGenerationFromPromptToResultWithErrorHandler(
+                aiModelForOptimizePrompt,
+                input,
+                SURVEY_ANALYSIS_SYSTEM_PROMPT,
+                this.tools.getToolsForAnalysis,
+                'Failed to analyze survey intent',
+                10,
+                Output.object(analysisOutput),
+                0.2 // Slightly lower temperature for survey consistency
+            );
+
+            if (!result) {
+                this.logger.warn('[AiAnalysis] Survey analysis returned null');
+                return null;
+            }
+
+            const analysis = JSON.parse(result) as AnalysisObject;
+            this.logger.log(`[AiAnalysis] Survey analysis completed. Explanation: ${analysis.explanation}`);
+            return analysis;
+        } catch (error) {
+            this.logger.error('[AiAnalysis] Survey analysis failed', error);
             return null;
         }
     }

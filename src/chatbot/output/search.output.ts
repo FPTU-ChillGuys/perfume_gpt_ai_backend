@@ -26,9 +26,18 @@ export const trendOutput = {
   }).describe('Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
 };
 
+export const surveyOutput = {
+  schema: z.object({
+    message: z.string().describe('Thông điệp tư vấn cá nhân hóa gửi cho người dùng dựa trên kết quả khảo sát (Tiếng Việt)'),
+    products: z.array(productCardOutputItemSchema).nullable(),
+    productTemp: z.array(productTempItemSchema).nullable()
+  }).describe('Kết quả tư vấn khảo sát dựa trên phân tích sở thích người dùng')
+};
+
 export const searchOutputSchema = searchOutput.schema;
 export const conversationOutputSchema = conversationOutput.schema;
 export const trendOutputSchema = trendOutput.schema;
+export const surveyOutputSchema = surveyOutput.schema;
 
 export const convertProductCardOutputToProducts = (output: unknown): ProductCardOutputItem[] => {
   try {

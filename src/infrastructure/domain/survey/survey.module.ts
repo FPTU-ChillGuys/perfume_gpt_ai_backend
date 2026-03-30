@@ -8,12 +8,15 @@ import { AdminInstructionModule } from 'src/infrastructure/domain/admin-instruct
 import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.module';
 import { QueueName } from 'src/application/constant/processor';
 
+import { ProductModule } from 'src/infrastructure/domain/product/product.module';
+
 @Module({
   imports: [
     UnitOfWorkModule,
     AIModule,
     AdminInstructionModule,
     UserLogModule,
+    ProductModule,
     BullModule.registerQueue({ name: QueueName.SURVEY_QUEUE })
   ],
   providers: [SurveyService, SurveyQuestionRepository],

@@ -107,7 +107,26 @@ export const recommendationReportPrompt = (reportPrompt: string): string =>
 export const recommendationSummaryPrompt = (summaryReportPrompt: string): string =>
   `[DỮ LIỆU TÓM TẮT HÀNH VI NGƯỜI DÙNG]\n${summaryReportPrompt}`;
 
+
+// ==================== Survey Prompts ====================
+
 /**
- * Pass-through: trả về chính prompt đã được build sẵn từ prompt-builder.
+ * Cung cấp context: dữ liệu câu hỏi và câu trả lời Survey.
  */
-export const adminTokenPrompt = (prompt: string): string => `${prompt}`;
+export const surveyContextPrompt = (surveyData: string): string =>
+  `[NGỮ CẢNH KHẢO SÁT NGƯỜI DÙNG - CÂU HỎI VÀ TRẢ LỜI]\n${surveyData}`;
+
+/**
+ * Cung cấp context: danh sách sản phẩm tiềm năng (TOON format) để AI chọn lọc.
+ */
+export const surveyProductContextPrompt = (toonProducts: string): string =>
+  `[DANH SÁCH SẢN PHẨM TIỀM NĂNG - TOON FORMAT]\n${toonProducts}`;
+
+/**
+ * Kết hợp thông tin survey với danh sách sản phẩm tiềm năng.
+ */
+export const surveyRecommendationSystemPrompt = (
+  systemPrompt: string,
+  surveyContext: string,
+  productContext: string
+): string => `${systemPrompt}\n${surveyContext}\n${productContext}`;

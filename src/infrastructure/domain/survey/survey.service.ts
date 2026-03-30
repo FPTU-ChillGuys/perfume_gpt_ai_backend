@@ -23,10 +23,13 @@ import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { AI_HELPER, AI_SURVEY_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
-import { surveyPrompt } from 'src/application/constant/prompts';
+import { surveyContextPrompt, surveyProductContextPrompt, surveyPrompt, surveyRecommendationSystemPrompt } from 'src/application/constant/prompts';
 import { SurveyQuestionAnswer } from 'src/domain/entities/survey-question-answer.entity';
 import { INSTRUCTION_TYPE_SURVEY } from 'src/application/constant/prompts/admin-instruction-types';
-import { conversationOutput, searchOutput } from 'src/chatbot/output/search.output';
+import { conversationOutput, searchOutput, surveyOutput } from 'src/chatbot/output/search.output';
+import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
+import { ProductService } from 'src/infrastructure/domain/product/product.service';
+import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 
 @Injectable()
 export class SurveyService {
@@ -35,7 +38,9 @@ export class SurveyService {
     @Inject(AI_SURVEY_HELPER) private readonly aiHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userLogService: UserLogService,
-    @InjectQueue(QueueName.SURVEY_QUEUE) private readonly surveyQueue: Queue
+    @InjectQueue(QueueName.SURVEY_QUEUE) private readonly surveyQueue: Queue,
+    private readonly productService: ProductService,
+    private readonly analysisService: AiAnalysisService
   ) { }
 
   async addSurveyQues(
@@ -318,7 +323,7 @@ export class SurveyService {
     return Ok(aiResponse.data);
   }
 
-  /** Xử lý survey qua BullMQ queue và trả về gợi ý AI */
+  /** Xử lý survey qua BullMQ queue và trả về gợi ý AI mang tính cá nhân hóa */
   async processSurveyV2AndGetAIResponse(
     userId: string,
     surveyAnswers: { questionId: string; answerId: string }[]
@@ -345,20 +350,92 @@ export class SurveyService {
       }
     }
 
-    const prompt = surveyPrompt(quesAnses);
-
+    // Phase 1: Thêm vào Queue để lưu record
     await this.surveyQueue.add(SurveyJobName.ADD_SURVEY_QUESTION_AND_ANSWER, { userId, details: surveyAnswers });
 
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
-    const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt, Output.object(conversationOutput));
+    // Phase 2: Phân tích Survey Q&A để trích xuất intent
+    const analysis = await this.analysisService.analyzeSurvey(quesAnses);
+    
+    let toonProducts = '';
+    
+    // Phase 3: Tìm kiếm sản phẩm dựa trên phân tích
+    if (analysis) {
+        const searchResponse = await this.productService.getProductsByStructuredQuery(analysis);
+        if (searchResponse.success && searchResponse.data) {
+            const candidates = searchResponse.data.items.slice(0, 15); // Lấy top 15 làm ứng viên
+            const minimalProducts = candidates.map(p => ({
+                id: p.id,
+                name: p.name,
+                brand: p.brandName,
+                category: p.categoryName,
+                description: p.description,
+                attributes: p.attributes.map(a => `${a.attribute}: ${a.value}`),
+                scentNotes: p.scentNotes,
+                olfactoryFamilies: p.olfactoryFamilies,
+                variants: p.variants.map(v => ({ id: v.id, volume: v.volumeMl, price: v.basePrice }))
+            }));
+            toonProducts = encodeToolOutput(minimalProducts).encoded;
+        }
+    }
 
-    if (!aiResponse.success) {
+    // Phase 4: AI Recommendation
+    const adminInstruction = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
+    
+    const surveyCtx = surveyContextPrompt(JSON.stringify(quesAnses));
+    const productCtx = surveyProductContextPrompt(toonProducts || 'Không tìm thấy sản phẩm phù hợp trong database.');
+    
+    const combinedSystemPrompt = surveyRecommendationSystemPrompt(
+        adminInstruction || '',
+        surveyCtx,
+        productCtx
+    );
+
+    const aiResponsePayload = await this.aiHelper.textGenerateFromPrompt(
+        'Dựa trên kết quả khảo sát và danh sách sản phẩm tiềm năng, hãy đưa ra tư vấn cá nhân hóa và chọn 5 sản phẩm tốt nhất.',
+        combinedSystemPrompt,
+        Output.object(surveyOutput)
+    );
+
+    if (!aiResponsePayload.success || !aiResponsePayload.data) {
       throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI response',
+        'Failed to get structured AI response for survey',
         { userId, service: 'AIHelper' }
       );
     }
 
-    return Ok(aiResponse.data);
+    const aiResponse = typeof aiResponsePayload.data === 'string' 
+        ? JSON.parse(aiResponsePayload.data) 
+        : aiResponsePayload.data;
+
+    // Phase 5: Hydrate sản phẩm (Nếu AI trả về productTemp)
+    if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
+        const ids = aiResponse.productTemp.map((item: any) => item.id).filter((id: string) => !!id).slice(0, 5);
+        if (ids.length > 0) {
+            const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+            if (productResponse.success && productResponse.data) {
+                const hydratedProducts = productResponse.data;
+                const recommendationsMap = new Map<string, string[]>();
+                aiResponse.productTemp.forEach((item: any) => {
+                    if (item.id && item.variants && Array.isArray(item.variants)) {
+                        recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
+                    }
+                });
+
+                aiResponse.products = hydratedProducts.map(product => {
+                    const recommendedVariantIds = recommendationsMap.get(product.id);
+                    if (recommendedVariantIds && recommendedVariantIds.length > 0) {
+                        const variantIdsSet = new Set(recommendedVariantIds);
+                        return {
+                            ...product,
+                            variants: (product.variants || []).filter(v => variantIdsSet.has(v.id))
+                        };
+                    }
+                    return product;
+                }).filter(product => product.variants && product.variants.length > 0);
+            }
+        }
+    }
+
+    return Ok(JSON.stringify(aiResponse));
   }
 }

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { ToolSet } from 'ai';
 import { ProductTool } from './tools/products.tool';
 import { OrderTool } from './tools/orders.tool';
@@ -10,7 +11,7 @@ import { InventoryTool } from './tools/inventory.tool';
 import { MasterDataTool } from './tools/master-data.tool';
 
 @Injectable()
-export class Tools {
+export class Tools implements OnModuleInit {
   getTools: ToolSet;
   getToolsForChatbot: ToolSet;
   getToolsForTrend: ToolSet;
@@ -21,25 +22,35 @@ export class Tools {
   getToolsForInventoryReport: ToolSet;
   getToolsForReview: ToolSet;
 
-  constructor(
-    private readonly productTool: ProductTool,
-    private readonly orderTool: OrderTool,
-    private readonly profileTool: ProfileTool,
-    private readonly logTool: LogTool,
-    private readonly reviewTool: ReviewTool,
-    private readonly userTool: UserTool,
-    private readonly inventoryTool: InventoryTool,
-    private readonly masterDataTool: MasterDataTool
-  ) {
+  private productTool: ProductTool;
+  private orderTool: OrderTool;
+  private profileTool: ProfileTool;
+  private logTool: LogTool;
+  private reviewTool: ReviewTool;
+  private userTool: UserTool;
+  private inventoryTool: InventoryTool;
+  private masterDataTool: MasterDataTool;
+
+  constructor(private readonly moduleRef: ModuleRef) { }
+
+  onModuleInit() {
+    this.productTool = this.moduleRef.get(ProductTool, { strict: false });
+    this.orderTool = this.moduleRef.get(OrderTool, { strict: false });
+    this.profileTool = this.moduleRef.get(ProfileTool, { strict: false });
+    this.logTool = this.moduleRef.get(LogTool, { strict: false });
+    this.reviewTool = this.moduleRef.get(ReviewTool, { strict: false });
+    this.userTool = this.moduleRef.get(UserTool, { strict: false });
+    this.inventoryTool = this.moduleRef.get(InventoryTool, { strict: false });
+    this.masterDataTool = this.moduleRef.get(MasterDataTool, { strict: false });
+
+    this.initializeToolSets();
+  }
+
+  private initializeToolSets() {
     this.getToolsForChatbot = {
-      // getAllProducts: this.productTool.getAllProducts,
-      // searchProduct: this.productTool.searchProduct,
-      // queryProducts: this.productTool.queryProducts,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
       getLeastSellingProducts: this.productTool.getLeastSellingProducts,
-      // // Order tools
-      // getAllOrders: this.orderTool.getAllOrders,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
       addCartItems: this.orderTool.addCartItems,
       getOwnProfile: this.profileTool.getOwnProfile,
@@ -92,7 +103,6 @@ export class Tools {
       getOrderDetailsWithOrdersByUserId:
         this.orderTool.getOrderDetailsWithOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
-      // getUserById: this.profileTool.getUserById,
       getUserLogSummary: this.logTool.getUserLogSummary,
       getUserById: this.userTool.getUserById
     };

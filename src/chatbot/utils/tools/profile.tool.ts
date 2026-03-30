@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { ProfileResponse } from 'src/application/dtos/response/profile.response';
-import { ProfileService } from 'src/infrastructure/servicies/profile.service';
-import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { ProfileService } from 'src/infrastructure/domain/profile/profile.service';
+import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import * as z from 'zod';
 
 @Injectable()

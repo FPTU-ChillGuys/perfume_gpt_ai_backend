@@ -1,4 +1,4 @@
-import { ReviewSummaryLogRepository } from 'src/infrastructure/repositories/review-summary.repository';
+import { ReviewSummaryLogRepository } from 'src/infrastructure/domain/repositories/review-summary.repository';
 import { Sentiment } from '../enum/sentiment.enum';
 import { Common } from './common/common.entities';
 import { Entity, Enum, Property } from '@mikro-orm/core';

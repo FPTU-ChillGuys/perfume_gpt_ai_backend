@@ -27,7 +27,7 @@ export const createMockUserLogService = () => ({
   createUserLogIfNotExist: jest.fn(),
   addUserSearch: jest.fn(),
   addSearchLogToUserLog: jest.fn(),
-  addQuizQuesAnsDetailToUserLog: jest.fn(),
+  addSurveyQuesAnsDetailToUserLog: jest.fn(),
   saveUserLogSummary: jest.fn(),
   getUserLogSummariesByUserId: jest.fn(),
   getUserLogSummaryReportByUserId: jest.fn(),
@@ -57,18 +57,18 @@ export const createMockReviewService = () => ({
   getReviewStatisticByVariantId: jest.fn(),
 });
 
-// ──────────── QuizService ────────────
+// ──────────── SurveyService ────────────
 export const createMockQuizService = () => ({
-  addQuizQues: jest.fn(),
+  addSurveyQues: jest.fn(),
   updateAnswer: jest.fn(),
-  getQuizQuesById: jest.fn(),
-  getQuizQuesByIdList: jest.fn(),
-  getAllQuizQues: jest.fn(),
-  addQuizQuesAnws: jest.fn(),
+  getSurveyQuesById: jest.fn(),
+  getSurveyQuesByIdList: jest.fn(),
+  getAllSurveyQues: jest.fn(),
+  addSurveyQuesAnws: jest.fn(),
   getAllQuizQuesAnws: jest.fn(),
   getQuizQuesAnwsById: jest.fn(),
-  getQuizQuesAnwsByUserId: jest.fn(),
-  checkExistQuizQuesAnwsByUserId: jest.fn(),
+  getSurveyQuesAnwsByUserId: jest.fn(),
+  checkExistSurveyQuesAnwsByUserId: jest.fn(),
   mappingFromRequestToEntity: jest.fn(),
 });
 

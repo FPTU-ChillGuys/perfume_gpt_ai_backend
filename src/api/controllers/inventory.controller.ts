@@ -27,7 +27,7 @@ import {
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
-import { CACHE_TTL_1HOUR } from 'src/infrastructure/cacheable/cacheable.constants';
+import { CACHE_TTL_1HOUR } from 'src/infrastructure/domain/common/cacheable/cacheable.constants';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
@@ -35,8 +35,8 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
-import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
-import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
+import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import {
   AIInventoryReportStructuredResponse
 } from 'src/application/dtos/response/ai-structured.response';
@@ -46,7 +46,7 @@ import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
 import { add } from 'date-fns';
 import { VariantSalesAnalyticsResponse } from 'src/application/dtos/response/variant-sales-analytics.response';
-import { RestockService } from 'src/infrastructure/servicies/restock.service';
+import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 
 @Role(['admin'])
 @ApiTags('Inventory')

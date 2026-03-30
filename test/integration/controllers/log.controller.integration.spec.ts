@@ -1,9 +1,9 @@
 import { MikroORM } from '@mikro-orm/core';
 import { TestingModule } from '@nestjs/testing';
 import { LogController } from 'src/api/controllers/log.controller';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { AIService } from 'src/infrastructure/domain/ai/ai.service';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 import { v4 as uuidv4 } from 'uuid';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';

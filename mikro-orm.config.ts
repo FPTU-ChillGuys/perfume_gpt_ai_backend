@@ -3,7 +3,7 @@ import { Migrator } from '@mikro-orm/migrations';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { PostgreSqlOptions } from '@mikro-orm/postgresql/PostgreSqlMikroORM.js';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
-import { entities } from 'src/infrastructure/utils/entities';
+import { entities } from 'src/infrastructure/domain/utils/entities';
 
 const hostConfig = async () => {
   try {

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductController } from 'src/api/controllers/product.controller';
-import { ProductService } from 'src/infrastructure/servicies/product.service';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { ProductService } from 'src/infrastructure/domain/product/product.service';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { createMockProductService, createMockUserLogService } from '../../helpers/mock-factories';
 import { successResponseAPI, errorResponseAPI, createMockRequest } from '../../helpers/test-constants';
 

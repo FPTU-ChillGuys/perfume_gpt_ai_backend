@@ -2,8 +2,8 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { productDetailTabsContent } from 'src/application/constant/productDetailTabContent';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
-import { ProductService } from 'src/infrastructure/servicies/product.service';
-import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { ProductService } from 'src/infrastructure/domain/product/product.service';
+import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { encodeToolOutput } from '../toon-encoder.util';
 import * as z from 'zod';
 

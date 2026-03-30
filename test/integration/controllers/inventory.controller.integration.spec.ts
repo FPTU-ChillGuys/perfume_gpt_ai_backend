@@ -4,9 +4,9 @@ import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
 import { InventoryController } from 'src/api/controllers/inventory.controller';
-import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
+import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { AIService } from 'src/infrastructure/domain/ai/ai.service';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 import { Request } from 'express';
 

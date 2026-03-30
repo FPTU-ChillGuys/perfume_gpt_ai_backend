@@ -10,8 +10,8 @@ import {
 import { Public } from 'src/application/common/Metadata';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
-import { AIAcceptanceService } from 'src/infrastructure/servicies/ai-acceptance.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 
 @ApiTags('AI Acceptance')
 @Public()

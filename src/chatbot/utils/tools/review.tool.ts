@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
-import { ReviewService } from 'src/infrastructure/servicies/review.service';
-import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { ReviewService } from 'src/infrastructure/domain/review/review.service';
+import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { encodeToolOutput } from '../toon-encoder.util';
 import * as z from 'zod';
 

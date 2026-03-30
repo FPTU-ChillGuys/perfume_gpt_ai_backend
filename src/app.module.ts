@@ -4,7 +4,7 @@ import { AppService } from './app.service';
 import { AutomapperModule } from '@automapper/nestjs';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import defineConfig from '../mikro-orm.config';
-import { ProviderModule } from './infrastructure/modules/provider.module';
+import { ProviderModule } from './infrastructure/domain/common/provider.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthGuard } from './application/common/auth/AuthGuard';
@@ -18,7 +18,7 @@ import { EjsAdapter } from '@nestjs-modules/mailer/dist/adapters/ejs.adapter';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import * as path from 'path';
-import { SearchModule } from './infrastructure/modules/search.module';
+import { SearchModule } from 'src/infrastructure/domain/search/search.module';
 
 @Module({
   imports: [

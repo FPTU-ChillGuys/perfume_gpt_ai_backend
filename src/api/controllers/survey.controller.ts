@@ -23,8 +23,8 @@ import { SurveyQuesAnwsRequest } from 'src/application/dtos/request/survey-ques-
 import { SurveyQuestionRequest } from 'src/application/dtos/request/survey-question.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { SurveyQuestionResponse } from 'src/application/dtos/response/survey-question.response';
-import { SurveyService } from 'src/infrastructure/servicies/survey.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { SurveyService } from 'src/infrastructure/domain/survey/survey.service';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { SurveyQuestionAnswerResponse } from 'src/application/dtos/response/survey-question-answer.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';

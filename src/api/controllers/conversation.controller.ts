@@ -21,9 +21,9 @@ import {
 import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
-import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { getTokenPayloadFromRequest } from 'src/infrastructure/utils/extract-token';
+import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
+import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 
 @ApiTags('Conversation')
 @Controller('conversation')

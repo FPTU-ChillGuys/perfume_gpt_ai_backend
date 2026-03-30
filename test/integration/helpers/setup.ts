@@ -2,8 +2,8 @@ import { MikroORM } from '@mikro-orm/core';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { TestingModule, Test } from '@nestjs/testing';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { entities } from 'src/infrastructure/utils/entities';
-import { UnitOfWork } from 'src/infrastructure/repositories/unit-of-work';
+import { entities } from 'src/infrastructure/domain/utils/entities';
+import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import * as fs from 'fs';
 import * as path from 'path';
 

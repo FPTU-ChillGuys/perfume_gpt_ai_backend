@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { QuizController } from 'src/api/controllers/quiz.controller';
-import { QuizService } from 'src/infrastructure/servicies/quiz.service';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { SurveyController } from 'src/api/controllers/quiz.controller';
+import { SurveyService } from 'src/infrastructure/domain/survey/survey.service';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { AI_SERVICE } from 'src/infrastructure/domain/ai/ai.module';
 import {
   createMockQuizService,
   createMockUserLogService,
   createMockAIService,
   createMockAdminInstructionService,
 } from '../../helpers/mock-factories';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import {
   successResponse,
   errorResponse,
@@ -17,8 +17,8 @@ import {
   TEST_QUIZ_QUESTION_ID,
 } from '../../helpers/test-constants';
 
-describe('QuizController', () => {
-  let controller: QuizController;
+describe('SurveyController', () => {
+  let controller: SurveyController;
   let quizService: ReturnType<typeof createMockQuizService>;
   let logService: ReturnType<typeof createMockUserLogService>;
   let aiService: ReturnType<typeof createMockAIService>;
@@ -31,9 +31,9 @@ describe('QuizController', () => {
     adminInstructionService = createMockAdminInstructionService();
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [QuizController],
+      controllers: [SurveyController],
       providers: [
-        { provide: QuizService, useValue: quizService },
+        { provide: SurveyService, useValue: quizService },
         { provide: UserLogService, useValue: logService },
         { provide: AI_SERVICE, useValue: aiService },
         { provide: 'BullQueue_quiz', useValue: { add: jest.fn() } }, // Mock Queue if needed
@@ -41,7 +41,7 @@ describe('QuizController', () => {
       ],
     }).compile();
 
-    controller = module.get<QuizController>(QuizController);
+    controller = module.get<SurveyController>(SurveyController);
   });
 
   it('should be defined', () => {
@@ -55,7 +55,7 @@ describe('QuizController', () => {
         { id: '1', question: 'Bạn thích mùi hương nào?', answers: [] },
         { id: '2', question: 'Bạn dùng nước hoa vào dịp nào?', answers: [] },
       ];
-      quizService.getAllQuizQues.mockResolvedValue(successResponse(mockQuestions));
+      quizService.getAllSurveyQues.mockResolvedValue(successResponse(mockQuestions));
 
       const result = await controller.getAllQuizzes();
 
@@ -64,7 +64,7 @@ describe('QuizController', () => {
     });
 
     it('TC-FUNC-071: should return empty when no questions exist', async () => {
-      quizService.getAllQuizQues.mockResolvedValue(successResponse([]));
+      quizService.getAllSurveyQues.mockResolvedValue(successResponse([]));
 
       const result = await controller.getAllQuizzes();
 
@@ -80,16 +80,16 @@ describe('QuizController', () => {
         question: 'Bạn thích mùi gì?',
         answers: [{ answer: 'Floral' }, { answer: 'Woody' }],
       };
-      quizService.addQuizQues.mockResolvedValue(successResponse('quiz-q-new'));
+      quizService.addSurveyQues.mockResolvedValue(successResponse('quiz-q-new'));
 
       const result = await controller.createQuizQues(createRequest as any);
 
       expect(result.success).toBe(true);
-      expect(quizService.addQuizQues).toHaveBeenCalledWith(createRequest);
+      expect(quizService.addSurveyQues).toHaveBeenCalledWith(createRequest);
     });
 
     it('TC-VAL-070: should pass validation errors from service', async () => {
-      quizService.addQuizQues.mockResolvedValue(
+      quizService.addSurveyQues.mockResolvedValue(
         errorResponse('Question is required'),
       );
 
@@ -102,7 +102,7 @@ describe('QuizController', () => {
   // ────────── GET /quizzes/user/:userId/check-first-time ──────────
   describe('checkFirstTime', () => {
     it('TC-FUNC-073: should return true for first-time user', async () => {
-      quizService.checkExistQuizQuesAnwsByUserId.mockResolvedValue(false);
+      quizService.checkExistSurveyQuesAnwsByUserId.mockResolvedValue(false);
 
       const result = await controller.checkFirstTime(TEST_USER_ID);
 
@@ -111,7 +111,7 @@ describe('QuizController', () => {
     });
 
     it('TC-FUNC-074: should return false for returning user', async () => {
-      quizService.checkExistQuizQuesAnwsByUserId.mockResolvedValue(true);
+      quizService.checkExistSurveyQuesAnwsByUserId.mockResolvedValue(true);
 
       const result = await controller.checkFirstTime(TEST_USER_ID);
 
@@ -126,12 +126,12 @@ describe('QuizController', () => {
         { question: 'Q1?', answers: [{ answer: 'A1' }] },
         { question: 'Q2?', answers: [{ answer: 'A2' }] },
       ];
-      quizService.addQuizQues.mockResolvedValue(successResponse('id'));
+      quizService.addSurveyQues.mockResolvedValue(successResponse('id'));
 
       const result = await controller.createQuizQueses(questions as any);
 
       expect(result.success).toBe(true);
-      expect(quizService.addQuizQues).toHaveBeenCalledTimes(2);
+      expect(quizService.addSurveyQues).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -167,16 +167,16 @@ describe('QuizController', () => {
         { questionId: 'q1', answerId: 'a1' },
         { questionId: 'q2', answerId: 'a2' },
       ];
-      quizService.getQuizQuesByIdList.mockResolvedValue(
+      quizService.getSurveyQuesByIdList.mockResolvedValue(
         successResponse([
           { id: 'q1', question: 'Mùi hương?', answers: [{ id: 'a1', answer: 'Floral' }] },
           { id: 'q2', question: 'Dịp?', answers: [{ id: 'a2', answer: 'Hàng ngày' }] },
         ]),
       );
-      quizService.addQuizQuesAnws.mockResolvedValue(
+      quizService.addSurveyQuesAnws.mockResolvedValue(
         successResponse({ id: 'qqa-1' }),
       );
-      logService.addQuizQuesAnsDetailToUserLog.mockResolvedValue([]);
+      logService.addSurveyQuesAnsDetailToUserLog.mockResolvedValue([]);
       aiService.textGenerateFromPrompt.mockResolvedValue(
         successResponse('Gợi ý: Dior J\'adore phù hợp với bạn!'),
       );
@@ -188,11 +188,11 @@ describe('QuizController', () => {
     });
 
     it('TC-NEG-071: should handle empty quiz answers', async () => {
-      quizService.getQuizQuesByIdList.mockResolvedValue(successResponse([]));
-      quizService.addQuizQuesAnws.mockResolvedValue(
+      quizService.getSurveyQuesByIdList.mockResolvedValue(successResponse([]));
+      quizService.addSurveyQuesAnws.mockResolvedValue(
         successResponse({ id: 'qqa-empty' }),
       );
-      logService.addQuizQuesAnsDetailToUserLog.mockResolvedValue([]);
+      logService.addSurveyQuesAnsDetailToUserLog.mockResolvedValue([]);
       aiService.textGenerateFromPrompt.mockResolvedValue(
         successResponse('No quiz data available for recommendation'),
       );
@@ -203,15 +203,15 @@ describe('QuizController', () => {
     });
 
     it('TC-NEG-072: should handle AI failure during quiz processing', async () => {
-      quizService.getQuizQuesByIdList.mockResolvedValue(
+      quizService.getSurveyQuesByIdList.mockResolvedValue(
         successResponse([
           { id: 'q1', question: 'Q?', answers: [{ id: 'a1', answer: 'A' }] },
         ]),
       );
-      quizService.addQuizQuesAnws.mockResolvedValue(
+      quizService.addSurveyQuesAnws.mockResolvedValue(
         successResponse({ id: 'qqa-1' }),
       );
-      logService.addQuizQuesAnsDetailToUserLog.mockResolvedValue([]);
+      logService.addSurveyQuesAnsDetailToUserLog.mockResolvedValue([]);
       aiService.textGenerateFromPrompt.mockResolvedValue(
         errorResponse('AI timeout'),
       );

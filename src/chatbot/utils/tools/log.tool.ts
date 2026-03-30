@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import * as z from 'zod';
 

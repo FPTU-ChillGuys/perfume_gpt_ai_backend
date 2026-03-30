@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { UnitOfWork } from 'src/infrastructure/repositories/unit-of-work';
-import { RestockService } from 'src/infrastructure/servicies/restock.service';
-import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
+import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
+import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { encodeToolOutput } from '../toon-encoder.util';
 import * as z from 'zod';
 

@@ -1,21 +1,21 @@
 import { MikroORM } from '@mikro-orm/core';
 import { TestingModule } from '@nestjs/testing';
 import { getMapperToken } from '@automapper/nestjs';
-import { QuizController } from 'src/api/controllers/quiz.controller';
-import { QuizService } from 'src/infrastructure/servicies/quiz.service';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
-import { UnitOfWork } from 'src/infrastructure/repositories/unit-of-work';
+import { SurveyController } from 'src/api/controllers/quiz.controller';
+import { SurveyService } from 'src/infrastructure/domain/survey/survey.service';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { AIService } from 'src/infrastructure/domain/ai/ai.service';
+import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 import { v4 as uuidv4 } from 'uuid';
 import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 
-describe('QuizController (Integration)', () => {
+describe('SurveyController (Integration)', () => {
   let module: TestingModule;
   let orm: MikroORM;
-  let controller: QuizController;
-  let quizService: QuizService;
+  let controller: SurveyController;
+  let quizService: SurveyService;
   let userLogService: UserLogService;
   let unitOfWork: UnitOfWork;
 
@@ -36,15 +36,15 @@ describe('QuizController (Integration)', () => {
 
   beforeAll(async () => {
     module = await createIntegrationTestingModule([
-      QuizService,
+      SurveyService,
       UserLogService,
       { provide: getMapperToken(), useValue: {} },
     ]);
     orm = module.get(MikroORM);
-    quizService = module.get(QuizService);
+    quizService = module.get(SurveyService);
     userLogService = module.get(UserLogService);
     unitOfWork = module.get(UnitOfWork);
-    controller = new QuizController(
+    controller = new SurveyController(
       mockAIService,
       quizService,
       userLogService,
@@ -57,7 +57,7 @@ describe('QuizController (Integration)', () => {
     await clearDatabase(orm);
     // Also clear the repo's forked EntityManagers to prevent stale identity maps
     try {
-      (unitOfWork.AIQuizQuestionRepo as any).getEntityManager().clear();
+      (unitOfWork.AISurveyQuestionRepo as any).getEntityManager().clear();
     } catch { /* ignore if not available */ }
     jest.clearAllMocks();
   });
@@ -80,7 +80,7 @@ describe('QuizController (Integration)', () => {
     });
 
     it('should return quiz questions from database', async () => {
-      await quizService.addQuizQues({
+      await quizService.addSurveyQues({
         question: 'What scent do you prefer?',
         answers: [{ answer: 'Floral' }, { answer: 'Woody' }],
       });
@@ -136,7 +136,7 @@ describe('QuizController (Integration)', () => {
   // ────────── UPDATE ANSWER ──────────
   describe('updateQuizAnswer', () => {
     it('should update quiz answers via controller', async () => {
-      const created = await quizService.addQuizQues({
+      const created = await quizService.addSurveyQues({
         question: 'Q?',
         answers: [{ answer: 'Old Answer' }],
       });
@@ -159,15 +159,15 @@ describe('QuizController (Integration)', () => {
   describe('chatQuiz', () => {
     beforeEach(() => {
       // Mock fire-and-forget log methods to prevent DB side effects
-      // 1) Controller calls logService.addQuizQuesAnsDetailToUserLog
-      jest.spyOn(userLogService, 'addQuizQuesAnsDetailToUserLog').mockResolvedValue([]);
-      // 2) QuizService.addQuizQuesAnws internally calls UserLogRepo.addQuizQuesAnsDetailLogToUserLog (fire-and-forget)
-      jest.spyOn(unitOfWork.UserLogRepo, 'addQuizQuesAnsDetailLogToUserLog' as any).mockResolvedValue([]);
+      // 1) Controller calls logService.addSurveyQuesAnsDetailToUserLog
+      jest.spyOn(userLogService, 'addSurveyQuesAnsDetailToUserLog').mockResolvedValue([]);
+      // 2) SurveyService.addSurveyQuesAnws internally calls EventLogRepo.addQuizQuesAnsDetailLogToUserLog (fire-and-forget)
+      jest.spyOn(unitOfWork.EventLogRepo, 'addQuizQuesAnsDetailLogToUserLog' as any).mockResolvedValue([]);
     });
 
     it('should process quiz answers and return AI response', async () => {
       // Create question with answers
-      const created = await quizService.addQuizQues({
+      const created = await quizService.addSurveyQues({
         question: 'What scent?',
         answers: [{ answer: 'Floral' }, { answer: 'Woody' }],
       });
@@ -192,7 +192,7 @@ describe('QuizController (Integration)', () => {
     });
 
     it('should return error when AI fails', async () => {
-      const created = await quizService.addQuizQues({
+      const created = await quizService.addSurveyQues({
         question: 'Q?',
         answers: [{ answer: 'A' }],
       });

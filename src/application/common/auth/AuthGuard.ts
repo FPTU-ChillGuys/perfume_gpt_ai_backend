@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../Metadata';
 import { Reflector } from '@nestjs/core';
-import { extractTokenFromHeader } from 'src/infrastructure/utils/extract-token';
+import { extractTokenFromHeader } from 'src/infrastructure/domain/utils/extract-token';
 
 interface JwtPayload {
   sub: string;

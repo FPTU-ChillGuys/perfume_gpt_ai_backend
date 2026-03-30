@@ -1,6 +1,6 @@
 import { MikroORM } from '@mikro-orm/core';
 import { TestingModule } from '@nestjs/testing';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 
 describe('AdminInstructionService (Integration)', () => {

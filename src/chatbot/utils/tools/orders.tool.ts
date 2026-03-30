@@ -6,9 +6,9 @@ import {
   OrderListItemResponse,
   OrderResponse
 } from 'src/application/dtos/response/order.response';
-import { OrderService } from 'src/infrastructure/servicies/order.service';
-import { UserService } from 'src/infrastructure/servicies/user.service';
-import { funcHandlerAsync } from 'src/infrastructure/utils/error-handler';
+import { OrderService } from 'src/infrastructure/domain/order/order.service';
+import { UserService } from 'src/infrastructure/domain/user/user.service';
+import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { encodeToolOutput } from '../toon-encoder.util';
 import * as z from 'zod';
 

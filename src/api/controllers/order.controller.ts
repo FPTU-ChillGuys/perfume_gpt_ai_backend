@@ -26,11 +26,11 @@ import {
   orderSummaryPrompt,
   INSTRUCTION_TYPE_ORDER
 } from 'src/application/constant/prompts';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
-import { OrderService } from 'src/infrastructure/servicies/order.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { AI_SERVICE } from 'src/infrastructure/domain/ai/ai.module';
+import { AIService } from 'src/infrastructure/domain/ai/ai.service';
+import { OrderService } from 'src/infrastructure/domain/order/order.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 
 import {
   AIOrderSummaryStructuredResponse,
@@ -39,7 +39,7 @@ import {
 import {
   isDataEmpty,
   INSUFFICIENT_DATA_MESSAGES
-} from 'src/infrastructure/utils/insufficient-data';
+} from 'src/infrastructure/domain/utils/insufficient-data';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Role } from 'src/application/common/Metadata';

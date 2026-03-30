@@ -1,8 +1,8 @@
 import { MikroORM } from '@mikro-orm/core';
 import { TestingModule } from '@nestjs/testing';
 import { AIAcceptanceController } from 'src/api/controllers/ai-acceptance.controller';
-import { AIAcceptanceService } from 'src/infrastructure/servicies/ai-acceptance.service';
-import { UnitOfWork } from 'src/infrastructure/repositories/unit-of-work';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
+import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 import { v4 as uuidv4 } from 'uuid';
 

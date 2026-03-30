@@ -1,7 +1,7 @@
 import { Collection, Entity, Enum, OneToMany, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
 import { SurveyAnswer } from './survey-answer.entity';
-import { SurveyQuestionRepository } from 'src/infrastructure/repositories/survey-question.repository';
+import { SurveyQuestionRepository } from 'src/infrastructure/domain/repositories/survey-question.repository';
 import { SurveyQuestionAnswerDetail } from './survey-question-answer-detail.entity';
 import { ApiProperty } from '@nestjs/swagger';
 

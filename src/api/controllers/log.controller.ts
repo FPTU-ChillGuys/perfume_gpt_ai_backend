@@ -14,9 +14,9 @@ import {
 } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { UserLogAIService } from 'src/infrastructure/servicies/user-log-ai.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { UserLogAIService } from 'src/infrastructure/domain/user-log/user-log-ai.service';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';

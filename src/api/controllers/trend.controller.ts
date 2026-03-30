@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { AllUserLogRequest, AllUserLogWithForceRefreshRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { AITrendForecastStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
@@ -12,8 +12,8 @@ import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controlle
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
-import { CACHE_TTL_1WEEK } from 'src/infrastructure/cacheable/cacheable.constants';
-import { TrendService } from 'src/infrastructure/servicies/trend.service';
+import { CACHE_TTL_1WEEK } from 'src/infrastructure/domain/common/cacheable/cacheable.constants';
+import { TrendService } from 'src/infrastructure/domain/trend/trend.service';
 import { ProductCardResponse } from 'src/application/dtos/response/product-card.response';
 
 const cachingTrendTTL = CACHE_TTL_1WEEK;

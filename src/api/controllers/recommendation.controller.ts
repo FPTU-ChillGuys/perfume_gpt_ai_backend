@@ -6,9 +6,9 @@ import {
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { RecommendationService } from 'src/infrastructure/servicies/recommandation.service';
+import { RecommendationService } from 'src/infrastructure/domain/recommendation/recommandation.service';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')

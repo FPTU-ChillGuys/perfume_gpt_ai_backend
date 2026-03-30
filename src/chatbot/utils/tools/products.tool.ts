@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { productDetailTabsContent } from 'src/application/constant/productDetailTabContent';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
@@ -11,7 +11,7 @@ import * as z from 'zod';
 export class ProductTool {
   private readonly logger = new Logger(ProductTool.name);
 
-  constructor(private readonly productService: ProductService) { }
+  constructor(@Inject(forwardRef(() => ProductService)) private readonly productService: ProductService) { }
 
   private mapToMinimalProduct(product: any) {
     return {

@@ -176,7 +176,6 @@ export class ProductService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly httpService: HttpService,
     private readonly searchService: SearchService,
   ) { }
 

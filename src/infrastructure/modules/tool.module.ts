@@ -15,7 +15,7 @@ import { MasterDataTool } from 'src/chatbot/utils/tools/master-data.tool';
 import { SearchModule } from './search.module';
 
 @Module({
-  imports: [ProductModule, OrderModule, ProfileModule, UserLogModule, ReviewModule, UserModule, UnitOfWorkModule, RestockModule, SearchModule],
+  imports: [OrderModule, ProfileModule, UserLogModule, ReviewModule, UserModule, UnitOfWorkModule, RestockModule, SearchModule],
   providers: [Tools, ReviewTool, UserTool, InventoryTool, MasterDataTool],
   exports: [Tools]
 })

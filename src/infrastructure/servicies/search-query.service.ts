@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { QueryDslQueryContainer } from '@elastic/elasticsearch/lib/api/types';
-import { SearchObjectDto } from 'src/application/dtos/request/search-object.dto';
+import { SearchObjectDto, GenderIntent } from 'src/application/dtos/request/search-object.dto';
+import { AnalysisObject } from 'src/chatbot/utils/output/analysis.output';
 import { embed } from 'ai';
 import { embeddingModel } from 'src/chatbot/ai-model';
 export class SearchQueryService {
@@ -405,5 +406,55 @@ export class SearchQueryService {
                 minimum_should_match: (shouldClauses.length > 0 && mustClauses.length === 0) ? 1 : undefined
             }
         };
+    }
+
+    /**
+     * Maps the robust AnalysisObject to a flat SearchObjectDto for Elasticsearch filters
+     */
+    mapAnalysisToSearchObject(analysis: AnalysisObject): SearchObjectDto {
+        const dto = new SearchObjectDto();
+
+        if (analysis.budget) {
+            dto.minPrice = analysis.budget.min || undefined;
+            dto.maxPrice = analysis.budget.max || undefined;
+        }
+
+        if (analysis.normalizationMetadata && analysis.normalizationMetadata.length > 0) {
+            analysis.normalizationMetadata.forEach(meta => {
+                if (!meta.isNormalized) return;
+
+                switch (meta.type) {
+                    case 'brand':
+                        dto.brand = meta.corrected;
+                        break;
+                    case 'category':
+                        dto.category = meta.corrected;
+                        break;
+                    case 'note':
+                        dto.notes = [...(dto.notes || []), meta.corrected];
+                        break;
+                    case 'family':
+                        dto.families = [...(dto.families || []), meta.corrected];
+                        break;
+                    case 'attribute':
+                        // Map specific attributes to DTO fields if they match
+                        const val = meta.corrected.toLowerCase();
+                        if (['nam', 'male'].includes(val)) dto.gender = GenderIntent.MALE;
+                        else if (['nữ', 'female'].includes(val)) dto.gender = GenderIntent.FEMALE;
+                        else if (['unisex', 'trung tính'].includes(val)) dto.gender = GenderIntent.UNISEX;
+                        else if (val.includes('tuổi')) dto.ageGroup = meta.corrected;
+                        else if (['tiệc', 'đi chơi', 'văn phòng'].some(s => val.includes(s))) dto.occasion = meta.corrected;
+                        else dto.style = meta.corrected;
+                        break;
+                }
+            });
+        }
+
+        // Handle product names from analysis
+        if (analysis.productNames && analysis.productNames.length > 0) {
+            dto.productName = analysis.productNames[0]; // Take first as primary for flat DTO
+        }
+
+        return dto;
     }
 }

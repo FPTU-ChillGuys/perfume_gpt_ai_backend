@@ -3,7 +3,8 @@ import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SearchQueryService } from './search-query.service';
-import { SearchAiService } from './search-ai.service';
+import { ModuleRef } from '@nestjs/core';
+import { AiAnalysisService } from './ai-analysis.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { embed } from 'ai';
 import { embeddingModel } from 'src/chatbot/ai-model';
@@ -17,7 +18,7 @@ export class SearchService {
         private readonly elasticsearchService: ElasticsearchService,
         private readonly configService: ConfigService,
         private readonly searchQueryService: SearchQueryService,
-        private readonly searchAiService: SearchAiService,
+        private readonly moduleRef: ModuleRef,
         private readonly prisma: PrismaService,
     ) {
         this.indexName = this.configService.get<string>('ELASTICSEARCH_INDEX_NAME') || 'products';
@@ -137,15 +138,15 @@ export class SearchService {
     async searchWithAi(searchText: string, request: PagedAndSortedRequest) {
         if (!searchText) return { items: [], totalCount: 0 };
 
-        // 1. Extract structured search object using AI
-        const searchObject = await this.searchAiService.extractSearchObject(searchText);
+        // 1. Get analysis service at runtime to avoid circular dependency
+        const aiAnalysisService = this.moduleRef.get(AiAnalysisService, { strict: false });
+        const analysis = await aiAnalysisService.analyze(searchText);
+        const searchObject = analysis ? this.searchQueryService.mapAnalysisToSearchObject(analysis) : {};
 
         // 2. Build Hybrid Query (Filters + Vector)
-        const { query, knn } = await this.searchQueryService.buildHybridQuery(searchText, searchObject);
+        const { query, knn } = await this.searchQueryService.buildHybridQuery(searchText, searchObject as any);
 
-        this.logger.log(`[ES] Executing Hybrid Search...`);
-        // console.log(`[ES] Query: ${JSON.stringify(query, null, 2)}`);
-        // if (knn) console.log(`[ES] kNN: ${JSON.stringify(knn, null, 2)}`);
+        this.logger.log(`[ES] Executing Unified Hybrid Search...`);
 
         try {
             const response = await this.elasticsearchService.search({
@@ -163,7 +164,7 @@ export class SearchService {
             return {
                 items,
                 totalCount: total,
-                extractedObject: searchObject
+                extractedObject: analysis
             };
         } catch (error) {
             this.logger.error(`[ES-AI] Search failed:`, error);

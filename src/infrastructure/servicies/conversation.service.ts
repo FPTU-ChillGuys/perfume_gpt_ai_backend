@@ -15,7 +15,7 @@ import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIHelper } from '../helpers/ai.helper';
 import { AI_CONVERSATION_HELPER } from '../modules/ai.module';
 import { AdminInstructionService } from './admin-instruction.service';
-import { ConversationAnalysisService } from './conversation-analysis.service';
+import { AiAnalysisService } from './ai-analysis.service';
 import { ConversationJobName, QueueName } from 'src/application/constant/processor';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -42,7 +42,7 @@ export class ConversationService {
     private readonly userLogService: UserLogService,
     @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue,
     private readonly productService: ProductService,
-    private readonly analysisService: ConversationAnalysisService
+    private readonly analysisService: AiAnalysisService
   ) { }
 
   async addConversation(

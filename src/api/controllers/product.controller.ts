@@ -9,6 +9,7 @@ import { ProductWithVariantsResponse } from 'src/application/dtos/response/produ
 import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
 import { VariantSalesAnalyticsResponse } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { ProductService } from 'src/infrastructure/servicies/product.service';
+import { AiAnalysisService } from 'src/infrastructure/servicies/ai-analysis.service';
 import { RestockService } from 'src/infrastructure/servicies/restock.service';
 import { ExtendApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
 import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
@@ -24,7 +25,8 @@ import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dto
 export class ProductController {
   constructor(
     private productService: ProductService,
-    private userLog: UserLogService
+    private userLog: UserLogService,
+    private aiAnalysisService: AiAnalysisService
   ) { }
 
   /** Lấy danh sách tất cả sản phẩm */
@@ -117,16 +119,22 @@ export class ProductController {
   async getProductsByAiSearch(
     @Req() req: Request,
     @Query() request: SearchRequest
-  ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
-    const result = await this.productService.getProductsUsingAiSearch(
-      request.searchText,
-      request
-    );
+  ): Promise<BaseResponseAPI<any>> {
+    const analysis = await this.aiAnalysisService.analyze(request.searchText);
+
+    const result = analysis
+      ? await this.productService.getProductsByStructuredQuery(analysis)
+      : await this.productService.getAllProductsWithVariants(request);
+
     // Ghi log tìm kiếm
     const userId = getTokenPayloadFromRequest(req)?.id;
     const logId = userId ?? uuidv4();
     await this.userLog.addSearchLogToUserLog(logId, request.searchText);
-    return result;
+
+    return {
+      success: true,
+      payload: result.data
+    };
   }
 
   /** [TEST] Lấy chi tiết một sản phẩm kèm toàn bộ variants */

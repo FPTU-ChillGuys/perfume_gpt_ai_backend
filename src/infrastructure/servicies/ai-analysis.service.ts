@@ -7,16 +7,16 @@ import { Tools } from 'src/chatbot/utils/tools';
 import { analysisOutput, AnalysisObject } from 'src/chatbot/utils/output/analysis.output';
 
 @Injectable()
-export class ConversationAnalysisService {
-    private readonly logger = new Logger(ConversationAnalysisService.name);
+export class AiAnalysisService {
+    private readonly logger = new Logger(AiAnalysisService.name);
 
     constructor(private readonly tools: Tools) { }
 
     async analyze(currentMessage: string, previousMessages?: string): Promise<AnalysisObject | null> {
         try {
-            this.logger.log(`[ConversationAnalysis] Starting context-aware analysis...`);
+            this.logger.log(`[AiAnalysis] Starting context-aware analysis...`);
             if (!currentMessage) {
-                this.logger.warn('[ConversationAnalysis] Current message is empty or undefined');
+                this.logger.warn('[AiAnalysis] Current message is empty or undefined');
                 return null;
             }
 
@@ -30,22 +30,22 @@ export class ConversationAnalysisService {
                 input,
                 CONVERSATION_ANALYSIS_SYSTEM_PROMPT,
                 this.tools.getToolsForAnalysis,
-                'Failed to analyze conversation intent',
+                'Failed to analyze intent',
                 10,
                 Output.object(analysisOutput),
                 0.3 // Zero temperature for absolute consistency
             );
 
             if (!result) {
-                this.logger.warn('[ConversationAnalysis] Analysis returned null');
+                this.logger.warn('[AiAnalysis] Analysis returned null');
                 return null;
             }
 
             const analysis = JSON.parse(result) as AnalysisObject;
-            this.logger.log(`[ConversationAnalysis] Analysis completed. Intent: ${analysis.intent}`);
+            this.logger.log(`[AiAnalysis] Analysis completed. Intent: ${analysis.intent}`);
             return analysis;
         } catch (error) {
-            this.logger.error('[ConversationAnalysis] Analysis failed', error);
+            this.logger.error('[AiAnalysis] Analysis failed', error);
             return null;
         }
     }

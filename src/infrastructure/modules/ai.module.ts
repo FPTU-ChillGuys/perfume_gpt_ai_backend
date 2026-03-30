@@ -1,9 +1,9 @@
+import { forwardRef, Global, Module, Provider } from '@nestjs/common';
 import { SearchModule } from './search.module';
-import { ConversationAnalysisService } from '../servicies/conversation-analysis.service';
+import { AiAnalysisService } from '../servicies/ai-analysis.service';
 import { SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { AIHelper } from '../helpers/ai.helper';
 import { Tools } from 'src/chatbot/utils/tools';
-import { Module, Provider } from '@nestjs/common';
 import { UnitOfWorkModule } from './unit-of-work.module';
 import { ToolModule } from './tool.module';
 import { aiModelForSurvey, aiModelForRestock, aiModelForReview, aiModelForTrend } from 'src/chatbot/ai-model';
@@ -117,10 +117,11 @@ const aiInventoryReportProvider: Provider = {
   inject: [Tools]
 };
 
+@Global()
 @Module({
-  imports: [UnitOfWorkModule, ToolModule, SearchModule],
+  imports: [UnitOfWorkModule, ToolModule, forwardRef(() => SearchModule)],
   providers: [
-    ConversationAnalysisService,
+    AiAnalysisService,
     aiProvider,
     aiConversationProvider,
     // ...
@@ -132,7 +133,7 @@ const aiInventoryReportProvider: Provider = {
     aiReviewProvider
   ],
   exports: [
-    ConversationAnalysisService,
+    AiAnalysisService,
     aiProvider,
     aiConversationProvider,
     aiTrendProvider,

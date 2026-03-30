@@ -1,8 +1,6 @@
-import { forwardRef } from "@nestjs/common";
 import { AdminInstructionModule } from 'src/infrastructure/domain/admin-instruction/admin-instruction.module';
 import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.module';
 import { AIModule } from 'src/infrastructure/domain/ai/ai.module';
-import { ConversationModule } from 'src/infrastructure/domain/conversation/conversation.module';
 import { EmailModule } from 'src/infrastructure/domain/common/email.module';
 import { InventoryModule } from 'src/infrastructure/domain/inventory/inventory.module';
 import { MappingModule } from 'src/infrastructure/domain/common/mapping.module';
@@ -19,6 +17,7 @@ import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.modul
 import { UserLogAIModule } from 'src/infrastructure/domain/user-log/user-log-ai.module';
 import { UserModule } from 'src/infrastructure/domain/user/user.module';
 import { RecommendationModule } from 'src/infrastructure/domain/recommendation/recommendation.module';
+import { ConversationModule } from "../../conversation/conversation.module";
 
 export const modules = [
   ConversationModule,

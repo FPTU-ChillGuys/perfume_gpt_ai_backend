@@ -6,7 +6,7 @@ import { INSTRUCTION_TYPE_RECOMMENDATION, INSTRUCTION_TYPE_REPURCHASE } from 'sr
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { searchOutput } from 'src/chatbot/utils/output/search.output';
+import { searchOutput } from 'src/chatbot/output/search.output';
 import { buildCombinedPromptV5 } from 'src/infrastructure/domain/utils/prompt-builder';
 import { parseAIRecommendationResponse } from 'src/infrastructure/domain/utils/ai-response-parser';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';

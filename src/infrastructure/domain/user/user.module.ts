@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UserService } from 'src/infrastructure/domain/user/user.service';
-import { UserTool } from 'src/chatbot/utils/tools/user.tool';
+import { UserTool } from 'src/chatbot/tools/user.tool';
 import { PrismaModule } from 'src/prisma/prisma.module';
 
 @Module({

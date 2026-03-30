@@ -4,7 +4,7 @@ import { productDetailTabsContent } from 'src/application/constant/productDetail
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
-import { encodeToolOutput } from '../toon-encoder.util';
+import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 
 @Injectable()

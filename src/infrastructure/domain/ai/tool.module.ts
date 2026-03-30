@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { Tools } from 'src/chatbot/utils/tools';
+import { Tools } from 'src/chatbot/tools';
 
 @Module({
   providers: [Tools],

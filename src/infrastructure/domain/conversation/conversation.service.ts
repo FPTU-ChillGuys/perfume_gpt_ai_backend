@@ -7,7 +7,7 @@ import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/co
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Output, UIMessage } from 'ai';
-import { conversationOutput, conversationOutputSchema, searchOutput } from 'src/chatbot/utils/output/search.output';
+import { conversationOutput, conversationOutputSchema, searchOutput } from 'src/chatbot/output/search.output';
 import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
 import { addMessageToMessages, convertToMessages, overrideMessagesToConversation } from 'src/infrastructure/domain/utils/message-helper';
 import { buildCombinedPromptV5 } from 'src/infrastructure/domain/utils/prompt-builder';

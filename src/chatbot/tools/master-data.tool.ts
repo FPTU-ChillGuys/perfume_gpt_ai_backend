@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool, Output } from 'ai';
 import { MasterDataService } from 'src/infrastructure/domain/common/master-data.service';
-import { encodeToolOutput } from '../toon-encoder.util';
+import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 import { aiModel, aiModelForConversationAnalysis } from 'src/chatbot/ai-model';
 import { objectGenerationFromMessagesToResultWithErrorHandler } from 'src/chatbot/chatbot';

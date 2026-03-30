@@ -4,7 +4,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
-import { encodeToolOutput } from '../toon-encoder.util';
+import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 
 @Injectable()
@@ -17,7 +17,7 @@ export class InventoryTool {
     private readonly prisma: PrismaService,
     private readonly unitOfWork: UnitOfWork,
     private readonly restockService: RestockService
-  ) {}
+  ) { }
 
   /**
    * Lấy dữ liệu tồn kho tất cả variant.

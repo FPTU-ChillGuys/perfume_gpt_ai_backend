@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { ReviewService } from 'src/infrastructure/domain/review/review.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
-import { encodeToolOutput } from '../toon-encoder.util';
+import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 
 @Injectable()
@@ -32,9 +32,9 @@ export class ReviewTool {
                     if (!response.success) {
                         return { success: false, error: `Failed to fetch reviews for variant ${input.variantId}.` };
                     }
-                    
+
                     const reviews = response.payload ?? [];
-                    
+
                     // Encode large datasets to optimize token usage
                     if (Array.isArray(reviews) && reviews.length > 5) {
                         const encodingResult = encodeToolOutput(reviews);
@@ -43,7 +43,7 @@ export class ReviewTool {
                             encodedData: encodingResult.encoded
                         };
                     }
-                    
+
                     return { success: true, data: reviews };
                 },
                 'Error occurred while fetching reviews.',
@@ -125,7 +125,7 @@ export class ReviewTool {
                     if (!response.success) {
                         return { success: false, error: 'Failed to fetch paged reviews.' };
                     }
-                    
+
                     const data = response.payload ?? null;
                     // If payload is an array, optionally encode it
                     if (Array.isArray(data) && data.length > 5) {
@@ -135,7 +135,7 @@ export class ReviewTool {
                             encodedData: encodingResult.encoded
                         };
                     }
-                    
+
                     return { success: true, data };
                 },
                 'Error occurred while fetching paged reviews.',

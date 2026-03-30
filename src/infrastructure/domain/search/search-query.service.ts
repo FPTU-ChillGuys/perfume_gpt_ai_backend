@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { QueryDslQueryContainer } from '@elastic/elasticsearch/lib/api/types';
 import { SearchObjectDto, GenderIntent } from 'src/application/dtos/request/search-object.dto';
-import { AnalysisObject } from 'src/chatbot/utils/output/analysis.output';
+import { AnalysisObject } from 'src/chatbot/output/analysis.output';
 import { embed } from 'ai';
 import { embeddingModel } from 'src/chatbot/ai-model';
 export class SearchQueryService {

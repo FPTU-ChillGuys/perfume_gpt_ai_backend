@@ -1,7 +1,7 @@
 import { HttpModule } from '@nestjs/axios';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { Module } from '@nestjs/common';
-import { ProductTool } from 'src/chatbot/utils/tools/products.tool';
+import { ProductTool } from 'src/chatbot/tools/products.tool';
 import { SearchModule } from 'src/infrastructure/domain/search/search.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 

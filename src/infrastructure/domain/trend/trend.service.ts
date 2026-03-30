@@ -14,8 +14,8 @@ import {
   trendForecastingPrompt,
   INSTRUCTION_TYPE_TREND
 } from 'src/application/constant/prompts';
-import { convertProductCardOutputToProducts, searchOutput, trendOutput } from 'src/chatbot/utils/output/search.output';
-import { productOutput, ProductCardOutputItem, ProductCardVariantOutput } from 'src/chatbot/utils/output/product.output';
+import { convertProductCardOutputToProducts, searchOutput, trendOutput } from 'src/chatbot/output/search.output';
+import { productOutput, ProductCardOutputItem, ProductCardVariantOutput } from 'src/chatbot/output/product.output';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { AI_TREND_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';

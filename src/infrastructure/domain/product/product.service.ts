@@ -22,7 +22,7 @@ import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { SearchService } from 'src/infrastructure/domain/search/search.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { ProductCardOutputItem } from 'src/chatbot/utils/output/product.output';
+import { ProductCardOutputItem } from 'src/chatbot/output/product.output';
 
 const productInclude = {
   Brands: true,

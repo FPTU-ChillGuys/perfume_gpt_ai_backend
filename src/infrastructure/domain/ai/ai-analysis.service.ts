@@ -3,8 +3,8 @@ import { Output } from 'ai';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
 import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
-import { Tools } from 'src/chatbot/utils/tools';
-import { analysisOutput, AnalysisObject } from 'src/chatbot/utils/output/analysis.output';
+import { Tools } from 'src/chatbot/tools';
+import { analysisOutput, AnalysisObject } from 'src/chatbot/output/analysis.output';
 
 @Injectable()
 export class AiAnalysisService {

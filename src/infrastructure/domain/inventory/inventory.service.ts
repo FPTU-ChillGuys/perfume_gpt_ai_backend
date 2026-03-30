@@ -34,7 +34,7 @@ import {
   AIInventoryReportStructuredResponse,
   AIResponseMetadata
 } from 'src/application/dtos/response/ai-structured.response';
-import { restockOutput } from 'src/chatbot/utils/output/restock.output';
+import { restockOutput } from 'src/chatbot/output/restock.output';
 
 type RestockVariantResult = {
   id: string;
@@ -62,7 +62,7 @@ export class InventoryService {
     @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService
-  ) {}
+  ) { }
 
   private async ensureCriticalLowStockIncluded(
     restockData: unknown
@@ -135,7 +135,7 @@ export class InventoryService {
   }
 
   async getInventoryStock(
-    request: InventoryStockRequest 
+    request: InventoryStockRequest
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return await funcHandlerAsync(
       async () => {
@@ -146,17 +146,17 @@ export class InventoryService {
           ...(request.VariantId ? { VariantId: request.VariantId } : {}),
           ...(request.SearchTerm
             ? {
-                ProductVariants: {
-                  Products: { Name: { contains: request.SearchTerm } }
-                }
+              ProductVariants: {
+                Products: { Name: { contains: request.SearchTerm } }
               }
+            }
             : {}),
           ...(request.IsLowStock != null
             ? {
-                ProductVariants: {
-                  Stocks: request.IsLowStock ? { isNot: null } : undefined
-                }
+              ProductVariants: {
+                Stocks: request.IsLowStock ? { isNot: null } : undefined
               }
+            }
             : {})
         };
 
@@ -234,33 +234,33 @@ export class InventoryService {
             : {}),
           ...(request.isExpired != null
             ? {
-                ExpiryDate: request.isExpired
-                  ? { lt: new Date() }
-                  : { gte: new Date() }
-              }
+              ExpiryDate: request.isExpired
+                ? { lt: new Date() }
+                : { gte: new Date() }
+            }
             : {}),
           ...(request.variantSku ||
-          request.productName ||
-          request.volumeMl ||
-          request.concentrationName
+            request.productName ||
+            request.volumeMl ||
+            request.concentrationName
             ? {
-                ProductVariants: {
-                  ...(request.variantSku
-                    ? { Sku: { contains: request.variantSku } }
-                    : {}),
-                  ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
-                  ...(request.productName
-                    ? { Products: { Name: { contains: request.productName } } }
-                    : {}),
-                  ...(request.concentrationName
-                    ? {
-                        Concentrations: {
-                          Name: { contains: request.concentrationName }
-                        }
-                      }
-                    : {})
-                }
+              ProductVariants: {
+                ...(request.variantSku
+                  ? { Sku: { contains: request.variantSku } }
+                  : {}),
+                ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
+                ...(request.productName
+                  ? { Products: { Name: { contains: request.productName } } }
+                  : {}),
+                ...(request.concentrationName
+                  ? {
+                    Concentrations: {
+                      Name: { contains: request.concentrationName }
+                    }
+                  }
+                  : {})
               }
+            }
             : {})
         };
 

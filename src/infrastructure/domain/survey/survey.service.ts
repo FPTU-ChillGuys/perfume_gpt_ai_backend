@@ -26,7 +26,7 @@ import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.serv
 import { surveyPrompt } from 'src/application/constant/prompts';
 import { SurveyQuestionAnswer } from 'src/domain/entities/survey-question-answer.entity';
 import { INSTRUCTION_TYPE_SURVEY } from 'src/application/constant/prompts/admin-instruction-types';
-import { conversationOutput, searchOutput } from 'src/chatbot/utils/output/search.output';
+import { conversationOutput, searchOutput } from 'src/chatbot/output/search.output';
 
 @Injectable()
 export class SurveyService {

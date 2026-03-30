@@ -9,6 +9,7 @@ import { ReviewTool } from './tools/review.tool';
 import { UserTool } from './tools/user.tool';
 import { InventoryTool } from './tools/inventory.tool';
 import { MasterDataTool } from './tools/master-data.tool';
+import { CartTool } from './tools/cart.tool';
 
 @Injectable()
 export class Tools implements OnModuleInit {
@@ -30,6 +31,7 @@ export class Tools implements OnModuleInit {
   private userTool: UserTool;
   private inventoryTool: InventoryTool;
   private masterDataTool: MasterDataTool;
+  private cartTool: CartTool;
 
   constructor(private readonly moduleRef: ModuleRef) { }
 
@@ -42,6 +44,7 @@ export class Tools implements OnModuleInit {
     this.userTool = this.moduleRef.get(UserTool, { strict: false });
     this.inventoryTool = this.moduleRef.get(InventoryTool, { strict: false });
     this.masterDataTool = this.moduleRef.get(MasterDataTool, { strict: false });
+    this.cartTool = this.moduleRef.get(CartTool, { strict: false });
 
     this.initializeToolSets();
   }
@@ -52,10 +55,11 @@ export class Tools implements OnModuleInit {
       getBestSellingProducts: this.productTool.getBestSellingProducts,
       getLeastSellingProducts: this.productTool.getLeastSellingProducts,
       getOrdersByUserId: this.orderTool.getOrdersByUserId,
-      addCartItems: this.orderTool.addCartItems,
-      getOwnProfile: this.profileTool.getOwnProfile,
       getStaticProductPolicy: this.productTool.getStaticProductPolicy,
-      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId
+      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId,
+      addToCart: this.cartTool.addToCart,
+      getCart: this.cartTool.getCart,
+      clearCart: this.cartTool.clearCart,
     };
 
     this.getToolsForAnalysis = {

@@ -11,7 +11,6 @@ import {
   OrderResponse
 } from 'src/application/dtos/response/order.response';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
-import { CreateCartItemForAIRequest } from 'src/application/dtos/request/create-cart-item-for-ai.request';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import ApiUrl from 'src/infrastructure/domain/common/api/api_url';
@@ -104,18 +103,18 @@ function mapOrderFull(o: OrderFull): OrderResponse {
     voucherCode: o.UserVouchers?.Vouchers?.Code ?? null,
     recipientInfo: o.RecipientInfos
       ? {
-          fullName: o.RecipientInfos.RecipientName,
-          phone: o.RecipientInfos.RecipientPhoneNumber,
-          fullAddress: o.RecipientInfos.FullAddress
-        }
+        fullName: o.RecipientInfos.RecipientName,
+        phone: o.RecipientInfos.RecipientPhoneNumber,
+        fullAddress: o.RecipientInfos.FullAddress
+      }
       : null,
     shippingInfo: o.ShippingInfos
       ? {
-          carrierName: o.ShippingInfos.CarrierName,
-          trackingNumber: o.ShippingInfos.TrackingNumber,
-          shippingFee: Number(o.ShippingInfos.ShippingFee),
-          status: o.ShippingInfos.Status
-        }
+        carrierName: o.ShippingInfos.CarrierName,
+        trackingNumber: o.ShippingInfos.TrackingNumber,
+        shippingFee: Number(o.ShippingInfos.ShippingFee),
+        status: o.ShippingInfos.Status
+      }
       : null,
     orderDetails: o.OrderDetails.map(
       (d): OrderDetailResponse =>
@@ -145,27 +144,27 @@ function buildOrderWhere(
     ...(request.paymentStatus ? { PaymentStatus: request.paymentStatus } : {}),
     ...(request.fromDate || request.toDate
       ? {
-          CreatedAt: {
-            ...(request.fromDate ? { gte: new Date(request.fromDate) } : {}),
-            ...(request.toDate ? { lte: new Date(request.toDate) } : {})
-          }
+        CreatedAt: {
+          ...(request.fromDate ? { gte: new Date(request.fromDate) } : {}),
+          ...(request.toDate ? { lte: new Date(request.toDate) } : {})
         }
+      }
       : {}),
     ...(request.searchTerm
       ? {
-          OR: [
-            {
-              AspNetUsers_Orders_CustomerIdToAspNetUsers: {
-                FullName: { contains: request.searchTerm }
-              }
-            },
-            {
-              AspNetUsers_Orders_StaffIdToAspNetUsers: {
-                FullName: { contains: request.searchTerm }
-              }
+        OR: [
+          {
+            AspNetUsers_Orders_CustomerIdToAspNetUsers: {
+              FullName: { contains: request.searchTerm }
             }
-          ]
-        }
+          },
+          {
+            AspNetUsers_Orders_StaffIdToAspNetUsers: {
+              FullName: { contains: request.searchTerm }
+            }
+          }
+        ]
+      }
       : {})
   };
 }
@@ -175,7 +174,7 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService
-  ) {}
+  ) { }
 
   async getAllOrders(
     request: OrderRequest
@@ -280,42 +279,5 @@ export class OrderService {
         .join('\n----------------\n');
       return { success: true, data: report };
     }, 'Failed to create order report');
-  }
-
-  async addCartItemsForAi(
-    request: CreateCartItemForAIRequest
-  ): Promise<BaseResponseAPI<string>> {
-    return await funcHandlerAsync(
-      async () => {
-        // Bước 1: Gọi external semantic search API để lấy danh sách sản phẩm đã được rank
-        const { data: searchResult } = await firstValueFrom(
-          this.httpService.post<BaseResponseAPI<string>>(
-            ApiUrl().CART_URL('items/add-to-cart-for-ai'),
-            {
-              userId: request.userId,
-              variantId: request.variantId,
-              quantity: request.quantity
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.PERFUME_GPT_TOKEN}`
-              }
-            }
-          )
-        );
-
-        if (!searchResult.success) {
-          return { success: false, error: searchResult.error };
-        }
-
-        return {
-          success: true,
-          payload: searchResult.payload || 'Items added to cart successfully'
-        };
-      },
-      'Failed to fetch products with variants using semantic search',
-      true
-    );
   }
 }

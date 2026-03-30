@@ -18,6 +18,7 @@ import { UserLogAIModule } from 'src/infrastructure/domain/user-log/user-log-ai.
 import { UserModule } from 'src/infrastructure/domain/user/user.module';
 import { RecommendationModule } from 'src/infrastructure/domain/recommendation/recommendation.module';
 import { ConversationModule } from "../../conversation/conversation.module";
+import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
 
 export const modules = [
   ConversationModule,
@@ -40,4 +41,5 @@ export const modules = [
   TrendModule,
   RecommendationModule,
   RestockModule,
+  CartModule,
 ];

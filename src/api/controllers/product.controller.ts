@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, ParseUUIDPipe, Post, Query, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
@@ -23,6 +23,7 @@ import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dto
 @ApiTags('Products')
 @Controller('products')
 export class ProductController {
+  private readonly logger = new Logger(ProductController.name);
   constructor(
     private productService: ProductService,
     private userLog: UserLogService,
@@ -121,6 +122,8 @@ export class ProductController {
     @Query() request: SearchRequest
   ): Promise<BaseResponseAPI<any>> {
     const analysis = await this.aiAnalysisService.analyze(request.searchText);
+
+    this.logger.log(`Analysis: ${JSON.stringify(analysis)}`);
 
     const result = analysis
       ? await this.productService.getProductsByStructuredQuery(analysis)

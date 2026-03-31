@@ -692,10 +692,10 @@ export class ProductService {
         return filtered.length > 0 ? filtered : null;
       }).filter(group => group !== null);
 
-      // Build OR conditions
-      const orConditions: Prisma.ProductsWhereInput[] = purifiedLogic.map((group: any) => {
-        const andItems = group;
-        const andConditions: Prisma.ProductsWhereInput[] = andItems.map((item: string) => ({
+      // Build AND conditions (each group is a set of OR alternatives)
+      const groupConditions: Prisma.ProductsWhereInput[] = purifiedLogic.map((group: any) => {
+        const orItems = group;
+        const orConditionsForGroup: Prisma.ProductsWhereInput[] = orItems.map((item: string) => ({
           OR: [
             { Name: { contains: item } },
             { Brands: { Name: { contains: item } } },
@@ -706,26 +706,36 @@ export class ProductService {
             { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } } } }
           ]
         }));
-        return { AND: andConditions };
+        return { OR: orConditionsForGroup };
       });
+
+      const andConditionsForWhere: Prisma.ProductsWhereInput[] = [];
+
+      if (nameConditions.length > 0) {
+        andConditionsForWhere.push({ OR: nameConditions });
+      }
+
+      if (groupConditions.length > 0) {
+        andConditionsForWhere.push(...groupConditions);
+      }
+
+      if (budget) {
+        andConditionsForWhere.push({
+          ProductVariants: {
+            some: {
+              IsDeleted: false,
+              BasePrice: {
+                gte: budget.min ? Number(budget.min) : undefined,
+                lte: budget.max ? Number(budget.max) : undefined
+              }
+            }
+          }
+        });
+      }
 
       const where: Prisma.ProductsWhereInput = {
         IsDeleted: false,
-        AND: [
-          nameConditions.length > 0 ? { OR: nameConditions } : {},
-          orConditions.length > 0 ? { OR: orConditions } : {},
-          budget ? {
-            ProductVariants: {
-              some: {
-                IsDeleted: false,
-                BasePrice: {
-                  gte: budget.min ? Number(budget.min) : undefined,
-                  lte: budget.max ? Number(budget.max) : undefined
-                }
-              }
-            }
-          } : {}
-        ]
+        ...(andConditionsForWhere.length > 0 ? { AND: andConditionsForWhere } : {})
       };
 
       // Sorting logic

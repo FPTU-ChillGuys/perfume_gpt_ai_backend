@@ -13,15 +13,103 @@ import { CartTool } from './tools/cart.tool';
 
 @Injectable()
 export class Tools implements OnModuleInit {
-  getTools: ToolSet;
-  getToolsForChatbot: ToolSet;
-  getToolsForTrend: ToolSet;
-  getToolsForAnalysis: ToolSet;
-  getToolsForRecomendationAndRepurchase: ToolSet;
-  getToolsForRestock: ToolSet;
-  getToolsForSurvey: ToolSet;
-  getToolsForInventoryReport: ToolSet;
-  getToolsForReview: ToolSet;
+  get getToolsForChatbot(): ToolSet {
+    if (!this.productTool || !this.orderTool || !this.logTool || !this.cartTool) return {};
+    return {
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getLeastSellingProducts: this.productTool.getLeastSellingProducts,
+      getOrdersByUserId: this.orderTool.getOrdersByUserId,
+      getStaticProductPolicy: this.productTool.getStaticProductPolicy,
+      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId,
+      addToCart: this.cartTool.addToCart,
+      getCart: this.cartTool.getCart,
+      clearCart: this.cartTool.clearCart,
+    };
+  }
+
+  get getToolsForAnalysis(): ToolSet {
+    if (!this.masterDataTool) return {};
+    return {
+      searchMasterData: this.masterDataTool.searchMasterData,
+    };
+  }
+
+  get getToolsForSurvey(): ToolSet {
+    if (!this.productTool || !this.inventoryTool) return {};
+    return {
+      getAllProducts: this.productTool.getAllProducts,
+      searchProduct: this.productTool.searchProduct,
+      queryProducts: this.productTool.queryProducts,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getInventoryStock: this.inventoryTool.getInventoryStock
+    };
+  }
+
+  get getToolsForTrend(): ToolSet {
+    if (!this.productTool || !this.logTool || !this.inventoryTool) return {};
+    return {
+      searchProduct: this.productTool.searchProduct,
+      queryProducts: this.productTool.queryProducts,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek,
+      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
+      getProductSalesAnalyticsForTrend:
+        this.inventoryTool.getProductSalesAnalyticsForTrend
+    };
+  }
+
+  get getToolsForRestock(): ToolSet {
+    if (!this.inventoryTool) return {};
+    return {
+      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
+      getProductSalesAnalyticsForRestock:
+        this.inventoryTool.getProductSalesAnalyticsForRestock
+    };
+  }
+
+  get getToolsForInventoryReport(): ToolSet {
+    if (!this.inventoryTool) return {};
+    return {
+      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
+      getProductSalesAnalyticsForRestock:
+        this.inventoryTool.getProductSalesAnalyticsForRestock
+    };
+  }
+
+  get getToolsForRecomendationAndRepurchase(): ToolSet {
+    if (!this.productTool || !this.orderTool || !this.profileTool || !this.logTool || !this.userTool) return {};
+    return {
+      getAllProducts: this.productTool.getAllProducts,
+      searchProduct: this.productTool.searchProduct,
+      queryProducts: this.productTool.queryProducts,
+      getNewestProducts: this.productTool.getNewestProducts,
+      getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getOrderDetailsWithOrdersByUserId:
+        this.orderTool.getOrderDetailsWithOrdersByUserId,
+      getOwnProfile: this.profileTool.getOwnProfile,
+      getUserLogSummary: this.logTool.getUserLogSummary,
+      getUserById: this.userTool.getUserById
+    };
+  }
+
+  get getToolsForReview(): ToolSet {
+    if (!this.reviewTool) return {};
+    return {
+      getReviewStatisticsByVariantId:
+        this.reviewTool.getReviewStatisticsByVariantId,
+      getReviewsByVariantId: this.reviewTool.getReviewsByVariantId
+    };
+  }
+
+  get getTools(): ToolSet {
+    return {
+      ...this.getToolsForChatbot,
+      ...this.getToolsForTrend
+    };
+  }
 
   private productTool: ProductTool;
   private orderTool: OrderTool;
@@ -45,76 +133,6 @@ export class Tools implements OnModuleInit {
     this.inventoryTool = this.moduleRef.get(InventoryTool, { strict: false });
     this.masterDataTool = this.moduleRef.get(MasterDataTool, { strict: false });
     this.cartTool = this.moduleRef.get(CartTool, { strict: false });
-
-    this.initializeToolSets();
   }
 
-  private initializeToolSets() {
-    this.getToolsForChatbot = {
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getLeastSellingProducts: this.productTool.getLeastSellingProducts,
-      getOrdersByUserId: this.orderTool.getOrdersByUserId,
-      getStaticProductPolicy: this.productTool.getStaticProductPolicy,
-      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId,
-      addToCart: this.cartTool.addToCart,
-      getCart: this.cartTool.getCart,
-      clearCart: this.cartTool.clearCart,
-    };
-
-    this.getToolsForAnalysis = {
-      searchMasterData: this.masterDataTool.searchMasterData,
-    };
-
-    this.getToolsForSurvey = {
-      getAllProducts: this.productTool.getAllProducts,
-      searchProduct: this.productTool.searchProduct,
-      queryProducts: this.productTool.queryProducts,
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getInventoryStock: this.inventoryTool.getInventoryStock
-    };
-
-    this.getToolsForTrend = {
-      searchProduct: this.productTool.searchProduct,
-      queryProducts: this.productTool.queryProducts,
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek,
-      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
-      getProductSalesAnalyticsForTrend:
-        this.inventoryTool.getProductSalesAnalyticsForTrend
-    };
-
-    this.getToolsForRestock = {
-      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
-      getProductSalesAnalyticsForRestock:
-        this.inventoryTool.getProductSalesAnalyticsForRestock
-    };
-
-    this.getToolsForInventoryReport = {
-      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
-      getProductSalesAnalyticsForRestock:
-        this.inventoryTool.getProductSalesAnalyticsForRestock
-    };
-
-    this.getToolsForRecomendationAndRepurchase = {
-      getAllProducts: this.productTool.getAllProducts,
-      searchProduct: this.productTool.searchProduct,
-      queryProducts: this.productTool.queryProducts,
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getOrderDetailsWithOrdersByUserId:
-        this.orderTool.getOrderDetailsWithOrdersByUserId,
-      getOwnProfile: this.profileTool.getOwnProfile,
-      getUserLogSummary: this.logTool.getUserLogSummary,
-      getUserById: this.userTool.getUserById
-    };
-
-    this.getToolsForReview = {
-      getReviewStatisticsByVariantId:
-        this.reviewTool.getReviewStatisticsByVariantId,
-      getReviewsByVariantId: this.reviewTool.getReviewsByVariantId
-    };
-  }
 }

@@ -1,10 +1,10 @@
 import z from 'zod';
 
 export const analysisOutputSchema = z.object({
-    intent: z.enum(['Search', 'Consult', 'Compare', 'Greeting', 'Chat', 'Unknown'])
-        .describe('The core intent of the user message.'),
+    intent: z.enum(['Search', 'Consult', 'Compare', 'Greeting', 'Chat', 'Task', 'Unknown'])
+        .describe('The core intent of the user message. Use "Task" for specific actions like adding items to cart.'),
     logic: z.array(z.union([z.string(), z.array(z.string())]))
-        .describe('Disjunctive Normal Form (DNF) logic for product attributes. e.g. [["Chanel", "Nước hoa nữ"], "Dior"] means (Chanel AND Nước hoa nữ) OR Dior.'),
+        .describe('Conjunctive Normal Form (CNF) logic for product attributes. e.g. [["Chanel", "Dior"], "Nữ"] means (Chanel OR Dior) AND Nữ.'),
     productNames: z.array(z.string()).nullable()
         .describe('Explicit list of product names mentioned by the user (e.g. ["Bleu de Chanel", "Sauvage"]).'),
     sorting: z.object({

@@ -27,7 +27,7 @@ export const AI_RESTOCK_SERVICE = AI_RESTOCK_HELPER;
 
 const aiProvider: Provider = {
   provide: AI_HELPER,
-  useFactory: (tools: Tools) => new AIHelper(SYSTEM_PROMPT, tools.getTools, 10),
+  useFactory: (tools: Tools) => new AIHelper(SYSTEM_PROMPT, () => tools.getTools, 10),
   inject: [Tools]
 };
 
@@ -36,7 +36,7 @@ const aiConversationProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      tools.getToolsForChatbot,
+      () => tools.getToolsForChatbot,
       10,
       undefined,
       undefined,
@@ -55,7 +55,7 @@ const aiTrendProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      tools.getToolsForTrend,
+      () => tools.getToolsForTrend,
       10,
       undefined,
       undefined,
@@ -71,7 +71,7 @@ const aiRecommendationProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      tools.getToolsForRecomendationAndRepurchase,
+      () => tools.getToolsForRecomendationAndRepurchase,
       10
     ),
   inject: [Tools]
@@ -80,7 +80,7 @@ const aiRecommendationProvider: Provider = {
 const aiRestockProvider: Provider = {
   provide: AI_RESTOCK_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(SYSTEM_PROMPT, tools.getToolsForRestock, 10, 0, 'auto', aiModelForRestock, undefined, 300000),
+    new AIHelper(SYSTEM_PROMPT, () => tools.getToolsForRestock, 10, 0, 'auto', aiModelForRestock, undefined, 300000),
   inject: [Tools]
 };
 
@@ -89,7 +89,7 @@ const aiSurveyProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      tools.getToolsForSurvey,
+      () => tools.getToolsForSurvey,
       10,
       0,
       'auto',
@@ -101,7 +101,7 @@ const aiSurveyProvider: Provider = {
 const aiReviewProvider: Provider = {
   provide: AI_REVIEW_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(SYSTEM_PROMPT, tools.getToolsForReview, 10, 0, 'auto', aiModelForReview),
+    new AIHelper(SYSTEM_PROMPT, () => tools.getToolsForReview, 10, 0, 'auto', aiModelForReview),
   inject: [Tools]
 };
 
@@ -110,7 +110,7 @@ const aiInventoryReportProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      tools.getToolsForInventoryReport,
+      () => tools.getToolsForInventoryReport,
       10,
       undefined
     ),

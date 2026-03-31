@@ -78,7 +78,7 @@ export class AIHelper {
 
   constructor(
     private systemPrompt?: string,
-    private tools?: ToolSet,
+    private toolsProvider?: ToolSet | (() => ToolSet),
     private stopWhen?: number,
     private temperature?: number,
     private toolChoice?: ToolChoice<ToolSet>,
@@ -86,6 +86,12 @@ export class AIHelper {
     private promptOptimizationConfig?: PromptOptimizationConfig,
     private maxTokens?: number
   ) { }
+
+  private get resolvedTools(): ToolSet | undefined {
+    return typeof this.toolsProvider === 'function'
+      ? this.toolsProvider()
+      : this.toolsProvider;
+  }
 
   async textGenerateFromPrompt(
     prompt: string,
@@ -101,7 +107,7 @@ export class AIHelper {
         requestId,
         'textGenerateFromPrompt',
         modelName,
-        `promptLength=${prompt.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
+        `promptLength=${prompt.length} tools=${this.resolvedTools ? Object.keys(this.resolvedTools).length : 0}`
       );
 
       const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
@@ -117,7 +123,7 @@ export class AIHelper {
           model,
           optimizedPrompt,
           this.systemPrompt + (additionalSystemPrompt ?? ''),
-          this.tools,
+          this.resolvedTools,
           errorMessage,
           this.stopWhen,
           output,
@@ -162,7 +168,7 @@ export class AIHelper {
         requestId,
         'textGenerateFromMessages',
         modelName,
-        `messageCount=${messages.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
+        `messageCount=${messages.length} tools=${this.resolvedTools ? Object.keys(this.resolvedTools).length : 0}`
       );
 
 
@@ -174,7 +180,7 @@ export class AIHelper {
           model,
           finalMessages,
           systemContext,
-          this.tools,
+          this.resolvedTools,
           errorMessage,
           this.stopWhen,
           output,
@@ -219,14 +225,14 @@ export class AIHelper {
         requestId,
         'textGenerateStreamFromPrompt',
         modelName,
-        `promptLength=${prompt.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
+        `promptLength=${prompt.length} tools=${this.resolvedTools ? Object.keys(this.resolvedTools).length : 0}`
       );
 
       const stream = streamTextGenerationFromPromptToResultWithErrorHandler(
         model,
         prompt,
         this.systemPrompt + (additionalSystemPrompt ?? ''),
-        this.tools,
+        this.resolvedTools,
         this.stopWhen,
         output,
         errorMessage,
@@ -257,7 +263,7 @@ export class AIHelper {
       requestId,
       'textGenerateStreamFromMessages',
       modelName,
-      `messageCount=${messages.length} tools=${this.tools ? Object.keys(this.tools).length : 0}`
+      `messageCount=${messages.length} tools=${this.resolvedTools ? Object.keys(this.resolvedTools).length : 0}`
     );
 
     this.logger.log(
@@ -268,7 +274,7 @@ export class AIHelper {
       model,
       messages,
       this.systemPrompt + (additionalSystemPrompt ?? ''),
-      this.tools,
+      this.resolvedTools,
       this.stopWhen,
       errorMessage,
       output,

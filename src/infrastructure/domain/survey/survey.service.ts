@@ -355,45 +355,46 @@ export class SurveyService {
 
     // Phase 2: Phân tích Survey Q&A để trích xuất intent
     const analysis = await this.analysisService.analyzeSurvey(quesAnses);
-    
+
     let toonProducts = '';
-    
+
     // Phase 3: Tìm kiếm sản phẩm dựa trên phân tích
     if (analysis) {
-        const searchResponse = await this.productService.getProductsByStructuredQuery(analysis);
-        if (searchResponse.success && searchResponse.data) {
-            const candidates = searchResponse.data.items.slice(0, 15); // Lấy top 15 làm ứng viên
-            const minimalProducts = candidates.map(p => ({
-                id: p.id,
-                name: p.name,
-                brand: p.brandName,
-                category: p.categoryName,
-                description: p.description,
-                attributes: p.attributes.map(a => `${a.attribute}: ${a.value}`),
-                scentNotes: p.scentNotes,
-                olfactoryFamilies: p.olfactoryFamilies,
-                variants: p.variants.map(v => ({ id: v.id, volume: v.volumeMl, price: v.basePrice }))
-            }));
-            toonProducts = encodeToolOutput(minimalProducts).encoded;
-        }
+      const searchResponse = await this.productService.getProductsByStructuredQuery(analysis);
+      if (searchResponse.success && searchResponse.data) {
+        const candidates = searchResponse.data.items.slice(0, 15); // Lấy top 15 làm ứng viên
+        const minimalProducts = candidates.map(p => ({
+          id: p.id,
+          name: p.name,
+          brand: p.brandName,
+          image: p.primaryImage,
+          category: p.categoryName,
+          description: p.description,
+          attributes: p.attributes.map(a => `${a.attribute}: ${a.value}`),
+          scentNotes: p.scentNotes,
+          olfactoryFamilies: p.olfactoryFamilies,
+          variants: p.variants.map(v => ({ id: v.id, volume: v.volumeMl, price: v.basePrice }))
+        }));
+        toonProducts = encodeToolOutput(minimalProducts).encoded;
+      }
     }
 
     // Phase 4: AI Recommendation
     const adminInstruction = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
-    
+
     const surveyCtx = surveyContextPrompt(JSON.stringify(quesAnses));
     const productCtx = surveyProductContextPrompt(toonProducts || 'Không tìm thấy sản phẩm phù hợp trong database.');
-    
+
     const combinedSystemPrompt = surveyRecommendationSystemPrompt(
-        adminInstruction || '',
-        surveyCtx,
-        productCtx
+      adminInstruction || '',
+      surveyCtx,
+      productCtx
     );
 
     const aiResponsePayload = await this.aiHelper.textGenerateFromPrompt(
-        'Dựa trên kết quả khảo sát và danh sách sản phẩm tiềm năng, hãy đưa ra tư vấn cá nhân hóa và chọn 5 sản phẩm tốt nhất.',
-        combinedSystemPrompt,
-        Output.object(surveyOutput)
+      'Dựa trên kết quả khảo sát và danh sách sản phẩm tiềm năng, hãy đưa ra tư vấn cá nhân hóa và chọn 5 sản phẩm tốt nhất.',
+      combinedSystemPrompt,
+      Output.object(surveyOutput)
     );
 
     if (!aiResponsePayload.success || !aiResponsePayload.data) {
@@ -403,37 +404,37 @@ export class SurveyService {
       );
     }
 
-    const aiResponse = typeof aiResponsePayload.data === 'string' 
-        ? JSON.parse(aiResponsePayload.data) 
-        : aiResponsePayload.data;
+    const aiResponse = typeof aiResponsePayload.data === 'string'
+      ? JSON.parse(aiResponsePayload.data)
+      : aiResponsePayload.data;
 
     // Phase 5: Hydrate sản phẩm (Nếu AI trả về productTemp)
     if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
-        const ids = aiResponse.productTemp.map((item: any) => item.id).filter((id: string) => !!id).slice(0, 5);
-        if (ids.length > 0) {
-            const productResponse = await this.productService.getProductsByIdsForOutput(ids);
-            if (productResponse.success && productResponse.data) {
-                const hydratedProducts = productResponse.data;
-                const recommendationsMap = new Map<string, string[]>();
-                aiResponse.productTemp.forEach((item: any) => {
-                    if (item.id && item.variants && Array.isArray(item.variants)) {
-                        recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
-                    }
-                });
-
-                aiResponse.products = hydratedProducts.map(product => {
-                    const recommendedVariantIds = recommendationsMap.get(product.id);
-                    if (recommendedVariantIds && recommendedVariantIds.length > 0) {
-                        const variantIdsSet = new Set(recommendedVariantIds);
-                        return {
-                            ...product,
-                            variants: (product.variants || []).filter(v => variantIdsSet.has(v.id))
-                        };
-                    }
-                    return product;
-                }).filter(product => product.variants && product.variants.length > 0);
+      const ids = aiResponse.productTemp.map((item: any) => item.id).filter((id: string) => !!id).slice(0, 5);
+      if (ids.length > 0) {
+        const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+        if (productResponse.success && productResponse.data) {
+          const hydratedProducts = productResponse.data;
+          const recommendationsMap = new Map<string, string[]>();
+          aiResponse.productTemp.forEach((item: any) => {
+            if (item.id && item.variants && Array.isArray(item.variants)) {
+              recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
             }
+          });
+
+          aiResponse.products = hydratedProducts.map(product => {
+            const recommendedVariantIds = recommendationsMap.get(product.id);
+            if (recommendedVariantIds && recommendedVariantIds.length > 0) {
+              const variantIdsSet = new Set(recommendedVariantIds);
+              return {
+                ...product,
+                variants: (product.variants || []).filter(v => variantIdsSet.has(v.id))
+              };
+            }
+            return product;
+          }).filter(product => product.variants && product.variants.length > 0);
         }
+      }
     }
 
     return Ok(JSON.stringify(aiResponse));

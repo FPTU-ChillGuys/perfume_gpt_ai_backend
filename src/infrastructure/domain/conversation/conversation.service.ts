@@ -267,6 +267,7 @@ export class ConversationService {
           name: p.name,
           brand: p.brandName,
           category: p.categoryName,
+          image: p.primaryImage,
           attributes: p.attributes.map(a => `${a.attribute}: ${a.value}`),
           scentNotes: p.scentNotes,
           olfactoryFamilies: p.olfactoryFamilies,

@@ -57,14 +57,14 @@ export class MasterDataTool {
                     .replace('{{CONTEXT}}', JSON.stringify(context, null, 2))
                     .replace('{{KEYWORDS}}', missingKeywords.join(', '));
 
-                const normalizationResult = await objectGenerationFromMessagesToResultWithErrorHandler<{ mappings: { original: string, corrected: string | null }[] }>(
+                const normalizationResult = await objectGenerationFromMessagesToResultWithErrorHandler<{ mappings: { original: string, corrected: string | string[] | null }[] }>(
                     aiModelForConversationAnalysis,
                     [{ id: Date.now().toString(), role: 'user', parts: [{ type: 'text', text: prompt }] }],
                     "Bạn là chuyên gia chuẩn hóa dữ liệu nước hoa.",
                     z.object({
                         mappings: z.array(z.object({
                             original: z.string(),
-                            corrected: z.string().nullable()
+                            corrected: z.union([z.string(), z.array(z.string())]).nullable()
                         }))
                     })
                     ,
@@ -75,10 +75,13 @@ export class MasterDataTool {
                     const reSearchTasks: Promise<void>[] = [];
                     for (const mapping of (normalizationResult as any).mappings) {
                         if (mapping.corrected) {
-                            this.logger.log(`[searchMasterData] Re-searching normalized: ${mapping.original} -> ${mapping.corrected}`);
-                            // Reuse types from original searchInfo if possible
+                            const correctedTerms = Array.isArray(mapping.corrected) ? mapping.corrected : [mapping.corrected];
                             const originalInfo = searchInfos.find(i => i.keyword === mapping.original);
-                            reSearchTasks.push(performSearch(mapping.corrected, originalInfo?.types || ['all']));
+
+                            for (const term of correctedTerms) {
+                                this.logger.log(`[searchMasterData] Re-searching normalized: ${mapping.original} -> ${term}`);
+                                reSearchTasks.push(performSearch(term, originalInfo?.types || ['all']));
+                            }
                         }
                     }
                     await Promise.all(reSearchTasks);
@@ -96,14 +99,27 @@ export class MasterDataTool {
                 });
             };
 
-            return encodeToolOutput({
-                brands: deduplicate(finalResults.brands),
-                categories: deduplicate(finalResults.categories),
-                notes: deduplicate(finalResults.notes),
-                families: deduplicate(finalResults.families),
-                attributes: deduplicate(finalResults.attributes),
-                products: deduplicate(finalResults.products)
-            });
+            const getLabels = (arr: any[]) => arr.map(item => item.Name || item.Value || item.id || item.Id);
+
+            return {
+                ...encodeToolOutput({
+                    brands: deduplicate(finalResults.brands),
+                    categories: deduplicate(finalResults.categories),
+                    notes: deduplicate(finalResults.notes),
+                    families: deduplicate(finalResults.families),
+                    attributes: deduplicate(finalResults.attributes),
+                    products: deduplicate(finalResults.products)
+                }),
+                // Thêm summary text để AI (như GPT-Nano) dễ đọc được các Nhãn chuẩn mà không cần giải mã TOON
+                summaryFoundLabels: {
+                    brands: Array.from(new Set(getLabels(finalResults.brands))),
+                    categories: Array.from(new Set(getLabels(finalResults.categories))),
+                    notes: Array.from(new Set(getLabels(finalResults.notes))),
+                    families: Array.from(new Set(getLabels(finalResults.families))),
+                    attributes: Array.from(new Set(getLabels(finalResults.attributes))),
+                    products: Array.from(new Set(getLabels(finalResults.products)))
+                }
+            };
         }
     });
 

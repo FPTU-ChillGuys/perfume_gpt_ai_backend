@@ -740,7 +740,9 @@ export class ProductService {
 
       // Sorting logic
       let orderBy: Prisma.ProductsOrderByWithRelationInput = { CreatedAt: 'desc' };
-      if (sorting) {
+      const isPriceSorting = sorting && sorting.field === 'Price';
+
+      if (sorting && !isPriceSorting) {
         const direction = sorting.isDescending ? 'desc' : 'asc';
         switch (sorting.field) {
           case 'Newest':
@@ -749,25 +751,93 @@ export class ProductService {
           case 'Name':
             orderBy = { Name: direction };
             break;
-          case 'Price':
           case 'Volume':
           case 'Sales':
           default:
-            // Aggregate sorting (_min, _max) on relations is not supported by current Prisma version/setup
             orderBy = { CreatedAt: 'desc' };
         }
       }
 
-      const [products, totalCount] = await Promise.all([
-        this.prisma.products.findMany({
+      let products: ProductWithVariantsRelations[] = [];
+      let totalCount = 0;
+
+      if (!isPriceSorting) {
+        // Fallback or Normal Sorting behavior
+        [products, totalCount] = await Promise.all([
+          this.prisma.products.findMany({
+            where,
+            include: productWithVariantsInclude,
+            skip,
+            take,
+            orderBy
+          }),
+          this.prisma.products.count({ where })
+        ]);
+      } else {
+        // ==========================================
+        // Custom IN-MEMORY Price Sorting
+        // ==========================================
+        const matchedProducts = await this.prisma.products.findMany({
           where,
-          include: productWithVariantsInclude,
-          skip,
-          take,
-          orderBy
-        }),
-        this.prisma.products.count({ where })
-      ]);
+          select: { Id: true }
+        });
+        const matchedIds = matchedProducts.map(p => p.Id);
+        totalCount = matchedIds.length;
+
+        if (totalCount > 0) {
+          const variantFilter: Prisma.ProductVariantsWhereInput = {
+            ProductId: { in: matchedIds },
+            IsDeleted: false,
+            ...(budget && {
+              BasePrice: {
+                gte: budget.min ? Number(budget.min) : undefined,
+                lte: budget.max ? Number(budget.max) : undefined
+              }
+            })
+          };
+
+          const variants = await this.prisma.productVariants.findMany({
+            where: variantFilter,
+            select: { ProductId: true, BasePrice: true }
+          });
+
+          // Compute max/min price for each Product among matching variants
+          const priceMap = new Map<string, number>();
+          variants.forEach(v => {
+            const price = Number(v.BasePrice);
+            const current = priceMap.get(v.ProductId);
+
+            if (sorting.isDescending) {
+              if (current === undefined || price > current) priceMap.set(v.ProductId, price);
+            } else {
+              if (current === undefined || price < current) priceMap.set(v.ProductId, price);
+            }
+          });
+
+          // Sort product IDs based on the collected prices
+          // Products that completely lost their variants (e.g., due to budget mismatch) will be sorted to the bottom/top depending on logic,
+          // but they shouldn't exist because `matchedProducts` implies they passed the global `where` budget filter.
+          matchedIds.sort((a, b) => {
+            const priceA = priceMap.get(a) ?? (sorting.isDescending ? 0 : Infinity);
+            const priceB = priceMap.get(b) ?? (sorting.isDescending ? 0 : Infinity);
+            return sorting.isDescending ? priceB - priceA : priceA - priceB;
+          });
+
+          // Paginate in memory
+          const finalProductIds = matchedIds.slice(skip, skip + take);
+
+          // Fetch FULL details only for the paginated items
+          const dbProducts = await this.prisma.products.findMany({
+            where: { Id: { in: finalProductIds } },
+            include: productWithVariantsInclude
+          });
+
+          // Restore original sorted order since DB doesn't retain IN () order
+          products = finalProductIds
+            .map(id => dbProducts.find(p => p.Id === id)!)
+            .filter(Boolean);
+        }
+      }
 
       return {
         success: true,

@@ -340,6 +340,8 @@ export class ConversationService {
 
     const finalMessageData = JSON.stringify(aiResponse);
 
+    this.logger.debug("Final message: ", finalMessageData);
+
     const responseConversation = overrideMessagesToConversation(
       conversationId || '',
       userId || '',

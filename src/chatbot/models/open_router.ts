@@ -53,4 +53,6 @@ export const trinityMiniFree: LanguageModel = openrouter("arcee-ai/trinity-mini:
 
 export const gptOss20b: LanguageModel = openrouter("openai/gpt-oss-20b")
 
+export const qwen3_6PlusPreview: LanguageModel = openrouter("qwen/qwen3.6-plus-preview:free")
+
 

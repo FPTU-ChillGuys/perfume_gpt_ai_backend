@@ -80,12 +80,16 @@ export class WinkNlpService {
       throw new Error('Dictionary snapshot not available');
     }
 
-    // Extract raw entities
-    const rawEntities = this.extractEntities(text);
+    // Normalize input first so accented Vietnamese input can match ASCII-safe patterns.
     const normalizedText = this.normalizeText(text);
+
+    // Extract raw entities from normalized input.
+    const rawEntities = this.extractEntities(normalizedText);
 
     // Normalize using reverse map
     const result: Record<string, any> = {
+      input: text,
+      normalizedInput: normalizedText,
       rawEntities,
       normalized: {},
       byType: {},

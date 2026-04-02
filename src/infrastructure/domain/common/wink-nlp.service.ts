@@ -127,34 +127,48 @@ export class WinkNlpService {
     const patterns: CustomEntityExample[] = [];
 
     for (const [entityType, canonicalMap] of Object.entries(entityDictionary)) {
-      const allTerms = new Set<string>();
+      const termPatterns = new Set<string>();
 
-      // Collect all terms: canonicals + synonyms
+      // Build one syntax-safe pattern per canonical/synonym.
+      // docs: no space inside [], and multi-word phrases must be expressed as multiple bracketed tokens.
       for (const [canonical, synonyms] of Object.entries(canonicalMap)) {
-        allTerms.add(canonical);
-        for (const syn of synonyms) {
-          allTerms.add(syn);
+        const allTerms = [canonical, ...synonyms];
+
+        for (const term of allTerms) {
+          const patternString = this.buildSingleTermPattern(term);
+          if (!patternString) continue;
+          termPatterns.add(patternString);
         }
       }
 
-      if (allTerms.size === 0) continue;
-
-      // Build shorthand pattern for winkNLP
-      // Format: [...terms...] => multi-word match with longest match first
-      const termsArray = Array.from(allTerms).sort((a, b) => b.length - a.length);
-      const patternString = `[${termsArray.join('|')}]`;
+      if (termPatterns.size === 0) continue;
 
       patterns.push({
         name: entityType,
-        patterns: [patternString],
+        patterns: Array.from(termPatterns),
       });
 
       this.logger.debug(
-        `[WinkNLP] Pattern for ${entityType}: ${allTerms.size} terms`,
+        `[WinkNLP] Pattern for ${entityType}: ${termPatterns.size} terms`,
       );
     }
 
     return patterns;
+  }
+
+  private buildSingleTermPattern(term: string): string | null {
+    const normalized = this.normalizeText(term);
+    if (!normalized) return null;
+
+    const tokens = normalized
+      .split(/\s+/)
+      .map(token => token.trim())
+      .filter(token => token.length > 0)
+      .filter(token => /^[a-z0-9]+$/.test(token));
+
+    if (tokens.length === 0) return null;
+
+    return tokens.map(token => `[${token}]`).join(' ');
   }
 
   /**
@@ -266,6 +280,7 @@ export class WinkNlpService {
       .trim()
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đ]/g, 'd')
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();

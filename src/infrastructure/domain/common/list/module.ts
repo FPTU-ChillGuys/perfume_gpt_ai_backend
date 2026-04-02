@@ -19,6 +19,7 @@ import { UserModule } from 'src/infrastructure/domain/user/user.module';
 import { RecommendationModule } from 'src/infrastructure/domain/recommendation/recommendation.module';
 import { ConversationModule } from "../../conversation/conversation.module";
 import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
+import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.module';
 
 export const modules = [
   ConversationModule,
@@ -27,6 +28,7 @@ export const modules = [
   ToolModule,
   MappingModule,
   AIModule,
+  DictionaryModule,
   UserLogModule,
   UserLogAIModule,
   ReviewModule,

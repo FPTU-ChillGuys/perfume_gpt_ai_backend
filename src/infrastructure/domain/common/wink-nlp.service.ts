@@ -143,9 +143,22 @@ export class WinkNlpService {
 
       if (termPatterns.size === 0) continue;
 
+      const orderedPatterns = Array.from(termPatterns).sort((a, b) => {
+        const aTokenCount = a.split(' ').length;
+        const bTokenCount = b.split(' ').length;
+
+        // More-token phrases first, single-token last.
+        if (aTokenCount !== bTokenCount) {
+          return bTokenCount - aTokenCount;
+        }
+
+        // If same token count, longer phrase first.
+        return b.length - a.length;
+      });
+
       patterns.push({
         name: entityType,
-        patterns: Array.from(termPatterns),
+        patterns: orderedPatterns,
       });
 
       this.logger.debug(

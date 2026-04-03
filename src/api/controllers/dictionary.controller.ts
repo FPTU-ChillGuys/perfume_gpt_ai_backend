@@ -10,6 +10,7 @@ import {
 import { Public } from 'src/application/common/Metadata';
 import { DictionaryBuilderService } from 'src/infrastructure/domain/common/dictionary-builder.service';
 import { WinkNlpService } from 'src/infrastructure/domain/common/wink-nlp.service';
+import { VocabularySnapshotService } from 'src/infrastructure/domain/common/vocabulary-snapshot.service';
 
 /**
  * Dictionary test controller - for development/testing only
@@ -25,6 +26,7 @@ export class DictionaryController {
   constructor(
     private readonly dictionarybuilderService: DictionaryBuilderService,
     private readonly winkNlpService: WinkNlpService,
+    private readonly vocabularySnapshotService: VocabularySnapshotService,
   ) {}
 
   /**
@@ -296,6 +298,7 @@ export class DictionaryController {
   async rebuildDictionary() {
     try {
       const snapshot = await this.dictionarybuilderService.buildDictionary();
+      await this.vocabularySnapshotService.persistSnapshot(snapshot, 'manual-rebuild');
       await this.winkNlpService.initializeWithDictionary();
       return {
         success: true,

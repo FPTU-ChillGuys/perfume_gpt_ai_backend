@@ -99,17 +99,13 @@ export class DictionaryBuilderService {
       // Build numeric patterns (hybrid: winkNLP entities + regex constraints)
       const numPatterns = this.buildNumericPatterns(productVariants, products);
 
-      // Build reverse map for post-processing
-      const reverseMap = this.buildSynonymCanonicalMap(dict);
-
-      // Store in memory
-      this.entityDictionary = dict;
-      this.numericPatterns = numPatterns;
-      this.synonymCanonicalMap = reverseMap;
-      this.lastBuiltAt = new Date();
-
-      // Compute stats
+      // Compute stats and store in memory
       const stats = this.computeStats(dict);
+      this.hydrateSnapshot({
+        entityDictionary: dict,
+        numericPatterns: numPatterns,
+        stats,
+      });
 
       const elapsed = Date.now() - startTime;
       this.logger.log(
@@ -122,6 +118,16 @@ export class DictionaryBuilderService {
       this.logger.error(`[DictionaryBuilder] Build failed: ${error}`);
       throw error;
     }
+  }
+
+  /**
+   * Hydrate internal caches from a snapshot (for loading persisted vocab)
+   */
+  hydrateSnapshot(snapshot: DictionarySnapshot): void {
+    this.entityDictionary = snapshot.entityDictionary;
+    this.numericPatterns = snapshot.numericPatterns;
+    this.synonymCanonicalMap = this.buildSynonymCanonicalMap(snapshot.entityDictionary);
+    this.lastBuiltAt = snapshot.stats.timestamp ?? new Date();
   }
 
   /**
@@ -277,7 +283,11 @@ export class DictionaryBuilderService {
       .toLowerCase()
       .trim()
       .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, ''); // Remove diacritics
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+      .replace(/[đ]/g, 'd')
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
@@ -297,12 +307,6 @@ export class DictionaryBuilderService {
     }
     if (lower.includes('eau de cologne')) {
       abbrevs.push('edc', 'eau de cologne');
-    }
-
-    // First letters of multi-word names
-    const words = lower.split(/\s+/);
-    if (words.length > 1) {
-      abbrevs.push(words.map(w => w[0]).join(''));
     }
 
     return abbrevs;

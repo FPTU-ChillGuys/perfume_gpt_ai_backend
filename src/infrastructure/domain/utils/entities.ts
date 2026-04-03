@@ -11,6 +11,11 @@ import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { TrendLog } from 'src/domain/entities/trend-log.entity';
 import { EventLog } from 'src/domain/entities/event-log.entity';
+import { VocabDictionary } from 'src/domain/entities/vocab/vocab-dictionary.entity';
+import { VocabTerm } from 'src/domain/entities/vocab/vocab-term.entity';
+import { VocabAlias } from 'src/domain/entities/vocab/vocab-alias.entity';
+import { VocabAgeBucket } from 'src/domain/entities/vocab/vocab-age-bucket.entity';
+import { VocabPhraseRule } from 'src/domain/entities/vocab/vocab-phrase-rule.entity';
 
 export const entities = [
   Conversation,
@@ -25,5 +30,10 @@ export const entities = [
   InventoryLog,
   ReviewLog,
   TrendLog,
-  EventLog
+  EventLog,
+  VocabDictionary,
+  VocabTerm,
+  VocabAlias,
+  VocabAgeBucket,
+  VocabPhraseRule
 ];

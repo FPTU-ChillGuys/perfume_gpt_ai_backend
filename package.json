@@ -37,6 +37,7 @@
     "test:integration:watch": "jest --config ./test/jest-integration.json --runInBand --watch",
     "test:integration:cov": "jest --config ./test/jest-integration.json --runInBand --coverage",
     "test:integration:setup": "node test/integration/helpers/create-test-db.js",
+    "test:search:v3": "ts-node scripts/run-search-v3-test.ts",
     "bullmq:delete-all-jobs": "ts-node scripts/deleteDataBullScript.ts",
     "find-deadcode": "ts-prune"
   },

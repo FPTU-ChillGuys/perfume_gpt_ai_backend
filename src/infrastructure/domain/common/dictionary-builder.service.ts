@@ -96,6 +96,8 @@ export class DictionaryBuilderService {
         ),
       };
 
+      this.enrichGenderAliases(dict);
+
       // Build numeric patterns (hybrid: winkNLP entities + regex constraints)
       const numPatterns = this.buildNumericPatterns(productVariants, products);
 
@@ -166,6 +168,31 @@ export class DictionaryBuilderService {
     }
 
     return map;
+  }
+
+  private enrichGenderAliases(dict: EntityDictionary): void {
+    const genderMap = dict.gender ?? {};
+
+    const addAliases = (canonical: string, aliases: string[]) => {
+      if (!genderMap[canonical]) {
+        return;
+      }
+
+      const current = new Set<string>(genderMap[canonical]);
+      for (const alias of aliases) {
+        const normalizedAlias = this.normalizeText(alias);
+        if (!normalizedAlias || normalizedAlias === canonical) continue;
+        current.add(alias.toLowerCase());
+        current.add(normalizedAlias);
+      }
+      genderMap[canonical] = Array.from(current);
+    };
+
+    addAliases('male', ['nam', 'cho nam']);
+    addAliases('female', ['nu', 'nữ', 'cho nu', 'cho nữ']);
+    addAliases('unisex', ['cho ca nam va nu', 'cho cả nam và nữ', 'trung tinh', 'trung tính']);
+
+    dict.gender = genderMap;
   }
 
   /**

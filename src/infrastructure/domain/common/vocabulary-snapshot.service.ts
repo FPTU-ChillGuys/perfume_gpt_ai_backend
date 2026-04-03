@@ -1,4 +1,4 @@
-import { InjectEntityManager } from '@mikro-orm/nestjs';
+import { MikroORM } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { Injectable, Logger } from '@nestjs/common';
 import { DictionarySnapshot, EntityDictionary, NumericFieldType, NumericPattern } from 'src/domain/types/dictionary.types';
@@ -22,10 +22,11 @@ type SerializedSnapshotPayload = {
 export class VocabularySnapshotService {
   private readonly logger = new Logger(VocabularySnapshotService.name);
 
-  constructor(@InjectEntityManager('default') private readonly em: EntityManager) {}
+  constructor(private readonly orm: MikroORM) {}
 
   async persistSnapshot(snapshot: DictionarySnapshot, source: string): Promise<VocabDictionary> {
-    return this.em.transactional(async em => {
+    const em = this.orm.em.fork() as EntityManager;
+    return em.transactional(async em => {
       await em.nativeUpdate(VocabDictionary, { isActive: true }, { isActive: false, status: 'archived' });
 
       const version = this.buildVersion(snapshot);
@@ -105,7 +106,8 @@ export class VocabularySnapshotService {
   }
 
   async loadActiveSnapshot(): Promise<DictionarySnapshot | null> {
-    const dictionary = await this.em.findOne(VocabDictionary, { isActive: true }, { orderBy: { builtAt: 'DESC' } });
+    const em = this.orm.em.fork() as EntityManager;
+    const dictionary = await em.findOne(VocabDictionary, { isActive: true }, { orderBy: { builtAt: 'DESC' } });
     if (!dictionary?.snapshotPayload) {
       return null;
     }

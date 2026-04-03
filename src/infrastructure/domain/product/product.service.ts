@@ -24,6 +24,10 @@ import { SearchService } from 'src/infrastructure/domain/search/search.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProductCardOutputItem } from 'src/chatbot/output/product.output';
 import { WinkNlpService } from 'src/infrastructure/domain/common/wink-nlp.service';
+import { DictionaryBuilderService } from 'src/infrastructure/domain/common/dictionary-builder.service';
+import { EntityDictionary } from 'src/domain/types/dictionary.types';
+import { unescapeUnicode } from 'unescape-unicode';
+import { escapeUnicode, isNotAscii } from 'escape-unicode';
 
 const productInclude = {
   Brands: true,
@@ -179,6 +183,7 @@ export class ProductService {
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
     private readonly winkNlpService: WinkNlpService,
+    private readonly dictionaryBuilderService: DictionaryBuilderService,
   ) { }
 
   async getAllProducts(
@@ -320,12 +325,14 @@ export class ProductService {
   private mapParsedToStructuredAnalysis(parsed: Record<string, any>, request: PagedAndSortedRequest): any {
     const byType = parsed?.byType && typeof parsed.byType === 'object' ? parsed.byType : {};
     const signals = parsed?.signals && typeof parsed.signals === 'object' ? parsed.signals : {};
+    const entityDictionary = this.dictionaryBuilderService.getSnapshot()?.entityDictionary;
 
-    const productNames = this.asStringArray(byType.product_name);
+    const productNames = this.expandTermsForStructuredQuery(this.asStringArray(byType.product_name), entityDictionary);
 
     const logicGroups: string[][] = [];
     const pushGroup = (values: unknown) => {
-      const group = this.asStringArray(values);
+      const baseTerms = this.asStringArray(values);
+      const group = this.expandTermsForStructuredQuery(baseTerms, entityDictionary);
       if (group.length > 0) {
         logicGroups.push(group);
       }
@@ -366,6 +373,77 @@ export class ProductService {
       return [];
     }
     return Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)));
+  }
+
+  private expandTermsForStructuredQuery(terms: string[], entityDictionary?: EntityDictionary): string[] {
+    const expanded = new Set<string>();
+
+    for (const term of terms) {
+      const normalizedTerm = term.trim();
+      if (!normalizedTerm) continue;
+
+      expanded.add(normalizedTerm);
+
+      const unescaped = this.safeUnescapeUnicode(normalizedTerm);
+      if (unescaped) {
+        expanded.add(unescaped);
+      }
+
+      // Keep escaped representation when input arrives as unicode escapes.
+      const escaped = this.safeEscapeUnicode(unescaped || normalizedTerm);
+      if (escaped && escaped !== unescaped && escaped !== normalizedTerm) {
+        expanded.add(escaped);
+      }
+
+      const normalizedKey = this.normalizeForLookup(unescaped || normalizedTerm);
+      if (!entityDictionary || !normalizedKey) continue;
+
+      for (const canonicalMap of Object.values(entityDictionary)) {
+        const synonyms = canonicalMap[normalizedKey];
+        if (!synonyms) continue;
+
+        // Canonical no-diacritic remains as fallback search token.
+        expanded.add(normalizedKey);
+
+        // Synonyms preserve Vietnamese diacritics and punctuation from source DB.
+        for (const syn of synonyms) {
+          const trimmedSyn = syn?.trim();
+          if (trimmedSyn) {
+            expanded.add(trimmedSyn);
+          }
+        }
+      }
+    }
+
+    return Array.from(expanded);
+  }
+
+  private normalizeForLookup(text: string): string {
+    return text
+      .toLowerCase()
+      .trim()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đ]/g, 'd')
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private safeUnescapeUnicode(value: string): string {
+    try {
+      return unescapeUnicode(value);
+    } catch {
+      return value;
+    }
+  }
+
+  private safeEscapeUnicode(value: string): string {
+    try {
+      return escapeUnicode(value, { filter: isNotAscii });
+    } catch {
+      return value;
+    }
   }
 
   /**

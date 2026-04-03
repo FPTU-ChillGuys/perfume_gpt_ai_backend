@@ -131,6 +131,9 @@ importers:
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
+      escape-unicode:
+        specifier: ^0.3.0
+        version: 0.3.0
       jwt-decode:
         specifier: ^4.0.0
         version: 4.0.0
@@ -158,6 +161,9 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
+      unescape-unicode:
+        specifier: ^0.3.0
+        version: 0.3.0
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
@@ -3151,6 +3157,9 @@ packages:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
     engines: {node: '>=10'}
 
+  escape-unicode@0.3.0:
+    resolution: {integrity: sha512-4Lr9Prysw8FBwpW8dURr4T3/VRU4RYlhayLgy34zavplBG9bUsTtaCuM7Lw3szWTuidQvkZ2a1qJxG3e5+o99w==}
+
   escodegen@2.1.0:
     resolution: {integrity: sha512-2NlIDTwUWJN0mRPQOdtQBzbUHvdGY2P1VXSyU83Q3xKxM7WHX2Ql8dKq782Q9TgQUNOLEzEYu9bzLNj1q88I5w==}
     engines: {node: '>=6.0'}
@@ -6079,6 +6088,9 @@ packages:
   undici@6.24.1:
     resolution: {integrity: sha512-sC+b0tB1whOCzbtlx20fx3WgCXwkW627p4EA9uM+/tNNPkSS+eSEld6pAs9nDv7WbY1UUljBMYPtu9BCOrCWKA==}
     engines: {node: '>=18.17'}
+
+  unescape-unicode@0.3.0:
+    resolution: {integrity: sha512-K1jDX7CqR4zEsVehK4vOWH4+ZQCwQibK31/cH+U5FswxzzM1jqg049+YzZKDwpkbGKAyxQdf1adwzAMZg5v9Pw==}
 
   universalify@2.0.1:
     resolution: {integrity: sha512-gptHNQghINnc/vTGIk0SOFGFNXw7JVrlRUtConJRlvaw6DuX0wO5Jeko9sWrMBhh+PsYAZ7oXAiOnf/UKogyiw==}
@@ -9689,6 +9701,8 @@ snapshots:
   escape-string-regexp@2.0.0: {}
 
   escape-string-regexp@4.0.0: {}
+
+  escape-unicode@0.3.0: {}
 
   escodegen@2.1.0:
     dependencies:
@@ -13326,6 +13340,8 @@ snapshots:
   undici-types@7.16.0: {}
 
   undici@6.24.1: {}
+
+  unescape-unicode@0.3.0: {}
 
   universalify@2.0.1: {}
 

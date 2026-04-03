@@ -23,6 +23,7 @@ import { HttpService } from '@nestjs/axios';
 import { SearchService } from 'src/infrastructure/domain/search/search.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProductCardOutputItem } from 'src/chatbot/output/product.output';
+import { WinkNlpService } from 'src/infrastructure/domain/common/wink-nlp.service';
 
 const productInclude = {
   Brands: true,
@@ -177,6 +178,7 @@ export class ProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
+    private readonly winkNlpService: WinkNlpService,
   ) { }
 
   async getAllProducts(
@@ -283,6 +285,87 @@ export class ProductService {
       'Failed to fetch products using semantic search v2',
       true
     );
+  }
+
+  /**
+    * Search sản phẩm dùng parser (winkNLP) -> map sang structured analysis -> chạy `getProductsByStructuredQuery`.
+    * Không dùng Elasticsearch path, phục vụ kiểm chứng parse -> query DB hiện tại.
+   */
+  async getProductsUsingParsedSearch(
+    searchText: string,
+    request: PagedAndSortedRequest
+  ): Promise<BaseResponseAPI<any>> {
+    return await funcHandlerAsync(
+      async () => {
+        const parsedResult = this.winkNlpService.parseAndNormalize(searchText);
+        const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
+
+        const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
+        const result = structuredResult.data;
+
+        return {
+          success: structuredResult.success,
+          payload: {
+            ...result,
+            parsedResult,
+            extractedObject,
+          },
+        };
+      },
+      'Failed to fetch products using parsed query path',
+      true,
+    );
+  }
+
+  private mapParsedToStructuredAnalysis(parsed: Record<string, any>, request: PagedAndSortedRequest): any {
+    const byType = parsed?.byType && typeof parsed.byType === 'object' ? parsed.byType : {};
+    const signals = parsed?.signals && typeof parsed.signals === 'object' ? parsed.signals : {};
+
+    const productNames = this.asStringArray(byType.product_name);
+
+    const logicGroups: string[][] = [];
+    const pushGroup = (values: unknown) => {
+      const group = this.asStringArray(values);
+      if (group.length > 0) {
+        logicGroups.push(group);
+      }
+    };
+
+    pushGroup(byType.brand);
+    pushGroup(byType.category);
+    pushGroup(byType.concentration);
+    pushGroup(byType.olfactory_family);
+    pushGroup(byType.scent_note);
+    pushGroup(byType.attribute_value);
+    pushGroup(byType.origin);
+    pushGroup(byType.gender);
+
+    const priceRange = signals?.priceRange && typeof signals.priceRange === 'object' ? signals.priceRange : {};
+    const budget = {
+      min: typeof priceRange.minPriceVnd === 'number' ? priceRange.minPriceVnd : undefined,
+      max: typeof priceRange.maxPriceVnd === 'number' ? priceRange.maxPriceVnd : undefined,
+    };
+
+    return {
+      logic: logicGroups,
+      productNames,
+      budget,
+      sorting: {
+        field: 'Newest',
+        isDescending: request.SortOrder !== 'asc',
+      },
+      pagination: {
+        pageNumber: request.PageNumber || 1,
+        pageSize: request.PageSize || 10,
+      },
+    };
+  }
+
+  private asStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)));
   }
 
   /**

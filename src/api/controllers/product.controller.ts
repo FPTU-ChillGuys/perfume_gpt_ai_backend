@@ -140,6 +140,24 @@ export class ProductController {
     };
   }
 
+  /** Tìm kiếm sản phẩm bằng parser path (winkNLP parse -> query builder) để kiểm chứng */
+  @Public()
+  @Get('search/v3')
+  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng parser path (parse -> query)' })
+  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  async getProductsByParsedSearch(
+    @Req() req: Request,
+    @Query() request: SearchRequest
+  ): Promise<BaseResponseAPI<any>> {
+    const result = await this.productService.getProductsUsingParsedSearch(request.searchText, request);
+
+    const userId = getTokenPayloadFromRequest(req)?.id;
+    const logId = userId ?? uuidv4();
+    await this.userLog.addSearchLogToUserLog(logId, request.searchText);
+
+    return result;
+  }
+
   /** [TEST] Lấy chi tiết một sản phẩm kèm toàn bộ variants */
   @Public()
   @Get(':id/with-variants')

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { DictionaryBuilderService } from 'src/infrastructure/domain/common/dictionary-builder.service';
-import { WinkNlpService } from 'src/infrastructure/domain/common/wink-nlp.service';
+import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
 import { VocabularySnapshotService } from 'src/infrastructure/domain/common/vocabulary-snapshot.service';
 
 /**
@@ -25,7 +25,7 @@ export class DictionaryController {
 
   constructor(
     private readonly dictionarybuilderService: DictionaryBuilderService,
-    private readonly winkNlpService: WinkNlpService,
+    private readonly nlpEngineService: NlpEngineService,
     private readonly vocabularySnapshotService: VocabularySnapshotService,
   ) {}
 
@@ -93,7 +93,8 @@ export class DictionaryController {
   checkReady() {
     return {
       dictionaryReady: this.dictionarybuilderService.getSnapshot() !== null,
-      winkNlpReady: this.winkNlpService.isReady(),
+      winkNlpReady: this.nlpEngineService.isReady(),
+      activeNlpEngine: this.nlpEngineService.getActiveEngine(),
       timestamp: new Date(),
     };
   }
@@ -157,7 +158,7 @@ export class DictionaryController {
     }
 
     try {
-      const result = this.winkNlpService.parseAndNormalize(body.text);
+      const result = this.nlpEngineService.parseAndNormalize(body.text);
       return {
         input: body.text,
         ...result,
@@ -209,7 +210,7 @@ export class DictionaryController {
     }
 
     try {
-      const entities = this.winkNlpService.extractEntities(body.text);
+      const entities = this.nlpEngineService.extractEntities(body.text);
       return {
         input: body.text,
         rawEntities: entities,
@@ -299,11 +300,15 @@ export class DictionaryController {
     try {
       const snapshot = await this.dictionarybuilderService.buildDictionary();
       await this.vocabularySnapshotService.persistSnapshot(snapshot, 'manual-rebuild');
-      await this.winkNlpService.initializeWithDictionary();
+      const reloadedSnapshot = await this.vocabularySnapshotService.loadActiveSnapshot();
+      if (reloadedSnapshot) {
+        this.dictionarybuilderService.hydrateSnapshot(reloadedSnapshot);
+      }
+      await this.nlpEngineService.initializeWithDictionary();
       return {
         success: true,
-        stats: snapshot.stats,
-        message: 'Dictionary rebuilt successfully',
+        stats: reloadedSnapshot?.stats ?? snapshot.stats,
+        message: `Dictionary rebuilt successfully (engine: ${this.nlpEngineService.getActiveEngine()})`,
       };
     } catch (error) {
       this.logger.error(`Rebuild failed: ${error}`);

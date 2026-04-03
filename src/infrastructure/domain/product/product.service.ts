@@ -23,7 +23,7 @@ import { HttpService } from '@nestjs/axios';
 import { SearchService } from 'src/infrastructure/domain/search/search.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProductCardOutputItem } from 'src/chatbot/output/product.output';
-import { WinkNlpService } from 'src/infrastructure/domain/common/wink-nlp.service';
+import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
 import { DictionaryBuilderService } from 'src/infrastructure/domain/common/dictionary-builder.service';
 import { EntityDictionary } from 'src/domain/types/dictionary.types';
 import { unescapeUnicode } from 'unescape-unicode';
@@ -182,7 +182,7 @@ export class ProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
-    private readonly winkNlpService: WinkNlpService,
+    private readonly nlpEngineService: NlpEngineService,
     private readonly dictionaryBuilderService: DictionaryBuilderService,
   ) { }
 
@@ -302,7 +302,7 @@ export class ProductService {
   ): Promise<BaseResponseAPI<any>> {
     return await funcHandlerAsync(
       async () => {
-        const parsedResult = this.winkNlpService.parseAndNormalize(searchText);
+        const parsedResult = this.nlpEngineService.parseAndNormalize(searchText);
         const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
 
         const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
@@ -314,6 +314,7 @@ export class ProductService {
             ...result,
             parsedResult,
             extractedObject,
+            queryLogicUsed: extractedObject.logic ?? [],
           },
         };
       },
@@ -326,8 +327,13 @@ export class ProductService {
     const byType = parsed?.byType && typeof parsed.byType === 'object' ? parsed.byType : {};
     const signals = parsed?.signals && typeof parsed.signals === 'object' ? parsed.signals : {};
     const entityDictionary = this.dictionaryBuilderService.getSnapshot()?.entityDictionary;
+    const searchText = [parsed?.input, parsed?.normalizedInput].find((value): value is string => typeof value === 'string' && value.trim().length > 0) ?? '';
 
     const productNames = this.expandTermsForStructuredQuery(this.asStringArray(byType.product_name), entityDictionary);
+    const genderValues = this.expandTermsForStructuredQuery(this.asStringArray(byType.gender), entityDictionary);
+    const originValues = this.expandTermsForStructuredQuery(this.asStringArray(byType.origin), entityDictionary);
+    const concentrationValues = this.expandTermsForStructuredQuery(this.asStringArray(byType.concentration), entityDictionary);
+    const variantTypeValues = this.expandTermsForStructuredQuery(this.asStringArray(byType.variant_type), entityDictionary);
 
     const logicGroups: string[][] = [];
     const pushGroup = (values: unknown) => {
@@ -340,22 +346,41 @@ export class ProductService {
 
     pushGroup(byType.brand);
     pushGroup(byType.category);
-    pushGroup(byType.concentration);
     pushGroup(byType.olfactory_family);
     pushGroup(byType.scent_note);
-    pushGroup(byType.attribute_value);
-    pushGroup(byType.origin);
-    pushGroup(byType.gender);
+    const attributeValues = this.asStringArray(byType.attribute_value);
+    const nonAgeAttributeValues = attributeValues.filter(value => !this.isAgeBucketValue(value));
+    const ageAttributeValues = attributeValues.filter(value => this.isAgeBucketValue(value));
+    pushGroup(nonAgeAttributeValues);
+
+    const releaseYear = this.extractReleaseYear(searchText);
+    const volumeValues = this.extractVolumeValues(searchText);
+    const minLongevity = this.extractThreshold(searchText, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i);
+    const minSillage = this.extractThreshold(searchText, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i'));
 
     const priceRange = signals?.priceRange && typeof signals.priceRange === 'object' ? signals.priceRange : {};
+    const ageRange = signals?.ageRange && typeof signals.ageRange === 'object' ? signals.ageRange : {};
     const budget = {
       min: typeof priceRange.minPriceVnd === 'number' ? priceRange.minPriceVnd : undefined,
       max: typeof priceRange.maxPriceVnd === 'number' ? priceRange.maxPriceVnd : undefined,
     };
+    const minAge = typeof ageRange.minAge === 'number' ? ageRange.minAge : undefined;
+    const maxAge = typeof ageRange.maxAge === 'number' ? ageRange.maxAge : undefined;
 
     return {
       logic: logicGroups,
       productNames,
+      ageAttributeValues: this.expandTermsForStructuredQuery(ageAttributeValues, entityDictionary),
+      genderValues,
+      originValues,
+      concentrationValues,
+      variantTypeValues,
+      volumeValues,
+      releaseYear,
+      minAge,
+      maxAge,
+      minLongevity,
+      minSillage,
       budget,
       sorting: {
         field: 'Newest',
@@ -373,6 +398,100 @@ export class ProductService {
       return [];
     }
     return Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)));
+  }
+
+  private asNumberArray(value: unknown): number[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        value
+          .map(item => Number(item))
+          .filter(item => Number.isFinite(item) && item > 0)
+      )
+    );
+  }
+
+  private asOptionalNumber(value: unknown): number | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private extractReleaseYear(text: string): number | undefined {
+    const match = text.match(/\b(19\d{2}|20\d{2})\b/);
+    return match ? Number(match[1]) : undefined;
+  }
+
+  private extractVolumeValues(text: string): number[] {
+    const matches = Array.from(text.matchAll(/\b(\d+(?:\.\d+)?)\s*ml\b/gi));
+    return Array.from(new Set(matches.map(match => Number(match[1])).filter(value => Number.isFinite(value) && value > 0)));
+  }
+
+  private extractThreshold(text: string, pattern: RegExp): number | undefined {
+    const match = text.match(pattern);
+    if (!match?.[1]) {
+      return undefined;
+    }
+
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private isAgeBucketValue(value: string): boolean {
+    const normalized = this.normalizeForLookup(value);
+    if (!normalized) {
+      return false;
+    }
+
+    return /(tuoi|thanh nien|nguoi lon|trung nien|thieu nien|teen)/i.test(normalized);
+  }
+
+  private inferAgeTermsFromRange(minAge?: number, maxAge?: number): string[] {
+    if (minAge === undefined && maxAge === undefined) {
+      return [];
+    }
+
+    const terms = new Set<string>();
+
+    if (maxAge !== undefined && maxAge <= 25) {
+      terms.add('thanh nien');
+      terms.add('20-29');
+      terms.add('20 29');
+      terms.add('duoi 25');
+      terms.add('dưới 25');
+    }
+
+    if (minAge !== undefined && minAge >= 25) {
+      terms.add('thanh nien');
+      terms.add('25-30');
+      terms.add('25 30');
+      terms.add('nguoi lon');
+      terms.add('người lớn');
+    }
+
+    if (minAge !== undefined && minAge >= 30) {
+      terms.add('nguoi lon');
+      terms.add('người lớn');
+      terms.add('30-45');
+      terms.add('30 45');
+    }
+
+    if (minAge !== undefined && minAge >= 45) {
+      terms.add('trung nien');
+      terms.add('45+');
+    }
+
+    return Array.from(terms);
   }
 
   private expandTermsForStructuredQuery(terms: string[], entityDictionary?: EntityDictionary): string[] {
@@ -419,14 +538,17 @@ export class ProductService {
   }
 
   private normalizeForLookup(text: string): string {
-    return text
-      .toLowerCase()
-      .trim()
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[đ]/g, 'd')
+    return this.normalizeTextNfc(text)
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private normalizeTextNfc(text: string): string {
+    return text
+      .normalize('NFC')
+      .toLowerCase()
+      .replace(/[\s\-]+/g, ' ')
       .trim();
   }
 
@@ -834,6 +956,19 @@ export class ProductService {
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(async () => {
       const { logic, sorting, budget, pagination, productNames } = analysis;
+      const genderValues = this.asStringArray(analysis.genderValues ?? analysis.gender);
+      const originValues = this.asStringArray(analysis.originValues ?? analysis.origin);
+      const concentrationValues = this.asStringArray(analysis.concentrationValues ?? analysis.concentration);
+      const variantTypeValues = this.asStringArray(analysis.variantTypeValues ?? analysis.variantType);
+      const ageAttributeValues = this.asStringArray(analysis.ageAttributeValues);
+      const volumeValues = this.asNumberArray(analysis.volumeValues ?? analysis.volume);
+      const releaseYear = this.asOptionalNumber(analysis.releaseYear);
+      const minAge = this.asOptionalNumber(analysis.minAge);
+      const maxAge = this.asOptionalNumber(analysis.maxAge);
+      const inferredAgeTerms = this.inferAgeTermsFromRange(minAge, maxAge);
+      const ageTerms = Array.from(new Set([...ageAttributeValues, ...inferredAgeTerms]));
+      const minLongevity = this.asOptionalNumber(analysis.minLongevity);
+      const minSillage = this.asOptionalNumber(analysis.minSillage);
       const skip = ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 5);
       const take = pagination?.pageSize || 5;
 
@@ -861,10 +996,22 @@ export class ProductService {
             { Name: { contains: item } },
             { Brands: { Name: { contains: item } } },
             { Categories: { Name: { contains: item } } },
+            { Gender: { contains: item } },
+            { Origin: { contains: item } },
             { ProductNoteMaps: { some: { ScentNotes: { Name: { contains: item } } } } },
             { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains: item } } } } },
             { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } },
-            { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } } } }
+            { ProductVariants: { some: { Type: { contains: item } } } },
+            { ProductVariants: { some: { Concentrations: { Name: { contains: item } } } } },
+            { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } } } },
+            ...(this.extractReleaseYear(item) ? [{ ReleaseYear: this.extractReleaseYear(item)! }] : []),
+            ...(this.extractVolumeValues(item).length > 0 ? [{ ProductVariants: { some: { VolumeMl: { in: this.extractVolumeValues(item) } } } }] : []),
+            ...(this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i) !== undefined
+              ? [{ ProductVariants: { some: { Longevity: { gte: this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i)! } } } }]
+              : []),
+            ...(this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i')) !== undefined
+              ? [{ ProductVariants: { some: { Sillage: { gte: this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i'))! } } } }]
+              : [])
           ]
         }));
         return { OR: orConditionsForGroup };
@@ -878,6 +1025,101 @@ export class ProductService {
 
       if (groupConditions.length > 0) {
         andConditionsForWhere.push(...groupConditions);
+      }
+
+      if (ageTerms.length > 0) {
+        andConditionsForWhere.push({
+          ProductAttributes: {
+            some: {
+              OR: ageTerms.map(value => ({
+                AttributeValues: {
+                  Value: { contains: value }
+                }
+              }))
+            }
+          }
+        });
+      }
+
+      if (genderValues.length > 0) {
+        andConditionsForWhere.push({
+          OR: genderValues.map(value => ({
+            Gender: { contains: value }
+          }))
+        });
+      }
+
+      if (originValues.length > 0) {
+        andConditionsForWhere.push({
+          OR: originValues.map(value => ({
+            Origin: { contains: value }
+          }))
+        });
+      }
+
+      if (releaseYear !== undefined) {
+        andConditionsForWhere.push({ ReleaseYear: releaseYear });
+      }
+
+      if (volumeValues.length > 0) {
+        andConditionsForWhere.push({
+          ProductVariants: {
+            some: {
+              IsDeleted: false,
+              VolumeMl: { in: volumeValues }
+            }
+          }
+        });
+      }
+
+      if (concentrationValues.length > 0) {
+        andConditionsForWhere.push({
+          ProductVariants: {
+            some: {
+              IsDeleted: false,
+              OR: concentrationValues.map(value => ({
+                Concentrations: {
+                  Name: { contains: value }
+                }
+              }))
+            }
+          }
+        });
+      }
+
+      if (variantTypeValues.length > 0) {
+        andConditionsForWhere.push({
+          ProductVariants: {
+            some: {
+              IsDeleted: false,
+              OR: variantTypeValues.map(value => ({
+                Type: { contains: value }
+              }))
+            }
+          }
+        });
+      }
+
+      if (minLongevity !== undefined) {
+        andConditionsForWhere.push({
+          ProductVariants: {
+            some: {
+              IsDeleted: false,
+              Longevity: { gte: minLongevity }
+            }
+          }
+        });
+      }
+
+      if (minSillage !== undefined) {
+        andConditionsForWhere.push({
+          ProductVariants: {
+            some: {
+              IsDeleted: false,
+              Sillage: { gte: minSillage }
+            }
+          }
+        });
       }
 
       if (budget) {

@@ -28,6 +28,16 @@ export class SearchObjectDto {
     @IsOptional()
     gender?: GenderIntent;
 
+    @ApiProperty({ description: 'Xuất xứ', required: false })
+    @IsString()
+    @IsOptional()
+    origin?: string;
+
+    @ApiProperty({ description: 'Năm ra mắt', required: false, example: 2020 })
+    @IsNumber()
+    @IsOptional()
+    releaseYear?: number;
+
     @ApiProperty({ description: 'Giá tối thiểu', required: false })
     @IsNumber()
     @IsOptional()
@@ -77,6 +87,11 @@ export class SearchObjectDto {
     @IsNumber()
     @IsOptional()
     volume?: number;
+
+    @ApiProperty({ description: 'Loại variant', required: false })
+    @IsString()
+    @IsOptional()
+    variantType?: string;
 
     @ApiProperty({ description: 'Dịp sử dụng (đi tiệc, đi làm, ...)', required: false })
     @IsString()

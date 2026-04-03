@@ -25,6 +25,20 @@ export type NumericFieldType =
   | 'longevity'
   | 'sillage';
 
+export interface AgeBucketSnapshot {
+  label: string;
+  minAge: number;
+  maxAge: number;
+  priority: number;
+}
+
+export interface ParserRuleSnapshot {
+  ruleGroup: string;
+  pattern: string;
+  isRegex: boolean;
+  priority: number;
+}
+
 /**
  * Entity-centric dictionary structure:
  * Key: entity type
@@ -68,6 +82,8 @@ export interface ParsedEntity {
 export interface DictionarySnapshot {
   entityDictionary: EntityDictionary;
   numericPatterns: Map<NumericFieldType, NumericPattern>;
+  ageBuckets?: AgeBucketSnapshot[];
+  parserRules?: ParserRuleSnapshot[];
   stats: {
     totalCanonicals: number;
     totalSynonyms: number;

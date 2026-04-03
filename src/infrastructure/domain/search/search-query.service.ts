@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { QueryDslQueryContainer } from '@elastic/elasticsearch/lib/api/types';
 import { SearchObjectDto, GenderIntent } from 'src/application/dtos/request/search-object.dto';
 import { AnalysisObject } from 'src/chatbot/output/analysis.output';
 import { embed } from 'ai';
 import { embeddingModel } from 'src/chatbot/ai-model';
+
+type QueryDslQueryContainer = Record<string, any>;
 export class SearchQueryService {
     /**
      * Builds the main search query with multiple layers (Exact, Semantic, Discovery, Typo, Technical)
@@ -102,15 +103,30 @@ export class SearchQueryService {
      */
     buildFilterQuery(params: {
         gender?: string;
+        origin?: string;
+        releaseYear?: number;
         categoryId?: string;
         brandId?: string;
         fromPrice?: number;
         toPrice?: number;
+        volume?: number;
+        concentration?: string;
+        variantType?: string;
+        minLongevity?: number;
+        minSillage?: number;
     }): QueryDslQueryContainer[] {
         const filters: QueryDslQueryContainer[] = [];
 
         if (params.gender) {
             filters.push({ term: { gender: params.gender } });
+        }
+
+        if (params.origin) {
+            filters.push({ term: { origin: params.origin } });
+        }
+
+        if (params.releaseYear !== undefined) {
+            filters.push({ term: { releaseYear: params.releaseYear } });
         }
 
         if (params.categoryId) {
@@ -126,6 +142,26 @@ export class SearchQueryService {
             if (params.fromPrice !== undefined) range.gte = params.fromPrice;
             if (params.toPrice !== undefined) range.lte = params.toPrice;
             filters.push({ range: { variantPrices: range } });
+        }
+
+        if (params.volume !== undefined) {
+            filters.push({ term: { volumes: params.volume } });
+        }
+
+        if (params.concentration) {
+            filters.push({ match: { concentrations: { query: params.concentration } } });
+        }
+
+        if (params.variantType) {
+            filters.push({ match: { variantType: { query: params.variantType } } });
+        }
+
+        if (params.minLongevity !== undefined) {
+            filters.push({ range: { longevity: { gte: params.minLongevity } } });
+        }
+
+        if (params.minSillage !== undefined) {
+            filters.push({ range: { sillage: { gte: params.minSillage } } });
         }
 
         return filters;
@@ -162,6 +198,12 @@ export class SearchQueryService {
         }
         if (obj.gender) {
             filters.push({ term: { gender: obj.gender } });
+        }
+        if (obj.origin) {
+            filters.push({ term: { origin: obj.origin } });
+        }
+        if (obj.releaseYear !== undefined) {
+            filters.push({ term: { releaseYear: obj.releaseYear } });
         }
         if (obj.minPrice !== undefined || obj.maxPrice !== undefined) {
             const range: any = {};
@@ -297,6 +339,12 @@ export class SearchQueryService {
         if (obj.gender) {
             filters.push({ term: { gender: obj.gender } });
         }
+        if (obj.origin) {
+            filters.push({ term: { origin: obj.origin } });
+        }
+        if (obj.releaseYear !== undefined) {
+            filters.push({ term: { releaseYear: obj.releaseYear } });
+        }
 
         // 5. Price range filter
         if (obj.minPrice !== undefined || obj.maxPrice !== undefined) {
@@ -341,6 +389,28 @@ export class SearchQueryService {
                     volumes: {
                         value: obj.volume,
                         boost: 5.0
+                    }
+                }
+            });
+        }
+
+        if (obj.variantType) {
+            shouldClauses.push({
+                match: {
+                    variantType: {
+                        query: obj.variantType,
+                        boost: 2.5
+                    }
+                }
+            });
+        }
+
+        if (obj.concentration) {
+            shouldClauses.push({
+                match: {
+                    concentrations: {
+                        query: obj.concentration,
+                        boost: 2.5
                     }
                 }
             });
@@ -442,8 +512,16 @@ export class SearchQueryService {
                         if (['nam', 'male'].includes(val)) dto.gender = GenderIntent.MALE;
                         else if (['nữ', 'female'].includes(val)) dto.gender = GenderIntent.FEMALE;
                         else if (['unisex', 'trung tính'].includes(val)) dto.gender = GenderIntent.UNISEX;
+                        else if (/(?:^|\b)(edp|edt|parfum|eau de parfum|eau de toilette|extrait)(?:\b|$)/i.test(val)) dto.concentration = meta.corrected;
+                        else if (/(?:^|\b)(\d+)\s*ml(?:\b|$)/i.test(val)) dto.volume = Number(val.match(/(\d+)/)?.[1]);
+                        else if (/(?:^|\b)(\d{4})(?:\b|$)/.test(val)) dto.releaseYear = Number(val.match(/(\d{4})/)?.[1]);
+                        else if (/(?:\b)(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)(?:\b|$)/i.test(val)) dto.minLongevity = Number(val.match(/(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)/i)?.[1]);
+                        else if (/(?:\b)(\d+(?:\.\d+)?)\s*(?:\/10|điểm|points?)(?:\b|$)/i.test(val)) dto.minSillage = Number(val.match(/(\d+(?:\.\d+)?)\s*(?:\/10|điểm|points?)/i)?.[1]);
                         else if (val.includes('tuổi')) dto.ageGroup = meta.corrected;
                         else if (['tiệc', 'đi chơi', 'văn phòng'].some(s => val.includes(s))) dto.occasion = meta.corrected;
+                        else if (['us', 'usa', 'pháp', 'france', 'nhật', 'japan', 'hàn quốc', 'korea', 'italy', 'ý'].some(s => val.includes(s))) dto.origin = meta.corrected;
+                        else if (['edp', 'edt', 'parfum', 'eau de parfum', 'eau de toilette', 'extrait'].some(s => val.includes(s))) dto.concentration = meta.corrected;
+                        else if (['body mist', 'travel', 'sample', 'spray'].some(s => val.includes(s))) dto.variantType = meta.corrected;
                         else dto.style = meta.corrected;
                         break;
                 }
@@ -453,6 +531,26 @@ export class SearchQueryService {
         // Handle product names from analysis
         if (analysis.productNames && analysis.productNames.length > 0) {
             dto.productName = analysis.productNames[0]; // Take first as primary for flat DTO
+        }
+
+        const releaseYearMatch = analysis.originalRequestVietnamese?.match(/\b(19\d{2}|20\d{2})\b/);
+        if (releaseYearMatch) {
+            dto.releaseYear = Number(releaseYearMatch[1]);
+        }
+
+        const volumeMatch = analysis.originalRequestVietnamese?.match(/\b(\d+(?:\.\d+)?)\s*ml\b/i);
+        if (volumeMatch) {
+            dto.volume = Number(volumeMatch[1]);
+        }
+
+        const longevityMatch = analysis.originalRequestVietnamese?.match(/\b(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i);
+        if (longevityMatch) {
+            dto.minLongevity = Number(longevityMatch[1]);
+        }
+
+        const sillageMatch = analysis.originalRequestVietnamese?.match(/\b(\d+(?:\.\d+)?)\s*(?:\/10|điểm|points?)\b/i);
+        if (sillageMatch) {
+            dto.minSillage = Number(sillageMatch[1]);
         }
 
         return dto;

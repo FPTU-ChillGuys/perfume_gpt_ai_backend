@@ -285,7 +285,7 @@ export class WinkNlpService {
       .split(/\s+/)
       .map(token => token.trim())
       .filter(token => token.length > 0)
-      .filter(token => /^[a-z0-9]+$/.test(token))
+      .filter(token => /^[\p{L}\p{N}]+$/u.test(token))
       .filter(token => token.length >= 2 || /^\d+$/.test(token));
 
     if (tokens.length === 0) return null;
@@ -437,23 +437,24 @@ export class WinkNlpService {
   }
 
   private normalizeText(text: string): string {
-    return text
-      .toLowerCase()
-      .trim()
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[đ]/g, 'd')
+    return this.normalizeTextNfc(text)
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
   private normalizeTextKeepDiacritics(text: string): string {
-    return text
-      .toLowerCase()
-      .trim()
+    return this.normalizeTextNfc(text)
       .replace(/[^ -\u007F\p{L}\p{N}\s]/gu, ' ')
       .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private normalizeTextNfc(text: string): string {
+    return text
+      .normalize('NFC')
+      .toLowerCase()
+      .replace(/[\s\-]+/g, ' ')
       .trim();
   }
 

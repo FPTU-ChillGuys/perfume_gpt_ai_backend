@@ -23,9 +23,11 @@ type SearchV3Response = {
       productNames?: string[];
       budget?: Record<string, unknown>;
     };
+    queryLogicUsed?: string[][];
     parsedResult?: {
       byType?: Record<string, string[]>;
       signals?: Record<string, unknown>;
+      logic?: Record<string, unknown>;
     };
   };
 };
@@ -87,18 +89,16 @@ async function main() {
 
       lines.push(`success: ${data.success}`);
       lines.push(`totalCount: ${totalCount}`);
-      lines.push('top3:');
+      lines.push('top3 (quick check):');
       lines.push(shortJson(top3));
+      lines.push('parsedResult:');
+      lines.push(shortJson(payload.parsedResult));
       lines.push('parsed.byType:');
       lines.push(shortJson(payload.parsedResult?.byType));
       lines.push('parsed.signals:');
       lines.push(shortJson(payload.parsedResult?.signals));
-      lines.push('extractedObject.logic:');
-      lines.push(shortJson(payload.extractedObject?.logic));
-      lines.push('extractedObject.productNames:');
-      lines.push(shortJson(payload.extractedObject?.productNames));
-      lines.push('extractedObject.budget:');
-      lines.push(shortJson(payload.extractedObject?.budget));
+      lines.push('queryLogicUsed:');
+      lines.push(shortJson(payload.queryLogicUsed ?? payload.extractedObject?.logic));
     } catch (error: any) {
       lines.push('success: false');
       lines.push(`error: ${error?.message ?? 'unknown error'}`);

@@ -16,6 +16,7 @@ import { VocabTerm } from 'src/domain/entities/vocab/vocab-term.entity';
 import { VocabAlias } from 'src/domain/entities/vocab/vocab-alias.entity';
 import { VocabAgeBucket } from 'src/domain/entities/vocab/vocab-age-bucket.entity';
 import { VocabPhraseRule } from 'src/domain/entities/vocab/vocab-phrase-rule.entity';
+import { VocabParserRule } from 'src/domain/entities/vocab/vocab-parser-rule.entity';
 
 export const entities = [
   Conversation,
@@ -35,5 +36,6 @@ export const entities = [
   VocabTerm,
   VocabAlias,
   VocabAgeBucket,
-  VocabPhraseRule
+  VocabPhraseRule,
+  VocabParserRule
 ];

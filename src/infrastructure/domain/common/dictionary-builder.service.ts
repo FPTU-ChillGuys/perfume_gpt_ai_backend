@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { MasterDataService } from './master-data.service';
 import {
+  AgeBucketSnapshot,
+  ParserRuleSnapshot,
   EntityDictionary,
   EntityType,
   NumericPattern,
@@ -16,6 +18,8 @@ export class DictionaryBuilderService {
   private readonly logger = new Logger(DictionaryBuilderService.name);
   private entityDictionary: EntityDictionary | null = null;
   private numericPatterns: Map<NumericFieldType, NumericPattern> | null = null;
+  private ageBuckets: AgeBucketSnapshot[] | null = null;
+  private parserRules: ParserRuleSnapshot[] | null = null;
   private synonymCanonicalMap: SynonymCanonicalMap | null = null;
   private lastBuiltAt: Date | null = null;
 
@@ -106,6 +110,8 @@ export class DictionaryBuilderService {
       this.hydrateSnapshot({
         entityDictionary: dict,
         numericPatterns: numPatterns,
+        ageBuckets: [],
+        parserRules: [],
         stats,
       });
 
@@ -115,7 +121,7 @@ export class DictionaryBuilderService {
           `Total canonicals: ${stats.totalCanonicals}, Total synonyms: ${stats.totalSynonyms}`,
       );
 
-      return { entityDictionary: dict, numericPatterns: numPatterns, stats };
+      return { entityDictionary: dict, numericPatterns: numPatterns, ageBuckets: [], parserRules: [], stats };
     } catch (error) {
       this.logger.error(`[DictionaryBuilder] Build failed: ${error}`);
       throw error;
@@ -128,6 +134,8 @@ export class DictionaryBuilderService {
   hydrateSnapshot(snapshot: DictionarySnapshot): void {
     this.entityDictionary = snapshot.entityDictionary;
     this.numericPatterns = snapshot.numericPatterns;
+    this.ageBuckets = snapshot.ageBuckets ?? [];
+    this.parserRules = snapshot.parserRules ?? [];
     this.synonymCanonicalMap = this.buildSynonymCanonicalMap(snapshot.entityDictionary);
     this.lastBuiltAt = snapshot.stats.timestamp ?? new Date();
   }
@@ -150,6 +158,7 @@ export class DictionaryBuilderService {
 
       // Add original + lowercased
       synonyms.add(item.name.toLowerCase());
+      synonyms.add(this.normalizeTextNfc(item.name));
 
       // Add normalized version
       synonyms.add(canonical);
@@ -294,6 +303,15 @@ export class DictionaryBuilderService {
               confidence: 0.95, // Slightly less confident for synonyms
             };
           }
+
+          const nfcSyn = this.normalizeTextNfc(syn);
+          if (!map[nfcSyn]) {
+            map[nfcSyn] = {
+              type: entityType as EntityType,
+              canonical,
+              confidence: 0.95,
+            };
+          }
         }
       }
     }
@@ -303,17 +321,20 @@ export class DictionaryBuilderService {
   }
 
   /**
-   * Normalize text: lowercase, trim, remove accents (for Vietnamese)
+   * Normalize text for dictionary keys using NFC only (keep Vietnamese diacritics).
    */
   private normalizeText(text: string): string {
-    return text
-      .toLowerCase()
-      .trim()
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-      .replace(/[đ]/g, 'd')
+    return this.normalizeTextNfc(text)
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private normalizeTextNfc(text: string): string {
+    return text
+      .normalize('NFC')
+      .toLowerCase()
+      .replace(/[\s\-]+/g, ' ')
       .trim();
   }
 
@@ -377,6 +398,8 @@ export class DictionaryBuilderService {
     return {
       entityDictionary: this.entityDictionary,
       numericPatterns: this.numericPatterns,
+      ageBuckets: this.ageBuckets ?? [],
+      parserRules: this.parserRules ?? [],
       stats: {
         totalCanonicals: Object.values(this.entityDictionary).reduce(
           (sum, m) => sum + Object.keys(m).length,

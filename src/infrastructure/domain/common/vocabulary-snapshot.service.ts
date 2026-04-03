@@ -1,10 +1,11 @@
 import { MikroORM } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { Injectable, Logger } from '@nestjs/common';
-import { DictionarySnapshot, EntityDictionary, NumericFieldType, NumericPattern } from 'src/domain/types/dictionary.types';
+import { AgeBucketSnapshot, DictionarySnapshot, EntityDictionary, NumericFieldType, NumericPattern, ParserRuleSnapshot } from 'src/domain/types/dictionary.types';
 import { VocabAgeBucket } from 'src/domain/entities/vocab/vocab-age-bucket.entity';
 import { VocabAlias } from 'src/domain/entities/vocab/vocab-alias.entity';
 import { VocabDictionary } from 'src/domain/entities/vocab/vocab-dictionary.entity';
+import { VocabParserRule } from 'src/domain/entities/vocab/vocab-parser-rule.entity';
 import { VocabPhraseRule } from 'src/domain/entities/vocab/vocab-phrase-rule.entity';
 import { VocabTerm } from 'src/domain/entities/vocab/vocab-term.entity';
 
@@ -15,6 +16,8 @@ type SerializedNumericPattern = Omit<NumericPattern, 'regex'> & {
 type SerializedSnapshotPayload = {
   entityDictionary: EntityDictionary;
   numericPatterns: Array<[NumericFieldType, SerializedNumericPattern]>;
+  ageBuckets?: AgeBucketSnapshot[];
+  parserRules?: ParserRuleSnapshot[];
   stats: DictionarySnapshot['stats'];
 };
 
@@ -27,6 +30,15 @@ export class VocabularySnapshotService {
   async persistSnapshot(snapshot: DictionarySnapshot, source: string): Promise<VocabDictionary> {
     const em = this.orm.em.fork() as EntityManager;
     return em.transactional(async em => {
+      const latestDictionary = await em.findOne(
+        VocabDictionary,
+        {},
+        { orderBy: { builtAt: 'DESC', createdAt: 'DESC' } },
+      );
+      const baseParserRules = latestDictionary
+        ? await em.find(VocabParserRule, { dictionary: latestDictionary.id }, { orderBy: { priority: 'DESC' } })
+        : [];
+
       await em.nativeUpdate(VocabDictionary, { isActive: true }, { isActive: false, status: 'archived' });
 
       const version = this.buildVersion(snapshot);
@@ -47,6 +59,7 @@ export class VocabularySnapshotService {
       const aliases: VocabAlias[] = [];
       const ageBuckets: VocabAgeBucket[] = [];
       const phraseRules: VocabPhraseRule[] = [];
+      const parserRules: VocabParserRule[] = [];
 
       for (const [entityType, canonicalMap] of Object.entries(snapshot.entityDictionary)) {
         for (const [canonical, synonyms] of Object.entries(canonicalMap)) {
@@ -94,11 +107,46 @@ export class VocabularySnapshotService {
         );
       }
 
-      em.persist([...terms, ...aliases, ...ageBuckets, ...phraseRules]);
+      for (const rule of baseParserRules) {
+        parserRules.push(
+          em.create(VocabParserRule, {
+            dictionary: vocabDictionary,
+            ruleGroup: rule.ruleGroup,
+            pattern: rule.pattern,
+            isRegex: rule.isRegex,
+            priority: rule.priority,
+          } as any),
+        );
+      }
+
+      em.persist([...terms, ...aliases, ...ageBuckets, ...phraseRules, ...parserRules]);
+      await em.flush();
+
+      const ageBucketPayload: AgeBucketSnapshot[] = ageBuckets.map(bucket => ({
+        label: bucket.label,
+        minAge: bucket.minAge,
+        maxAge: bucket.maxAge,
+        priority: bucket.priority,
+      }));
+
+      const parserRulePayload: ParserRuleSnapshot[] = parserRules
+        .sort((a, b) => b.priority - a.priority)
+        .map(rule => ({
+          ruleGroup: rule.ruleGroup,
+          pattern: rule.pattern,
+          isRegex: rule.isRegex,
+          priority: rule.priority,
+        }));
+
+      vocabDictionary.snapshotPayload = this.serializeSnapshot({
+        ...snapshot,
+        ageBuckets: ageBucketPayload,
+        parserRules: parserRulePayload,
+      }) as any;
       await em.flush();
 
       this.logger.log(
-        `[VocabularySnapshot] Persisted ${version} with ${terms.length} terms, ${aliases.length} aliases, ${ageBuckets.length} age buckets, ${phraseRules.length} phrase rules`,
+        `[VocabularySnapshot] Persisted ${version} with ${terms.length} terms, ${aliases.length} aliases, ${ageBuckets.length} age buckets, ${phraseRules.length} phrase rules, ${parserRules.length} parser rules`,
       );
 
       return vocabDictionary;
@@ -112,7 +160,18 @@ export class VocabularySnapshotService {
       return null;
     }
 
-    return this.deserializeSnapshot(dictionary.snapshotPayload as unknown as SerializedSnapshotPayload);
+    const snapshot = this.deserializeSnapshot(dictionary.snapshotPayload as unknown as SerializedSnapshotPayload);
+    const parserRules = await em.find(VocabParserRule, { dictionary: dictionary.id }, { orderBy: { priority: 'DESC' } });
+
+    return {
+      ...snapshot,
+      parserRules: parserRules.map(rule => ({
+        ruleGroup: rule.ruleGroup,
+        pattern: rule.pattern,
+        isRegex: rule.isRegex,
+        priority: rule.priority,
+      })),
+    };
   }
 
   private serializeSnapshot(snapshot: DictionarySnapshot): SerializedSnapshotPayload {
@@ -128,6 +187,8 @@ export class VocabularySnapshotService {
           },
         },
       ]),
+      ageBuckets: snapshot.ageBuckets ?? [],
+      parserRules: snapshot.parserRules ?? [],
       stats: snapshot.stats,
     };
   }
@@ -146,6 +207,8 @@ export class VocabularySnapshotService {
     return {
       entityDictionary: payload.entityDictionary,
       numericPatterns,
+      ageBuckets: payload.ageBuckets ?? [],
+      parserRules: payload.parserRules ?? [],
       stats: {
         ...payload.stats,
         timestamp: payload.stats.timestamp instanceof Date
@@ -211,4 +274,5 @@ export class VocabularySnapshotService {
   private buildPhraseRules(): string[] {
     return ['co huong', 'mui huong', 'nuoc hoa', 'danh cho'];
   }
+
 }

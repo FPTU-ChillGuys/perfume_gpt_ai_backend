@@ -85,7 +85,7 @@ export class RecommendationController {
     description: 'ID của user cần recommend'
   })
   @ApiQuery({
-    name: 'topN',
+    name: 'size',
     required: false,
     type: Number,
     description: 'Số sản phẩm recommend (default: 10)'
@@ -93,11 +93,11 @@ export class RecommendationController {
   @ApiBaseResponse(Object)
   async getRecommendationsV2(
     @Query('userId') userId: string,
-    @Query('topN') topN?: number
+    @Query('size') size?: number
   ): Promise<BaseResponse<RecommendationResponse>> {
     return await this.recommendationV2Service.getRecommendations(
       userId,
-      topN || 10
+      size || 10
     );
   }
 }

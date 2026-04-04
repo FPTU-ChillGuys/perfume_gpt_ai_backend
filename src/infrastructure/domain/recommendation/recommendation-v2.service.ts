@@ -45,23 +45,30 @@ export class RecommendationV2Service {
    */
   async getRecommendations(
     userId: string,
-    topN: number = 10,
+    size: number = 10,
     weights?: Partial<ScoresWeights>
   ): Promise<BaseResponse<RecommendationResponse>> {
     try {
+      this.logger.log(`[START] Getting recommendations for user: ${userId}, size: ${size}`);
+
       // Step 1: Build user profile
       const profile = await this.buildUserRecommendationProfile(userId);
+      this.logger.log(`[PROFILE] Age: ${profile.dynamicAge}, Season: ${profile.currentSeason}, Budget: ${profile.monthlyBudgetAvg}VND`);
+      this.logger.log(`[PROFILE] Top Brands: ${profile.topBrands.join(', ')}`);
+      this.logger.log(`[PROFILE] Top Scents: ${profile.topScents.join(', ')}`);
 
       // Step 2: Generate candidate products
       const candidates = await this.generateCandidateProducts(profile);
+      this.logger.log(`[CANDIDATES] Found ${candidates.length} candidate products`);
 
       if (candidates.length === 0) {
+        this.logger.warn(`[FALLBACK] No candidates found, using best sellers`);
         // Fallback: return best sellers
         return {
           success: true,
           data: {
             userId,
-            recommendations: await this.getBestSellersFallback(topN),
+            recommendations: await this.getBestSellersFallback(size),
             totalProducts: 0,
             profile: {
               dynamicAge: profile.dynamicAge,
@@ -78,23 +85,30 @@ export class RecommendationV2Service {
       const scoredProducts = candidates.map((product) =>
         this.scoreProduct(product, profile, weights)
       );
+      
+      // Log top 5 scores for debugging
+      const top5 = scoredProducts.sort((a, b) => b.score - a.score).slice(0, 5);
+      this.logger.log(`[SCORING] Top 5 scores: ${top5.map(p => `${p.productName}(${p.score.toFixed(2)})`).join(', ')}`);
 
       // Step 4: Apply budget filter
       const budgetFiltered = scoredProducts.filter(
         (p) => p.basePrice && p.basePrice <= profile.maxBudgetMonthly * 1.2
       );
+      this.logger.log(`[BUDGET FILTER] ${scoredProducts.length} → ${budgetFiltered.length} (max: ${Math.round(profile.maxBudgetMonthly * 1.2)}VND)`);
 
       // Sort by score
       const sorted = budgetFiltered.sort((a, b) => b.score - a.score);
 
       // Fallback if not enough after filters
       const final =
-        sorted.length < topN
+        sorted.length < size
           ? [
               ...sorted,
-              ...(await this.getBestSellersFallback(topN - sorted.length))
-            ].slice(0, topN)
-          : sorted.slice(0, topN);
+              ...(await this.getBestSellersFallback(size - sorted.length))
+            ].slice(0, size)
+          : sorted.slice(0, size);
+      
+      this.logger.log(`[FINAL] Returning size=${size} products: ${final.map(p => p.productName).join(', ')}`);
 
       return {
         success: true,
@@ -126,6 +140,8 @@ export class RecommendationV2Service {
   async buildUserRecommendationProfile(
     userId: string
   ): Promise<RecommendationProfile> {
+    this.logger.log(`[PROFILE-BUILD] Starting for user: ${userId}`);
+
     const [user, orders, userSummary] = await Promise.all([
       this.userService.getUserById(userId).catch(() => null),
       this.getOrdersForUser(userId),
@@ -134,25 +150,33 @@ export class RecommendationV2Service {
         .catch(() => ({ success: false, data: null }))
     ]);
 
+    this.logger.log(`[PROFILE-BUILD] Found ${orders.length} orders from last 2 years`);
+
     // Extract preferences from orders
     const preferences = this.extractPreferencesFromOrders(orders);
+    this.logger.log(`[PROFILE-BUILD] Preferences extracted: Brands=${preferences.topBrands.join(',')}, Scents=${preferences.topScents.join(',')}`);
 
     // Calculate dynamic age
     const dynamicAge = await this.calculateDynamicAge(userId);
+    this.logger.log(`[PROFILE-BUILD] Dynamic age: ${dynamicAge}`);
 
     // Calculate budget from order history
     const budgetInfo = this.calculateMonthlyBudget(orders);
+    this.logger.log(`[PROFILE-BUILD] Budget: min=${budgetInfo.min}, avg=${budgetInfo.avg}, max=${budgetInfo.max}`);
 
     // Detect current season
     const currentSeason = this.detectCurrentSeason();
+    this.logger.log(`[PROFILE-BUILD] Current season: ${currentSeason}`);
 
     // Extract survey preferences
     const surveyPrefs = this.extractSurveyPreferences(
       userSummary?.success ? (userSummary.data as any) : null
     );
+    this.logger.log(`[PROFILE-BUILD] Survey prefs: Scents=${surveyPrefs.scents.join(',')}, Occasions=${surveyPrefs.occasions.join(',')}`);
 
     // Calculate repurchase frequency
     const repurchaseMap = this.calculateRepurchaseFrequencies(orders);
+    this.logger.log(`[PROFILE-BUILD] Repurchase products count: ${Object.keys(repurchaseMap).length}`);
 
     return {
       userId,
@@ -232,7 +256,11 @@ export class RecommendationV2Service {
     const priceRangeCounts = new Map<string, number>();
 
     orders.forEach((order) => {
+      if (!order?.orderDetails) return;
+      
       order.orderDetails.forEach((detail) => {
+        if (!detail?.productVariant?.Products) return;
+        
         const product = detail.productVariant.Products;
 
         if (!product) return;
@@ -273,22 +301,29 @@ export class RecommendationV2Service {
     });
 
     return {
-      topBrands: this.getTopItems(brandCounts, 3),
-      topScents: this.getTopItems(scentCounts, 3),
-      topGenders: this.getTopItems(genderCounts, 2),
+      topBrands: this.getTopItems(brandCounts, 3, 'BRANDS'),
+      topScents: this.getTopItems(scentCounts, 3, 'SCENTS'),
+      topGenders: this.getTopItems(genderCounts, 2, 'GENDERS'),
       topOccasions: [], // From survey data, not orders
-      topPriceRanges: this.getTopItems(priceRangeCounts, 2)
+      topPriceRanges: this.getTopItems(priceRangeCounts, 2, 'PRICE_RANGES')
     };
   }
 
   /**
-   * Get top N items from a count map
+   * Get top N items from a count map (topK selection)
+   * Sorts by frequency descending and takes first N items
    */
-  private getTopItems(map: Map<string, number>, n: number): string[] {
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, n)
-      .map((entry) => entry[0]);
+  private getTopItems(map: Map<string, number>, n: number, category: string = ''): string[] {
+    const sorted = Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1]);
+    
+    const selected = sorted.slice(0, n).map((entry) => entry[0]);
+    
+    // Log the topK selection
+    const debug = sorted.map((entry) => `${entry[0]}(${entry[1]})`).join(', ');
+    this.logger.log(`[TOPK] ${category} - All: [${debug}] → Top${n}: [${selected.join(', ')}]`);
+    
+    return selected;
   }
 
   /**
@@ -427,7 +462,11 @@ export class RecommendationV2Service {
 
     // Group purchases by product
     orders.forEach((order) => {
+      if (!order?.orderDetails) return;
+
       order.orderDetails.forEach((detail) => {
+        if (!detail?.productVariant) return;
+
         const productKey = `${detail.productVariant.id}`;
         if (!productPurchases.has(productKey)) {
           productPurchases.set(productKey, []);
@@ -510,6 +549,8 @@ export class RecommendationV2Service {
     const variants: ProductVariantInfo[] = [];
 
     products.forEach((product) => {
+      if (!product?.ProductVariants) return;
+
       product.ProductVariants.forEach((variant) => {
         variants.push({
           variantId: variant.Id,
@@ -559,9 +600,25 @@ export class RecommendationV2Service {
       this.isRepurchaseCandidate(product, profile);
     const repurchaseBonus = isRepurchaseCandidate ? 0.5 : 0;
 
+    let finalScore = score;
     if (isRepurchaseCandidate) {
-      score *= 1.5; // Boost score by 50% for repurchase items
+      finalScore = score * 1.5; // Boost score by 50% for repurchase items
     }
+
+    const normalizedScore = Math.min(100, Math.max(0, finalScore * 100)); // Normalize to 0-100
+    
+    // Log detailed scoring breakdown
+    this.logger.debug(
+      `[SCORE] ${product.productName}: ` +
+      `Brand(${(brandScore * weights.brand * 100).toFixed(1)}%) + ` +
+      `Scent(${(scentScore * weights.scent * 100).toFixed(1)}%) + ` +
+      `Survey(${(surveyScore * weights.survey * 100).toFixed(1)}%) + ` +
+      `Season(${(seasonScore * weights.season * 100).toFixed(1)}%) + ` +
+      `Age(${(ageScore * weights.age * 100).toFixed(1)}%) + ` +
+      `Budget(${(budgetScore * weights.budget * 100).toFixed(1)}%) ` +
+      `${isRepurchaseCandidate ? `+ Repurchase(×1.5) ` : ''}` +
+      `= ${normalizedScore.toFixed(1)}/100`
+    );
 
     return {
       productId: product.productId,
@@ -571,7 +628,7 @@ export class RecommendationV2Service {
       brand: product.brand,
       basePrice: product.basePrice,
       gender: product.gender,
-      score: Math.min(100, Math.max(0, score * 100)), // Normalize to 0-100
+      score: normalizedScore,
       scoreBreakdown: {
         brandScore: brandScore * 100,
         scentScore: scentScore * 100,

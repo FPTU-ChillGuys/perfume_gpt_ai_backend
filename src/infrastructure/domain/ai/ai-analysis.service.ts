@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Output } from 'ai';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
-import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, SURVEY_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
+import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT, SURVEY_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { Tools } from 'src/chatbot/tools';
-import { analysisOutput, AnalysisObject } from 'src/chatbot/output/analysis.output';
+import { analysisOutput, AnalysisObject, intentOnlyOutput, IntentOnlyObject } from 'src/chatbot/output/analysis.output';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 
 @Injectable()
@@ -47,6 +47,44 @@ export class AiAnalysisService {
             return analysis;
         } catch (error) {
             this.logger.error('[AiAnalysis] Analysis failed', error);
+            return null;
+        }
+    }
+
+    async analyzeIntentOnly(currentMessage: string, previousMessages?: string): Promise<IntentOnlyObject | null> {
+        try {
+            this.logger.log(`[AiAnalysis] Starting intent-only analysis...`);
+            if (!currentMessage) {
+                this.logger.warn('[AiAnalysis] Current message is empty or undefined');
+                return null;
+            }
+
+            const input = JSON.stringify({
+                previousMessages: previousMessages || 'No previous context.',
+                currentMessage: currentMessage
+            });
+
+            const result = await textGenerationFromPromptToResultWithErrorHandler(
+                aiModelForOptimizePrompt,
+                input,
+                INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT,
+                undefined,
+                'Failed to analyze intent only',
+                10,
+                Output.object(intentOnlyOutput),
+                0.2 // Low temperature for consistent intent
+            );
+
+            if (!result) {
+                this.logger.warn('[AiAnalysis] Intent analysis returned null');
+                return null;
+            }
+
+            const analysis = JSON.parse(result) as IntentOnlyObject;
+            this.logger.log(`[AiAnalysis] Intent analysis completed. Intent: ${analysis.intent}`);
+            return analysis;
+        } catch (error) {
+            this.logger.error('[AiAnalysis] Intent analysis failed', error);
             return null;
         }
     }

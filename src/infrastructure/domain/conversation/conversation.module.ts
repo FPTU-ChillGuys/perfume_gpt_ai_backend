@@ -9,6 +9,7 @@ import { UnitOfWorkModule } from 'src/infrastructure/domain/common/unit-of-work.
 import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from 'src/application/constant/processor';
 import { RecommendationModule } from 'src/infrastructure/domain/recommendation/recommendation.module';
+import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.module';
 
 @Module({
     imports: [
@@ -17,6 +18,7 @@ import { RecommendationModule } from 'src/infrastructure/domain/recommendation/r
         UserLogModule,
         ProductModule,
         AdminInstructionModule,
+        DictionaryModule,
         forwardRef(() => RecommendationModule), // Avoid circular dependency if any
         BullModule.registerQueue({ name: QueueName.CONVERSATION_QUEUE }),
     ],

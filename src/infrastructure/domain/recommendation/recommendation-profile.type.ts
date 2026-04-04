@@ -3,9 +3,12 @@
  */
 
 export type Season = 'summer' | 'winter';
+export type RecommendationMode = 'cold-start' | 'warm-user' | 'hybrid';
 
 export interface RecommendationProfile {
   userId: string;
+
+  recommendationMode: RecommendationMode;
   
   // Age & Demographics
   dynamicAge: number;

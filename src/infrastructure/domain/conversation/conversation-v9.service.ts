@@ -20,6 +20,8 @@ import { ConversationJobName, QueueName } from 'src/application/constant/process
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { RecommendationV2Service } from 'src/infrastructure/domain/recommendation/recommendation-v2.service';
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
+import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
+import { AnalysisObject } from 'src/chatbot/output/analysis.output';
 
 @Injectable()
 export class ConversationV9Service {
@@ -31,7 +33,8 @@ export class ConversationV9Service {
     @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue,
     private readonly productService: ProductService,
     private readonly recommendationV2Service: RecommendationV2Service,
-    private readonly aiAnalysisService: AiAnalysisService
+    private readonly aiAnalysisService: AiAnalysisService,
+    private readonly nlpEngineService: NlpEngineService
   ) { }
 
   /**
@@ -78,16 +81,37 @@ export class ConversationV9Service {
     combinedPrompt: string,
     endpoint: string
   ): Promise<ConversationDto> {
-    // Phase 1: Extract Context & Run Middleman AI
+    // Phase 1: Extract Intent using AI
     const lastUserMessage = [...convertedMessages].reverse().find(m => m.role === 'user');
     const messageText = lastUserMessage?.parts.find(p => p.type === 'text')?.text || '';
     
-    this.logger.log(`[processAiChatResponseV9] Analyzing message with Middleman AI: "${messageText.substring(0, 50)}..."`);
+    this.logger.log(`[processAiChatResponseV9] Analyzing intent only with AI: "${messageText.substring(0, 50)}..."`);
     
-    const analysis = await this.aiAnalysisService.analyze(messageText, JSON.stringify(conversationMessages));
-    let intent = analysis?.intent || 'Chat';
+    const intentResult = await this.aiAnalysisService.analyzeIntentOnly(messageText, JSON.stringify(conversationMessages));
+    let intent = intentResult?.intent || 'Chat';
 
-    this.logger.log(`[processAiChatResponseV9] Detected Intent: ${intent} (Explanation: ${analysis?.explanation})`);
+    this.logger.log(`[processAiChatResponseV9] Detected Intent: ${intent}`);
+
+    // Phase 2: Run Keyword Extraction via NLP
+    // We parse NLP here so we can format it into a pseudo-AnalysisObject for Recommendation context if needed.
+    const parsedNlpKw = this.nlpEngineService.parseAndNormalize(messageText);
+    const nlpBrands = parsedNlpKw?.byType?.brand || [];
+    const nlpProductNames = parsedNlpKw?.byType?.product_name || [];
+    const nlpScents = parsedNlpKw?.byType?.scent_note || [];
+    const nlpGenders = parsedNlpKw?.byType?.gender || [];
+    
+    // Construct a pseudo-chat context matching what Recommendation expects
+    const pseudoChatContext: AnalysisObject = {
+      intent: intent,
+      logic: [...nlpBrands, ...nlpScents, ...nlpGenders], 
+      productNames: nlpProductNames.length > 0 ? nlpProductNames : null,
+      budget: null, 
+      sorting: null,
+      pagination: null,
+      originalRequestVietnamese: messageText,
+      explanation: 'NLP parsed intent and keywords',
+      normalizationMetadata: null
+    };
 
     let finalMessages = convertedMessages;
 
@@ -95,7 +119,7 @@ export class ConversationV9Service {
     if (intent === 'Recommend') {
       try {
         this.logger.log(`[processAiChatResponseV9] Invoking RecommendationV2Service for user ${userId}...`);
-        const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 5, analysis || undefined); // top 5 with context
+        const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 5, pseudoChatContext); // top 5 with context
 
         if (recommendationResult.success && recommendationResult.data?.recommendations?.length) {
           const minimalProducts = recommendationResult.data.recommendations.map(p => ({
@@ -125,25 +149,13 @@ export class ConversationV9Service {
     } 
     else if (intent === 'Search' || intent === 'Consult') {
       try {
-        this.logger.log(`[processAiChatResponseV9] Invoking Structural Search via ProductService...`);
-        // Override pagination if not specified by AI
-        if (analysis && !analysis.pagination) {
-          analysis.pagination = { pageNumber: 1, pageSize: 5 };
-        }
+        this.logger.log(`[processAiChatResponseV9] Invoking Structural Search via ProductService using NLP parsing...`);
         
-        const searchPayload = analysis || { 
-          intent: 'Search', 
-          logic: [], 
-          productNames: [], 
-          pagination: { pageNumber: 1, pageSize: 5 }, 
-          sorting: null, 
-          budget: null 
-        };
+        // Let product service perform standard NLP search matching V8 but guided by explicit AI search intent
+        const searchResponse = await this.productService.getProductsUsingParsedSearch(messageText, { PageNumber: 1, PageSize: 5, SortOrder: 'asc', IsDescending: false });
 
-        const searchResponse = await this.productService.getProductsByStructuredQuery(searchPayload);
-
-        if (searchResponse.success && searchResponse.data?.items?.length) {
-          const products = searchResponse.data.items;
+        if (searchResponse.success && searchResponse.payload?.items?.length) {
+          const products = searchResponse.payload.items;
           const minimalProducts = products.map((p: any) => ({
             id: p.id,
             name: p.name,

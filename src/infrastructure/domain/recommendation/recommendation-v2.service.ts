@@ -57,6 +57,7 @@ export class RecommendationV2Service {
 
       // Step 1: Build user profile
       const profile = await this.buildUserRecommendationProfile(userId);
+      this.logger.log(`[PROFILE] Mode: ${profile.recommendationMode}`);
       this.logger.log(`[PROFILE] Age: ${profile.dynamicAge}, Season: ${profile.currentSeason}, Budget: ${profile.monthlyBudgetAvg}VND`);
       this.logger.log(`[PROFILE] Top Brands: ${profile.topBrands.join(', ')}`);
       this.logger.log(`[PROFILE] Top Scents: ${profile.topScents.join(', ')}`);
@@ -118,25 +119,27 @@ export class RecommendationV2Service {
       const scoredProducts = candidates.map((product) =>
         this.scoreProduct(product, profile, chatContext, weights)
       );
+
+      const uniqueScoredProducts = this.deduplicateProductScores(scoredProducts);
       
-      // Log top 5 scores for debugging
-      const top5 = scoredProducts.sort((a, b) => b.score - a.score).slice(0, 5);
-      this.logger.log(`[SCORING] Top 5 scores: ${top5.map(p => `${p.productName}(${p.score.toFixed(2)})`).join(', ')}`);
+      // Log top 10 scores for debugging
+      const top10 = uniqueScoredProducts.sort((a, b) => b.score - a.score).slice(0, 10);
+      this.logger.log(`[SCORING] Top 10 scores: ${top10.map(p => `${p.productName}(${p.score.toFixed(2)})`).join(', ')}`);
 
       // Step 4: Apply budget exploration (Allow 20% premium out of bounds)
-      let budgetFiltered = scoredProducts;
-      if (chatContext && chatContext.budget && chatContext.budget.max !== null) {
+      let budgetFiltered = uniqueScoredProducts;
+      if (chatContext && chatContext.budget && Number.isFinite(chatContext.budget.max ?? NaN)) {
         // Hard constraint if AI strictly captured a budget
         const maxB = chatContext.budget.max;
-        budgetFiltered = scoredProducts.filter(p => p.basePrice && p.basePrice <= maxB);
+        budgetFiltered = uniqueScoredProducts.filter(p => p.basePrice && p.basePrice <= (maxB ?? 0));
       } else {
         // Budget exploration: 80% strict match, 20% slight upsell allowed (+30% price)
-        budgetFiltered = scoredProducts.filter(
+        budgetFiltered = uniqueScoredProducts.filter(
           (p) => p.basePrice && p.basePrice <= profile.maxBudgetMonthly * 1.3
         );
       }
       
-      this.logger.log(`[BUDGET FILTER] ${scoredProducts.length} → ${budgetFiltered.length}`);
+      this.logger.log(`[BUDGET FILTER] ${uniqueScoredProducts.length} → ${budgetFiltered.length}`);
 
       // Sort by score BEFORE diversity
       const sorted = budgetFiltered.sort((a, b) => b.score - a.score);
@@ -238,12 +241,53 @@ export class RecommendationV2Service {
     const summaryPreferences = this.extractPreferencesFromUserSummary(
       userSummary?.success ? (userSummary.data as any) : null
     );
+    const repurchaseMap = this.calculateRepurchaseFrequencies(orders);
 
-    const topBrands = preferences.topBrands.length > 0 ? preferences.topBrands : summaryPreferences.topBrands;
-    const topScents = preferences.topScents.length > 0 ? preferences.topScents : summaryPreferences.topScents;
-    const topGenders = preferences.topGenders.length > 0 ? preferences.topGenders : summaryPreferences.topGenders;
-    const topOccasions = preferences.topOccasions.length > 0 ? preferences.topOccasions : summaryPreferences.topOccasions;
-    const topPriceRanges = preferences.topPriceRanges.length > 0 ? preferences.topPriceRanges : summaryPreferences.topPriceRanges;
+    const hasOrderSignals =
+      preferences.topBrands.length > 0 ||
+      preferences.topScents.length > 0 ||
+      preferences.topGenders.length > 0 ||
+      Object.keys(repurchaseMap || {}).length > 0;
+
+    const hasSummarySignals =
+      summaryPreferences.topBrands.length > 0 ||
+      summaryPreferences.topScents.length > 0 ||
+      summaryPreferences.topGenders.length > 0 ||
+      summaryPreferences.surveyTopScents.length > 0 ||
+      summaryPreferences.surveyTopOccasions.length > 0 ||
+      summaryPreferences.surveyTopStyles.length > 0;
+
+    const recommendationMode = hasOrderSignals && hasSummarySignals
+      ? 'hybrid'
+      : hasOrderSignals
+        ? 'warm-user'
+        : 'cold-start';
+
+    const topBrands = this.resolvePreferenceSignals(
+      recommendationMode,
+      preferences.topBrands,
+      summaryPreferences.topBrands
+    );
+    const topScents = this.resolvePreferenceSignals(
+      recommendationMode,
+      preferences.topScents,
+      summaryPreferences.topScents
+    );
+    const topGenders = this.resolvePreferenceSignals(
+      recommendationMode,
+      preferences.topGenders,
+      summaryPreferences.topGenders
+    );
+    const topOccasions = this.resolvePreferenceSignals(
+      recommendationMode,
+      preferences.topOccasions,
+      summaryPreferences.topOccasions
+    );
+    const topPriceRanges = this.resolvePreferenceSignals(
+      recommendationMode,
+      preferences.topPriceRanges,
+      summaryPreferences.topPriceRanges
+    );
 
     this.logger.log(
       `[PROFILE-BUILD] Preferences extracted: ` +
@@ -271,12 +315,11 @@ export class RecommendationV2Service {
     );
     this.logger.log(`[PROFILE-BUILD] Survey prefs: Scents=${surveyPrefs.scents.join(',')}, Occasions=${surveyPrefs.occasions.join(',')}`);
 
-    // Calculate repurchase frequency
-    const repurchaseMap = this.calculateRepurchaseFrequencies(orders);
     this.logger.log(`[PROFILE-BUILD] Repurchase products count: ${Object.keys(repurchaseMap).length}`);
 
     return {
       userId,
+      recommendationMode,
       dynamicAge,
       gender: topGenders[0],
       topBrands,
@@ -293,6 +336,18 @@ export class RecommendationV2Service {
       surveyTopStyles: surveyPrefs.styles.length > 0 ? surveyPrefs.styles : summaryPreferences.surveyTopStyles,
       repurchaseFrequencyMap: repurchaseMap
     };
+  }
+
+  private resolvePreferenceSignals(mode: 'cold-start' | 'warm-user' | 'hybrid', orderSignals: string[], summarySignals: string[]): string[] {
+    if (mode === 'warm-user') {
+      return orderSignals;
+    }
+
+    if (mode === 'cold-start') {
+      return summarySignals;
+    }
+
+    return Array.from(new Set([...orderSignals, ...summarySignals]));
   }
 
   /**
@@ -334,7 +389,22 @@ export class RecommendationV2Service {
       }
     });
 
-    return orders as any;
+    return orders.map((order: any) => ({
+      orderId: order.id ?? order.Id,
+      customerId: order.CustomerId ?? order.customerId,
+      createdAt: order.CreatedAt ?? order.createdAt,
+      totalAmount: Number(order.TotalAmount ?? order.totalAmount ?? 0),
+      orderDetails: (order.OrderDetails ?? order.orderDetails ?? []).map((detail: any) => ({
+        quantity: Number(detail.Quantity ?? detail.quantity ?? 0),
+        unitPrice: Number(detail.UnitPrice ?? detail.unitPrice ?? 0),
+        productVariant: {
+          id: detail.ProductVariants?.Id ?? detail.productVariant?.id,
+          VolumeMl: detail.ProductVariants?.VolumeMl ?? detail.productVariant?.VolumeMl ?? detail.productVariant?.volumeMl ?? 0,
+          BasePrice: detail.ProductVariants?.BasePrice ?? detail.productVariant?.BasePrice ?? detail.productVariant?.basePrice ?? 0,
+          Products: detail.ProductVariants?.Products ?? detail.productVariant?.Products
+        }
+      }))
+    })) as any;
   }
 
   /**
@@ -545,8 +615,16 @@ export class RecommendationV2Service {
 
     if (recent.length === 0) {
       // Use all orders
-      const total = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
-      const avg = total / orders.length;
+      const validTotals = orders
+        .map((o) => Number(o.totalAmount))
+        .filter((amount) => Number.isFinite(amount));
+
+      if (validTotals.length === 0) {
+        return { avg: 2_000_000, min: 1_000_000, max: 3_000_000 };
+      }
+
+      const total = validTotals.reduce((sum, amount) => sum + amount, 0);
+      const avg = total / validTotals.length;
       return {
         avg,
         min: Math.floor(avg * 0.7),
@@ -554,8 +632,16 @@ export class RecommendationV2Service {
       };
     }
 
-    const total = recent.reduce((sum, o) => sum + Number(o.totalAmount), 0);
-    const months = Math.min(3, recent.length);
+    const validRecentTotals = recent
+      .map((o) => Number(o.totalAmount))
+      .filter((amount) => Number.isFinite(amount));
+
+    if (validRecentTotals.length === 0) {
+      return { avg: 2_000_000, min: 1_000_000, max: 3_000_000 };
+    }
+
+    const total = validRecentTotals.reduce((sum, amount) => sum + amount, 0);
+    const months = Math.min(3, validRecentTotals.length);
     const avg = total / months;
 
     return {
@@ -1005,6 +1091,10 @@ export class RecommendationV2Service {
     const price = product.basePrice;
     const maxBudget = profile.maxBudgetMonthly;
 
+    if (!Number.isFinite(maxBudget) || maxBudget <= 0) {
+      return 0.5;
+    }
+
     if (price <= maxBudget) {
       return 1.0; // Within budget
     }
@@ -1075,5 +1165,18 @@ export class RecommendationV2Service {
         isRepurchaseCandidate: false
       }))
       .slice(0, limit);
+  }
+
+  private deduplicateProductScores(scores: ProductScore[]): ProductScore[] {
+    const byProductId = new Map<string, ProductScore>();
+
+    for (const score of scores) {
+      const existing = byProductId.get(score.productId);
+      if (!existing || score.score > existing.score) {
+        byProductId.set(score.productId, score);
+      }
+    }
+
+    return Array.from(byProductId.values());
   }
 }

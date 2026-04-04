@@ -29,8 +29,18 @@ export const analysisOutputSchema = z.object({
     explanation: z.string().describe('Short explanation of the analysis in Vietnamese (visible to main AI only).')
 });
 
+export const intentOnlyOutputSchema = z.object({
+    intent: z.enum(['Search', 'Consult', 'Recommend', 'Compare', 'Greeting', 'Chat', 'Task', 'Unknown'])
+        .describe('The core intent of the user message. Use "Recommend" for advice/suggestions requesting personalized picks, "Task" for actions.')
+});
+
 export type AnalysisObject = z.infer<typeof analysisOutputSchema>;
+export type IntentOnlyObject = z.infer<typeof intentOnlyOutputSchema>;
 
 export const analysisOutput = {
     schema: analysisOutputSchema
+};
+
+export const intentOnlyOutput = {
+    schema: intentOnlyOutputSchema
 };

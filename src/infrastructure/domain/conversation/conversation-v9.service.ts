@@ -119,6 +119,9 @@ export class ConversationV9Service {
     if (intent === 'Recommend') {
       try {
         this.logger.log(`[processAiChatResponseV9] Invoking RecommendationV2Service for user ${userId}...`);
+        this.logger.log(
+          `[processAiChatResponseV9] [RECOMMEND_INPUT] intent=${intent}; brands=${nlpBrands.slice(0, 10).join('|') || 'none'}; scents=${nlpScents.slice(0, 10).join('|') || 'none'}; genders=${nlpGenders.slice(0, 10).join('|') || 'none'}; productNames=${nlpProductNames.slice(0, 10).join('|') || 'none'}`
+        );
         const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 5, pseudoChatContext); // top 5 with context
 
         if (recommendationResult.success && recommendationResult.data?.recommendations?.length) {
@@ -130,6 +133,12 @@ export class ConversationV9Service {
             brand: p.brand,
             basePrice: p.basePrice,
             gender: p.gender,
+            attributes: [
+              ...(Array.isArray(p.scentNotes) ? p.scentNotes.map(note => `Scent: ${note}`) : []),
+              ...(Array.isArray(p.olfactoryFamilies) ? p.olfactoryFamilies.map(f => `Family: ${f}`) : [])
+            ],
+            scentNotes: p.scentNotes,
+            olfactoryFamilies: p.olfactoryFamilies,
             matchScore: p.score,
             scoreBreakdown: p.scoreBreakdown
           }));

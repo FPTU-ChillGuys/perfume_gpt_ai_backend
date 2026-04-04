@@ -46,6 +46,7 @@ export interface ProductScore {
   brand?: string;
   basePrice?: number;
   gender?: string;
+  scentNotes?: string[];
   score: number;
   
   // Score breakdown for transparency

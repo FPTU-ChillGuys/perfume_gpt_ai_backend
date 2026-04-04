@@ -54,6 +54,9 @@ export class RecommendationV2Service {
     try {
       const userId = userIdRaw.toLowerCase();
       this.logger.log(`[START] Getting recommendations for user: ${userId}, size: ${size}`);
+      this.logger.log(
+        `[INPUT] chatContext intent=${chatContext?.intent ?? 'none'}, logicCount=${chatContext?.logic?.length ?? 0}, productNameCount=${chatContext?.productNames?.length ?? 0}, budgetMax=${chatContext?.budget?.max ?? 'none'}`
+      );
 
       // Step 1: Build user profile
       const profile = await this.buildUserRecommendationProfile(userId);
@@ -805,7 +808,17 @@ export class RecommendationV2Service {
             Concentrations: true
           }
         },
-        Brands: true
+        Brands: true,
+        ProductNoteMaps: {
+          include: {
+            ScentNotes: true
+          }
+        },
+        ProductFamilyMaps: {
+          include: {
+            OlfactoryFamilies: true
+          }
+        }
       },
       take: 100
     });
@@ -827,6 +840,12 @@ export class RecommendationV2Service {
           basePrice: Number(variant.BasePrice),
           volumeMl: variant.VolumeMl,
           concentration: variant.Concentrations?.Name,
+          scentNotes: (product.ProductNoteMaps || [])
+            .map((m: any) => m?.ScentNotes?.Name)
+            .filter((name: string | undefined): name is string => Boolean(name)),
+          olfactoryFamilies: (product.ProductFamilyMaps || [])
+            .map((m: any) => m?.OlfactoryFamilies?.Name)
+            .filter((name: string | undefined): name is string => Boolean(name)),
           priceRange: this.getPriceRange(Number(variant.BasePrice))
         });
       });
@@ -902,18 +921,7 @@ export class RecommendationV2Service {
 
     const normalizedScore = Math.min(100, Math.max(0, finalScore * 100)); // Normalize to 0-100
     
-    // Log detailed scoring breakdown
-    this.logger.debug(
-      `[SCORE] ${product.productName}: ` +
-      `Brand(${(brandScore * weights.brand * 100).toFixed(1)}%) + ` +
-      `Scent(${(scentScore * weights.scent * 100).toFixed(1)}%) + ` +
-      `Survey(${(surveyScore * weights.survey * 100).toFixed(1)}%) + ` +
-      `Season(${(seasonScore * weights.season * 100).toFixed(1)}%) + ` +
-      `Age(${(ageScore * weights.age * 100).toFixed(1)}%) + ` +
-      `Budget(${(budgetScore * weights.budget * 100).toFixed(1)}%) ` +
-      `${isRepurchaseCandidate ? `+ Repurchase(×1.5) ` : ''}` +
-      `= ${normalizedScore.toFixed(1)}/100`
-    );
+    // Keep logs concise: only the aggregated Top 10 scores are logged in getRecommendations().
 
     return {
       productId: product.productId,
@@ -923,6 +931,7 @@ export class RecommendationV2Service {
       brand: product.brand,
       basePrice: product.basePrice,
       gender: product.gender,
+      scentNotes: product.scentNotes,
       olfactoryFamilies: product.olfactoryFamilies,
       score: normalizedScore,
       scoreBreakdown: {

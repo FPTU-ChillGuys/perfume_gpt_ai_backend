@@ -30,6 +30,7 @@ import { conversationOutput, searchOutput, surveyOutput } from 'src/chatbot/outp
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class SurveyService {
@@ -151,14 +152,16 @@ export class SurveyService {
       const surveyQuestionAnswer =
         await this.unitOfWork.AISurveyQuestionAnswerRepo.createQuesAns(quesAns);
 
+      const logUserId = surveyQuesAnws.userId ?? uuidv4();
+
       //Log last survey question answer
       const surveyEventIds = await this.unitOfWork.EventLogRepo.createSurveyEventsFromDetails(
-        surveyQuesAnws.userId,
+        logUserId,
         surveyQuestionAnswer.details.getItems()
       );
 
       if (surveyEventIds.length) {
-        await this.userLogService.enqueueRollingSummaryUpdate(surveyQuesAnws.userId);
+        await this.userLogService.enqueueRollingSummaryUpdate(logUserId);
       }
 
       const savedQuesAns = SurveyQuestionAnswerMapper.toResponse(

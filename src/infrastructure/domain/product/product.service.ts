@@ -598,14 +598,69 @@ export class ProductService {
   async resolveProductViewInfo(
     productId: string,
     variantId?: string
-  ): Promise<{ productName?: string; variantName?: string }> {
+  ): Promise<{
+    productName?: string;
+    variantName?: string;
+    brand?: string;
+    category?: string;
+    gender?: string;
+    scentNotes?: string[];
+    olfactoryFamilies?: string[];
+    basePrice?: number;
+  }> {
     const product = await this.prisma.products.findFirst({
       where: { Id: productId, IsDeleted: false },
-      select: { Name: true }
+      select: {
+        Name: true,
+        Gender: true,
+        Brands: {
+          select: {
+            Name: true
+          }
+        },
+        Categories: {
+          select: {
+            Name: true
+          }
+        },
+        ProductNoteMaps: {
+          select: {
+            ScentNotes: {
+              select: {
+                Name: true
+              }
+            }
+          }
+        },
+        ProductFamilyMaps: {
+          select: {
+            OlfactoryFamilies: {
+              select: {
+                Name: true
+              }
+            }
+          }
+        }
+      }
     });
 
+    const productContext = {
+      productName: product?.Name,
+      brand: product?.Brands?.Name,
+      category: product?.Categories?.Name,
+      gender: product?.Gender ?? undefined,
+      scentNotes:
+        product?.ProductNoteMaps?.map((item) => item.ScentNotes?.Name).filter(
+          Boolean
+        ) ?? [],
+      olfactoryFamilies:
+        product?.ProductFamilyMaps?.map(
+          (item) => item.OlfactoryFamilies?.Name
+        ).filter(Boolean) ?? []
+    };
+
     if (!variantId) {
-      return { productName: product?.Name };
+      return productContext;
     }
 
     const variant = await this.prisma.productVariants.findFirst({
@@ -615,6 +670,7 @@ export class ProductService {
         Sku: true,
         Type: true,
         VolumeMl: true,
+        BasePrice: true,
         Concentrations: {
           select: { Name: true }
         }
@@ -622,7 +678,7 @@ export class ProductService {
     });
 
     if (!variant || variant.ProductId !== productId) {
-      return { productName: product?.Name };
+      return productContext;
     }
 
     const variantParts = [
@@ -636,8 +692,9 @@ export class ProductService {
       (variant.Sku ? `SKU ${variant.Sku}` : undefined);
 
     return {
-      productName: product?.Name,
-      variantName
+      ...productContext,
+      variantName,
+      basePrice: Number(variant.BasePrice)
     };
   }
 

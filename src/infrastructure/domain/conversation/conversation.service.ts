@@ -74,10 +74,13 @@ export class ConversationService {
 
         //Luu message vao log (chỉ khi user đã đăng nhập)
         if (conversation.userId) {
+          const latestMessage = this.getLastMessage(conversation.messages.getItems());
+          if (latestMessage) {
           await this.unitOfWork.EventLogRepo.createMessageEvent(
             conversation.userId,
-            conversation.messages.getItems()[conversation.messages.getItems().length - 2]
+            latestMessage
           );
+          }
           await this.userLogService.enqueueRollingSummaryUpdate(conversation.userId);
         }
 
@@ -115,10 +118,13 @@ export class ConversationService {
 
         //Lay message luu vao log (chỉ khi user đã đăng nhập)
         if (conversation.userId) {
+          const latestMessage = this.getLastMessage(messages);
+          if (latestMessage) {
           await this.unitOfWork.EventLogRepo.createMessageEvent(
             conversation.userId,
-            messages[messages.length - 2]
+            latestMessage
           );
+          }
           await this.userLogService.enqueueRollingSummaryUpdate(conversation.userId);
         }
 
@@ -150,6 +156,14 @@ export class ConversationService {
 
       return { success: true, data: conversationDto };
     }, 'Failed to get conversation by id');
+  }
+
+  private getLastMessage(messages: Message[]): Message | undefined {
+    if (!messages.length) {
+      return undefined;
+    }
+
+    return messages[messages.length - 1];
   }
 
   async isExistConversation(id: string): Promise<boolean> {

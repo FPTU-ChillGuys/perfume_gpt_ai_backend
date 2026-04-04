@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { jwtDecode } from "jwt-decode";
+import { createHash } from 'crypto';
 
 export interface TokenPayload {
   sub: string;
@@ -29,6 +30,37 @@ export function getTokenPayloadFromRequest(request: Request): TokenPayload | nul
     console.error('Failed to parse token payload:', error);
     return null;
   }
+}
+
+function toHeaderValue(headerValue: string | string[] | undefined): string {
+  if (!headerValue) {
+    return '';
+  }
+
+  return Array.isArray(headerValue) ? headerValue.join(',') : headerValue;
+}
+
+function resolveClientIp(request: Request): string {
+  const forwardedFor = toHeaderValue(request.headers['x-forwarded-for']);
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0]?.trim() ?? '';
+  }
+
+  return request.ip || '';
+}
+
+function buildAnonymousUserIdFromRequest(request: Request): string {
+  const clientIp = resolveClientIp(request);
+  const userAgent = toHeaderValue(request.headers['user-agent']);
+  const acceptLanguage = toHeaderValue(request.headers['accept-language']);
+  const fingerprint = `${clientIp}|${userAgent}|${acceptLanguage}`;
+  const digest = createHash('sha256').update(fingerprint).digest('hex').slice(0, 24);
+
+  return `anonymous:${digest}`;
+}
+
+export function resolveLogUserIdFromRequest(request: Request): string {
+  return getTokenPayloadFromRequest(request)?.id ?? buildAnonymousUserIdFromRequest(request);
 }
 
 

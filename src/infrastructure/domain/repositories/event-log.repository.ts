@@ -6,6 +6,7 @@ import { SurveyQuestionAnswerDetail } from 'src/domain/entities/survey-question-
 import { EventLogEntityType } from 'src/domain/enum/event-log-entity-type.enum';
 import { EventLogEventType } from 'src/domain/enum/event-log-event-type.enum';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import { BadRequestException } from '@nestjs/common';
 
 export type EventLogQuery = {
   userId?: string;
@@ -17,6 +18,7 @@ export type EventLogQuery = {
 @Injectable()
 export class EventLogRepository extends SqlEntityRepository<EventLog> {
   async createEventLog(event: Partial<EventLog>): Promise<string> {
+    this.validateEventPayload(event);
     const record = new EventLog(event);
     await this.upsert(record);
     return record.id;
@@ -29,7 +31,8 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
       entityType: EventLogEntityType.SEARCH,
       contentText: searchText,
       metadata: {
-        source: 'user_search'
+        source: 'user_search',
+        keyword: searchText
       }
     });
   }
@@ -39,7 +42,8 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
     productId: string,
     variantId?: string,
     productName?: string,
-    variantName?: string
+    variantName?: string,
+    extraMetadata?: Record<string, unknown>
   ): Promise<string> {
     return this.createEventLog({
       userId,
@@ -50,7 +54,8 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
         source: 'product_view',
         ...(variantId ? { variantId } : {}),
         ...(productName ? { productName } : {}),
-        ...(variantName ? { variantName } : {})
+        ...(variantName ? { variantName } : {}),
+        ...(extraMetadata || {})
       }
     });
   }
@@ -69,7 +74,7 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
   }
 
   async createSurveyEventsFromDetails(
-    userId: string,
+    userId: string | undefined,
     surveyQuesAnsDetails: SurveyQuestionAnswerDetail[]
   ): Promise<string[]> {
     const detailIds = surveyQuesAnsDetails.map((item) => item.id);
@@ -91,27 +96,78 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
     const eventLogs = surveyQuesAnsDetails
       .filter((detail) => !existingDetailIds.has(detail.id))
       .map(
-        (detail) =>
+        (detail) => {
+          const answerPayload = {
+            questionId: detail.question?.id,
+            question: detail.question?.question,
+            answerId: detail.answer?.id,
+            answer: detail.answer?.answer
+          };
+
+          return (
           new EventLog({
             userId,
             eventType: EventLogEventType.SURVEY,
             entityType: EventLogEntityType.SURVEY,
             entityId: detail.id,
             metadata: {
-              questionId: detail.question?.id,
-              question: detail.question?.question,
-              answerId: detail.answer?.id,
-              answer: detail.answer?.answer
+              source: 'survey_submitted',
+              ...answerPayload,
+              answers: [answerPayload]
             }
           })
+          );
+        }
       );
 
     if (!eventLogs.length) {
       return [];
     }
 
-    await this.getEntityManager().persistAndFlush(eventLogs);
+    await this.getEntityManager().upsert(eventLogs);
     return eventLogs.map((item) => item.id);
+  }
+
+  private validateEventPayload(event: Partial<EventLog>): void {
+    if (!event.eventType) {
+      throw new BadRequestException('eventType is required');
+    }
+
+    if (!event.entityType) {
+      throw new BadRequestException('entityType is required');
+    }
+
+    const expectedEntityTypeMap: Record<EventLogEventType, EventLogEntityType> = {
+      [EventLogEventType.MESSAGE]: EventLogEntityType.CONVERSATION,
+      [EventLogEventType.SEARCH]: EventLogEntityType.SEARCH,
+      [EventLogEventType.SURVEY]: EventLogEntityType.SURVEY,
+      [EventLogEventType.PRODUCT]: EventLogEntityType.PRODUCT
+    };
+
+    const expectedEntityType = expectedEntityTypeMap[event.eventType];
+    if (event.entityType !== expectedEntityType) {
+      throw new BadRequestException(
+        `Invalid entityType for ${event.eventType}. Expected ${expectedEntityType}`
+      );
+    }
+
+    if (
+      (event.eventType === EventLogEventType.MESSAGE ||
+        event.eventType === EventLogEventType.SEARCH) &&
+      (!event.contentText || !event.contentText.trim())
+    ) {
+      throw new BadRequestException(
+        `contentText is required for ${event.eventType} events`
+      );
+    }
+
+    if (event.eventType === EventLogEventType.PRODUCT && !event.entityId) {
+      throw new BadRequestException('entityId is required for product events');
+    }
+
+    if (event.eventType === EventLogEventType.SURVEY && !event.metadata) {
+      throw new BadRequestException('metadata is required for survey events');
+    }
   }
 
   private buildWhere(query: EventLogQuery): Record<string, unknown> {

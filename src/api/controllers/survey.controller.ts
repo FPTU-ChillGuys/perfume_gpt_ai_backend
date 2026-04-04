@@ -7,6 +7,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UseInterceptors
 } from '@nestjs/common';
 import {
@@ -29,6 +30,8 @@ import { SurveyQuestionAnswerResponse } from 'src/application/dtos/response/surv
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import { Request } from 'express';
+import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 
 @ApiTags('Surveys')
 @Controller('surveys')
@@ -127,28 +130,32 @@ export class SurveyController {
   @Public()
   @Post('user')
   @ApiOperation({ summary: 'Trả lời survey và nhận gợi ý AI' })
-  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({ name: 'userId', type: String, required: false, description: 'ID của người dùng (optional, fallback from request fingerprint)' })
   @ApiBaseResponse(String)
   @ApiBody({ type: [SurveyQuesAnsDetailRequest] })
   async chatSurvey(
+    @Req() req: Request,
     @Query('userId') userId: string,
     @Body() surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    return this.surveyService.processSurveyAndGetAIResponse(userId, surveyAnswers);
+    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    return this.surveyService.processSurveyAndGetAIResponse(resolvedUserId, surveyAnswers);
   }
 
   /** Trả lời survey và nhận gợi ý nước hoa từ AI */
   @Public()
   @Post('user/v2')
   @ApiOperation({ summary: 'Trả lời survey và nhận gợi ý AI' })
-  @ApiQuery({ name: 'userId', type: String, description: 'ID của người dùng' })
+  @ApiQuery({ name: 'userId', type: String, required: false, description: 'ID của người dùng (optional, fallback from request fingerprint)' })
   @ApiBaseResponse(String)
   @ApiBody({ type: [SurveyQuesAnsDetailRequest] })
   async chatSurveyV2(
+    @Req() req: Request,
     @Query('userId') userId: string,
     @Body() surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    return this.surveyService.processSurveyV2AndGetAIResponse(userId, surveyAnswers);
+    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    return this.surveyService.processSurveyV2AndGetAIResponse(resolvedUserId, surveyAnswers);
   }
 
   /** Lấy tất cả câu hỏi và câu trả lời survey của người dùng */

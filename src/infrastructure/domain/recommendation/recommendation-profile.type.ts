@@ -1,0 +1,144 @@
+/**
+ * Type definitions for recommendation system
+ */
+
+export type Season = 'summer' | 'winter';
+
+export interface RecommendationProfile {
+  userId: string;
+  
+  // Age & Demographics
+  dynamicAge: number;
+  gender?: string;
+  
+  // Preferences from purchase history (last 2 years)
+  topBrands: string[];
+  topScents: string[];
+  topGenders: string[];
+  topOccasions: string[];
+  topPriceRanges: string[];
+  
+  // Budget information
+  monthlyBudgetAvg: number;
+  minBudgetMonthly: number;
+  maxBudgetMonthly: number;
+  
+  // Seasonality
+  currentSeason: Season;
+  
+  // Survey preferences
+  surveyTopScents: string[];
+  surveyTopOccasions: string[];
+  surveyTopStyles: string[];
+  
+  // Purchase frequency patterns
+  repurchaseFrequencyMap: Record<string, number>; // productId -> days
+}
+
+export interface ProductScore {
+  productId: string;
+  variantId: string;
+  productName: string;
+  variantName: string;
+  brand?: string;
+  basePrice?: number;
+  gender?: string;
+  score: number;
+  
+  // Score breakdown for transparency
+  scoreBreakdown: {
+    brandScore: number;
+    scentScore: number;
+    surveyScore: number;
+    seasonScore: number;
+    ageScore: number;
+    budgetScore: number;
+    repurchaseBonus: number;
+  };
+  
+  // Additional metadata
+  isRepurchaseCandidate: boolean;
+  repurchaseDaysRemaining?: number;
+}
+
+export interface RecommendationResponse {
+  userId: string;
+  recommendations: ProductScore[];
+  totalProducts: number;
+  profile: {
+    dynamicAge: number;
+    currentSeason: Season;
+    monthlyBudgetAvg: number;
+    topBrands: string[];
+    topScents: string[];
+  };
+}
+
+export interface ProductVariantInfo {
+  variantId: string;
+  productId: string;
+  productName: string;
+  variantName?: string;
+  brand?: string;
+  gender?: string;
+  basePrice?: number;
+  volumeMl?: number;
+  concentration?: string;
+  scentNotes?: string[];
+  olfactoryFamilies?: string[];
+  priceRange?: string;
+}
+
+export interface OrderWithProducts {
+  orderId: string;
+  customerId: string;
+  createdAt: Date;
+  totalAmount: number;
+  orderDetails: Array<{
+    quantity: number;
+    unitPrice: number;
+    productVariant: {
+      id: string;
+      VolumeMl: number;
+      BasePrice: number;
+      Products?: {
+        Id: string;
+        Name: string;
+        Brands?: {
+          Name: string;
+        };
+        Gender?: string;
+        ProductFamilyMaps?: Array<{
+          OlfactoryFamilies?: {
+            Name: string;
+          };
+        }>;
+        ProductNoteMaps?: Array<{
+          ScentNotes?: {
+            Name: string;
+          };
+        }>;
+      };
+    };
+  }>;
+}
+
+export interface ScoresWeights {
+  brand: number;
+  scent: number;
+  survey: number;
+  season: number;
+  age: number;
+  budget: number;
+}
+
+const DEFAULT_WEIGHTS: ScoresWeights = {
+  brand: 0.35,
+  scent: 0.25,
+  survey: 0.15,
+  season: 0.12,
+  age: 0.08,
+  budget: 0.03
+};
+
+export { DEFAULT_WEIGHTS };

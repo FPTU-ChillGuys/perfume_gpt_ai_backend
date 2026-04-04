@@ -14,8 +14,7 @@ import { RestockService } from 'src/infrastructure/domain/restock/restock.servic
 import { ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { Request } from 'express';
-import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
-import { v4 as uuidv4 } from 'uuid';
+import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { SearchRequest } from 'src/application/dtos/request/search.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dtos/request/product-log.request';
@@ -46,16 +45,8 @@ export class ProductController {
   @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
   async getProductsBySemanticSearch(@Req() req: Request, @Query() request: SearchRequest): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     const result = await this.productService.getProductsUsingSemanticSearch(request.searchText, request);
-    // Ghi log tìm kiếm của người dùng
-    // Lay userId tu token
-    const userId = getTokenPayloadFromRequest(req)?.id;
-    if (userId) {
-      await this.userLog.addSearchLogToUserLog(userId, request.searchText);
-    } else {
-      // Tu tao moi uuid de luu log cho nguoi dung khong xac dinh
-      const anonymousUserId = uuidv4();
-      await this.userLog.addSearchLogToUserLog(anonymousUserId, request.searchText);
-    }
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
     return result;
   }
 
@@ -105,10 +96,8 @@ export class ProductController {
       request.searchText,
       request
     );
-    // Ghi log tìm kiếm
-    const userId = getTokenPayloadFromRequest(req)?.id;
-    const logId = userId ?? uuidv4();
-    await this.userLog.addSearchLogToUserLog(logId, request.searchText);
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
     return result;
   }
 
@@ -129,10 +118,8 @@ export class ProductController {
       ? await this.productService.getProductsByStructuredQuery(analysis)
       : await this.productService.getAllProductsWithVariants(request);
 
-    // Ghi log tìm kiếm
-    const userId = getTokenPayloadFromRequest(req)?.id;
-    const logId = userId ?? uuidv4();
-    await this.userLog.addSearchLogToUserLog(logId, request.searchText);
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
 
     return {
       success: true,
@@ -151,9 +138,8 @@ export class ProductController {
   ): Promise<BaseResponseAPI<any>> {
     const result = await this.productService.getProductsUsingParsedSearch(request.searchText, request);
 
-    const userId = getTokenPayloadFromRequest(req)?.id;
-    const logId = userId ?? uuidv4();
-    await this.userLog.addSearchLogToUserLog(logId, request.searchText);
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
 
     return result;
   }
@@ -179,7 +165,7 @@ export class ProductController {
     @Req() req: Request,
     @Body() body: ProductViewLogRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    const userId = getTokenPayloadFromRequest(req)?.id ?? uuidv4();
+    const userId = resolveLogUserIdFromRequest(req);
     const viewInfo = await this.productService.resolveProductViewInfo(
       body.productId,
       body.variantId
@@ -189,7 +175,15 @@ export class ProductController {
       body.productId,
       body.variantId,
       viewInfo.productName,
-      viewInfo.variantName
+      viewInfo.variantName,
+      {
+        brand: viewInfo.brand,
+        category: viewInfo.category,
+        gender: viewInfo.gender,
+        scentNotes: viewInfo.scentNotes,
+        olfactoryFamilies: viewInfo.olfactoryFamilies,
+        basePrice: viewInfo.basePrice
+      }
     );
     return { success: true, data: { id } };
   }
@@ -203,7 +197,7 @@ export class ProductController {
     @Req() req: Request,
     @Body() body: SearchTextLogRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    const userId = getTokenPayloadFromRequest(req)?.id ?? uuidv4();
+    const userId = resolveLogUserIdFromRequest(req);
     const id = await this.userLog.addSearchTextLog(userId, body.searchText);
     return { success: true, data: { id } };
   }

@@ -81,6 +81,7 @@ export class EventLogCreateRequest {
 
   @ApiProperty({ description: 'Text payload cho message/search', required: false, nullable: true })
   @ValidateIf((obj) => obj.eventType !== EventLogEventType.SURVEY)
+  @IsOptional()
   @IsString()
   contentText?: string;
 

@@ -21,4 +21,7 @@ export class EventLogSummaryResponse {
 
   @ApiProperty({ description: 'Số event survey' })
   surveyCount!: number;
+
+  @ApiProperty({ description: 'Số event product' })
+  productCount!: number;
 }

@@ -214,6 +214,9 @@ export class UserLogService {
         const surveyCount = eventLogs.filter(
           (log) => log.eventType === EventLogEventType.SURVEY
         ).length;
+        const productCount = eventLogs.filter(
+          (log) => log.eventType === EventLogEventType.PRODUCT
+        ).length;
 
         return {
           success: true,
@@ -224,7 +227,8 @@ export class UserLogService {
             totalCount: eventLogs.length,
             messageCount,
             searchCount,
-            surveyCount
+            surveyCount,
+            productCount
           }
         };
       },
@@ -263,7 +267,8 @@ export class UserLogService {
             totalCount: 0,
             messageCount: 0,
             searchCount: 0,
-            surveyCount: 0
+            surveyCount: 0,
+            productCount: 0
           };
 
           existingBucket.totalCount += 1;
@@ -273,6 +278,8 @@ export class UserLogService {
             existingBucket.searchCount += 1;
           } else if (eventLog.eventType === EventLogEventType.SURVEY) {
             existingBucket.surveyCount += 1;
+          } else if (eventLog.eventType === EventLogEventType.PRODUCT) {
+            existingBucket.productCount += 1;
           }
 
           buckets.set(bucketKey, existingBucket);
@@ -446,14 +453,16 @@ export class UserLogService {
     productId: string,
     variantId?: string,
     productName?: string,
-    variantName?: string
+    variantName?: string,
+    metadata?: Record<string, unknown>
   ): Promise<string> {
     const id = await this.unitOfWork.EventLogRepo.createProductViewEvent(
       userId,
       productId,
       variantId,
       productName,
-      variantName
+      variantName,
+      metadata
     );
     await this.enqueueRollingSummaryUpdate(userId);
     return id;

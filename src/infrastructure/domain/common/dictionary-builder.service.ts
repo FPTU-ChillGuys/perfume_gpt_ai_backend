@@ -98,7 +98,6 @@ export class DictionaryBuilderService {
             })),
           ),
         ),
-        intent: {},
       };
 
       this.enrichGenderAliases(dict);
@@ -491,17 +490,28 @@ export class DictionaryBuilderService {
    * Compute entity breakdown for stats
    */
   private computeEntityBreakdown(): Record<EntityType, { canonicals: number; synonyms: number }> {
-    const breakdown = {} as Record<EntityType, { canonicals: number; synonyms: number }>;
+    const breakdown: Record<EntityType, { canonicals: number; synonyms: number }> = {
+      brand: { canonicals: 0, synonyms: 0 },
+      category: { canonicals: 0, synonyms: 0 },
+      concentration: { canonicals: 0, synonyms: 0 },
+      olfactory_family: { canonicals: 0, synonyms: 0 },
+      scent_note: { canonicals: 0, synonyms: 0 },
+      attribute_category: { canonicals: 0, synonyms: 0 },
+      attribute_value: { canonicals: 0, synonyms: 0 },
+      product_name: { canonicals: 0, synonyms: 0 },
+      gender: { canonicals: 0, synonyms: 0 },
+      origin: { canonicals: 0, synonyms: 0 },
+      variant_type: { canonicals: 0, synonyms: 0 },
+      note_type: { canonicals: 0, synonyms: 0 },
+    };
 
     for (const [entityType, canonicalMap] of Object.entries(this.entityDictionary || {})) {
       const key = entityType as EntityType;
-      breakdown[key] = {
-        canonicals: Object.keys(canonicalMap).length,
-        synonyms: Object.values(canonicalMap).reduce(
-          (sum, syns) => sum + syns.length,
-          0,
-        ),
-      };
+      breakdown[key].canonicals = Object.keys(canonicalMap).length;
+      breakdown[key].synonyms = Object.values(canonicalMap).reduce(
+        (sum, syns) => sum + syns.length,
+        0,
+      );
     }
 
     return breakdown;

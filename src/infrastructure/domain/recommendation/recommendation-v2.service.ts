@@ -26,8 +26,9 @@ import {
   Season
 } from './recommendation-profile.type';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { isAfter, isWithinInterval, subMonths, subYears } from 'date-fns';
+import { isAfter, isWithinInterval, subMonths, subYears, differenceInDays } from 'date-fns';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
+import { AnalysisObject } from 'src/chatbot/output/analysis.output';
 
 @Injectable()
 export class RecommendationV2Service {
@@ -47,6 +48,7 @@ export class RecommendationV2Service {
   async getRecommendations(
     userIdRaw: string,
     size: number = 10,
+    chatContext?: AnalysisObject,
     weights?: Partial<ScoresWeights>
   ): Promise<BaseResponse<RecommendationResponse>> {
     try {
@@ -75,7 +77,7 @@ export class RecommendationV2Service {
           success: true,
           data: {
             userId,
-            recommendations: await this.getBestSellersFallback(size),
+            recommendations: await this.getBestSellersFallback(size, chatContext),
             totalProducts: 0,
             profile: {
               dynamicAge: profile.dynamicAge,
@@ -99,7 +101,7 @@ export class RecommendationV2Service {
           success: true,
           data: {
             userId,
-            recommendations: await this.getBestSellersFallback(size),
+            recommendations: await this.getBestSellersFallback(size, chatContext),
             totalProducts: 0,
             profile: {
               dynamicAge: profile.dynamicAge,
@@ -114,30 +116,55 @@ export class RecommendationV2Service {
 
       // Step 3: Score and rank products
       const scoredProducts = candidates.map((product) =>
-        this.scoreProduct(product, profile, weights)
+        this.scoreProduct(product, profile, chatContext, weights)
       );
       
       // Log top 5 scores for debugging
       const top5 = scoredProducts.sort((a, b) => b.score - a.score).slice(0, 5);
       this.logger.log(`[SCORING] Top 5 scores: ${top5.map(p => `${p.productName}(${p.score.toFixed(2)})`).join(', ')}`);
 
-      // Step 4: Apply budget filter
-      const budgetFiltered = scoredProducts.filter(
-        (p) => p.basePrice && p.basePrice <= profile.maxBudgetMonthly * 1.2
-      );
-      this.logger.log(`[BUDGET FILTER] ${scoredProducts.length} → ${budgetFiltered.length} (max: ${Math.round(profile.maxBudgetMonthly * 1.2)}VND)`);
+      // Step 4: Apply budget exploration (Allow 20% premium out of bounds)
+      let budgetFiltered = scoredProducts;
+      if (chatContext && chatContext.budget && chatContext.budget.max !== null) {
+        // Hard constraint if AI strictly captured a budget
+        const maxB = chatContext.budget.max;
+        budgetFiltered = scoredProducts.filter(p => p.basePrice && p.basePrice <= maxB);
+      } else {
+        // Budget exploration: 80% strict match, 20% slight upsell allowed (+30% price)
+        budgetFiltered = scoredProducts.filter(
+          (p) => p.basePrice && p.basePrice <= profile.maxBudgetMonthly * 1.3
+        );
+      }
+      
+      this.logger.log(`[BUDGET FILTER] ${scoredProducts.length} → ${budgetFiltered.length}`);
 
-      // Sort by score
+      // Sort by score BEFORE diversity
       const sorted = budgetFiltered.sort((a, b) => b.score - a.score);
 
+      // Phase 2 Filter: Diversity (Max 2 per brand or olfactory family)
+      const diversified: ProductScore[] = [];
+      const brandCount: Record<string, number> = {};
+      const familyCount: Record<string, number> = {};
+      
+      for (const p of sorted) {
+        const b = p.brand || 'Unbranded';
+        const f = p.olfactoryFamilies?.[0] || 'Unknown';
+        
+        if ((brandCount[b] || 0) < 2 && (familyCount[f] || 0) < 2) {
+          diversified.push(p);
+          brandCount[b] = (brandCount[b] || 0) + 1;
+          familyCount[f] = (familyCount[f] || 0) + 1;
+        }
+        
+        if (diversified.length >= size) break;
+      }
+
       // Fallback if not enough after filters
-      const final =
-        sorted.length < size
-          ? [
-              ...sorted,
-              ...(await this.getBestSellersFallback(size - sorted.length))
-            ].slice(0, size)
-          : sorted.slice(0, size);
+      let final = diversified;
+      if (final.length < size) {
+        const fallbacks = await this.getBestSellersFallback(size - final.length, chatContext);
+        final = [...final, ...fallbacks].slice(0, size);
+      }
       
       this.logger.log(`[FINAL] Returning size=${size} products: ${final.map(p => p.productName).join(', ')}`);
 
@@ -328,6 +355,12 @@ export class RecommendationV2Service {
     orders.forEach((order) => {
       if (!order?.orderDetails) return;
       
+      // Time Decay factor for historical orders
+      const monthsAgo = differenceInDays(new Date(), order.createdAt) / 30;
+      let decay = 1.0;
+      if (monthsAgo > 12) decay = 0.4;
+      else if (monthsAgo > 3) decay = 0.7;
+
       order.orderDetails.forEach((detail) => {
         if (!detail?.productVariant?.Products) return;
         
@@ -339,7 +372,7 @@ export class RecommendationV2Service {
         if (product.Brands?.Name) {
           brandCounts.set(
             product.Brands.Name,
-            (brandCounts.get(product.Brands.Name) || 0) + detail.quantity
+            (brandCounts.get(product.Brands.Name) || 0) + (detail.quantity * decay)
           );
         }
 
@@ -347,7 +380,7 @@ export class RecommendationV2Service {
         if (product.Gender) {
           genderCounts.set(
             product.Gender,
-            (genderCounts.get(product.Gender) || 0) + detail.quantity
+            (genderCounts.get(product.Gender) || 0) + (detail.quantity * decay)
           );
         }
 
@@ -356,7 +389,7 @@ export class RecommendationV2Service {
           if (noteMap.ScentNotes?.Name) {
             scentCounts.set(
               noteMap.ScentNotes.Name,
-              (scentCounts.get(noteMap.ScentNotes.Name) || 0) + detail.quantity
+              (scentCounts.get(noteMap.ScentNotes.Name) || 0) + (detail.quantity * decay)
             );
           }
         });
@@ -365,7 +398,7 @@ export class RecommendationV2Service {
         const priceRange = this.getPriceRange(detail.unitPrice);
         priceRangeCounts.set(
           priceRange,
-          (priceRangeCounts.get(priceRange) || 0) + detail.quantity
+          (priceRangeCounts.get(priceRange) || 0) + (detail.quantity * decay)
         );
       });
     });
@@ -537,8 +570,11 @@ export class RecommendationV2Service {
    */
   private detectCurrentSeason(): Season {
     const month = new Date().getMonth() + 1; // 1-12
-    // Summer: May-August (5-8)
-    return month >= 5 && month <= 8 ? 'summer' : 'winter';
+    // Vietnam Climate Adaptation:
+    // South VN: mostly hot year-round. North VN: cold in late Nov-Feb.
+    // For a general fragrance logic in VN, 'summer' (fresh/citrus) dominates.
+    // We treat Nov-Feb as 'winter', March-Oct as 'summer'.
+    return month >= 3 && month <= 10 ? 'summer' : 'winter';
   }
 
   /**
@@ -719,6 +755,7 @@ export class RecommendationV2Service {
   scoreProduct(
     product: ProductVariantInfo,
     profile: RecommendationProfile,
+    chatContext?: AnalysisObject,
     customWeights?: Partial<ScoresWeights>
   ): ProductScore {
     const weights = { ...DEFAULT_WEIGHTS, ...customWeights };
@@ -748,6 +785,35 @@ export class RecommendationV2Service {
       finalScore = score * 1.5; // Boost score by 50% for repurchase items
     }
 
+    // Incorporate ChatContext (AnalysisObject) to override or boost scores
+    if (chatContext) {
+      const logic = chatContext.logic || [];
+      const productNames = chatContext.productNames || [];
+
+      // 1. Direct product name mention (Huge boost)
+      if (productNames.includes(product.productName)) {
+        finalScore += 0.4; // +40% score 
+      }
+
+      // 2. Logic matching (CNF parsing)
+      if (logic.length > 0) {
+        // Flatten the CNF logic for a simple keyword match heuristic for recommendation
+        // In a strict search this would be a hard filter, but for recommendation it's a strong signals boost
+        // @ts-ignore - TS doesn't know flat() depth typing perfectly here
+        const flatTerms: string[] = logic.flat(Infinity);
+        const normalizedTerms = flatTerms.map(t => t.toLowerCase());
+        
+        let matchCount = 0;
+        if (product.brand && normalizedTerms.some(t => product.brand!.toLowerCase().includes(t))) matchCount++;
+        if (product.gender && normalizedTerms.some(t => product.gender!.toLowerCase() === t)) matchCount++;
+        if (product.olfactoryFamilies?.some(f => normalizedTerms.some(t => f.toLowerCase().includes(t)))) matchCount++;
+        
+        if (matchCount > 0) {
+          finalScore += (matchCount * 0.15); // Add 15% per matched attribute from chat context
+        }
+      }
+    }
+
     const normalizedScore = Math.min(100, Math.max(0, finalScore * 100)); // Normalize to 0-100
     
     // Log detailed scoring breakdown
@@ -771,6 +837,7 @@ export class RecommendationV2Service {
       brand: product.brand,
       basePrice: product.basePrice,
       gender: product.gender,
+      olfactoryFamilies: product.olfactoryFamilies,
       score: normalizedScore,
       scoreBreakdown: {
         brandScore: brandScore * 100,
@@ -971,7 +1038,7 @@ export class RecommendationV2Service {
   /**
    * Fallback: Get best seller products
    */
-  private async getBestSellersFallback(limit: number): Promise<ProductScore[]> {
+  private async getBestSellersFallback(limit: number, chatContext?: AnalysisObject): Promise<ProductScore[]> {
     const products = await this.prisma.products.findMany({
       include: {
         ProductVariants: {

@@ -95,8 +95,8 @@ export class ConversationV9Service {
     if (intent === 'Recommend') {
       try {
         this.logger.log(`[processAiChatResponseV9] Invoking RecommendationV2Service for user ${userId}...`);
-        const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 5); // top 5
-        
+        const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 5, analysis || undefined); // top 5 with context
+
         if (recommendationResult.success && recommendationResult.data?.recommendations?.length) {
           const minimalProducts = recommendationResult.data.recommendations.map(p => ({
             id: p.productId,

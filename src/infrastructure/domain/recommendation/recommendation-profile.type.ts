@@ -56,6 +56,9 @@ export interface ProductScore {
     repurchaseBonus: number;
   };
   
+  // Diversification aids
+  olfactoryFamilies?: string[];
+  
   // Additional metadata
   isRepurchaseCandidate: boolean;
   repurchaseDaysRemaining?: number;
@@ -133,12 +136,12 @@ export interface ScoresWeights {
 }
 
 const DEFAULT_WEIGHTS: ScoresWeights = {
-  brand: 0.35,
-  scent: 0.25,
-  survey: 0.15,
+  brand: 0.25,
+  scent: 0.40, // Merge survey weight into hard purchase history
+  survey: 0.10, // Weak signal
   season: 0.12,
   age: 0.08,
-  budget: 0.03
+  budget: 0.05
 };
 
 export { DEFAULT_WEIGHTS };

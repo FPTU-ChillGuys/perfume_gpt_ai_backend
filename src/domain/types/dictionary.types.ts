@@ -15,7 +15,8 @@ export type EntityType =
   | 'gender'
   | 'origin'
   | 'variant_type'
-  | 'note_type';
+  | 'note_type'
+  | 'intent';
 
 export type NumericFieldType =
   | 'price'

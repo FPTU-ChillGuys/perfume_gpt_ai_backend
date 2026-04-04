@@ -1,8 +1,8 @@
 import z from 'zod';
 
 export const analysisOutputSchema = z.object({
-    intent: z.enum(['Search', 'Consult', 'Compare', 'Greeting', 'Chat', 'Task', 'Unknown'])
-        .describe('The core intent of the user message. Use "Task" for specific actions like adding items to cart.'),
+    intent: z.enum(['Search', 'Consult', 'Recommend', 'Compare', 'Greeting', 'Chat', 'Task', 'Unknown'])
+        .describe('The core intent of the user message. Use "Recommend" for advice/suggestions requesting personalized picks, "Task" for actions.'),
     logic: z.array(z.union([z.string(), z.array(z.string())]))
         .describe('Conjunctive Normal Form (CNF) logic for product attributes. e.g. [["Chanel", "Dior"], "Nữ"] means (Chanel OR Dior) AND Nữ.'),
     productNames: z.array(z.string()).nullable()

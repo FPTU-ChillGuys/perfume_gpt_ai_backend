@@ -19,7 +19,7 @@ import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruc
 import { ConversationJobName, QueueName } from 'src/application/constant/processor';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { RecommendationV2Service } from 'src/infrastructure/domain/recommendation/recommendation-v2.service';
-import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
+import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 
 @Injectable()
 export class ConversationV9Service {
@@ -31,7 +31,7 @@ export class ConversationV9Service {
     @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue,
     private readonly productService: ProductService,
     private readonly recommendationV2Service: RecommendationV2Service,
-    private readonly nlpEngineService: NlpEngineService
+    private readonly aiAnalysisService: AiAnalysisService
   ) { }
 
   /**
@@ -78,33 +78,16 @@ export class ConversationV9Service {
     combinedPrompt: string,
     endpoint: string
   ): Promise<ConversationDto> {
-    // Phase 1: Extract Context & Run Local NLP
+    // Phase 1: Extract Context & Run Middleman AI
     const lastUserMessage = [...convertedMessages].reverse().find(m => m.role === 'user');
     const messageText = lastUserMessage?.parts.find(p => p.type === 'text')?.text || '';
     
-    this.logger.log(`[processAiChatResponseV9] Analyzing message with NLP Engine: "${messageText.substring(0, 50)}..."`);
-    const parsedNlpResult = this.nlpEngineService.parseAndNormalize(messageText);
+    this.logger.log(`[processAiChatResponseV9] Analyzing message with Middleman AI: "${messageText.substring(0, 50)}..."`);
+    
+    const analysis = await this.aiAnalysisService.analyze(messageText, JSON.stringify(conversationMessages));
+    let intent = analysis?.intent || 'Chat';
 
-    // Phase 2: Read Intent directly from NLP byType filter (powered by vocab dictionary)
-    const intents: string[] = parsedNlpResult?.byType?.intent || [];
-    let intent = 'Chat'; // Default
-
-    if (intents.includes('recommend')) {
-      intent = 'Recommend';
-    } else if (intents.includes('task')) {
-      intent = 'Task';
-    } else if (intents.includes('consult')) {
-      intent = 'Consult';
-    } else if (
-      (parsedNlpResult?.byType?.brand?.length ?? 0) > 0 || 
-      (parsedNlpResult?.byType?.product_name?.length ?? 0) > 0 || 
-      (parsedNlpResult?.byType?.scent_note?.length ?? 0) > 0 || 
-      (parsedNlpResult?.byType?.category?.length ?? 0) > 0
-    ) {
-      intent = 'Search';
-    }
-
-    this.logger.log(`[processAiChatResponseV9] Detected Intent: ${intent} (NLP intents: ${intents.join(', ')})`);
+    this.logger.log(`[processAiChatResponseV9] Detected Intent: ${intent} (Explanation: ${analysis?.explanation})`);
 
     let finalMessages = convertedMessages;
 
@@ -143,10 +126,24 @@ export class ConversationV9Service {
     else if (intent === 'Search' || intent === 'Consult') {
       try {
         this.logger.log(`[processAiChatResponseV9] Invoking Structural Search via ProductService...`);
-        const searchResponse = await this.productService.getProductsUsingParsedSearch(messageText, { PageNumber: 1, PageSize: 5, SortOrder: 'asc', IsDescending: false });
+        // Override pagination if not specified by AI
+        if (analysis && !analysis.pagination) {
+          analysis.pagination = { pageNumber: 1, pageSize: 5 };
+        }
+        
+        const searchPayload = analysis || { 
+          intent: 'Search', 
+          logic: [], 
+          productNames: [], 
+          pagination: { pageNumber: 1, pageSize: 5 }, 
+          sorting: null, 
+          budget: null 
+        };
 
-        if (searchResponse.success && searchResponse.payload?.items?.length) {
-          const products = searchResponse.payload.items;
+        const searchResponse = await this.productService.getProductsByStructuredQuery(searchPayload);
+
+        if (searchResponse.success && searchResponse.data?.items?.length) {
+          const products = searchResponse.data.items;
           const minimalProducts = products.map((p: any) => ({
             id: p.id,
             name: p.name,

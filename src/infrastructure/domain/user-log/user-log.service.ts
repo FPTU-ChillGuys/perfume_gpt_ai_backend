@@ -1,5 +1,5 @@
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
@@ -60,6 +60,8 @@ import {
 
 @Injectable()
 export class UserLogService {
+  private readonly logger = new Logger(UserLogService.name);
+
   constructor(
     protected unitOfWork: UnitOfWork,
     @InjectQueue(QueueName.USER_LOG_SUMMARY_QUEUE)
@@ -72,6 +74,7 @@ export class UserLogService {
     }
 
     const safeUserId = userId.replace(/:/g, '_');
+    this.logger.debug(`[SUMMARY-QUEUE] Enqueue rolling summary update for userId=${userId}`);
 
     await this.userLogSummaryQueue.add(
       UserLogSummaryJobName.UPDATE_ROLLING_SUMMARY,
@@ -170,6 +173,10 @@ export class UserLogService {
   ): Promise<BaseResponse<{ id: string }>> {
     return await funcHandlerAsync(
       async () => {
+        this.logger.debug(
+          `[EVENT-LOG] Creating event log type=${request.eventType}, entityType=${request.entityType}, userId=${request.userId || 'anonymous'}`
+        );
+
         const id = await this.unitOfWork.EventLogRepo.createEventLog({
           userId: request.userId,
           eventType: request.eventType,
@@ -305,42 +312,38 @@ export class UserLogService {
     );
   }
 
-  async rebuildRollingSummaryForUser(userId: string): Promise<void> {
-    if (!userId) {
+  async rebuildRollingSummaryForUser(userIdRaw: string): Promise<void> {
+    if (!userIdRaw) {
       return;
     }
 
-    const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
-      userId
-    });
-    const lastSummaryUpdatedAt = existingSummary?.updatedAt;
+    const userId = userIdRaw.toLowerCase();
+    this.logger.log(`[SUMMARY] Rebuild start for userId=${userId}`);
 
-    const events = await this.unitOfWork.EventLogRepo.getEventLogs({
-      userId,
-      startDate: lastSummaryUpdatedAt || undefined
-    });
+    const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
 
-    const newEvents = events
-      .filter(
-        (event) =>
-          !lastSummaryUpdatedAt ||
-          event.createdAt.getTime() > lastSummaryUpdatedAt.getTime()
-      )
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-
-    if (!newEvents.length) {
-      return;
-    }
-
-    const featureSnapshot = normalizeFeatureSnapshot(existingSummary?.featureSnapshot);
-    const dailyFeatureSnapshot = normalizeDailyFeatureSnapshot(
-      existingSummary?.dailyFeatureSnapshot
+    this.logger.log(
+      `[SUMMARY] Existing summary=${existingSummary ? 'yes' : 'no'}, mode=full-rebuild`
     );
-    let totalEvents = existingSummary?.totalEvents || 0;
 
-    for (const event of newEvents) {
+    const events = await this.unitOfWork.EventLogRepo.getEventLogs({ userId });
+    const sortedEvents = [...events].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+    );
+
+    this.logger.log(`[SUMMARY] Loaded events=${sortedEvents.length}`);
+
+    if (!sortedEvents.length) {
+      this.logger.log(`[SUMMARY] No events found for userId=${userId}, skip rebuild`);
+      return;
+    }
+
+    const featureSnapshot = normalizeFeatureSnapshot();
+    const dailyFeatureSnapshot = normalizeDailyFeatureSnapshot();
+    let totalEvents = 0;
+
+    for (const event of sortedEvents) {
       totalEvents += 1;
-
       applyEventToFeatureSnapshot(featureSnapshot, event);
       applyEventToDailyFeatureSnapshot(dailyFeatureSnapshot, event);
     }
@@ -348,10 +351,14 @@ export class UserLogService {
     const logSummary = buildRollingSummaryText(featureSnapshot, totalEvents);
     const dailyLogSummary = buildDailyLogSummaryMap(dailyFeatureSnapshot);
 
+    this.logger.log(
+      `[SUMMARY] Built summary for userId=${userId}: ${logSummary}`
+    );
+
     if (!existingSummary) {
       // For new summary, createdAt should be the first event's time
-      const createdAt = newEvents.length > 0
-        ? newEvents[0].createdAt
+      const createdAt = sortedEvents.length > 0
+        ? sortedEvents[0].createdAt
         : new Date();
       
       const newSummary = new UserLogSummary({
@@ -364,6 +371,7 @@ export class UserLogService {
         createdAt
       });
       await this.unitOfWork.UserLogSummaryRepo.insert(newSummary);
+      this.logger.log(`[SUMMARY] Created new rolling summary for userId=${userId}`);
       return;
     }
 
@@ -377,6 +385,7 @@ export class UserLogService {
     await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
       existingSummary
     );
+    this.logger.log(`[SUMMARY] Updated existing rolling summary for userId=${userId}`);
   }
 
   /** Lay tat ca log */
@@ -984,7 +993,7 @@ export class UserLogService {
               );
 
           const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-            userId,
+            userId: userId.toLowerCase(),
             startDate: normalizedStartDate,
             endDate: normalizedEndDate
           });
@@ -1005,7 +1014,7 @@ export class UserLogService {
 
         const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne(
           {
-            userId: userId
+            userId: userId.toLowerCase()
           }
         );
 

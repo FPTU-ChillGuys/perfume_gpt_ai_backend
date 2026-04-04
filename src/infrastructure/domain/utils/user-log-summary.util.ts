@@ -1,7 +1,6 @@
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { EventLog } from 'src/domain/entities/event-log.entity';
 import { EventLogEventType } from 'src/domain/enum/event-log-event-type.enum';
-import { tokenizeText } from './nlp-tokenizer';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { convertToUTC } from './time-zone';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
@@ -9,7 +8,6 @@ import { AllUserLogRequest } from 'src/application/dtos/request/user-log.request
 
 export type RollingFeatureSnapshot = {
   eventTypeCounts: Record<string, number>;
-  keywordCounts: Record<string, number>;
   intentCounts: Record<string, number>;
   audienceCounts: Record<string, number>;
   hourCounts: Record<string, number>;
@@ -46,7 +44,6 @@ function createEmptyPreferenceCounterGroup(): PreferenceCounterGroup {
 export function createEmptyRollingFeatureSnapshot(): RollingFeatureSnapshot {
   return {
     eventTypeCounts: {},
-    keywordCounts: {},
     intentCounts: {},
     audienceCounts: {},
     hourCounts: {},
@@ -100,7 +97,6 @@ export function normalizeFeatureSnapshot(
 
   return {
     eventTypeCounts: normalizeCounterRecord(snapshot?.eventTypeCounts),
-    keywordCounts: normalizeCounterRecord(snapshot?.keywordCounts),
     intentCounts: normalizeCounterRecord(snapshot?.intentCounts),
     audienceCounts: normalizeCounterRecord(snapshot?.audienceCounts),
     hourCounts: normalizeCounterRecord(snapshot?.hourCounts),
@@ -113,40 +109,45 @@ export function normalizeFeatureSnapshot(
   };
 }
 
-function collectMetadataValues(
-  value: unknown,
-  targetKeys: Set<string>,
-  depth = 0,
-  maxDepth = 4
-): string[] {
-  if (depth > maxDepth || value === null || value === undefined) {
+function normalizePrimitiveValues(value: unknown): string[] {
+  if (value === null || value === undefined) {
     return [];
   }
 
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (typeof value === 'string') {
+    return [value.trim()].filter(Boolean);
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
     return [String(value).trim()].filter(Boolean);
   }
 
   if (Array.isArray(value)) {
-    return value.flatMap((item) => collectMetadataValues(item, targetKeys, depth + 1, maxDepth));
+    return value.flatMap((item) => normalizePrimitiveValues(item));
   }
 
-  if (typeof value !== 'object') {
-    return [];
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).flatMap((item) =>
+      normalizePrimitiveValues(item)
+    );
   }
 
-  const result: string[] = [];
-  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-    const lowerKey = key.toLowerCase();
-    if (targetKeys.has(lowerKey)) {
-      result.push(...collectMetadataValues(nested, targetKeys, depth + 1, maxDepth));
-      continue;
-    }
+  return [];
+}
 
-    result.push(...collectMetadataValues(nested, targetKeys, depth + 1, maxDepth));
-  }
+function collectValuesByKeys(
+  metadata: Record<string, unknown>,
+  keys: string[]
+): string[] {
+  const values = keys.flatMap((key) => {
+    const normalizedKey = key.toLowerCase();
+    const matchedEntry = Object.entries(metadata).find(
+      ([entryKey]) => entryKey.toLowerCase() === normalizedKey
+    );
+    return matchedEntry ? normalizePrimitiveValues(matchedEntry[1]) : [];
+  });
 
-  return result;
+  return dedupeNormalizedValues(values);
 }
 
 function dedupeNormalizedValues(values: string[]): string[] {
@@ -161,31 +162,45 @@ function dedupeNormalizedValues(values: string[]): string[] {
   return Array.from(deduped);
 }
 
+function normalizeScentValue(value: string): string {
+  return value
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function getPriceRangeLabel(priceValue: unknown): string | undefined {
+  const amount = Number(priceValue);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return undefined;
+  }
+
+  if (amount < 500_000) return '< 500k';
+  if (amount < 1_000_000) return '500k-1m';
+  if (amount < 2_000_000) return '1m-2m';
+  if (amount < 3_000_000) return '2m-3m';
+  return '> 3m';
+}
+
 function collectPreferenceSignals(event: EventLog): PreferenceCounterGroup {
   const metadata = event.metadata || {};
   const signal = createEmptyPreferenceCounterGroup();
 
-  const brands = dedupeNormalizedValues(
-    collectMetadataValues(metadata, new Set(['brand', 'brands']))
-  );
-  const scents = dedupeNormalizedValues(
-    collectMetadataValues(
-      metadata,
-      new Set(['scent', 'scents', 'scentnote', 'scentnotes', 'olfactoryfamily', 'olfactoryfamilies'])
-    )
-  );
-  const priceRanges = dedupeNormalizedValues(
-    collectMetadataValues(metadata, new Set(['pricerange', 'price_range']))
-  );
-  const occasions = dedupeNormalizedValues(
-    collectMetadataValues(metadata, new Set(['occasion', 'occasions']))
-  );
-  const genders = dedupeNormalizedValues(
-    collectMetadataValues(metadata, new Set(['gender', 'genders']))
-  );
-  const styles = dedupeNormalizedValues(
-    collectMetadataValues(metadata, new Set(['style', 'styles']))
-  );
+  const brands = collectValuesByKeys(metadata, ['brand', 'brands']);
+  const scents = collectValuesByKeys(metadata, [
+    'scent',
+    'scents',
+    'scentnote',
+    'scentnotes',
+    'olfactoryfamily',
+    'olfactoryfamilies'
+  ]).map(normalizeScentValue).filter(Boolean);
+  const priceRanges = collectValuesByKeys(metadata, ['pricerange', 'price_range']);
+  const occasions = collectValuesByKeys(metadata, ['occasion', 'occasions']);
+  const genders = collectValuesByKeys(metadata, ['gender', 'genders']);
+  const styles = collectValuesByKeys(metadata, ['style', 'styles']);
+  const derivedPriceRange = getPriceRangeLabel(metadata.basePrice);
 
   for (const key of brands) {
     increaseCounter(signal.brand, key);
@@ -204,6 +219,10 @@ function collectPreferenceSignals(event: EventLog): PreferenceCounterGroup {
   }
   for (const key of styles) {
     increaseCounter(signal.style, key);
+  }
+
+  if (derivedPriceRange) {
+    increaseCounter(signal.priceRange, derivedPriceRange);
   }
 
   return signal;
@@ -345,13 +364,32 @@ export function applyEventToFeatureSnapshot(
     textParts.push(event.contentText);
   }
 
-  textParts.push(...extractTextFromMetadata(event.metadata));
+  const metadata = event.metadata || {};
+  if (event.eventType === EventLogEventType.PRODUCT) {
+    textParts.push(
+      ...collectValuesByKeys(metadata, [
+        'productName',
+        'variantName',
+        'brand',
+        'category',
+        'gender',
+        'scentNotes',
+        'olfactoryFamilies'
+      ])
+    );
+  } else if (event.eventType === EventLogEventType.SEARCH) {
+    textParts.push(
+      ...collectValuesByKeys(metadata, ['keyword', 'query', 'searchText'])
+    );
+  } else if (event.eventType === EventLogEventType.SURVEY) {
+    textParts.push(
+      ...collectValuesByKeys(metadata, ['question', 'answer', 'answers'])
+    );
+  } else {
+    textParts.push(...extractTextFromMetadata(event.metadata));
+  }
 
   const normalizedText = textParts.join(' ').toLowerCase();
-  const keywords = tokenizeText(normalizedText);
-  for (const keyword of keywords) {
-    increaseCounter(featureSnapshot.keywordCounts, keyword);
-  }
 
   if (/recommend|goi y|gợi ý|suggest/.test(normalizedText)) {
     increaseCounter(featureSnapshot.intentCounts, 'recommendation');
@@ -433,7 +471,6 @@ export function buildRollingSummaryText(
       .map(([key, value]) => `${key} (${value})`)
       .join(', ');
 
-  const topKeywords = topEntries(featureSnapshot.keywordCounts);
   const intents = topEntries(featureSnapshot.intentCounts, 3);
   const audiences = topEntries(featureSnapshot.audienceCounts, 3);
   const activeHours = topEntries(featureSnapshot.hourCounts, 3);
@@ -444,7 +481,6 @@ export function buildRollingSummaryText(
   return [
     `Total events: ${totalEvents}.`,
     `Top event types: ${eventTypes || 'n/a'}.`,
-    `Top keywords: ${topKeywords || 'n/a'}.`,
     `Detected intents: ${intents || 'n/a'}.`,
     `Detected audiences: ${audiences || 'n/a'}.`,
     `Top brands: ${topBrands || 'n/a'}.`,
@@ -544,9 +580,6 @@ export function mergeFeatureSnapshots(
   for (const snapshot of snapshots) {
     for (const [key, value] of Object.entries(snapshot.eventTypeCounts)) {
       increaseCounter(merged.eventTypeCounts, key, value);
-    }
-    for (const [key, value] of Object.entries(snapshot.keywordCounts)) {
-      increaseCounter(merged.keywordCounts, key, value);
     }
     for (const [key, value] of Object.entries(snapshot.intentCounts)) {
       increaseCounter(merged.intentCounts, key, value);

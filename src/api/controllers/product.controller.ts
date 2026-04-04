@@ -165,7 +165,18 @@ export class ProductController {
     @Req() req: Request,
     @Body() body: ProductViewLogRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    const userId = resolveLogUserIdFromRequest(req);
+    const rawUserId = body.userId || resolveLogUserIdFromRequest(req);
+    const userId = rawUserId.toLowerCase();
+    
+    if (userId.startsWith('anonymous:')) {
+      this.logger.warn(
+        `[PRODUCT-LOG] logProductView is using anonymous userId. Pass body.userId or Bearer token for personalized recommendation.`
+      );
+    }
+    this.logger.log(
+      `[PRODUCT-LOG] logProductView userId=${userId}, productId=${body.productId}, variantId=${body.variantId || 'n/a'}`
+    );
+
     const viewInfo = await this.productService.resolveProductViewInfo(
       body.productId,
       body.variantId
@@ -197,7 +208,18 @@ export class ProductController {
     @Req() req: Request,
     @Body() body: SearchTextLogRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    const userId = resolveLogUserIdFromRequest(req);
+    const rawUserId = body.userId || resolveLogUserIdFromRequest(req);
+    const userId = rawUserId.toLowerCase();
+    
+    if (userId.startsWith('anonymous:')) {
+      this.logger.warn(
+        `[PRODUCT-LOG] logSearchText is using anonymous userId. Pass body.userId or Bearer token for personalized recommendation.`
+      );
+    }
+    this.logger.log(
+      `[PRODUCT-LOG] logSearchText userId=${userId}, searchText=${body.searchText}`
+    );
+
     const id = await this.userLog.addSearchTextLog(userId, body.searchText);
     return { success: true, data: { id } };
   }

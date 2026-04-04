@@ -45,11 +45,14 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
     variantName?: string,
     extraMetadata?: Record<string, unknown>
   ): Promise<string> {
+    const contentText = [productName, variantName].filter(Boolean).join(' ').trim();
+
     return this.createEventLog({
       userId,
       eventType: EventLogEventType.PRODUCT,
       entityType: EventLogEntityType.PRODUCT,
       entityId: productId,
+      contentText: contentText || undefined,
       metadata: {
         source: 'product_view',
         ...(variantId ? { variantId } : {}),

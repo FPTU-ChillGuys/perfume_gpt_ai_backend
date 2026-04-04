@@ -62,7 +62,7 @@ export class LogController {
         success: response.success,
         data: response.data?.response
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new InternalServerErrorWithDetailsException(error);
     }
   }

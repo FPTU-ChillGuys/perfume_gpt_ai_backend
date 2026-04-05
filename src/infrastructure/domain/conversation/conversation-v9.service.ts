@@ -122,7 +122,7 @@ export class ConversationV9Service {
         this.logger.log(
           `[processAiChatResponseV9] [RECOMMEND_INPUT] intent=${intent}; brands=${nlpBrands.slice(0, 10).join('|') || 'none'}; scents=${nlpScents.slice(0, 10).join('|') || 'none'}; genders=${nlpGenders.slice(0, 10).join('|') || 'none'}; productNames=${nlpProductNames.slice(0, 10).join('|') || 'none'}`
         );
-        const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 5, pseudoChatContext); // top 5 with context
+        const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 1, pseudoChatContext); // Top 1 with context theo yêu cầu
 
         if (recommendationResult.success && recommendationResult.data?.recommendations?.length) {
           const minimalProducts = recommendationResult.data.recommendations.map(p => ({
@@ -133,6 +133,7 @@ export class ConversationV9Service {
             brand: p.brand,
             basePrice: p.basePrice,
             gender: p.gender,
+            source: 'RECOMMENDATION_RESULTS', // Thêm trường source để AI biết
             attributes: [
               ...(Array.isArray(p.scentNotes) ? p.scentNotes.map(note => `Scent: ${note}`) : []),
               ...(Array.isArray(p.olfactoryFamilies) ? p.olfactoryFamilies.map(f => `Family: ${f}`) : [])
@@ -161,7 +162,7 @@ export class ConversationV9Service {
         this.logger.log(`[processAiChatResponseV9] Invoking Structural Search via ProductService using NLP parsing...`);
         
         // Let product service perform standard NLP search matching V8 but guided by explicit AI search intent
-        const searchResponse = await this.productService.getProductsUsingParsedSearch(messageText, { PageNumber: 1, PageSize: 5, SortOrder: 'asc', IsDescending: false });
+        const searchResponse = await this.productService.getProductsUsingParsedSearch(messageText, { PageNumber: 1, PageSize: 1, SortOrder: 'asc', IsDescending: false }); // Chỉ lấy 1 sản phẩm
 
         if (searchResponse.success && searchResponse.payload?.items?.length) {
           const products = searchResponse.payload.items;
@@ -170,6 +171,7 @@ export class ConversationV9Service {
             name: p.name,
             brand: p.brandName || p.brand,
             category: p.categoryName || p.category,
+            source: 'SEARCH_RESULTS', // Thêm trường source để nhắc AI
             image: p.primaryImage || p.image,
             attributes: Array.isArray(p.attributes) ? p.attributes.map((a: any) => typeof a === 'string' ? a : `${a.attribute}: ${a.value}`) : p.attributes,
             scentNotes: p.scentNotes,
@@ -223,23 +225,41 @@ export class ConversationV9Service {
         if (productResponse.success && productResponse.data) {
           const hydratedProducts = productResponse.data;
           const recommendationsMap = new Map<string, string[]>();
+          const tempMetaMap = new Map<string, any>();
+          
           productTemp.forEach((item: any) => {
             if (item.id && item.variants && Array.isArray(item.variants)) {
               recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
+            }
+            if (item.id) {
+              tempMetaMap.set(item.id, { reasoning: item.reasoning, source: item.source });
             }
           });
 
           aiResponse.products = hydratedProducts.map(product => {
             const recommendedVariantIds = recommendationsMap.get(product.id);
+            const metaInfo = tempMetaMap.get(product.id);
+            
             if (recommendedVariantIds && recommendedVariantIds.length > 0) {
               const variantIdsSet = new Set(recommendedVariantIds);
               return {
                 ...product,
-                variants: (product.variants || []).filter(v => variantIdsSet.has(v.id))
+                variants: (product.variants || []).filter(v => variantIdsSet.has(v.id)),
+                reasoning: metaInfo?.reasoning,
+                source: metaInfo?.source
               };
             }
-            return product;
+            return {
+              ...product,
+              reasoning: metaInfo?.reasoning,
+              source: metaInfo?.source
+            };
           }).filter(product => product.variants && product.variants.length > 0);
+
+          // Log AI reasoning for products side-by-side with original source context
+          aiResponse.products.forEach((p: any) => {
+            this.logger.log(`\n=== 🤖 AI GỢI Ý & GIẢI THÍCH ===\n✨ Tên sản phẩm: ${p.name}\n🔍 Nguồn dữ liệu: ${p.source || 'N/A'}\n🧠 Lý do (AI phân tích): ${p.reasoning || 'Không có'}\n================================`);
+          });
         }
       }
     }

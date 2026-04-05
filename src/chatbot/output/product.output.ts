@@ -12,13 +12,17 @@ export const productCardOutputItemSchema = z.object({
     name: z.string(),
     brandName: z.string(),
     primaryImage: z.string().nullable(),
-    variants: z.array(productCardVariantOutputSchema)
+    variants: z.array(productCardVariantOutputSchema),
+    reasoning: z.string().optional().describe('Giải thích lý do lựa chọn sản phẩm này cho người dùng dựa trên nhu cầu của họ.'),
+    source: z.string().optional().describe('Nguồn gợi ý sản phẩm (ví dụ: RECOMMENDATION_RESULTS, SEARCH_RESULTS, vv.)')
 });
 
 export const productTempItemSchema = z.object({
     id: z.string(),
     name: z.string().nullable(),
-    variants: z.array(z.object({ id: z.string(), price: z.number() })).nullable()
+    variants: z.array(z.object({ id: z.string(), price: z.number() })).nullable(),
+    reasoning: z.string().describe('Giải thích chi tiết tại sao AI quyết định gợi ý sản phẩm này (dựa trên sở thích, profile người dùng). BẮT BUỘC có.'),
+    source: z.string().describe('Nguồn cung cấp sản phẩm này (RECOMMENDATION_RESULTS, SEARCH_RESULTS, hay AI_KNOWLEDGE). BẮT BUỘC có.')
 });
 
 export const productOutput = {

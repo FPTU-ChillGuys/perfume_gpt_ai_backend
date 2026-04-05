@@ -55,4 +55,5 @@ export const gptOss20b: LanguageModel = openrouter("openai/gpt-oss-20b")
 
 export const qwen3_6PlusPreview: LanguageModel = openrouter("qwen/qwen3.6-plus-preview:free")
 
+export const gemma4 : LanguageModel = openrouter("google/gemma-4-26b-a4b-it:exacto");
 

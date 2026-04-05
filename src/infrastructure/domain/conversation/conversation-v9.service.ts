@@ -22,6 +22,8 @@ import { RecommendationV2Service } from 'src/infrastructure/domain/recommendatio
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
 import { AnalysisObject } from 'src/chatbot/output/analysis.output';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class ConversationV9Service {
@@ -85,11 +87,20 @@ export class ConversationV9Service {
     const lastUserMessage = [...convertedMessages].reverse().find(m => m.role === 'user');
     const messageText = lastUserMessage?.parts.find(p => p.type === 'text')?.text || '';
     
+    // --- Khởi tạo log ghi ra file ở đây ---
+    const debugTraceSessionId = uuid();
+    const traceLogs: string[] = [
+      `\n======================================================`,
+      `[REQ_ID: ${debugTraceSessionId}] - TIME: ${new Date().toISOString()}`,
+      `[USER_MESSAGE]: ${messageText}`
+    ];
+    
     this.logger.log(`[processAiChatResponseV9] Analyzing intent only with AI: "${messageText.substring(0, 50)}..."`);
     
     const intentResult = await this.aiAnalysisService.analyzeIntentOnly(messageText, JSON.stringify(conversationMessages));
     let intent = intentResult?.intent || 'Chat';
 
+    traceLogs.push(`[AI_ANALYSIS_INTENT]: ${intent}`);
     this.logger.log(`[processAiChatResponseV9] Detected Intent: ${intent}`);
 
     // Phase 2: Run Keyword Extraction via NLP
@@ -113,18 +124,38 @@ export class ConversationV9Service {
       normalizationMetadata: null
     };
 
+    traceLogs.push(`[NLP_EXTRACTED_KEYWORDS]: Brands=${nlpBrands.join(',') || 'none'}, Scents=${nlpScents.join(',') || 'none'}, Genders=${nlpGenders.join(',') || 'none'}`);
+
     let finalMessages = convertedMessages;
 
     // Phase 3: Route Actions
     if (intent === 'Recommend') {
       try {
         this.logger.log(`[processAiChatResponseV9] Invoking RecommendationV2Service for user ${userId}...`);
-        this.logger.log(
-          `[processAiChatResponseV9] [RECOMMEND_INPUT] intent=${intent}; brands=${nlpBrands.slice(0, 10).join('|') || 'none'}; scents=${nlpScents.slice(0, 10).join('|') || 'none'}; genders=${nlpGenders.slice(0, 10).join('|') || 'none'}; productNames=${nlpProductNames.slice(0, 10).join('|') || 'none'}`
-        );
+        
+        const recommendInputStr = `intent=${intent}; brands=${nlpBrands.slice(0, 10).join('|') || 'none'}; scents=${nlpScents.slice(0, 10).join('|') || 'none'}; genders=${nlpGenders.slice(0, 10).join('|') || 'none'}; productNames=${nlpProductNames.slice(0, 10).join('|') || 'none'}`;
+        this.logger.log(`[processAiChatResponseV9] [RECOMMEND_INPUT] ${recommendInputStr}`);
+        traceLogs.push(`[RECOMMEND_INPUT]: ${recommendInputStr}`);
+
         const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 1, pseudoChatContext); // Top 1 with context theo yêu cầu
 
         if (recommendationResult.success && recommendationResult.data?.recommendations?.length) {
+          const profile = recommendationResult.data.profile;
+          if (profile) {
+            traceLogs.push(`[RECOMMEND_PROFILE_USED]: Mode=Dynamic, Age=${profile.dynamicAge}, Season=${profile.currentSeason}, BudgetAvg=${profile.monthlyBudgetAvg}`);
+            traceLogs.push(`[RECOMMEND_PROFILE_PREFS]: Brands=[${profile.topBrands?.join(', ') || 'N/A'}], Scents=[${profile.topScents?.join(', ') || 'N/A'}]`);
+          }
+
+          traceLogs.push(`[RECOMMEND_SYSTEM_RESULT]: Returned ${recommendationResult.data.recommendations.length} items`);
+          recommendationResult.data.recommendations.forEach((rec, idx) => {
+            const br = rec.scoreBreakdown;
+            let scoreStr = `(Score: ${rec.score.toFixed(2)})`;
+            if (br) {
+               scoreStr += ` -> Breakdown [Brand: ${br.brandScore.toFixed(0)}%, Scent: ${br.scentScore.toFixed(0)}%, Season: ${br.seasonScore.toFixed(0)}%, Age: ${br.ageScore.toFixed(0)}%, Budget: ${br.budgetScore.toFixed(0)}%]`;
+            }
+            traceLogs.push(`   -> Rank ${idx + 1}: ${rec.productName} ${scoreStr}`);
+          });
+
           const minimalProducts = recommendationResult.data.recommendations.map(p => ({
             id: p.productId,
             name: p.productName,
@@ -187,9 +218,11 @@ export class ConversationV9Service {
             parts: [{ type: 'text', text: `SEARCH_RESULTS: ${resultsStr}` }]
           };
           finalMessages = [...convertedMessages, injectionMessage];
+          traceLogs.push(`[SEARCH_SYSTEM_RESULT]: Returned ${products.length} products`);
         }
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error(`[processAiChatResponseV9] Search fallback failed:`, err);
+        traceLogs.push(`[SEARCH_SYSTEM_ERROR]: ${err.message}`);
       }
     }
 
@@ -199,6 +232,7 @@ export class ConversationV9Service {
       combinedPrompt
     );
 
+    traceLogs.push(`[AI_FINAL_GENERATION]: Starting text generation...`);
     this.logger.log(`[processAiChatResponseV9] Generating structured response using textGenerate...`);
     const message = await this.aiHelper.textGenerateFromMessages(
       finalMessages,
@@ -258,13 +292,27 @@ export class ConversationV9Service {
 
           // Log AI reasoning for products side-by-side with original source context
           aiResponse.products.forEach((p: any) => {
-            this.logger.log(`\n=== 🤖 AI GỢI Ý & GIẢI THÍCH ===\n✨ Tên sản phẩm: ${p.name}\n🔍 Nguồn dữ liệu: ${p.source || 'N/A'}\n🧠 Lý do (AI phân tích): ${p.reasoning || 'Không có'}\n================================`);
+            const displayLog = `\n=== 🤖 AI GỢI Ý & GIẢI THÍCH ===\n✨ Tên sản phẩm: ${p.name}\n🔍 Nguồn dữ liệu: ${p.source || 'N/A'}\n🧠 Lý do (AI phân tích): ${p.reasoning || 'Không có'}\n================================`;
+            this.logger.log(displayLog);
+            traceLogs.push(`[AI_FINAL_RECOMMEND_REASONING]: ${p.name} | ${p.source || 'N/A'} | ${p.reasoning}`);
           });
         }
       }
     }
 
     const finalMessageData = JSON.stringify(aiResponse);
+    traceLogs.push(`[AI_FINAL_MESSAGE]: ${aiResponse.message?.substring(0, 100)}...`);
+
+    // Lưu file log chuyên biệt
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const logDir = path.join(process.cwd(), 'logs');
+      if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+      fs.appendFileSync(path.join(logDir, 'ai_recommendation_trace.txt'), traceLogs.join('\n') + '\n\n', 'utf8');
+    } catch (fileErr) {
+      this.logger.error('Could not write trace log file', fileErr);
+    }
 
     this.logger.debug("Final message: ", finalMessageData);
 

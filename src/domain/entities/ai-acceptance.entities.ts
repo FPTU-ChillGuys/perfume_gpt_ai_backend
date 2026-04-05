@@ -9,16 +9,16 @@ export class AIAcceptance extends Common {
   /** ID người dùng */
   @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   @Property()
-  userId: string;
+  userId?: string;
 
   @ApiProperty({ description: "Id của cart item nếu có liên quan", format: 'string', nullable: true })
   @Property()
-  cartItemId: string | null;
+  cartItemId?: string | null;
 
   /** Người dùng có chấp nhận đề xuất AI hay không */
   @ApiProperty({ description: 'Trạng thái chấp nhận AI' })
   @Property()
-  isAccepted: boolean;
+  isAccepted?: boolean;
 
   constructor(init?: Partial<AIAcceptance>) {
     super();

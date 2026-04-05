@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RecommendationService } from 'src/infrastructure/domain/recommendation/recommandation.service';
 import { RecommendationV2Service } from 'src/infrastructure/domain/recommendation/recommendation-v2.service';
+import { RecommendationV3Service } from 'src/infrastructure/domain/recommendation/recommendation-v3.service';
 import { AIModule } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionModule } from 'src/infrastructure/domain/admin-instruction/admin-instruction.module';
 import { UserModule } from 'src/infrastructure/domain/user/user.module';
@@ -11,7 +12,7 @@ import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.modul
 
 @Module({
   imports: [AIModule, AdminInstructionModule, UserModule, EmailModule, OrderModule, ProductModule, UserLogModule],
-  providers: [RecommendationService, RecommendationV2Service],
-  exports: [RecommendationService, RecommendationV2Service]
+  providers: [RecommendationService, RecommendationV2Service, RecommendationV3Service],
+  exports: [RecommendationService, RecommendationV2Service, RecommendationV3Service]
 })
 export class RecommendationModule {}

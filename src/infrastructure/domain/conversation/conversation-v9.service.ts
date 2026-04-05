@@ -18,7 +18,7 @@ import { AI_CONVERSATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { ConversationJobName, QueueName } from 'src/application/constant/processor';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
-import { RecommendationV2Service } from 'src/infrastructure/domain/recommendation/recommendation-v2.service';
+import { RecommendationV3Service } from 'src/infrastructure/domain/recommendation/recommendation-v3.service';
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
 import { AnalysisObject } from 'src/chatbot/output/analysis.output';
@@ -34,13 +34,13 @@ export class ConversationV9Service {
     private readonly adminInstructionService: AdminInstructionService,
     @InjectQueue(QueueName.CONVERSATION_QUEUE) private readonly conversationQueue: Queue,
     private readonly productService: ProductService,
-    private readonly recommendationV2Service: RecommendationV2Service,
+    private readonly recommendationV3Service: RecommendationV3Service,
     private readonly aiAnalysisService: AiAnalysisService,
     private readonly nlpEngineService: NlpEngineService
   ) { }
 
   /**
-   * Xử lý luồng Chat V9 - Sử dụng NlpEngineService (local) và RecommendationV2Service 
+   * Xử lý luồng Chat V9 - Sử dụng NlpEngineService (local) và RecommendationV3Service 
    */
   async chatV9(
     conversation: ConversationRequestDto
@@ -131,18 +131,37 @@ export class ConversationV9Service {
     // Phase 3: Route Actions
     if (intent === 'Recommend') {
       try {
-        this.logger.log(`[processAiChatResponseV9] Invoking RecommendationV2Service for user ${userId}...`);
+        this.logger.log(`[processAiChatResponseV9] Invoking RecommendationV3Service for user ${userId}...`);
         
         const recommendInputStr = `intent=${intent}; brands=${nlpBrands.slice(0, 10).join('|') || 'none'}; scents=${nlpScents.slice(0, 10).join('|') || 'none'}; genders=${nlpGenders.slice(0, 10).join('|') || 'none'}; productNames=${nlpProductNames.slice(0, 10).join('|') || 'none'}`;
         this.logger.log(`[processAiChatResponseV9] [RECOMMEND_INPUT] ${recommendInputStr}`);
         traceLogs.push(`[RECOMMEND_INPUT]: ${recommendInputStr}`);
 
-        const recommendationResult = await this.recommendationV2Service.getRecommendations(userId, 1, pseudoChatContext); // Top 1 with context theo yêu cầu
+        // --- NEW: DYNAMIC WEIGHTS LOGIC (Hybrid Rule-based) ---
+        const lowerMsg = messageText.toLowerCase();
+        let targetWeights = { brand: 0.25, scent: 0.40, survey: 0.10, season: 0.12, age: 0.08, budget: 0.05 };
+        let activeMode = 'default';
+
+        if (lowerMsg.includes('giá') || lowerMsg.includes('tiền') || lowerMsg.includes('tầm') || lowerMsg.includes('khoảng') || lowerMsg.includes('ngân sách') || lowerMsg.includes('rẻ') || lowerMsg.includes('đắt') || lowerMsg.includes('triệu') || lowerMsg.includes('k ')) {
+          targetWeights = { budget: 0.50, brand: 0.10, scent: 0.10, survey: 0.10, season: 0.10, age: 0.10 };
+          activeMode = 'budget_focus';
+        } else if (lowerMsg.includes('mùa') || lowerMsg.includes('nóng') || lowerMsg.includes('lạnh') || lowerMsg.includes('hè') || lowerMsg.includes('đông') || lowerMsg.includes('thu') || lowerMsg.includes('xuân') || lowerMsg.includes('thời tiết')) {
+          targetWeights = { season: 0.40, scent: 0.25, brand: 0.15, survey: 0.10, age: 0.05, budget: 0.05 };
+          activeMode = 'season_focus';
+        } else if (lowerMsg.includes('giống') || lowerMsg.includes('tương tự') || lowerMsg.includes('như chai') || lowerMsg.includes('cùng loại')) {
+          targetWeights = { brand: 0.40, scent: 0.40, survey: 0.05, season: 0.05, age: 0.05, budget: 0.05 };
+          activeMode = 'similar_focus';
+        }
+        
+        traceLogs.push(`[RECOMMEND_DYNAMIC_WEIGHTS]: Mode=${activeMode}, Weights=${JSON.stringify(targetWeights)}`);
+        this.logger.log(`[processAiChatResponseV9] Applied Dynamic Weight: Mode=${activeMode} | Weights=${JSON.stringify(targetWeights)}`);
+
+        const recommendationResult = await this.recommendationV3Service.getRecommendations(userId, 1, pseudoChatContext, targetWeights); // Top 1 with dynamic weights
 
         if (recommendationResult.success && recommendationResult.data?.recommendations?.length) {
           const profile = recommendationResult.data.profile;
           if (profile) {
-            traceLogs.push(`[RECOMMEND_PROFILE_USED]: Mode=Dynamic, Age=${profile.dynamicAge}, Season=${profile.currentSeason}, BudgetAvg=${profile.monthlyBudgetAvg}`);
+            traceLogs.push(`[RECOMMEND_PROFILE_USED]: Mode=Simple_V3, Age=${profile.age}, BudgetRange=${profile.budgetRange?.[0]}-${profile.budgetRange?.[1]}`);
             traceLogs.push(`[RECOMMEND_PROFILE_PREFS]: Brands=[${profile.topBrands?.join(', ') || 'N/A'}], Scents=[${profile.topScents?.join(', ') || 'N/A'}]`);
           }
 
@@ -151,7 +170,7 @@ export class ConversationV9Service {
             const br = rec.scoreBreakdown;
             let scoreStr = `(Score: ${rec.score.toFixed(2)})`;
             if (br) {
-               scoreStr += ` -> Breakdown [Brand: ${br.brandScore.toFixed(0)}%, Scent: ${br.scentScore.toFixed(0)}%, Season: ${br.seasonScore.toFixed(0)}%, Age: ${br.ageScore.toFixed(0)}%, Budget: ${br.budgetScore.toFixed(0)}%]`;
+               scoreStr += ` -> Breakdown [Brand: ${(br.brandScore * 100).toFixed(0)}%, Scent: ${(br.scentScore * 100).toFixed(0)}%, Season: ${(br.seasonScore * 100).toFixed(0)}%, Budget: ${(br.budgetScore * 100).toFixed(0)}%]`;
             }
             traceLogs.push(`   -> Rank ${idx + 1}: ${rec.productName} ${scoreStr}`);
           });

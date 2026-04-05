@@ -130,6 +130,36 @@ export interface OrderWithProducts {
   }>;
 }
 
+// ==========================================
+// V3 TYPES: SIMPLE & PRACTICAL
+// ==========================================
+
+export interface RecommendationProfileV3 {
+  topBrands: string[];
+  topScents: string[];
+  avgPrice: number;
+  budgetRange: [number, number]; // [min, max]
+  age: number;
+}
+
+export interface ProductScoreV3 {
+  productId: string;
+  variantId: string;
+  productName: string;
+  brand?: string;
+  basePrice?: number;
+  scentNotes?: string[];
+  score: number;
+  
+  // Simplified breakdown for V3
+  scoreBreakdown: {
+    brandScore: number;
+    scentScore: number;
+    budgetScore: number;
+    seasonScore: number;
+  };
+}
+
 export interface ScoresWeights {
   brand: number;
   scent: number;

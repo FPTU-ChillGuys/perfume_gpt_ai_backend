@@ -1,6 +1,6 @@
 import { BaseEntity, Entity, Property } from '@mikro-orm/core';
 import { ApiProperty } from '@nestjs/swagger';
-import { AIAcceptanceRepository } from 'src/infrastructure/repositories/ai-acceptance.repository';
+import { AIAcceptanceRepository } from 'src/infrastructure/domain/repositories/ai-acceptance.repository';
 import { Common } from './common/common.entities';
 
 /** Entity lưu trạng thái chấp nhận đề xuất AI của người dùng */

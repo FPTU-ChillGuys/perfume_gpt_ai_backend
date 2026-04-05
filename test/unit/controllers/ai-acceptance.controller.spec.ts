@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AIAcceptanceController } from 'src/api/controllers/ai-acceptance.controller';
-import { AIAcceptanceService } from 'src/infrastructure/servicies/ai-acceptance.service';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { createMockAIAcceptanceService } from '../../helpers/mock-factories';
 import {
   successResponse,

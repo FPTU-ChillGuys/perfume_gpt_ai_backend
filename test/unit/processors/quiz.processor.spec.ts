@@ -1,21 +1,21 @@
 jest.mock('src/infrastructure/servicies/quiz.service', () => ({
-  QuizService: class QuizService {}
+  SurveyService: class SurveyService {}
 }));
 
 jest.mock('src/infrastructure/servicies/user-log.service', () => ({
   UserLogService: class UserLogService {}
 }));
 
-import { QuizProcessor } from 'src/infrastructure/processor/quiz.processor';
-import { QuizJobName } from 'src/application/constant/processor';
+import { QuizProcessor } from 'src/infrastructure/domain/processor/quiz.processor';
+import { SurveyJobName } from 'src/application/constant/processor';
 
 describe('QuizProcessor', () => {
   const mockQuizService = {
-    addQuizQuesAnws: jest.fn()
+    addSurveyQuesAnws: jest.fn()
   };
 
   const mockUserLogService = {
-    addQuizQuesAnsDetailToUserLog: jest.fn()
+    addSurveyQuesAnsDetailToUserLog: jest.fn()
   };
 
   let processor: QuizProcessor;
@@ -25,15 +25,15 @@ describe('QuizProcessor', () => {
     processor = new QuizProcessor(mockQuizService as any, mockUserLogService as any);
   });
 
-  it('should process ADD_QUIZ_QUESTION_AND_ANSWER job successfully', async () => {
-    mockQuizService.addQuizQuesAnws.mockResolvedValue({
+  it('should process ADD_SURVEY_QUESTION_AND_ANSWER job successfully', async () => {
+    mockQuizService.addSurveyQuesAnws.mockResolvedValue({
       success: true,
       data: { id: 'quiz-answer-id' }
     });
 
     const job = {
       id: 'job-1',
-      name: QuizJobName.ADD_QUIZ_QUESTION_AND_ANSWER,
+      name: SurveyJobName.ADD_SURVEY_QUESTION_AND_ANSWER,
       data: {
         userId: 'user-1',
         details: [{ questionId: 'q1', answerId: 'a1' }]
@@ -42,22 +42,22 @@ describe('QuizProcessor', () => {
 
     await processor.process(job);
 
-    expect(mockQuizService.addQuizQuesAnws).toHaveBeenCalled();
-    expect(mockUserLogService.addQuizQuesAnsDetailToUserLog).toHaveBeenCalledWith(
+    expect(mockQuizService.addSurveyQuesAnws).toHaveBeenCalled();
+    expect(mockUserLogService.addSurveyQuesAnsDetailToUserLog).toHaveBeenCalledWith(
       'user-1',
       'quiz-answer-id'
     );
   });
 
   it('should skip log creation when quiz answer is not saved', async () => {
-    mockQuizService.addQuizQuesAnws.mockResolvedValue({
+    mockQuizService.addSurveyQuesAnws.mockResolvedValue({
       success: false,
       data: null
     });
 
     const job = {
       id: 'job-2',
-      name: QuizJobName.ADD_QUIZ_QUESTION_AND_ANSWER,
+      name: SurveyJobName.ADD_SURVEY_QUESTION_AND_ANSWER,
       data: {
         userId: 'user-1',
         details: [{ questionId: 'q1', answerId: 'a1' }]
@@ -66,7 +66,7 @@ describe('QuizProcessor', () => {
 
     await processor.process(job);
 
-    expect(mockUserLogService.addQuizQuesAnsDetailToUserLog).not.toHaveBeenCalled();
+    expect(mockUserLogService.addSurveyQuesAnsDetailToUserLog).not.toHaveBeenCalled();
   });
 
   it('should throw for unknown job name', async () => {

@@ -11,7 +11,7 @@
 export const generateSummaryPrompt = (
   searchContents: string,
   messageContents: string,
-  quizContents: string,
+  surveyContents: string,
   startDate: Date,
   endDate: Date
 ): string => {
@@ -22,14 +22,14 @@ export const generateSummaryPrompt = (
   if (messageContents) {
     prompt += `Tin nhắn: ${messageContents}\n`;
   }
-  if (quizContents) {
-    prompt += `Câu trả lời quiz: ${quizContents}\n`;
+  if (surveyContents) {
+    prompt += `Câu trả lời survey: ${surveyContents}\n`;
   }
   prompt += `Hãy cung cấp một bản tóm tắt ngắn gọn về các hoạt động của người dùng trong giai đoạn này.`;
   return prompt;
 };
 
-// ==================== Quiz Prompts ====================
+// ==================== Survey Prompts ====================
 
 /**
  * Chuyển đổi danh sách câu hỏi-trả lời thành chuỗi
@@ -40,33 +40,27 @@ export const convertQuesAnsesToString = (
   return quesAnses
     .map(
       (qa, index) =>
-        `${index + 1}. Câu hỏi: ${qa.question}\n   Trả lời: ${qa.answer}`
+        `Câu ${index + 1}. Câu hỏi: ${qa.question}\n  Nội dung câu trả lời của khách hàng: ${qa.answer}\n`
     )
     .join('\n');
 };
 
 /**
- * Prompt phân tích kết quả quiz và đề xuất nước hoa
+ * Prompt phân tích kết quả survey và đề xuất nước hoa
+ *
+ * QUYẾT ĐỊNH PHÂN 2 BƯỚC:
+ * 1. PHÂN TÍCH: Xác định sở thích từ survey data (KHÔNG GỌI TOOL)
+ * 2. GỌI TOOL: Dựa trên kết quả phân tích, gọi tool tìm sản phẩm thực tế
  *
  * YÊU CẦU OUTPUT có cấu trúc JSON gồm 2 field:
- *   - message: lời tư vấn thân thiện (string)
+ *   - message: lời tư vấn thân thiện (string) giải thích tại sao phù hợp
  *   - products: mảng sản phẩm thực tế lấy từ kết quả tool (array)
  */
-export const quizPrompt = (
+export const surveyPrompt = (
   quesAnses: Array<{ question: string; answer: string }>
 ): string => `
-Bạn là một chuyên gia tư vấn nước hoa. Dựa trên các câu hỏi và câu trả lời quiz sau, hãy phân tích sở thích của người dùng và đề xuất 1–3 sản phẩm nước hoa phù hợp nhất:
-
+Đây là kết quả survey tư vấn nước hoa của một khách hàng, bao gồm các câu hỏi và câu trả lời của họ để hiểu sở thích và nhu cầu của khách hàng (Và vui lòng gọi các tool đã được cung cấp để lấy dữ liệu sản phẩm thực tế, đừng dựa vào trí nhớ hoặc phỏng đoán):
 ${convertQuesAnsesToString(quesAnses)}
+`;
 
-## QUY TRÌNH BẮT BUỘC
-1. Gọi tool searchProduct hoặc getAllProducts để tìm kiếm sản phẩm thực tế từ cơ sở dữ liệu dựa trên sở thích quiz, với pageNumber = 1 và pageSize = 5.
-2. Từ kết quả tool, chọn 1–3 sản phẩm phù hợp nhất.
-3. Trả về JSON với đúng 2 field:
-   - "message": lời tư vấn ngắn gọn bằng tiếng Việt, thân thiện, giải thích tại sao mỗi sản phẩm phù hợp với câu trả lời quiz, nồng độ gợi ý (EDT/EDP/Parfum). KHÔNG liệt kê sản phẩm trong message — sản phẩm được trả trong field products.
-   - "products": mảng các sản phẩm THỰC TẾ lấy từ kết quả tool, mỗi phần tử phải có đủ các field: id, name, description, brandName, categoryName, primaryImage, attributes.
 
-## LƯU Ý QUAN TRỌNG
-- Trường "products" PHẢI chứa dữ liệu thực từ kết quả tool call, KHÔNG được để mảng rỗng nếu tool đã trả về sản phẩm.
-- Nếu tool không tìm thấy sản phẩm phù hợp, products để [], và ghi rõ trong message.
-- id phải được lấy chính xác từ kết quả tool (UUID thực), không tự tạo.`;

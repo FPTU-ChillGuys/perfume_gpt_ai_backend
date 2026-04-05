@@ -2,7 +2,7 @@ import { TestingModule, Test } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
-import { ProductService } from 'src/infrastructure/servicies/product.service';
+import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 
 // ─── mock helpers ───

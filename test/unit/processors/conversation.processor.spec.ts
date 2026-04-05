@@ -6,7 +6,7 @@ jest.mock('src/infrastructure/processor/helper/user-log.helper', () => ({
   UserLogHelper: class UserLogHelper {}
 }));
 
-import { ConversationProcessor } from 'src/infrastructure/processor/conversation.processor';
+import { ConversationProcessor } from 'src/infrastructure/domain/processor/conversation.processor';
 import { ConversationJobName } from 'src/application/constant/processor';
 
 describe('ConversationProcessor', () => {

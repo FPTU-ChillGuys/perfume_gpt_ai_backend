@@ -3,8 +3,8 @@ import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
 import { ProductController } from 'src/api/controllers/product.controller';
-import { ProductService } from 'src/infrastructure/servicies/product.service';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { ProductService } from 'src/infrastructure/domain/product/product.service';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 
 function axiosResponse<T>(data: T): AxiosResponse<T> {

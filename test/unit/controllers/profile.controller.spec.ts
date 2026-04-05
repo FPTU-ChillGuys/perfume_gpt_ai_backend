@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProfileController } from 'src/api/controllers/profile.controller';
-import { ProfileService } from 'src/infrastructure/servicies/profile.service';
+import { ProfileService } from 'src/infrastructure/domain/profile/profile.service';
 import { createMockProfileService } from '../../helpers/mock-factories';
 import {
   successResponseAPI,

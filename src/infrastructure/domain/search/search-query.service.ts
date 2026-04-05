@@ -1,0 +1,558 @@
+import { Injectable } from '@nestjs/common';
+import { SearchObjectDto, GenderIntent } from 'src/application/dtos/request/search-object.dto';
+import { AnalysisObject } from 'src/chatbot/output/analysis.output';
+import { embed } from 'ai';
+import { embeddingModel } from 'src/chatbot/ai-model';
+
+type QueryDslQueryContainer = Record<string, any>;
+export class SearchQueryService {
+    /**
+     * Builds the main search query with multiple layers (Exact, Semantic, Discovery, Typo, Technical)
+     */
+    buildSearchQuery(
+        searchText: string,
+        minimumShouldMatch: string = '75%',
+        defaultOp: 'and' | 'or' = 'and',
+        detectedSize: number | null = null,
+    ): QueryDslQueryContainer {
+        const shouldClauses: QueryDslQueryContainer[] = [];
+
+        // Layer 1: Exact Intent (Phrase matching)
+        shouldClauses.push({
+            multi_match: {
+                query: searchText,
+                fields: ['name^10', 'brand^8', 'scentNotes^5', 'olfactoryFamilies^5'],
+                type: 'phrase',
+                boost: 10.0,
+            },
+        });
+
+        // Layer 2: Semantic & Intent (Most Fields)
+        shouldClauses.push({
+            multi_match: {
+                query: searchText,
+                fields: [
+                    'name^5',
+                    'brand^4',
+                    'category^5',
+                    'genderSearch^5',
+                    'scentNotes^4',
+                    'olfactoryFamilies^4',
+                    'attributes^3',
+                    'concentrations^2',
+                    'origin',
+                ],
+                operator: defaultOp,
+                type: 'most_fields',
+                minimum_should_match: minimumShouldMatch,
+            },
+        });
+
+        // Layer 3: Discovery (Scent Notes & Olfactory Families)
+        shouldClauses.push({
+            multi_match: {
+                query: searchText,
+                fields: ['scentNotes^6', 'olfactoryFamilies^5'],
+                operator: 'or',
+                type: 'best_fields',
+                boost: 1.5,
+            },
+        });
+
+        // Layer 4: Typo & Correction (Fuzziness)
+        shouldClauses.push({
+            multi_match: {
+                query: searchText,
+                fields: ['name^2', 'brand^2'],
+                fuzziness: 'AUTO',
+                boost: 0.4,
+            },
+        });
+
+        // Layer 5: Technical Details (SKU, Barcode)
+        shouldClauses.push({
+            multi_match: {
+                query: searchText,
+                fields: ['scentNotes', 'skus^5', 'barcodes^5'],
+                operator: 'or',
+                type: 'best_fields',
+            },
+        });
+
+        // Layer 6: Specific Volume Awareness
+        if (detectedSize !== null) {
+            shouldClauses.push({
+                term: {
+                    volumes: {
+                        value: detectedSize,
+                        boost: 25.0,
+                    },
+                },
+            });
+        }
+
+        return {
+            bool: {
+                should: shouldClauses,
+            },
+        };
+    }
+
+    /**
+     * Builds filter clauses based on request parameters
+     */
+    buildFilterQuery(params: {
+        gender?: string;
+        origin?: string;
+        releaseYear?: number;
+        categoryId?: string;
+        brandId?: string;
+        fromPrice?: number;
+        toPrice?: number;
+        volume?: number;
+        concentration?: string;
+        variantType?: string;
+        minLongevity?: number;
+        minSillage?: number;
+    }): QueryDslQueryContainer[] {
+        const filters: QueryDslQueryContainer[] = [];
+
+        if (params.gender) {
+            filters.push({ term: { gender: params.gender } });
+        }
+
+        if (params.origin) {
+            filters.push({ term: { origin: params.origin } });
+        }
+
+        if (params.releaseYear !== undefined) {
+            filters.push({ term: { releaseYear: params.releaseYear } });
+        }
+
+        if (params.categoryId) {
+            filters.push({ term: { categoryId: params.categoryId } });
+        }
+
+        if (params.brandId) {
+            filters.push({ term: { brandId: params.brandId } });
+        }
+
+        if (params.fromPrice !== undefined || params.toPrice !== undefined) {
+            const range: any = {};
+            if (params.fromPrice !== undefined) range.gte = params.fromPrice;
+            if (params.toPrice !== undefined) range.lte = params.toPrice;
+            filters.push({ range: { variantPrices: range } });
+        }
+
+        if (params.volume !== undefined) {
+            filters.push({ term: { volumes: params.volume } });
+        }
+
+        if (params.concentration) {
+            filters.push({ match: { concentrations: { query: params.concentration } } });
+        }
+
+        if (params.variantType) {
+            filters.push({ match: { variantType: { query: params.variantType } } });
+        }
+
+        if (params.minLongevity !== undefined) {
+            filters.push({ range: { longevity: { gte: params.minLongevity } } });
+        }
+
+        if (params.minSillage !== undefined) {
+            filters.push({ range: { sillage: { gte: params.minSillage } } });
+        }
+
+        return filters;
+    }
+
+    /**
+     * Builds a complex Elasticsearch query with kNN for Hybrid Search
+     */
+    async buildHybridQuery(searchText: string, obj: SearchObjectDto): Promise<{ query: QueryDslQueryContainer, knn?: any }> {
+        const mustClauses: QueryDslQueryContainer[] = [];
+        const shouldClauses: QueryDslQueryContainer[] = [];
+        const filters: QueryDslQueryContainer[] = [];
+
+        // 1. Generate Query Embedding
+        let queryEmbedding: number[] | undefined;
+        try {
+            const { embedding } = await embed({
+                model: embeddingModel,
+                value: searchText,
+                providerOptions: {
+                    openai: {
+                        dimensions: 1024, // optional, number of dimensions for the embedding
+                    }
+                },
+            });
+            queryEmbedding = embedding;
+        } catch (error) {
+            console.error('[ES] Error generating query embedding:', error);
+        }
+
+        // 2. Build filters from SearchObject (Intent)
+        if (obj.brand) {
+            mustClauses.push({ match: { brand: { query: obj.brand, boost: 2.0 } } });
+        }
+        if (obj.gender) {
+            filters.push({ term: { gender: obj.gender } });
+        }
+        if (obj.origin) {
+            filters.push({ term: { origin: obj.origin } });
+        }
+        if (obj.releaseYear !== undefined) {
+            filters.push({ term: { releaseYear: obj.releaseYear } });
+        }
+        if (obj.minPrice !== undefined || obj.maxPrice !== undefined) {
+            const range: any = {};
+            if (obj.minPrice !== undefined) range.gte = obj.minPrice;
+            if (obj.maxPrice !== undefined) range.lte = obj.maxPrice;
+            filters.push({ range: { variantPrices: range } });
+        }
+        if (obj.notes && obj.notes.length > 0) {
+            obj.notes.forEach(note => {
+                shouldClauses.push({ match: { scentNotes: { query: note, boost: 1.5 } } });
+            });
+        }
+        if (obj.topNotes && obj.topNotes.length > 0) {
+            obj.topNotes.forEach(note => {
+                shouldClauses.push({ match: { top_notes: { query: note, boost: 2.0 } } });
+            });
+        }
+        if (obj.middleNotes && obj.middleNotes.length > 0) {
+            obj.middleNotes.forEach(note => {
+                shouldClauses.push({ match: { middle_notes: { query: note, boost: 1.8 } } });
+            });
+        }
+        if (obj.baseNotes && obj.baseNotes.length > 0) {
+            obj.baseNotes.forEach(note => {
+                shouldClauses.push({ match: { base_notes: { query: note, boost: 1.8 } } });
+            });
+        }
+        if (obj.families && obj.families.length > 0) {
+            obj.families.forEach(family => {
+                shouldClauses.push({ match: { olfactoryFamilies: { query: family, boost: 1.0 } } });
+            });
+        }
+
+        // Categorized Attribute Filters
+        if (obj.occasion) {
+            filters.push({ match: { attr_occasion: { query: obj.occasion, boost: 1.2 } } });
+        }
+        if (obj.weatherSeason) {
+            filters.push({ match: { attr_weather_season: { query: obj.weatherSeason, boost: 1.2 } } });
+        }
+        if (obj.ageGroup) {
+            filters.push({ match: { attr_age_group: { query: obj.ageGroup, boost: 1.2 } } });
+        }
+        if (obj.style) {
+            filters.push({ match: { attr_style: { query: obj.style, boost: 1.2 } } });
+        }
+        if (obj.scentCharacter) {
+            filters.push({ match: { attr_scent_character: { query: obj.scentCharacter, boost: 1.2 } } });
+        }
+        if (obj.timeOfDay) {
+            filters.push({ match: { attr_time_of_day: { query: obj.timeOfDay, boost: 1.2 } } });
+        }
+        if (obj.giftSuitability) {
+            filters.push({ match: { attr_gift_suitability: { query: obj.giftSuitability, boost: 1.2 } } });
+        }
+        if (obj.skinType) {
+            filters.push({ match: { attr_skin_type: { query: obj.skinType, boost: 1.2 } } });
+        }
+
+        if (obj.minLongevity !== undefined) {
+            filters.push({ range: { longevity: { gte: obj.minLongevity } } });
+        }
+        if (obj.minSillage !== undefined) {
+            filters.push({ range: { sillage: { gte: obj.minSillage } } });
+        }
+
+        const query: QueryDslQueryContainer = {
+            bool: {
+                must: mustClauses.length > 0 ? mustClauses : undefined,
+                should: shouldClauses.length > 0 ? shouldClauses : undefined,
+                filter: filters.length > 0 ? filters : undefined,
+                minimum_should_match: (shouldClauses.length > 0 && mustClauses.length === 0) ? 1 : undefined
+            }
+        };
+
+        const knn: any | undefined = queryEmbedding ? {
+            field: 'embedding',
+            query_vector: queryEmbedding,
+            k: 50,
+            num_candidates: 100,
+            filter: filters.length > 0 ? filters : undefined,
+            boost: 1.0
+        } : undefined;
+
+        return { query, knn };
+    }
+
+    /**
+     * Builds a complex Elasticsearch query from a structured SearchObject extracted by AI
+     */
+    buildQueryFromSearchObject(obj: SearchObjectDto): QueryDslQueryContainer {
+        const mustClauses: QueryDslQueryContainer[] = [];
+        const shouldClauses: QueryDslQueryContainer[] = [];
+        const filters: QueryDslQueryContainer[] = [];
+
+        // 1. Brand match (Strong filter/must)
+        if (obj.brand) {
+            mustClauses.push({
+                match: {
+                    brand: {
+                        query: obj.brand,
+                        boost: 5.0
+                    }
+                }
+            });
+        }
+
+        // 2. Product Name match
+        if (obj.productName) {
+            shouldClauses.push({
+                match: {
+                    name: {
+                        query: obj.productName,
+                        boost: 10.0
+                    }
+                }
+            });
+        }
+
+        // 3. Category match
+        if (obj.category) {
+            shouldClauses.push({
+                match: {
+                    category: {
+                        query: obj.category,
+                        boost: 3.0
+                    }
+                }
+            });
+        }
+
+        // 4. Gender filter
+        if (obj.gender) {
+            filters.push({ term: { gender: obj.gender } });
+        }
+        if (obj.origin) {
+            filters.push({ term: { origin: obj.origin } });
+        }
+        if (obj.releaseYear !== undefined) {
+            filters.push({ term: { releaseYear: obj.releaseYear } });
+        }
+
+        // 5. Price range filter
+        if (obj.minPrice !== undefined || obj.maxPrice !== undefined) {
+            const range: any = {};
+            if (obj.minPrice !== undefined) range.gte = obj.minPrice;
+            if (obj.maxPrice !== undefined) range.lte = obj.maxPrice;
+            filters.push({ range: { variantPrices: range } });
+        }
+
+        // 6. Scent Notes (Should)
+        if (obj.notes && obj.notes.length > 0) {
+            obj.notes.forEach(note => {
+                shouldClauses.push({
+                    match: {
+                        scentNotes: {
+                            query: note,
+                            boost: 2.0
+                        }
+                    }
+                });
+            });
+        }
+
+        // 7. Olfactory Families (Should)
+        if (obj.families && obj.families.length > 0) {
+            obj.families.forEach(family => {
+                shouldClauses.push({
+                    match: {
+                        olfactoryFamilies: {
+                            query: family,
+                            boost: 1.5
+                        }
+                    }
+                });
+            });
+        }
+
+        // 8. Volume awareness
+        if (obj.volume) {
+            shouldClauses.push({
+                term: {
+                    volumes: {
+                        value: obj.volume,
+                        boost: 5.0
+                    }
+                }
+            });
+        }
+
+        if (obj.variantType) {
+            shouldClauses.push({
+                match: {
+                    variantType: {
+                        query: obj.variantType,
+                        boost: 2.5
+                    }
+                }
+            });
+        }
+
+        if (obj.concentration) {
+            shouldClauses.push({
+                match: {
+                    concentrations: {
+                        query: obj.concentration,
+                        boost: 2.5
+                    }
+                }
+            });
+        }
+
+        // 9. Concentration, Occasion, Season, Description (Combined should)
+        const descriptionParts = [
+            obj.concentration,
+            obj.occasion,
+            obj.season,
+            obj.description
+        ].filter(Boolean) as string[];
+
+        if (descriptionParts.length > 0) {
+            shouldClauses.push({
+                multi_match: {
+                    query: descriptionParts.join(' '),
+                    fields: ['attributes', 'concentrations', 'name', 'brand', 'description'],
+                    boost: 1.0
+                }
+            });
+        }
+
+        // Categorized Attribute Filters
+        if (obj.occasion) {
+            filters.push({ match: { attr_occasion: { query: obj.occasion, boost: 1.2 } } });
+        }
+        if (obj.weatherSeason) {
+            filters.push({ match: { attr_weather_season: { query: obj.weatherSeason, boost: 1.2 } } });
+        }
+        if (obj.ageGroup) {
+            filters.push({ match: { attr_age_group: { query: obj.ageGroup, boost: 1.2 } } });
+        }
+        if (obj.style) {
+            filters.push({ match: { attr_style: { query: obj.style, boost: 1.2 } } });
+        }
+        if (obj.scentCharacter) {
+            filters.push({ match: { attr_scent_character: { query: obj.scentCharacter, boost: 1.2 } } });
+        }
+        if (obj.timeOfDay) {
+            filters.push({ match: { attr_time_of_day: { query: obj.timeOfDay, boost: 1.2 } } });
+        }
+        if (obj.giftSuitability) {
+            filters.push({ match: { attr_gift_suitability: { query: obj.giftSuitability, boost: 1.2 } } });
+        }
+        if (obj.skinType) {
+            filters.push({ match: { attr_skin_type: { query: obj.skinType, boost: 1.2 } } });
+        }
+
+        // 10. Performance filters (Longevity & Sillage)
+        if (obj.minLongevity !== undefined) {
+            filters.push({ range: { longevity: { gte: obj.minLongevity } } });
+        }
+        if (obj.minSillage !== undefined) {
+            filters.push({ range: { sillage: { gte: obj.minSillage } } });
+        }
+
+        return {
+            bool: {
+                must: mustClauses.length > 0 ? mustClauses : undefined,
+                should: shouldClauses.length > 0 ? shouldClauses : undefined,
+                filter: filters.length > 0 ? filters : undefined,
+                minimum_should_match: (shouldClauses.length > 0 && mustClauses.length === 0) ? 1 : undefined
+            }
+        };
+    }
+
+    /**
+     * Maps the robust AnalysisObject to a flat SearchObjectDto for Elasticsearch filters
+     */
+    mapAnalysisToSearchObject(analysis: AnalysisObject): SearchObjectDto {
+        const dto = new SearchObjectDto();
+
+        if (analysis.budget) {
+            dto.minPrice = analysis.budget.min || undefined;
+            dto.maxPrice = analysis.budget.max || undefined;
+        }
+
+        if (analysis.normalizationMetadata && analysis.normalizationMetadata.length > 0) {
+            analysis.normalizationMetadata.forEach(meta => {
+                if (!meta.isNormalized) return;
+
+                switch (meta.type) {
+                    case 'brand':
+                        dto.brand = meta.corrected;
+                        break;
+                    case 'category':
+                        dto.category = meta.corrected;
+                        break;
+                    case 'note':
+                        dto.notes = [...(dto.notes || []), meta.corrected];
+                        break;
+                    case 'family':
+                        dto.families = [...(dto.families || []), meta.corrected];
+                        break;
+                    case 'attribute':
+                        // Map specific attributes to DTO fields if they match
+                        const val = meta.corrected.toLowerCase();
+                        if (['nam', 'male'].includes(val)) dto.gender = GenderIntent.MALE;
+                        else if (['nữ', 'female'].includes(val)) dto.gender = GenderIntent.FEMALE;
+                        else if (['unisex', 'trung tính'].includes(val)) dto.gender = GenderIntent.UNISEX;
+                        else if (/(?:^|\b)(edp|edt|parfum|eau de parfum|eau de toilette|extrait)(?:\b|$)/i.test(val)) dto.concentration = meta.corrected;
+                        else if (/(?:^|\b)(\d+)\s*ml(?:\b|$)/i.test(val)) dto.volume = Number(val.match(/(\d+)/)?.[1]);
+                        else if (/(?:^|\b)(\d{4})(?:\b|$)/.test(val)) dto.releaseYear = Number(val.match(/(\d{4})/)?.[1]);
+                        else if (/(?:\b)(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)(?:\b|$)/i.test(val)) dto.minLongevity = Number(val.match(/(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)/i)?.[1]);
+                        else if (/(?:\b)(\d+(?:\.\d+)?)\s*(?:\/10|điểm|points?)(?:\b|$)/i.test(val)) dto.minSillage = Number(val.match(/(\d+(?:\.\d+)?)\s*(?:\/10|điểm|points?)/i)?.[1]);
+                        else if (val.includes('tuổi')) dto.ageGroup = meta.corrected;
+                        else if (['tiệc', 'đi chơi', 'văn phòng'].some(s => val.includes(s))) dto.occasion = meta.corrected;
+                        else if (['us', 'usa', 'pháp', 'france', 'nhật', 'japan', 'hàn quốc', 'korea', 'italy', 'ý'].some(s => val.includes(s))) dto.origin = meta.corrected;
+                        else if (['edp', 'edt', 'parfum', 'eau de parfum', 'eau de toilette', 'extrait'].some(s => val.includes(s))) dto.concentration = meta.corrected;
+                        else if (['body mist', 'travel', 'sample', 'spray'].some(s => val.includes(s))) dto.variantType = meta.corrected;
+                        else dto.style = meta.corrected;
+                        break;
+                }
+            });
+        }
+
+        // Handle product names from analysis
+        if (analysis.productNames && analysis.productNames.length > 0) {
+            dto.productName = analysis.productNames[0]; // Take first as primary for flat DTO
+        }
+
+        const releaseYearMatch = analysis.originalRequestVietnamese?.match(/\b(19\d{2}|20\d{2})\b/);
+        if (releaseYearMatch) {
+            dto.releaseYear = Number(releaseYearMatch[1]);
+        }
+
+        const volumeMatch = analysis.originalRequestVietnamese?.match(/\b(\d+(?:\.\d+)?)\s*ml\b/i);
+        if (volumeMatch) {
+            dto.volume = Number(volumeMatch[1]);
+        }
+
+        const longevityMatch = analysis.originalRequestVietnamese?.match(/\b(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i);
+        if (longevityMatch) {
+            dto.minLongevity = Number(longevityMatch[1]);
+        }
+
+        const sillageMatch = analysis.originalRequestVietnamese?.match(/\b(\d+(?:\.\d+)?)\s*(?:\/10|điểm|points?)\b/i);
+        if (sillageMatch) {
+            dto.minSillage = Number(sillageMatch[1]);
+        }
+
+        return dto;
+    }
+}

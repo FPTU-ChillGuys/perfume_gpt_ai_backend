@@ -1,6 +1,6 @@
 import { MikroORM } from '@mikro-orm/core';
 import { TestingModule } from '@nestjs/testing';
-import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
+import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
 import { getMapperToken } from '@automapper/nestjs';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { MessageDto } from 'src/application/dtos/common/message.dto';

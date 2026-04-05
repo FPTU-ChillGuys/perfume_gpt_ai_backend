@@ -86,48 +86,50 @@ model AspNetUserRoles {
 }
 
 model AspNetUsers {
-  Id                                                          String                @id(map: "PK_AspNetUsers") @db.UniqueIdentifier
-  FullName                                                    String                @db.NVarChar(Max)
-  IsActive                                                    Boolean
-  UpdatedAt                                                   DateTime?
-  CreatedAt                                                   DateTime
-  IsDeleted                                                   Boolean
-  DeletedAt                                                   DateTime?
-  UserName                                                    String?               @db.NVarChar(256)
-  NormalizedUserName                                          String?               @unique(map: "UserNameIndex", where: raw("([NormalizedUserName] IS NOT NULL)")) @db.NVarChar(256)
-  Email                                                       String?               @db.NVarChar(256)
-  NormalizedEmail                                             String?               @db.NVarChar(256)
-  EmailConfirmed                                              Boolean
-  PasswordHash                                                String?               @db.NVarChar(Max)
-  SecurityStamp                                               String?               @db.NVarChar(Max)
-  ConcurrencyStamp                                            String?               @db.NVarChar(Max)
-  PhoneNumber                                                 String?               @db.NVarChar(Max)
-  PhoneNumberConfirmed                                        Boolean
-  TwoFactorEnabled                                            Boolean
-  LockoutEnd                                                  DateTime?             @db.DateTimeOffset
-  LockoutEnabled                                              Boolean
-  AccessFailedCount                                           Int
-  PointBalance                                                Int                   @default(0, map: "DF__AspNetUse__Point__4E53A1AA")
-  Addresses                                                   Addresses[]
-  AspNetUserClaims                                            AspNetUserClaims[]
-  AspNetUserLogins                                            AspNetUserLogins[]
-  AspNetUserRoles                                             AspNetUserRoles[]
-  AspNetUserTokens                                            AspNetUserTokens[]
-  CartItems                                                   CartItems[]
-  CustomerProfiles                                            CustomerProfiles?
-  ImportTickets_ImportTickets_CreatedByIdToAspNetUsers        ImportTickets[]       @relation("ImportTickets_CreatedByIdToAspNetUsers")
-  ImportTickets_ImportTickets_VerifiedByIdToAspNetUsers       ImportTickets[]       @relation("ImportTickets_VerifiedByIdToAspNetUsers")
-  LoyaltyTransactions                                         LoyaltyTransactions[]
-  Media                                                       Media?
-  Notifications                                               Notifications[]
-  Orders_Orders_CustomerIdToAspNetUsers                       Orders[]              @relation("Orders_CustomerIdToAspNetUsers")
-  Orders_Orders_StaffIdToAspNetUsers                          Orders[]              @relation("Orders_StaffIdToAspNetUsers")
-  Reviews_Reviews_ModeratedByStaffIdToAspNetUsers             Reviews[]             @relation("Reviews_ModeratedByStaffIdToAspNetUsers")
-  Reviews_Reviews_UserIdToAspNetUsers                         Reviews[]             @relation("Reviews_UserIdToAspNetUsers")
-  StockAdjustments_StockAdjustments_CreatedByIdToAspNetUsers  StockAdjustments[]    @relation("StockAdjustments_CreatedByIdToAspNetUsers")
-  StockAdjustments_StockAdjustments_VerifiedByIdToAspNetUsers StockAdjustments[]    @relation("StockAdjustments_VerifiedByIdToAspNetUsers")
-  TemporaryMedia                                              TemporaryMedia[]
-  UserVouchers                                                UserVouchers[]
+  Id                                                                 String                @id(map: "PK_AspNetUsers") @db.UniqueIdentifier
+  FullName                                                           String                @db.NVarChar(Max)
+  IsActive                                                           Boolean
+  UpdatedAt                                                          DateTime?
+  CreatedAt                                                          DateTime
+  IsDeleted                                                          Boolean
+  DeletedAt                                                          DateTime?
+  UserName                                                           String?               @db.NVarChar(256)
+  NormalizedUserName                                                 String?               @unique(map: "UserNameIndex", where: raw("([NormalizedUserName] IS NOT NULL)")) @db.NVarChar(256)
+  Email                                                              String?               @db.NVarChar(256)
+  NormalizedEmail                                                    String?               @db.NVarChar(256)
+  EmailConfirmed                                                     Boolean
+  PasswordHash                                                       String?               @db.NVarChar(Max)
+  SecurityStamp                                                      String?               @db.NVarChar(Max)
+  ConcurrencyStamp                                                   String?               @db.NVarChar(Max)
+  PhoneNumber                                                        String?               @db.NVarChar(Max)
+  PhoneNumberConfirmed                                               Boolean
+  TwoFactorEnabled                                                   Boolean
+  LockoutEnd                                                         DateTime?             @db.DateTimeOffset
+  LockoutEnabled                                                     Boolean
+  AccessFailedCount                                                  Int
+  PointBalance                                                       Int                   @default(0, map: "DF__AspNetUse__Point__4E53A1AA")
+  Addresses                                                          Addresses[]
+  AspNetUserClaims                                                   AspNetUserClaims[]
+  AspNetUserLogins                                                   AspNetUserLogins[]
+  AspNetUserRoles                                                    AspNetUserRoles[]
+  AspNetUserTokens                                                   AspNetUserTokens[]
+  CartItems                                                          CartItems[]
+  CustomerProfiles                                                   CustomerProfiles?
+  ImportTickets_ImportTickets_CreatedByIdToAspNetUsers               ImportTickets[]       @relation("ImportTickets_CreatedByIdToAspNetUsers")
+  ImportTickets_ImportTickets_VerifiedByIdToAspNetUsers              ImportTickets[]       @relation("ImportTickets_VerifiedByIdToAspNetUsers")
+  LoyaltyTransactions                                                LoyaltyTransactions[]
+  Media                                                              Media?
+  Notifications                                                      Notifications[]
+  OrderCancelRequests_OrderCancelRequests_ProcessedByIdToAspNetUsers OrderCancelRequests[] @relation("OrderCancelRequests_ProcessedByIdToAspNetUsers")
+  OrderCancelRequests_OrderCancelRequests_RequestedByIdToAspNetUsers OrderCancelRequests[] @relation("OrderCancelRequests_RequestedByIdToAspNetUsers")
+  Orders_Orders_CustomerIdToAspNetUsers                              Orders[]              @relation("Orders_CustomerIdToAspNetUsers")
+  Orders_Orders_StaffIdToAspNetUsers                                 Orders[]              @relation("Orders_StaffIdToAspNetUsers")
+  Reviews_Reviews_ModeratedByStaffIdToAspNetUsers                    Reviews[]             @relation("Reviews_ModeratedByStaffIdToAspNetUsers")
+  Reviews_Reviews_UserIdToAspNetUsers                                Reviews[]             @relation("Reviews_UserIdToAspNetUsers")
+  StockAdjustments_StockAdjustments_CreatedByIdToAspNetUsers         StockAdjustments[]    @relation("StockAdjustments_CreatedByIdToAspNetUsers")
+  StockAdjustments_StockAdjustments_VerifiedByIdToAspNetUsers        StockAdjustments[]    @relation("StockAdjustments_VerifiedByIdToAspNetUsers")
+  TemporaryMedia                                                     TemporaryMedia[]
+  UserVouchers                                                       UserVouchers[]
 
   @@index([NormalizedEmail], map: "EmailIndex")
 }
@@ -310,9 +312,9 @@ model LoyaltyTransactions {
   TransactionType String      @db.NVarChar(Max)
   PointsChanged   Int
   Reason          String      @db.NVarChar(Max)
-  AspNetUsers AspNetUsers @relation( fields: [UserId], references: [Id], onDelete: Cascade)
-  Orders Orders? @relation(fields: [OrderId], references: [Id], onDelete: NoAction, onUpdate: NoAction )
-  Vouchers Vouchers? @relation(fields: [VoucherId],references: [Id], onDelete: NoAction,onUpdate: NoAction)
+  AspNetUsers     AspNetUsers @relation(fields: [UserId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_LoyaltyTransactions_AspNetUsers_UserId")
+  Orders          Orders?     @relation(fields: [OrderId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_LoyaltyTransactions_Orders_OrderId")
+  Vouchers        Vouchers?   @relation(fields: [VoucherId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_LoyaltyTransactions_Vouchers_VoucherId")
 
   @@index([OrderId], map: "IX_LoyaltyTransactions_OrderId")
   @@index([UserId], map: "IX_LoyaltyTransactions_UserId")
@@ -383,6 +385,29 @@ model OlfactoryFamilies {
   ProductFamilyMaps         ProductFamilyMaps[]
 }
 
+model OrderCancelRequests {
+  Id                                                         String       @id(map: "PK_OrderCancelRequests") @db.UniqueIdentifier
+  OrderId                                                    String       @db.UniqueIdentifier
+  RequestedById                                              String       @db.UniqueIdentifier
+  ProcessedById                                              String?      @db.UniqueIdentifier
+  Reason                                                     String       @db.NVarChar(Max)
+  StaffNote                                                  String?      @db.NVarChar(Max)
+  Status                                                     Int
+  IsRefundRequired                                           Boolean
+  RefundAmount                                               Decimal?     @db.Decimal(18, 2)
+  IsRefunded                                                 Boolean
+  VnpTransactionNo                                           String?      @db.NVarChar(Max)
+  CreatedAt                                                  DateTime
+  UpdatedAt                                                  DateTime?
+  AspNetUsers_OrderCancelRequests_ProcessedByIdToAspNetUsers AspNetUsers? @relation("OrderCancelRequests_ProcessedByIdToAspNetUsers", fields: [ProcessedById], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_OrderCancelRequests_AspNetUsers_ProcessedById")
+  AspNetUsers_OrderCancelRequests_RequestedByIdToAspNetUsers AspNetUsers  @relation("OrderCancelRequests_RequestedByIdToAspNetUsers", fields: [RequestedById], references: [Id], onUpdate: NoAction, map: "FK_OrderCancelRequests_AspNetUsers_RequestedById")
+  Orders                                                     Orders       @relation(fields: [OrderId], references: [Id], onUpdate: NoAction, map: "FK_OrderCancelRequests_Orders_OrderId")
+
+  @@index([OrderId], map: "IX_OrderCancelRequests_OrderId")
+  @@index([ProcessedById], map: "IX_OrderCancelRequests_ProcessedById")
+  @@index([RequestedById], map: "IX_OrderCancelRequests_RequestedById")
+}
+
 model OrderDetails {
   Id              String          @id(map: "PK_OrderDetails") @db.UniqueIdentifier
   OrderId         String          @db.UniqueIdentifier
@@ -413,6 +438,7 @@ model Orders {
   PaymentExpiresAt                           DateTime?
   LoyaltyTransactions                        LoyaltyTransactions[]
   Notifications                              Notifications[]
+  OrderCancelRequests                        OrderCancelRequests[]
   OrderDetails                               OrderDetails[]
   AspNetUsers_Orders_CustomerIdToAspNetUsers AspNetUsers?          @relation("Orders_CustomerIdToAspNetUsers", fields: [CustomerId], references: [Id], onUpdate: NoAction, map: "FK_Orders_AspNetUsers_CustomerId")
   AspNetUsers_Orders_StaffIdToAspNetUsers    AspNetUsers?          @relation("Orders_StaffIdToAspNetUsers", fields: [StaffId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_Orders_AspNetUsers_StaffId")
@@ -672,6 +698,7 @@ model Stocks {
   LowStockThreshold Int
   ReservedQuantity  Int                      @default(0, map: "DF__Stocks__Reserved__7849DB76")
   RowVersion        Unsupported("timestamp")
+  Status            String                   @default("N'", map: "DF__Stocks__Status__53D770D6") @db.NVarChar(Max)
   Notifications     Notifications[]
   ProductVariants   ProductVariants          @relation(fields: [VariantId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Stocks_ProductVariants_VariantId")
 }

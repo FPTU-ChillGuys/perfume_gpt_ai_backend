@@ -3,7 +3,7 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { MikroORM } from '@mikro-orm/core';
-import { seedAdminInstructions } from './infrastructure/seed/admin-instruction.seeder';
+import { seedAdminInstructions } from './infrastructure/domain/common/seed/admin-instruction.seeder';
 import { execSync } from 'child_process';
 import { HttpExceptionFilter } from './application/filters/http-exception.filter';
 import { SuccessResponseInterceptor } from './application/common/interceptors/success-response.interceptor';

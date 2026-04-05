@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TrendController } from 'src/api/controllers/trend.controller';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { AI_SERVICE } from 'src/infrastructure/domain/ai/ai.module';
 import {
   createMockUserLogService,
   createMockAIService,

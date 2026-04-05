@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConversationController } from 'src/api/controllers/conversation.controller';
-import { ConversationService } from 'src/infrastructure/servicies/conversation.service';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { OrderService } from 'src/infrastructure/servicies/order.service';
-import { ProfileService } from 'src/infrastructure/servicies/profile.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { OrderService } from 'src/infrastructure/domain/order/order.service';
+import { ProfileService } from 'src/infrastructure/domain/profile/profile.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { AI_SERVICE } from 'src/infrastructure/domain/ai/ai.module';
 import {
   createMockAIService,
   createMockConversationService,

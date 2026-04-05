@@ -1,7 +1,7 @@
 import { Entity, Index, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
 import { ApiProperty } from '@nestjs/swagger';
-import { UserLogSummaryRepository } from 'src/infrastructure/repositories/user-log-summary.repository';
+import { UserLogSummaryRepository } from 'src/infrastructure/domain/repositories/user-log-summary.repository';
 
 /** Entity lưu bản tóm tắt hành vi người dùng dạng rolling theo user */
 @Entity({repository: () => UserLogSummaryRepository})

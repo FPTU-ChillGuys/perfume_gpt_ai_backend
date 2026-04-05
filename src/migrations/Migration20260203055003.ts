@@ -3,7 +3,7 @@ import { Migration } from '@mikro-orm/migrations';
 export class Migration20260203055003 extends Migration {
 
   override async up(): Promise<void> {
-    this.addSql(`alter table "quiz_answer" alter column "answer" type text using ("answer"::text);`);
+    this.addSql(`alter table "survey_answer" alter column "answer" type text using ("answer"::text);`);
 
     this.addSql(`alter table "user_log_summary" alter column "log_summary" type text using ("log_summary"::text);`);
 
@@ -13,7 +13,7 @@ export class Migration20260203055003 extends Migration {
   }
 
   override async down(): Promise<void> {
-    this.addSql(`alter table "quiz_answer" alter column "answer" type varchar(255) using ("answer"::varchar(255));`);
+    this.addSql(`alter table "survey_answer" alter column "answer" type varchar(255) using ("answer"::varchar(255));`);
 
     this.addSql(`alter table "user_log_summary" alter column "log_summary" type varchar(255) using ("log_summary"::varchar(255));`);
 

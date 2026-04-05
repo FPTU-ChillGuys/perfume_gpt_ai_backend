@@ -1,7 +1,7 @@
 import { Collection, Entity, OneToMany, Property } from '@mikro-orm/core';
 import { Common } from './common/common.entities';
 import { Message } from './message.entity';
-import { ConversationRepository } from 'src/infrastructure/repositories/conversation.repository';
+import { ConversationRepository } from 'src/infrastructure/domain/repositories/conversation.repository';
 import { ApiProperty } from '@nestjs/swagger';
 
 /** Entity lưu cuộc hội thoại giữa người dùng và AI */

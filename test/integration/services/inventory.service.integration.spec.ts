@@ -2,7 +2,7 @@ import { TestingModule, Test } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
-import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
+import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 

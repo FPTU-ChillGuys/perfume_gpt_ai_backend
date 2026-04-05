@@ -7,7 +7,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class ReviewLog extends Common {
   @ApiProperty({ description: 'Nội dung log đánh giá' })
   @Enum(() => ReviewTypeEnum)
-  typeReview: ReviewTypeEnum;
+  typeReview?: ReviewTypeEnum;
 
   @ApiProperty({ description: 'ID của variant (nếu type là ID)' })
   @Property({ type: 'text', nullable: true })

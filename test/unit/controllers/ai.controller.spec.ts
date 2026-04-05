@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AIController } from 'src/api/controllers/ai/ai.controller';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { AI_SERVICE } from 'src/infrastructure/domain/ai/ai.module';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { createMockAIService, createMockUserLogService } from '../../helpers/mock-factories';
 import { successResponse, errorResponse, createMockRequest } from '../../helpers/test-constants';
 

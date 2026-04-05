@@ -18,8 +18,8 @@ import {
 } from 'src/application/dtos/request/admin-instruction.request';
 import { AdminInstructionResponse } from 'src/application/dtos/response/admin-instruction.response';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 
 /**
  * Controller quản lý chỉ thị admin cho hệ thống AI.

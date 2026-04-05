@@ -1,6 +1,6 @@
 export enum EventLogEntityType {
   CONVERSATION = 'conversation',
   SEARCH = 'search',
-  QUIZ = 'quiz',
+  SURVEY = 'survey',
   PRODUCT = 'product'
 }

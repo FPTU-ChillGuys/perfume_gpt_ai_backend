@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, ParseUUIDPipe, Post, Query, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
@@ -7,12 +7,14 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
-import { ProductService } from 'src/infrastructure/servicies/product.service';
-import { ExtendApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { VariantSalesAnalyticsResponse } from 'src/application/dtos/response/variant-sales-analytics.response';
+import { ProductService } from 'src/infrastructure/domain/product/product.service';
+import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
+import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
+import { ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { Request } from 'express';
-import { getTokenPayloadFromRequest } from 'src/infrastructure/utils/extract-token';
-import { v4 as uuidv4 } from 'uuid';
+import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { SearchRequest } from 'src/application/dtos/request/search.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dtos/request/product-log.request';
@@ -20,7 +22,12 @@ import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dto
 @ApiTags('Products')
 @Controller('products')
 export class ProductController {
-  constructor(private productService: ProductService, private userLog: UserLogService) { }
+  private readonly logger = new Logger(ProductController.name);
+  constructor(
+    private productService: ProductService,
+    private userLog: UserLogService,
+    private aiAnalysisService: AiAnalysisService
+  ) { }
 
   /** Lấy danh sách tất cả sản phẩm */
   @Public()
@@ -38,16 +45,8 @@ export class ProductController {
   @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
   async getProductsBySemanticSearch(@Req() req: Request, @Query() request: SearchRequest): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     const result = await this.productService.getProductsUsingSemanticSearch(request.searchText, request);
-    // Ghi log tìm kiếm của người dùng
-    // Lay userId tu token
-    const userId = getTokenPayloadFromRequest(req)?.id;
-    if (userId) {
-      await this.userLog.addSearchLogToUserLog(userId, request.searchText);
-    } else {
-      // Tu tao moi uuid de luu log cho nguoi dung khong xac dinh
-      const anonymousUserId = uuidv4();
-      await this.userLog.addSearchLogToUserLog(anonymousUserId, request.searchText);
-    }
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
     return result;
   }
 
@@ -97,10 +96,51 @@ export class ProductController {
       request.searchText,
       request
     );
-    // Ghi log tìm kiếm
-    const userId = getTokenPayloadFromRequest(req)?.id;
-    const logId = userId ?? uuidv4();
-    await this.userLog.addSearchLogToUserLog(logId, request.searchText);
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
+    return result;
+  }
+
+  /** Tìm kiếm sản phẩm bằng semantic search v2 (AI extraction) */
+  @Public()
+  @Get('search/v2')
+  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search v2 (AI extraction)' })
+  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  async getProductsByAiSearch(
+    @Req() req: Request,
+    @Query() request: SearchRequest
+  ): Promise<BaseResponseAPI<any>> {
+    const analysis = await this.aiAnalysisService.analyze(request.searchText);
+
+    this.logger.log(`Analysis: ${JSON.stringify(analysis)}`);
+
+    const result = analysis
+      ? await this.productService.getProductsByStructuredQuery(analysis)
+      : await this.productService.getAllProductsWithVariants(request);
+
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
+
+    return {
+      success: true,
+      payload: result.data
+    };
+  }
+
+  /** Tìm kiếm sản phẩm bằng parser path (winkNLP parse -> query builder) để kiểm chứng */
+  @Public()
+  @Get('search/v3')
+  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng parser path (parse -> query)' })
+  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  async getProductsByParsedSearch(
+    @Req() req: Request,
+    @Query() request: SearchRequest
+  ): Promise<BaseResponseAPI<any>> {
+    const result = await this.productService.getProductsUsingParsedSearch(request.searchText, request);
+
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
+
     return result;
   }
 
@@ -125,7 +165,18 @@ export class ProductController {
     @Req() req: Request,
     @Body() body: ProductViewLogRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    const userId = getTokenPayloadFromRequest(req)?.id ?? uuidv4();
+    const rawUserId = body.userId || resolveLogUserIdFromRequest(req);
+    const userId = rawUserId.toLowerCase();
+    
+    if (userId.startsWith('anonymous:')) {
+      this.logger.warn(
+        `[PRODUCT-LOG] logProductView is using anonymous userId. Pass body.userId or Bearer token for personalized recommendation.`
+      );
+    }
+    this.logger.log(
+      `[PRODUCT-LOG] logProductView userId=${userId}, productId=${body.productId}, variantId=${body.variantId || 'n/a'}`
+    );
+
     const viewInfo = await this.productService.resolveProductViewInfo(
       body.productId,
       body.variantId
@@ -135,7 +186,15 @@ export class ProductController {
       body.productId,
       body.variantId,
       viewInfo.productName,
-      viewInfo.variantName
+      viewInfo.variantName,
+      {
+        brand: viewInfo.brand,
+        category: viewInfo.category,
+        gender: viewInfo.gender,
+        scentNotes: viewInfo.scentNotes,
+        olfactoryFamilies: viewInfo.olfactoryFamilies,
+        basePrice: viewInfo.basePrice
+      }
     );
     return { success: true, data: { id } };
   }
@@ -149,9 +208,27 @@ export class ProductController {
     @Req() req: Request,
     @Body() body: SearchTextLogRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    const userId = getTokenPayloadFromRequest(req)?.id ?? uuidv4();
+    const rawUserId = body.userId || resolveLogUserIdFromRequest(req);
+    const userId = rawUserId.toLowerCase();
+    
+    if (userId.startsWith('anonymous:')) {
+      this.logger.warn(
+        `[PRODUCT-LOG] logSearchText is using anonymous userId. Pass body.userId or Bearer token for personalized recommendation.`
+      );
+    }
+    this.logger.log(
+      `[PRODUCT-LOG] logSearchText userId=${userId}, searchText=${body.searchText}`
+    );
+
     const id = await this.userLog.addSearchTextLog(userId, body.searchText);
     return { success: true, data: { id } };
   }
-}
 
+  /** Đồng bộ hóa tất cả sản phẩm vào Elasticsearch */
+  @Public()
+  @Post('sync')
+  @ApiOperation({ summary: 'Đồng bộ hóa tất cả sản phẩm vào Elasticsearch' })
+  async syncProducts(): Promise<BaseResponseAPI<{ success: boolean; message: string }>> {
+    return this.productService.syncAllProductsToIndex();
+  }
+}

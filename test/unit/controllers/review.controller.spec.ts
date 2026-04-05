@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewController } from 'src/api/controllers/review.controller';
-import { ReviewService } from 'src/infrastructure/servicies/review.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { ReviewService } from 'src/infrastructure/domain/review/review.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { AI_SERVICE } from 'src/infrastructure/domain/ai/ai.module';
 import {
   createMockReviewService,
   createMockAIService,

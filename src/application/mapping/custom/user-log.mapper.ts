@@ -1,7 +1,7 @@
 import { UserLog } from 'src/domain/entities/user-log.entity';
 import { UserLogResponse } from '../../dtos/response/user-log.response';
 import { UserMessageLogMapper } from './user-message-log.mapper';
-import { UserQuizLogMapper } from './user-quiz-log.mapper';
+import { UserSurveyLogMapper } from './user-survey-log.mapper';
 import { UserSearchLogMapper } from './user-search-log.mapper';
 
 export class UserLogMapper {
@@ -17,8 +17,8 @@ export class UserLogMapper {
         ? UserMessageLogMapper.toResponseList(entity.userMessageLogs.getItems())
         : [];
       
-      response.userQuizLogs = entity.userQuizLogs.isInitialized()
-        ? UserQuizLogMapper.toResponseList(entity.userQuizLogs.getItems())
+      response.userSurveyLogs = entity.userSurveyLogs.isInitialized()
+        ? UserSurveyLogMapper.toResponseList(entity.userSurveyLogs.getItems())
         : [];
       
       response.userSearchLogs = entity.userSearchLogs.isInitialized()
@@ -26,7 +26,7 @@ export class UserLogMapper {
         : [];
     } else {
       response.userMessageLogs = [];
-      response.userQuizLogs = [];
+      response.userSurveyLogs = [];
       response.userSearchLogs = [];
     }
 

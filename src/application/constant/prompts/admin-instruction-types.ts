@@ -32,11 +32,14 @@ export const INSTRUCTION_TYPE_LOG = 'log';
 /** Loại instruction cho chatbot conversation */
 export const INSTRUCTION_TYPE_CONVERSATION = 'conversation';
 
-/** Loại instruction cho quiz tư vấn nước hoa */
-export const INSTRUCTION_TYPE_QUIZ = 'quiz';
+/** Loại instruction cho survey tư vấn nước hoa */
+export const INSTRUCTION_TYPE_SURVEY = 'survey';
 
 /** Loại instruction cho phân tích nhu cầu nhập hàng (restock) */
 export const INSTRUCTION_TYPE_RESTOCK = 'restock';
+
+/** Loại instruction cho trích xuất thông tin tìm kiếm nước hoa (search extraction) */
+export const INSTRUCTION_TYPE_SEARCH_EXTRACTION = 'search_extraction';
 
 /** Danh sách tất cả các loại instruction hợp lệ */
 export const ALL_INSTRUCTION_TYPES = [
@@ -48,8 +51,9 @@ export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_REPURCHASE,
   INSTRUCTION_TYPE_LOG,
   INSTRUCTION_TYPE_CONVERSATION,
-  INSTRUCTION_TYPE_QUIZ,
-  INSTRUCTION_TYPE_RESTOCK
+  INSTRUCTION_TYPE_SURVEY,
+  INSTRUCTION_TYPE_RESTOCK,
+  INSTRUCTION_TYPE_SEARCH_EXTRACTION
 ] as const;
 
 export type InstructionDomainType = (typeof ALL_INSTRUCTION_TYPES)[number];

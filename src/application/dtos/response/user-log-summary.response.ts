@@ -5,11 +5,11 @@ import { CommonResponse } from './common/common.response';
 export class UserLogSummaryResponse extends CommonResponse {
   /** ID người dùng */
   @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
-  userId: string;
+  userId?: string;
 
   /** Nội dung tóm tắt log */
   @ApiProperty({ description: 'Nội dung tóm tắt log' })
-  logSummary: string;
+  logSummary?: string;
 
   /** Snapshot feature dạng JSON */
   @ApiProperty({ description: 'Feature snapshot dạng JSON', required: false, type: Object })
@@ -25,7 +25,7 @@ export class UserLogSummaryResponse extends CommonResponse {
 
   /** Tổng số event đã xử lý */
   @ApiProperty({ description: 'Tổng số event đã xử lý', default: 0 })
-  totalEvents: number;
+  totalEvents?: number;
 
   constructor(init?: Partial<UserLogSummaryResponse>) {
     super();

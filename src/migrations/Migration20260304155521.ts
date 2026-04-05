@@ -13,13 +13,13 @@ export class Migration20260304155521 extends Migration {
 
     this.addSql(`alter table "inventory_log" add column "is_active" boolean not null default true;`);
 
-    this.addSql(`alter table "quiz_question" add column "is_active" boolean not null default true;`);
+    this.addSql(`alter table "survey_question" add column "is_active" boolean not null default true;`);
 
-    this.addSql(`alter table "quiz_answer" add column "is_active" boolean not null default true;`);
+    this.addSql(`alter table "survey_answer" add column "is_active" boolean not null default true;`);
 
-    this.addSql(`alter table "quiz_question_answer" add column "is_active" boolean not null default true;`);
+    this.addSql(`alter table "survey_question_answer" add column "is_active" boolean not null default true;`);
 
-    this.addSql(`alter table "quiz_question_answer_detail" add column "is_active" boolean not null default true;`);
+    this.addSql(`alter table "survey_question_answer_detail" add column "is_active" boolean not null default true;`);
 
     this.addSql(`alter table "review_log" add column "is_active" boolean not null default true;`);
 
@@ -33,7 +33,7 @@ export class Migration20260304155521 extends Migration {
 
     this.addSql(`alter table "message" add column "is_active" boolean not null default true;`);
 
-    this.addSql(`alter table "user_quiz_log" add column "is_active" boolean not null default true;`);
+    this.addSql(`alter table "user_survey_log" add column "is_active" boolean not null default true;`);
 
     this.addSql(`alter table "user_search_log" add column "is_active" boolean not null default true;`);
   }
@@ -49,13 +49,13 @@ export class Migration20260304155521 extends Migration {
 
     this.addSql(`alter table "inventory_log" drop column "is_active";`);
 
-    this.addSql(`alter table "quiz_question" drop column "is_active";`);
+    this.addSql(`alter table "survey_question" drop column "is_active";`);
 
-    this.addSql(`alter table "quiz_answer" drop column "is_active";`);
+    this.addSql(`alter table "survey_answer" drop column "is_active";`);
 
-    this.addSql(`alter table "quiz_question_answer" drop column "is_active";`);
+    this.addSql(`alter table "survey_question_answer" drop column "is_active";`);
 
-    this.addSql(`alter table "quiz_question_answer_detail" drop column "is_active";`);
+    this.addSql(`alter table "survey_question_answer_detail" drop column "is_active";`);
 
     this.addSql(`alter table "review_log" drop column "is_active";`);
 
@@ -69,7 +69,7 @@ export class Migration20260304155521 extends Migration {
 
     this.addSql(`alter table "message" drop column "is_active";`);
 
-    this.addSql(`alter table "user_quiz_log" drop column "is_active";`);
+    this.addSql(`alter table "user_survey_log" drop column "is_active";`);
 
     this.addSql(`alter table "user_search_log" drop column "is_active";`);
   }

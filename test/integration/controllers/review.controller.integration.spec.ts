@@ -4,9 +4,9 @@ import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
 import { ReviewController } from 'src/api/controllers/review.controller';
-import { ReviewService } from 'src/infrastructure/servicies/review.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { AIService } from 'src/infrastructure/servicies/ai.service';
+import { ReviewService } from 'src/infrastructure/domain/review/review.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { AIService } from 'src/infrastructure/domain/ai/ai.service';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 
 function axiosResponse<T>(data: T): AxiosResponse<T> {

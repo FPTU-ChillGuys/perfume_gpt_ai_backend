@@ -2,7 +2,7 @@ import { MikroORM } from '@mikro-orm/core';
 import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
-import { ReviewService } from 'src/infrastructure/servicies/review.service';
+import { ReviewService } from 'src/infrastructure/domain/review/review.service';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 

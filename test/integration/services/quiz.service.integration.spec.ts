@@ -1,6 +1,6 @@
 import { MikroORM } from '@mikro-orm/core';
 import { TestingModule } from '@nestjs/testing';
-import { QuizService } from 'src/infrastructure/servicies/quiz.service';
+import { SurveyService } from 'src/infrastructure/domain/survey/survey.service';
 import { getMapperToken } from '@automapper/nestjs';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 import { v4 as uuidv4 } from 'uuid';
@@ -8,18 +8,18 @@ import { QuizQuestion } from 'src/domain/entities/quiz-question.entity';
 import { QuizQuestionAnswer } from 'src/domain/entities/quiz-question-answer.entity';
 import { QuizQuestionAnswerDetail } from 'src/domain/entities/quiz-question-answer-detail.entity';
 
-describe('QuizService (Integration)', () => {
+describe('SurveyService (Integration)', () => {
   let module: TestingModule;
   let orm: MikroORM;
-  let service: QuizService;
+  let service: SurveyService;
 
   beforeAll(async () => {
     module = await createIntegrationTestingModule([
-      QuizService,
+      SurveyService,
       { provide: getMapperToken(), useValue: {} },
     ]);
     orm = module.get(MikroORM);
-    service = module.get(QuizService);
+    service = module.get(SurveyService);
   });
 
   beforeEach(async () => {
@@ -40,9 +40,9 @@ describe('QuizService (Integration)', () => {
   }
 
   // ────────── CREATE QUESTION ──────────
-  describe('addQuizQues', () => {
+  describe('addSurveyQues', () => {
     it('should create quiz question with answers in database', async () => {
-      const result = await service.addQuizQues({
+      const result = await service.addSurveyQues({
         question: 'Which scent family do you prefer?',
         answers: [
           { answer: 'Floral' },
@@ -61,7 +61,7 @@ describe('QuizService (Integration)', () => {
     });
 
     it('should create question with single answer', async () => {
-      const result = await service.addQuizQues({
+      const result = await service.addSurveyQues({
         question: 'Yes or No?',
         answers: [{ answer: 'Yes' }],
       });
@@ -73,14 +73,14 @@ describe('QuizService (Integration)', () => {
   });
 
   // ────────── READ QUESTIONS ──────────
-  describe('getQuizQuesById', () => {
+  describe('getSurveyQuesById', () => {
     it('should return question data (answers omitted by mapper)', async () => {
-      const created = await service.addQuizQues({
+      const created = await service.addSurveyQues({
         question: 'Q1?',
         answers: [{ answer: 'A1' }, { answer: 'A2' }],
       });
 
-      const result = await service.getQuizQuesById(created.data!);
+      const result = await service.getSurveyQuesById(created.data!);
 
       expect(result.success).toBe(true);
       expect(result.data!.question).toBe('Q1?');
@@ -93,39 +93,39 @@ describe('QuizService (Integration)', () => {
 
     it('should return error for non-existent question', async () => {
       const fakeId = uuidv4();
-      const result = await service.getQuizQuesById(fakeId);
+      const result = await service.getSurveyQuesById(fakeId);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
     });
   });
 
-  describe('getAllQuizQues', () => {
+  describe('getAllSurveyQues', () => {
     it('should return empty array when no questions exist', async () => {
-      const result = await service.getAllQuizQues();
+      const result = await service.getAllSurveyQues();
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(0);
     });
 
     it('should return all questions with answers', async () => {
-      await service.addQuizQues({ question: 'Q1?', answers: [{ answer: 'A' }] });
-      await service.addQuizQues({ question: 'Q2?', answers: [{ answer: 'B' }, { answer: 'C' }] });
+      await service.addSurveyQues({ question: 'Q1?', answers: [{ answer: 'A' }] });
+      await service.addSurveyQues({ question: 'Q2?', answers: [{ answer: 'B' }, { answer: 'C' }] });
 
-      const result = await service.getAllQuizQues();
+      const result = await service.getAllSurveyQues();
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(2);
     });
   });
 
-  describe('getQuizQuesByIdList', () => {
+  describe('getSurveyQuesByIdList', () => {
     it('should return only requested questions', async () => {
-      const q1 = await service.addQuizQues({ question: 'Q1?', answers: [{ answer: 'A' }] });
-      const q2 = await service.addQuizQues({ question: 'Q2?', answers: [{ answer: 'B' }] });
-      await service.addQuizQues({ question: 'Q3?', answers: [{ answer: 'C' }] });
+      const q1 = await service.addSurveyQues({ question: 'Q1?', answers: [{ answer: 'A' }] });
+      const q2 = await service.addSurveyQues({ question: 'Q2?', answers: [{ answer: 'B' }] });
+      await service.addSurveyQues({ question: 'Q3?', answers: [{ answer: 'C' }] });
 
-      const result = await service.getQuizQuesByIdList([q1.data!, q2.data!]);
+      const result = await service.getSurveyQuesByIdList([q1.data!, q2.data!]);
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(2);
@@ -135,7 +135,7 @@ describe('QuizService (Integration)', () => {
   // ────────── UPDATE ──────────
   describe('updateAnswer', () => {
     it('should update answers for existing question', async () => {
-      const created = await service.addQuizQues({
+      const created = await service.addSurveyQues({
         question: 'Original Q?',
         answers: [{ answer: 'Old A1' }, { answer: 'Old A2' }],
       });
@@ -193,17 +193,17 @@ describe('QuizService (Integration)', () => {
     return quesAns;
   }
 
-  describe('addQuizQuesAnws', () => {
+  describe('addSurveyQuesAnws', () => {
     it('should save user quiz answers to database', async () => {
       // Create question and get answers via direct ORM query
-      const q1 = await service.addQuizQues({
+      const q1 = await service.addSurveyQues({
         question: 'Scent?',
         answers: [{ answer: 'Floral' }, { answer: 'Woody' }],
       });
       const q1Entity = await getQuestionWithAnswers(q1.data!);
       const answers = q1Entity.answers.getItems();
 
-      const result = await service.addQuizQuesAnws({
+      const result = await service.addSurveyQuesAnws({
         userId: 'quiz-user-1',
         details: [
           {
@@ -222,16 +222,16 @@ describe('QuizService (Integration)', () => {
     });
   });
 
-  describe('checkExistQuizQuesAnwsByUserId', () => {
+  describe('checkExistSurveyQuesAnwsByUserId', () => {
     it('should return false when user has no quiz answers', async () => {
-      const result = await service.checkExistQuizQuesAnwsByUserId('new-user');
+      const result = await service.checkExistSurveyQuesAnwsByUserId('new-user');
 
       expect(result).toBe(false);
     });
 
     it('should return true when user has submitted answers', async () => {
       // Create question + answers
-      const q1 = await service.addQuizQues({
+      const q1 = await service.addSurveyQues({
         question: 'Q?',
         answers: [{ answer: 'A' }],
       });
@@ -241,15 +241,15 @@ describe('QuizService (Integration)', () => {
       // Create quiz answer directly via ORM (bypasses side-effect)
       await createQuizAnswerViaORM('quiz-user-check', q1Entity, answers[0]);
 
-      const result = await service.checkExistQuizQuesAnwsByUserId('quiz-user-check');
+      const result = await service.checkExistSurveyQuesAnwsByUserId('quiz-user-check');
 
       expect(result).toBe(true);
     });
   });
 
-  describe('getQuizQuesAnwsByUserId', () => {
+  describe('getSurveyQuesAnwsByUserId', () => {
     it('should return user quiz answers', async () => {
-      const q1 = await service.addQuizQues({
+      const q1 = await service.addSurveyQues({
         question: 'Type?',
         answers: [{ answer: 'EDT' }, { answer: 'EDP' }],
       });
@@ -259,14 +259,14 @@ describe('QuizService (Integration)', () => {
       // Create quiz answer directly via ORM (bypasses side-effect)
       await createQuizAnswerViaORM('user-get-anws', q1Entity, answers[1]);
 
-      const result = await service.getQuizQuesAnwsByUserId('user-get-anws');
+      const result = await service.getSurveyQuesAnwsByUserId('user-get-anws');
 
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
     });
 
     it('should return error when user has no answers', async () => {
-      const result = await service.getQuizQuesAnwsByUserId('no-answers-user');
+      const result = await service.getSurveyQuesAnwsByUserId('no-answers-user');
 
       expect(result.success).toBe(false);
     });

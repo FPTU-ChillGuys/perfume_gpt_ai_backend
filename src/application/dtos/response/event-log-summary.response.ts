@@ -19,6 +19,9 @@ export class EventLogSummaryResponse {
   @ApiProperty({ description: 'Số event search' })
   searchCount!: number;
 
-  @ApiProperty({ description: 'Số event quiz' })
-  quizCount!: number;
+  @ApiProperty({ description: 'Số event survey' })
+  surveyCount!: number;
+
+  @ApiProperty({ description: 'Số event product' })
+  productCount!: number;
 }

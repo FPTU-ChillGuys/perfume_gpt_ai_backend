@@ -1,10 +1,13 @@
 import {
   convertToModelMessages,
   createUIMessageStream,
+  generateObject,
   generateText,
   LanguageModel,
+  Schema,
   stepCountIs,
   streamText,
+  ToolChoice,
   ToolSet,
   UIMessage
 } from 'ai';
@@ -17,19 +20,27 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
   errorMessage?: string,
   stopWhen?: number,
   output?: any,
-  temperature?: number
+  temperature?: number,
+  toolChoice?: ToolChoice<ToolSet>,
+  maxTokens?: number
 ) {
   let retries = 2;
   while (retries >= 0) {
     try {
+      if (!prompt) {
+        console.error(`[chatbot] textGenerationFromPrompt: prompt is empty or undefined`);
+        return errorMessage || 'Prompt is required';
+      }
       const result = await generateText({
         model: model,
         prompt: prompt,
         system: systemPrompt ? systemPrompt : undefined,
         tools: tools ? tools : undefined,
+        toolChoice: toolChoice ? toolChoice : undefined,
         stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
         output: output ? output : undefined,
-        temperature: temperature
+        temperature: temperature,
+        maxOutputTokens: maxTokens
       });
       return result.text;
     } catch (error) {
@@ -55,7 +66,9 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
   errorMessage?: string,
   stopWhen?: number,
   output?: any,
-  temperature?: number
+  temperature?: number,
+  toolChoice?: ToolChoice<ToolSet>,
+  maxTokens?: number
 ) {
   let retries = 2;
   while (retries >= 0) {
@@ -66,9 +79,11 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
         messages: modelMessages,
         system: systemPrompt ? systemPrompt : undefined,
         tools: tools ? tools : undefined,
+        toolChoice: toolChoice ? toolChoice : undefined,
         stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
         output: output ? output : undefined,
-        temperature: temperature
+        temperature: temperature,
+        maxOutputTokens: maxTokens
       });
       return result.text;
     } catch (error) {
@@ -86,6 +101,39 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
   }
 }
 
+export async function objectGenerationFromMessagesToResultWithErrorHandler<T>(
+  model: LanguageModel,
+  messages: UIMessage[],
+  systemPrompt?: string,
+  output?: any,
+  errorMessage?: string,
+  temperature?: number,
+  maxTokens?: number
+): Promise<T | null> {
+  let retries = 2;
+  while (retries >= 0) {
+    try {
+      const modelMessages = await convertToModelMessages(messages);
+      const result = await generateObject({
+        model: model,
+        messages: modelMessages,
+        system: systemPrompt ? systemPrompt : undefined,
+        schema: output,
+        temperature: temperature,
+        maxOutputTokens: maxTokens
+      });
+      return result.object as T;
+    } catch (error) {
+      console.error(`Error in ObjectGenerationFromMessages (Remaining retries: ${retries}):`, error);
+      if (retries === 0) {
+        return null;
+      }
+      retries--;
+    }
+  }
+  return null;
+}
+
 export function streamTextGenerationFromPromptToResultWithErrorHandler(
   model: LanguageModel,
   prompt: string,
@@ -95,7 +143,9 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
   output?: any,
   errorMessage?: string,
   onFinish?: (data) => void,
-  temperature?: number
+  temperature?: number,
+  toolChoice?: ToolChoice<ToolSet>,
+  maxTokens?: number
 ) {
   const stream = createUIMessageStream({
     execute({ writer }) {
@@ -105,9 +155,11 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
           system: systemPrompt ? systemPrompt : undefined,
           prompt: prompt,
           tools: tools ? tools : undefined,
+          toolChoice: toolChoice ? toolChoice : undefined,
           stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
           output: output ? output : undefined,
-          temperature: temperature
+          temperature: temperature,
+          maxOutputTokens: maxTokens
         });
         writer.merge(result.toUIMessageStream());
       } catch {
@@ -135,7 +187,9 @@ export function streamTextGenerationFromMessagesToResultWithErrorHandler(
   output?: any,
   errorMessage?: string,
   onFinish?: (data) => void,
-  temperature?: number
+  temperature?: number,
+  toolChoice?: ToolChoice<ToolSet>,
+  maxTokens?: number
 ) {
   const stream = createUIMessageStream({
     async execute({ writer }) {
@@ -145,9 +199,11 @@ export function streamTextGenerationFromMessagesToResultWithErrorHandler(
           system: systemPrompt ? systemPrompt : undefined,
           messages: await convertToModelMessages(messages),
           tools: tools ? tools : undefined,
+          toolChoice: toolChoice ? toolChoice : undefined,
           stopWhen: stepCountIs(stopWhen ? stopWhen : 5),
           output: output ? output : undefined,
-          temperature: temperature
+          temperature: temperature,
+          maxOutputTokens: maxTokens
         });
         writer.merge(result.toUIMessageStream());
       } catch {

@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
 import { ProfileController } from 'src/api/controllers/profile.controller';
-import { ProfileService } from 'src/infrastructure/servicies/profile.service';
+import { ProfileService } from 'src/infrastructure/domain/profile/profile.service';
 import { Request } from 'express';
 
 function axiosResponse<T>(data: T): AxiosResponse<T> {

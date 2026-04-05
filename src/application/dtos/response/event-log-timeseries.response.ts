@@ -13,8 +13,11 @@ export class EventLogTimeSeriesPointResponse {
   @ApiProperty({ description: 'Số event search trong bucket' })
   searchCount!: number;
 
-  @ApiProperty({ description: 'Số event quiz trong bucket' })
-  quizCount!: number;
+  @ApiProperty({ description: 'Số event survey trong bucket' })
+  surveyCount!: number;
+
+  @ApiProperty({ description: 'Số event product trong bucket' })
+  productCount!: number;
 }
 
 export class EventLogTimeSeriesResponse {

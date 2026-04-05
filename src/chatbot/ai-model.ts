@@ -1,3 +1,21 @@
-import { geminiFlash2_5, geminiFlash3, gemma3nE4bIt, glm47Flash, gpt5Nano, gptOss120b, gptOssSafeguard20b, llama4Scout, nemotron3Nano30bA3bNitro, qwen3_30b_a3b_Thinking_2507, Step3_5, trinityLargePreview, trinityMini } from "./models/open_router";
+import { openai } from "@ai-sdk/openai";
+import { EmbeddingModel } from "ai";
+import { deepSeek3_2, geminiFlash2_5, geminiFlash3, geminiFlash3_1, gemma3nE4bIt, gemma4, glm47Flash, gpt5_4nano, gpt5Nano, gptOss120b, gptOss20b, gptOssSafeguard20b, grok_4_1_fast, llama4Scout, llama_3_1_8b_instruct, ministral_14b_2512, ministral_8b_2512, mistral_small_2603, nemotron3Nano30bA3bNitro, qwen3_30b, qwen3_6PlusPreview, Step3_5, trinityLargePreview, trinityMini } from "./models/open_router";
 
-export const aiModels = geminiFlash2_5;
+export const embeddingModel: EmbeddingModel = openai.embedding('text-embedding-3-small');
+
+export const aiModel = gemma4;
+
+export const aiModelForSurvey = gpt5_4nano;
+
+export const aiModelForTrend = gpt5_4nano;
+
+export const aiModelForRestock = gpt5_4nano;
+
+export const aiModelForReview = llama_3_1_8b_instruct;
+
+export const aiModelForOptimizePrompt = gemma4;
+
+export const aiModelForSearch = qwen3_6PlusPreview;
+
+export const aiModelForConversationAnalysis = gemma3nE4bIt;

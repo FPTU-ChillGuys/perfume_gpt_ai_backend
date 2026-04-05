@@ -1,6 +1,6 @@
 import { MikroORM } from '@mikro-orm/core';
 import { TestingModule } from '@nestjs/testing';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { createIntegrationTestingModule, clearDatabase } from '../helpers/setup';
 

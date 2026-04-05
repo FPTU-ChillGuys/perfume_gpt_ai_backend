@@ -6,8 +6,10 @@
 // System prompts
 export {
   SYSTEM_PROMPT,
-  CHATBOT_SYSTEM_PROMPT,
-  ADVANCED_MATCHING_SYSTEM_PROMPT
+  PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
+  CONVERSATION_ANALYSIS_SYSTEM_PROMPT,
+  INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT,
+  SURVEY_ANALYSIS_SYSTEM_PROMPT,
 } from './system.prompt';
 
 // Controller prompts
@@ -23,14 +25,17 @@ export {
   orderSummaryPrompt,
   inventoryReportPrompt,
   recommendationReportPrompt,
-  recommendationSummaryPrompt
+  recommendationSummaryPrompt,
+  surveyContextPrompt,
+  surveyProductContextPrompt,
+  surveyRecommendationSystemPrompt
 } from './controller.prompt';
 
 // Service prompts
 export {
   generateSummaryPrompt,
   convertQuesAnsesToString,
-  quizPrompt
+  surveyPrompt
 } from './service.prompt';
 
 // Admin instruction type constants

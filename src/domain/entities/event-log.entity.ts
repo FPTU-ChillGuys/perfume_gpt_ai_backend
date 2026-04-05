@@ -1,6 +1,6 @@
 import { Entity, Enum, Index, Property } from '@mikro-orm/core';
 import { ApiProperty } from '@nestjs/swagger';
-import { EventLogRepository } from 'src/infrastructure/repositories/event-log.repository';
+import { EventLogRepository } from 'src/infrastructure/domain/repositories/event-log.repository';
 import { EventLogEntityType } from '../enum/event-log-entity-type.enum';
 import { EventLogEventType } from '../enum/event-log-event-type.enum';
 import { Common } from './common/common.entities';
@@ -30,7 +30,7 @@ export class EventLog extends Common {
   contentText?: string;
 
   @ApiProperty({
-    description: 'Metadata dạng JSONB cho quiz và dữ liệu mở rộng',
+    description: 'Metadata dạng JSONB cho survey và dữ liệu mở rộng',
     nullable: true,
     type: Object
   })

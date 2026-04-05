@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InventoryController } from 'src/api/controllers/inventory.controller';
-import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
-import { AI_SERVICE } from 'src/infrastructure/modules/ai.module';
+import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { AI_SERVICE } from 'src/infrastructure/domain/ai/ai.module';
 import {
   createMockInventoryService,
   createMockAIService,

@@ -1,18 +1,33 @@
-import { Controller, Get, Inject, Param, Query, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  InternalServerErrorException,
+  NotFoundException,
+  Param,
+  Query,
+  Req,
+  Res,
+  StreamableFile,
+  UseInterceptors
+} from '@nestjs/common';
 import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
-import * as crypto from 'crypto';
+import { Request } from 'express';
+import { Response } from 'express';
+import * as fs from 'fs';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
-import { CACHE_TTL_1HOUR } from 'src/infrastructure/cacheable/cacheable.constants';
+import { CACHE_TTL_1HOUR } from 'src/infrastructure/domain/common/cacheable/cacheable.constants';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
@@ -20,8 +35,8 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
-import { InventoryService } from 'src/infrastructure/servicies/inventory.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
+import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import {
   AIInventoryReportStructuredResponse
 } from 'src/application/dtos/response/ai-structured.response';
@@ -30,6 +45,8 @@ import { InternalServerErrorWithDetailsException } from 'src/application/common/
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
 import { add } from 'date-fns';
+import { VariantSalesAnalyticsResponse } from 'src/application/dtos/response/variant-sales-analytics.response';
+import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 
 @Role(['admin'])
 @ApiTags('Inventory')
@@ -42,6 +59,7 @@ import { add } from 'date-fns';
 export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
+    private readonly restockService: RestockService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) { }
 
@@ -103,18 +121,33 @@ export class InventoryController {
   @Public()
   @Get('report/ai/job')
   @ApiOperation({ summary: 'Khởi tạo job để tạo báo cáo tồn kho bằng AI' })
+  @ApiQuery({
+    name: 'forceRefresh',
+    required: false,
+    type: Boolean,
+    description: 'True để bỏ qua job đang cache và tạo job mới ngay lập tức'
+  })
   @ApiBaseResponse(String)
   @CacheTTL(CACHE_TTL_1HOUR)
   @UseInterceptors(CacheInterceptor)
-  async createInventoryReportJob(): Promise<BaseResponse<{ jobId: string }>> {
+  async createInventoryReportJob(
+    @Req() request: Request,
+    @Query('forceRefresh') forceRefresh?: boolean | string
+  ): Promise<BaseResponse<{ jobId: string }>> {
+    const forceRefreshEnabled =
+      forceRefresh === true || String(forceRefresh) === 'true';
+
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIInventoryReport(),
       {
         type: 'inventory_report_job',
         cacheKeyFactory: (jobId) => `inventory_report_job_${jobId}`,
-        ttlMilliseconds: CACHE_TTL_1HOUR
-      }
+        ttlMilliseconds: CACHE_TTL_1HOUR,
+        forceRefresh: forceRefreshEnabled,
+        cacheByRequest: true
+      },
+      request
     );
   }
 
@@ -170,9 +203,52 @@ export class InventoryController {
   @ApiOperation({ summary: 'Lấy chi tiết báo cáo tồn kho theo ID' })
   @ApiBaseResponse(InventoryLog)
   async getInventoryLogById(
-    @Query('id') id: string
+    @Param('id') id: string
   ): Promise<BaseResponse<InventoryLog>> {
     return this.inventoryService.getInventoryLogById(id);
+  }
+
+  @Get('report/logs/:id/pdf')
+  @ApiOperation({ summary: 'Convert markdown report theo ID sang PDF (không dùng AI)' })
+  @ApiParam({ name: 'id', description: 'ID của inventory log cần convert' })
+  async convertInventoryLogToPdf(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<StreamableFile> {
+    const converted = await this.inventoryService.convertInventoryLogMarkdownToPdf(
+      id
+    );
+
+    if (!converted.success) {
+      if (converted.error === 'Inventory log not found') {
+        throw new NotFoundException(converted.error);
+      }
+      throw new InternalServerErrorException(
+        converted.error || 'Failed to convert markdown to pdf'
+      );
+    }
+
+    const filePath = converted.data?.absolutePath;
+    const fileName = converted.data?.fileName || `inventory-log-${id}.pdf`;
+
+    if (!filePath) {
+      throw new InternalServerErrorException('PDF file path is empty');
+    }
+
+    const fileBuffer = await fs.promises.readFile(filePath);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    return new StreamableFile(fileBuffer);
+  }
+
+  @Get('restock/logs/:id/pdf')
+  @ApiOperation({ summary: 'Convert log restock theo ID sang PDF (không dùng AI)' })
+  @ApiParam({ name: 'id', description: 'ID của restock log cần convert' })
+  async convertRestockLogToPdf(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<StreamableFile> {
+    return this.convertInventoryLogToPdf(id, response);
   }
 
   //Tao email cảnh bảo stock
@@ -188,18 +264,33 @@ export class InventoryController {
   @Public()
   @Get('restock/job')
   @ApiOperation({ summary: 'Khởi tạo job để phân tích nhu cầu nhập hàng (restock)' })
+  @ApiQuery({
+    name: 'forceRefresh',
+    required: false,
+    type: Boolean,
+    description: 'True để bỏ qua job đang cache và tạo job mới ngay lập tức'
+  })
   @ApiBaseResponse(String)
   @CacheTTL(CACHE_TTL_1HOUR)
   @UseInterceptors(CacheInterceptor)
-  async createRestockReportJob(): Promise<BaseResponse<{ jobId: string }>> {
+  async createRestockReportJob(
+    @Req() request: Request,
+    @Query('forceRefresh') forceRefresh?: boolean | string
+  ): Promise<BaseResponse<{ jobId: string }>> {
+    const forceRefreshEnabled =
+      forceRefresh === true || String(forceRefresh) === 'true';
+
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIRestockingNeeds(),
       {
         type: 'inventory_restock_job',
         cacheKeyFactory: (jobId) => `inventory_restock_job_${jobId}`,
-        ttlMilliseconds: CACHE_TTL_1HOUR
-      }
+        ttlMilliseconds: CACHE_TTL_1HOUR,
+        forceRefresh: forceRefreshEnabled,
+        cacheByRequest: true
+      },
+      request
     );
   }
 
@@ -216,6 +307,33 @@ export class InventoryController {
       `inventory_restock_job_${jobId}`,
       { jobId, endpoint: 'inventory/restock/job/result/:jobId' }
     );
+  }
+
+   /** Lấy dữ liệu phân tích bán hàng tất cả variant (2 tháng gần nhất) cho tái cấp hàng */
+  @Public()
+  @Get('restock/sales-analytics')
+  @ApiOperation({
+    summary: 'Lấy dữ liệu phân tích bán hàng tất cả variant',
+    description: 'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất, sử dụng cho tool dự đoán tái cấp hàng'
+  })
+  @ExtendApiBaseResponse(VariantSalesAnalyticsResponse, true)
+  async getProductSalesAnalyticsForRestock(): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse[]>> {
+    return this.restockService.getProductSalesAnalyticsForRestock();
+  }
+
+  /** Lấy dữ liệu phân tích bán hàng cho một variant cụ thể (2 tháng gần nhất) */
+  @Public()
+  @Get('restock/sales-analytics/:id')
+  @ApiOperation({
+    summary: 'Lấy dữ liệu phân tích bán hàng một variant',
+    description: 'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất'
+  })
+  @ApiParam({ name: 'id', description: 'UUID của variant', format: 'uuid' })
+  @ExtendApiBaseResponse(VariantSalesAnalyticsResponse)
+  async getProductSalesAnalyticsById(
+    @Param('id') id: string
+  ): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse>> {
+    return this.restockService.getVariantSalesAnalyticsById(id);
   }
 
 }

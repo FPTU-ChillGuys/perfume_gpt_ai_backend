@@ -14,9 +14,9 @@ import {
 } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
-import { UserLogService } from 'src/infrastructure/servicies/user-log.service';
-import { UserLogAIService } from 'src/infrastructure/servicies/user-log-ai.service';
-import { ApiBaseResponse } from 'src/infrastructure/utils/api-response-decorator';
+import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { UserLogAIService } from 'src/infrastructure/domain/user-log/user-log-ai.service';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
@@ -62,7 +62,7 @@ export class LogController {
         success: response.success,
         data: response.data?.response
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new InternalServerErrorWithDetailsException(error);
     }
   }
@@ -100,7 +100,7 @@ export class LogController {
     };
   }
 
-  /** Lấy event log dạng mới (message/search/quiz) */
+  /** Lấy event log dạng mới (message/search/survey) */
   @CacheTTL(0)
   @Get('events')
   @ApiOperation({ summary: 'Lấy event log dạng mới' })
@@ -316,5 +316,62 @@ export class LogController {
       );
     }
     return Ok('User log summary saved successfully');
+  }
+
+  /** Rebuild rolling summary cho user cụ thể từ logs */
+  @Post('rebuild-summary/:userId')
+  @ApiOperation({ summary: 'Rebuild rolling summary cho user cụ thể từ logs' })
+  @ApiBaseResponse(String)
+  async rebuildUserSummary(
+    @Param('userId') userId: string
+  ): Promise<BaseResponse<string>> {
+    try {
+      await this.userLogService.rebuildRollingSummaryForUser(userId);
+      return Ok(`Rolling summary rebuilt successfully for user: ${userId}`);
+    } catch (error) {
+      throw new InternalServerErrorWithDetailsException(
+        `Failed to rebuild summary for user: ${userId}`,
+        { userId, error: String(error) }
+      );
+    }
+  }
+
+  /** Rebuild rolling summary cho tất cả users có logs */
+  @Post('rebuild-summary-all')
+  @ApiOperation({ summary: 'Rebuild rolling summary cho tất cả users có logs' })
+  @ApiBaseResponse(String)
+  async rebuildAllUsersSummary(): Promise<BaseResponse<string>> {
+    try {
+      const userIds = await this.userLogService.getAllUserIdsFromLogs();
+      
+      if (!userIds || userIds.length === 0) {
+        return Ok('No users found in logs');
+      }
+
+      let successCount = 0;
+      const failedUserIds: string[] = [];
+
+      for (const userId of userIds) {
+        try {
+          await this.userLogService.rebuildRollingSummaryForUser(userId);
+          successCount++;
+        } catch (error) {
+          failedUserIds.push(userId);
+          console.error(`Failed to rebuild summary for user ${userId}:`, error);
+        }
+      }
+
+      const summary = `Rebuilt summaries for ${successCount}/${userIds.length} users`;
+      const message = failedUserIds.length > 0 
+        ? `${summary}. Failed users: ${failedUserIds.join(', ')}`
+        : summary;
+
+      return Ok(message);
+    } catch (error) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to rebuild summaries for all users',
+        { error: String(error) }
+      );
+    }
   }
 }

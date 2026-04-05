@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminInstructionController } from 'src/api/controllers/admin-instruction.controller';
-import { AdminInstructionService } from 'src/infrastructure/servicies/admin-instruction.service';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { createMockAdminInstructionService } from '../../helpers/mock-factories';
 import {
   successResponse,

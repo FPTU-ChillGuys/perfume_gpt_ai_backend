@@ -24,6 +24,7 @@ export interface EmailProduct {
   categoryName: string;
   primaryImage?: string;
   variants?: ProductVariant[];
+  aiAcceptanceId?: string;
 }
 
 export interface EmailTemplateData {

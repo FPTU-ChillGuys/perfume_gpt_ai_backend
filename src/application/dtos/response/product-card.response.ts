@@ -35,4 +35,7 @@ export class ProductCardResponse {
 
   @ApiProperty({ description: 'Gia hien thi cua variant uu tien', example: 2280000 })
   displayPrice!: number;
+
+  @ApiProperty({ description: 'ID AI Acceptance dùng chung cho các sản phẩm cùng response', required: false })
+  aiAcceptanceId?: string;
 }

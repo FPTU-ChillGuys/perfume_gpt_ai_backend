@@ -22,6 +22,7 @@ import { RecommendationV3Service } from 'src/infrastructure/domain/recommendatio
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
 import { AnalysisObject } from 'src/chatbot/output/analysis.output';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -36,7 +37,8 @@ export class ConversationV9Service {
     private readonly productService: ProductService,
     private readonly recommendationV3Service: RecommendationV3Service,
     private readonly aiAnalysisService: AiAnalysisService,
-    private readonly nlpEngineService: NlpEngineService
+    private readonly nlpEngineService: NlpEngineService,
+    private readonly aiAcceptanceService: AIAcceptanceService
   ) { }
 
   /**
@@ -316,6 +318,27 @@ export class ConversationV9Service {
             traceLogs.push(`[AI_FINAL_RECOMMEND_REASONING]: ${p.name} | ${p.source || 'N/A'} | ${p.reasoning}`);
           });
         }
+      }
+    }
+
+    // Attach one aiAcceptanceId for all products in this response (if any)
+    if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
+      const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        userId,
+        contextType: 'chatbot',
+        sourceRefId: conversationId || null,
+        products: aiResponse.products,
+        metadata: {
+          endpoint,
+          intent,
+          productCount: aiResponse.products.length
+        }
+      });
+
+      aiResponse.products = attachResult.products;
+      if (attachResult.aiAcceptanceId) {
+        aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+        traceLogs.push(`[AI_ACCEPTANCE_ID]: ${attachResult.aiAcceptanceId}`);
       }
     }
 

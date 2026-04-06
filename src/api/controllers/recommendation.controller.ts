@@ -15,6 +15,7 @@ import {
 } from 'src/infrastructure/domain/recommendation/recommandation.service';
 import { RecommendationV2Service } from 'src/infrastructure/domain/recommendation/recommendation-v2.service';
 import { RecommendationResponse } from 'src/infrastructure/domain/recommendation/recommendation-profile.type';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -23,7 +24,8 @@ export class RecommendationController {
 
   constructor(
     private readonly recommendationService: RecommendationService,
-    private readonly recommendationV2Service: RecommendationV2Service
+    private readonly recommendationV2Service: RecommendationV2Service,
+    private readonly aiAcceptanceService: AIAcceptanceService
   ) {}
 
   /**
@@ -115,9 +117,29 @@ export class RecommendationController {
     @Query('userId') userId: string,
     @Query('size') size?: number
   ): Promise<BaseResponse<RecommendationResponse>> {
-    return await this.recommendationV2Service.getRecommendations(
+    const result = await this.recommendationV2Service.getRecommendations(
       userId,
       size || 10
     );
+
+    if (result.success && result.data?.recommendations?.length) {
+      const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        userId,
+        contextType: 'recommendation',
+        sourceRefId: `recommendation-v2-${userId}-${Date.now()}`,
+        products: result.data.recommendations,
+        metadata: {
+          sizeRequested: size || 10,
+          productCount: result.data.recommendations.length
+        }
+      });
+
+      result.data.recommendations = attachResult.products as any;
+      if (attachResult.aiAcceptanceId) {
+        (result.data as any).aiAcceptanceId = attachResult.aiAcceptanceId;
+      }
+    }
+
+    return result;
   }
 }

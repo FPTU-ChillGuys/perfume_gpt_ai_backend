@@ -21,6 +21,7 @@ import { OrderService } from 'src/infrastructure/domain/order/order.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { RecommendationV3Service } from './recommendation-v3.service';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 
 export type DailyRecommendationTrigger = 'cron' | 'manual';
 type DailyRecommendationUserResult =
@@ -55,7 +56,8 @@ export class RecommendationService {
     private readonly configService: ConfigService,
     private readonly orderService: OrderService,
     private readonly productService: ProductService,
-    private readonly recommendationV3Service: RecommendationV3Service
+    private readonly recommendationV3Service: RecommendationV3Service,
+    private readonly aiAcceptanceService: AIAcceptanceService
   ) { }
 
   private async hasPurchaseHistory(userId: string): Promise<boolean> {
@@ -165,6 +167,30 @@ export class RecommendationService {
     return `Dựa trên hồ sơ và hành vi gần đây, PerfumeGPT đã chọn ${productCount} gợi ý phù hợp nhất cho bạn hôm nay.`;
   }
 
+  private async attachAcceptanceForEmailProducts(
+    userId: string,
+    contextType: 'recommendation' | 'repurchase',
+    products: EmailProduct[],
+    sourceRefId: string
+  ): Promise<EmailProduct[]> {
+    if (!Array.isArray(products) || products.length === 0) {
+      return [];
+    }
+
+    const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+      userId,
+      contextType,
+      sourceRefId,
+      products,
+      metadata: {
+        channel: 'email',
+        productCount: products.length
+      }
+    });
+
+    return attachResult.products as EmailProduct[];
+  }
+
   private mapProductToEmailProduct(
     product: ProductWithVariantsResponse,
     fallbackVariant?: { variantId?: string; basePrice?: number }
@@ -256,9 +282,16 @@ export class RecommendationService {
       })
     );
 
-    return hydratedProducts
+    const mappedProducts = hydratedProducts
       .filter((product): product is EmailProduct => Boolean(product))
       .slice(0, this.dailyRecommendationProductLimit);
+
+    return this.attachAcceptanceForEmailProducts(
+      userId,
+      'recommendation',
+      mappedProducts,
+      `daily-recommendation-${userId}-${Date.now()}`
+    );
   }
 
   private async sendDailyRecommendationForRecipient(
@@ -403,6 +436,12 @@ export class RecommendationService {
 
       const parsed = parseAIRecommendationResponse(result.data ?? '');
       const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://perfumegpt.com');
+      const productsWithAcceptance = await this.attachAcceptanceForEmailProducts(
+        userId,
+        'recommendation',
+        ((parsed.products as EmailProduct[]) || []),
+        `recommendation-email-${userId}-${Date.now()}`
+      );
 
       await this.emailService.sendTemplateEmail(
         email,
@@ -412,7 +451,7 @@ export class RecommendationService {
           userName: userName || 'Khách hàng',
           heading: 'Hương nước hoa được gợi ý dành riêng cho bạn',
           message: parsed.message,
-          products: (parsed.products as EmailProduct[]) || [],
+          products: productsWithAcceptance,
           frontendUrl
         }
       );
@@ -443,6 +482,12 @@ export class RecommendationService {
 
       const parsed = parseAIRecommendationResponse(result.data ?? '');
       const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://perfumegpt.com');
+      const productsWithAcceptance = await this.attachAcceptanceForEmailProducts(
+        userId,
+        'repurchase',
+        ((parsed.products as EmailProduct[]) || []),
+        `repurchase-email-${userId}-${Date.now()}`
+      );
 
       if (!hasPurchaseHistory) {
         await this.emailService.sendTemplateEmail(
@@ -453,7 +498,7 @@ export class RecommendationService {
             userName: userName || 'Khách hàng',
             heading: 'Khám phá những lựa chọn phù hợp cho lần mua đầu tiên',
             message: parsed.message,
-            products: (parsed.products as EmailProduct[]) || [],
+            products: productsWithAcceptance,
             frontendUrl
           }
         );
@@ -465,7 +510,7 @@ export class RecommendationService {
           {
             userName: userName || 'Khách hàng',
             message: parsed.message,
-            products: (parsed.products as EmailProduct[]) || [],
+            products: productsWithAcceptance,
             frontendUrl,
             savingsPercent: '15'
           }

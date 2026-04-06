@@ -10,6 +10,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from 'src/application/constant/processor';
 import { RecommendationModule } from 'src/infrastructure/domain/recommendation/recommendation.module';
 import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.module';
+import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.module';
 
 @Module({
     imports: [
@@ -17,6 +18,7 @@ import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.mo
         AIModule,
         UserLogModule,
         ProductModule,
+        AIAcceptanceModule,
         AdminInstructionModule,
         DictionaryModule,
         forwardRef(() => RecommendationModule), // Avoid circular dependency if any

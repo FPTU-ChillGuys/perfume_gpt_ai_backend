@@ -30,6 +30,7 @@ import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import z from 'zod';
 
 type VariantSalesSignal = {
@@ -117,7 +118,8 @@ export class TrendService {
     private readonly adminInstructionService: AdminInstructionService,
     private readonly inventoryService: InventoryService,
     private readonly restockService: RestockService,
-    private readonly productService: ProductService
+    private readonly productService: ProductService,
+    private readonly aiAcceptanceService: AIAcceptanceService
   ) { }
 
   private readonly logger = new Logger(TrendService.name);
@@ -1359,7 +1361,19 @@ export class TrendService {
   ): Promise<BaseResponse<ProductCardResponse[]>> {
     const requestId = this.createRequestId('trend-product');
     const result = await this.resolveTrendPipeline(requestId, allUserLogRequest);
-    return Ok(result.products);
+
+    const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+      contextType: 'trend',
+      sourceRefId: requestId,
+      products: result.products,
+      metadata: {
+        sourceUsed: result.sourceUsed,
+        fallbackTier: result.fallbackTier,
+        keywordCount: result.keywordsUsed.length
+      }
+    });
+
+    return Ok(attachResult.products as ProductCardResponse[]);
   }
 
   async generateStructuredTrendForecast(

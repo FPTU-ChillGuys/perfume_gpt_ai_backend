@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -8,9 +8,11 @@ import {
   ApiUnauthorizedResponse
 } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
+import { CreateResponseAIAcceptanceRequest } from 'src/application/dtos/request/ai-acceptance.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
+import { AIAcceptanceContextType, AI_ACCEPTANCE_CONTEXTS } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.constants';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 
 @ApiTags('AI Acceptance')
@@ -21,6 +23,34 @@ import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-de
 @Controller('ai-acceptance')
 export class AIAcceptanceController {
   constructor(private readonly aiAcceptanceService: AIAcceptanceService) {}
+
+  @Post('response')
+  @ApiOperation({ summary: 'Tạo AI acceptance pending theo response-level (backend-first)' })
+  @ApiBaseResponse(AIAcceptance)
+  async createPendingResponseAcceptance(
+    @Body() request: CreateResponseAIAcceptanceRequest
+  ): Promise<BaseResponse<AIAcceptance>> {
+    return this.aiAcceptanceService.createPendingResponseAcceptance({
+      userId: request.userId,
+      contextType: request.contextType,
+      sourceRefId: request.sourceRefId,
+      productIds: request.productIds,
+      visibleInHours: request.visibleInHours,
+      metadata: request.metadata
+    });
+  }
+
+  @Post('click/:aiAcceptanceId')
+  @ApiOperation({ summary: 'Đánh dấu click chấp nhận theo aiAcceptanceId' })
+  @ApiParam({ name: 'aiAcceptanceId', description: 'ID bản ghi AI acceptance' })
+  @ApiQuery({ name: 'userId', required: false, description: 'ID user để kiểm tra quyền sở hữu (optional)' })
+  @ApiBaseResponse(AIAcceptance)
+  async clickAIAcceptance(
+    @Param('aiAcceptanceId') aiAcceptanceId: string,
+    @Query('userId') userId?: string
+  ): Promise<BaseResponse<AIAcceptance>> {
+    return this.aiAcceptanceService.markAcceptedByAcceptanceId(aiAcceptanceId, userId);
+  }
 
   @Get('status/all')
   @ApiOperation({
@@ -44,12 +74,12 @@ export class AIAcceptanceController {
   async updateAIAcceptanceData(
     @Param('id') id: string,
     @Query('cartItemId') cartItemId: string,
-    @Query('status') status: boolean
+    @Query('status') status: string
   ): Promise<BaseResponse<AIAcceptance>> {
     return this.aiAcceptanceService.updateAIAcceptanceStatusById(
       id,
       cartItemId,
-      status
+      status === 'true'
     );
   }
 
@@ -62,12 +92,12 @@ export class AIAcceptanceController {
   async updateAIAcceptanceDataByUserIdAndCartId(
     @Param('userId') userId: string,
     @Query('cartItemId') cartItemId: string,
-    @Query('status') status: boolean,
+    @Query('status') status: string,
   ): Promise<BaseResponse<AIAcceptance>> {
     return this.aiAcceptanceService.updateAIAcceptanceByUserIdAndCartId(
       userId,
       cartItemId,
-      status
+      status === 'true'
     );
   }
 
@@ -83,6 +113,18 @@ export class AIAcceptanceController {
     return this.aiAcceptanceService.getAIAcceptanceByUserId(userId);
   }
 
+  @Get('visible/:userId')
+  @ApiOperation({ summary: 'Lấy trạng thái AI acceptance có thể hiển thị (accepted ngay, false sau 24h)' })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
+  @ApiQuery({ name: 'contextType', required: false, enum: AI_ACCEPTANCE_CONTEXTS, description: 'Lọc theo ngữ cảnh' })
+  @ApiBaseResponse(AIAcceptance)
+  async getVisibleAIAcceptanceStatus(
+    @Param('userId') userId: string,
+    @Query('contextType') contextType?: AIAcceptanceContextType
+  ): Promise<BaseResponse<AIAcceptance[]>> {
+    return this.aiAcceptanceService.getVisibleAIAcceptanceByUserId(userId, contextType);
+  }
+
   /** Lấy tỷ lệ chấp nhận AI theo trạng thái */
   @Get('rate')
   @ApiOperation({ summary: 'Lấy tỷ lệ chấp nhận AI theo trạng thái' })
@@ -91,12 +133,20 @@ export class AIAcceptanceController {
     required: true,
     description: 'Trạng thái chấp nhận (true/false)'
   })
+  @ApiQuery({
+    name: 'contextType',
+    required: false,
+    enum: AI_ACCEPTANCE_CONTEXTS,
+    description: 'Lọc theo ngữ cảnh'
+  })
   @ApiBaseResponse(Number)
   async getAIAcceptanceRate(
-    @Query('isAccepted') isAccepted: string
+    @Query('isAccepted') isAccepted: string,
+    @Query('contextType') contextType?: AIAcceptanceContextType
   ): Promise<BaseResponse<number>> {
     return this.aiAcceptanceService.getAIAcceptanceRateByAcceptanceStatus(
-      isAccepted === 'true'
+      isAccepted === 'true',
+      contextType
     );
   }
 
@@ -104,13 +154,33 @@ export class AIAcceptanceController {
   @Get('rate/:userId')
   @ApiOperation({ summary: 'Lấy tỷ lệ chấp nhận AI theo user ID' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
+  @ApiQuery({
+    name: 'contextType',
+    required: false,
+    enum: AI_ACCEPTANCE_CONTEXTS,
+    description: 'Lọc theo ngữ cảnh'
+  })
   @ApiBaseResponse(Number)
   async getAIAcceptanceRateByUserId(
-    @Param('userId') userId: string
+    @Param('userId') userId: string,
+    @Query('contextType') contextType?: AIAcceptanceContextType
   ): Promise<BaseResponse<number>> {
     return this.aiAcceptanceService.getAIAcceptanceRateByAcceptanceStatusWithUserId(
-      userId
+      userId,
+      contextType
     );
+  }
+
+  @Get('metrics')
+  @ApiOperation({ summary: 'Lấy metrics acceptance theo context/user (accepted/pending/no-click)' })
+  @ApiQuery({ name: 'contextType', required: false, enum: AI_ACCEPTANCE_CONTEXTS })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiBaseResponse(Object)
+  async getAIAcceptanceMetrics(
+    @Query('contextType') contextType?: AIAcceptanceContextType,
+    @Query('userId') userId?: string
+  ) {
+    return this.aiAcceptanceService.getAIAcceptanceMetrics(contextType, userId);
   }
 
   /** Tạo bản ghi chấp nhận AI mới cho người dùng */

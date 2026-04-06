@@ -1,7 +1,6 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
-import { Output } from 'ai';
 import { subDays } from 'date-fns';
 import * as crypto from 'crypto';
 import * as googleTrends from 'google-trends-api';
@@ -18,20 +17,15 @@ import {
   ProductCardVariantResponse
 } from 'src/application/dtos/response/product-card.response';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
-import { INSTRUCTION_TYPE_TREND } from 'src/application/constant/prompts';
 import {
   ProductCardOutputItem,
   ProductCardVariantOutput
 } from 'src/chatbot/output/product.output';
-import { AI_TREND_HELPER } from 'src/infrastructure/domain/ai/ai.module';
-import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { CACHE_TTL_1WEEK } from 'src/infrastructure/domain/common/cacheable/cacheable.constants';
-import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
-import z from 'zod';
 
 type VariantSalesSignal = {
   last30DaysSales: number;
@@ -93,14 +87,7 @@ const GOOGLE_FETCH_RETRY_DELAY_MS = 300;
 const GOOGLE_TREND_GEO = 'VN';
 const GOOGLE_SIGNAL_PROMPT_LIMIT = 40;
 const FALLBACK_TREND_LOG_COUNT = 5;
-
-const trendKeywordMapperSchema = z.object({
-  primaryKeywords: z.array(z.string().min(1)).min(1).max(6),
-  expansionKeywords: z.array(z.string().min(1)).max(8).default([]),
-  negativeTerms: z.array(z.string().min(1)).max(8).default([]),
-  confidence: z.number().min(0).max(1).default(0.5),
-  explanation: z.string().min(1).max(600)
-});
+const SIMPLE_TREND_BASE_KEYWORD = 'nước hoa';
 
 const emptyMapperResult: TrendKeywordMapperResult = {
   primaryKeywords: [],
@@ -113,9 +100,7 @@ const emptyMapperResult: TrendKeywordMapperResult = {
 @Injectable()
 export class TrendService {
   constructor(
-    @Inject(AI_TREND_HELPER) private readonly aiHelper: AIHelper,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-    private readonly adminInstructionService: AdminInstructionService,
     private readonly inventoryService: InventoryService,
     private readonly restockService: RestockService,
     private readonly productService: ProductService,
@@ -167,6 +152,45 @@ export class TrendService {
     }
 
     return result;
+  }
+
+  private truncateForLog(value: string, maxLength = 240): string {
+    if (value.length <= maxLength) {
+      return value;
+    }
+
+    return `${value.slice(0, maxLength)}...(truncated:${value.length - maxLength})`;
+  }
+
+  private estimateTokenCountFromChars(charCount: number): number {
+    return Math.ceil(charCount / 4);
+  }
+
+  private summarizeSignals(signals: GoogleTrendSignal[]): {
+    relatedQueryCount: number;
+    interestOverTimeCount: number;
+    preview: string;
+  } {
+    const relatedQueryCount = signals.filter(
+      (signal) => signal.source === 'related_query'
+    ).length;
+    const interestOverTimeCount = signals.filter(
+      (signal) => signal.source === 'interest_over_time'
+    ).length;
+
+    const preview = this.truncateForLog(
+      signals
+        .slice(0, 8)
+        .map((signal) => `${signal.keyword}:${signal.score}`)
+        .join(' | '),
+      360
+    );
+
+    return {
+      relatedQueryCount,
+      interestOverTimeCount,
+      preview
+    };
   }
 
   private getForceRefreshFlag(allUserLogRequest: AllUserLogRequest): boolean {
@@ -607,33 +631,13 @@ export class TrendService {
     }
   }
 
-  private buildSeedKeywords(dynamicNameSeeds: string[]): TrendSeedKeyword[] {
-    const defaultNameSeeds = [
-      'Dior Sauvage',
-      'Bleu de Chanel',
-      'YSL Libre',
-      'Baccarat Rouge 540',
-      'Good Girl Carolina Herrera'
-    ];
+  private buildSeedKeywords(): TrendSeedKeyword[] {
+    // Keep only one broad seed keyword and let AI map related queries into product keywords.
+    const nameKeywords = this.uniqueKeywords([SIMPLE_TREND_BASE_KEYWORD], 1).map(
+      (keyword) => ({ keyword, stage: 'name' as const })
+    );
 
-    const nameKeywords = this.uniqueKeywords(
-      [...dynamicNameSeeds, ...defaultNameSeeds],
-      6
-    ).map((keyword) => ({ keyword, stage: 'name' as const }));
-
-    const attributeKeywords = this.uniqueKeywords(
-      [
-        'fresh perfume',
-        'woody perfume',
-        'floral perfume',
-        'long lasting perfume',
-        'summer perfume',
-        'winter perfume'
-      ],
-      6
-    ).map((keyword) => ({ keyword, stage: 'attribute' as const }));
-
-    return [...nameKeywords, ...attributeKeywords];
+    return nameKeywords;
   }
 
   private async fetchGoogleSignals(
@@ -650,6 +654,53 @@ export class TrendService {
     const signals: GoogleTrendSignal[] = [];
 
     for (const seed of seedKeywords) {
+      let hasRelatedSignals = false;
+
+      if (seed.stage === 'name') {
+        const relatedRaw = await this.executeWithRetry(
+          requestId,
+          'related_queries',
+          seed.keyword,
+          () =>
+            googleTrends.relatedQueries({
+              keyword: seed.keyword,
+              startTime: startDate,
+              endTime: endDate,
+              geo: GOOGLE_TREND_GEO
+            })
+        );
+
+        if (relatedRaw) {
+          const relatedRawText =
+            typeof relatedRaw === 'string' ? relatedRaw : JSON.stringify(relatedRaw);
+          const relatedSignals = this.extractRelatedSignals(
+            this.safeParseJson(relatedRaw),
+            seed.keyword,
+            seed.stage
+          );
+
+          this.logger.log(
+            `[Trend][GoogleFetch][RAW] requestId=${requestId} operation=related_queries keyword="${seed.keyword}" rawChars=${relatedRawText.length} parsedSignalCount=${relatedSignals.length} preview="${this.truncateForLog(
+              relatedSignals
+                .slice(0, 8)
+                .map((signal) => `${signal.keyword}:${signal.score}`)
+                .join(' | '),
+              360
+            )}"`
+          );
+
+          if (relatedSignals.length > 0) {
+            hasRelatedSignals = true;
+            signals.push(...relatedSignals);
+          }
+        }
+      }
+
+      // Fall back to a single interest-over-time call if related queries are unavailable.
+      if (hasRelatedSignals) {
+        continue;
+      }
+
       const interestRaw = await this.executeWithRetry(
         requestId,
         'interest_over_time',
@@ -664,7 +715,14 @@ export class TrendService {
       );
 
       if (interestRaw) {
+        const interestRawText =
+          typeof interestRaw === 'string' ? interestRaw : JSON.stringify(interestRaw);
         const score = this.extractInterestScore(this.safeParseJson(interestRaw));
+
+        this.logger.log(
+          `[Trend][GoogleFetch][RAW] requestId=${requestId} operation=interest_over_time keyword="${seed.keyword}" rawChars=${interestRawText.length} score=${score}`
+        );
+
         signals.push({
           keyword: seed.keyword,
           score,
@@ -672,35 +730,6 @@ export class TrendService {
           stage: seed.stage
         });
       }
-
-      if (seed.stage !== 'name') {
-        continue;
-      }
-
-      const relatedRaw = await this.executeWithRetry(
-        requestId,
-        'related_queries',
-        seed.keyword,
-        () =>
-          googleTrends.relatedQueries({
-            keyword: seed.keyword,
-            startTime: startDate,
-            endTime: endDate,
-            geo: GOOGLE_TREND_GEO
-          })
-      );
-
-      if (!relatedRaw) {
-        continue;
-      }
-
-      signals.push(
-        ...this.extractRelatedSignals(
-          this.safeParseJson(relatedRaw),
-          seed.keyword,
-          seed.stage
-        )
-      );
     }
 
     this.logger.log(
@@ -764,90 +793,21 @@ export class TrendService {
   ): Promise<TrendKeywordMapperResult> {
     const startedAt = Date.now();
     this.logger.log(
-      `[Trend][KeywordMap][START] requestId=${requestId} signalCount=${signals.length}`
+      `[Trend][KeywordMap][START] requestId=${requestId} mode=nlp-only signalCount=${signals.length}`
     );
 
     const compactSignals = signals
       .sort((left, right) => right.score - left.score)
-      .slice(0, GOOGLE_SIGNAL_PROMPT_LIMIT)
-      .map((signal) => ({
-        keyword: signal.keyword,
-        score: signal.score,
-        source: signal.source,
-        stage: signal.stage,
-        parentKeyword: signal.parentKeyword ?? null
-      }));
+      .slice(0, GOOGLE_SIGNAL_PROMPT_LIMIT);
+    const signalSummary = this.summarizeSignals(compactSignals);
 
-    const mapperPrompt = [
-      'You are a keyword planner for perfume trend product search.',
-      'Task: transform Google Trends signals into searchable product keywords.',
-      'Rules:',
-      '1) Keep perfume-name and brand keywords as primary keywords.',
-      '2) Put note/family/season style terms into expansion keywords.',
-      '3) Return concise keyword phrases only, no explanations inside arrays.',
-      '4) negativeTerms should contain noisy words that should be excluded.',
-      '',
-      `Seed keywords: ${JSON.stringify(seedKeywords)}`,
-      `Google signals: ${JSON.stringify(compactSignals)}`
-    ].join('\n');
+    const mapped = this.buildKeywordFallback(requestId, seedKeywords, compactSignals);
 
-    const mapperSystemPrompt = [
-      'Return valid JSON matching the schema exactly.',
-      'Do not call tools.',
-      'Keep output focused on perfume product search keywords.'
-    ].join('\n');
+    this.logger.log(
+      `[Trend][KeywordMap][DONE] requestId=${requestId} mode=nlp-only primaryCount=${mapped.primaryKeywords.length} expansionCount=${mapped.expansionKeywords.length} confidence=${mapped.confidence.toFixed(2)} durationMs=${Date.now() - startedAt} signalPreview="${signalSummary.preview}"`
+    );
 
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_TREND);
-
-    try {
-      const mapperResponse = await this.aiHelper.textGenerateFromPrompt(
-        mapperPrompt,
-        `${mapperSystemPrompt}\n${adminPrompt}`,
-        Output.object({ schema: trendKeywordMapperSchema }),
-        'Failed to map trend keywords'
-      );
-
-      if (!mapperResponse.success || !mapperResponse.data) {
-        return this.buildKeywordFallback(requestId, seedKeywords, signals);
-      }
-
-      const rawData =
-        typeof mapperResponse.data === 'string'
-          ? this.safeParseJson(mapperResponse.data)
-          : mapperResponse.data;
-
-      const parsed = trendKeywordMapperSchema.safeParse(rawData);
-      if (!parsed.success) {
-        this.logger.warn(
-          `[Trend][KeywordMap][FAIL] requestId=${requestId} reason=schema-validation-error issueCount=${parsed.error.issues.length}`
-        );
-        return this.buildKeywordFallback(requestId, seedKeywords, signals);
-      }
-
-      const normalized: TrendKeywordMapperResult = {
-        primaryKeywords: this.uniqueKeywords(parsed.data.primaryKeywords, 6),
-        expansionKeywords: this.uniqueKeywords(parsed.data.expansionKeywords, 8),
-        negativeTerms: this.uniqueKeywords(parsed.data.negativeTerms, 8),
-        confidence: parsed.data.confidence,
-        explanation: parsed.data.explanation
-      };
-
-      this.logger.log(
-        `[Trend][KeywordMap][DONE] requestId=${requestId} primaryCount=${normalized.primaryKeywords.length} expansionCount=${normalized.expansionKeywords.length} confidence=${normalized.confidence.toFixed(2)} durationMs=${Date.now() - startedAt}`
-      );
-
-      return normalized;
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : JSON.stringify(error);
-
-      this.logger.warn(
-        `[Trend][KeywordMap][FAIL] requestId=${requestId} reason=exception error=${errorMessage}`
-      );
-
-      return this.buildKeywordFallback(requestId, seedKeywords, signals);
-    }
+    return mapped;
   }
 
   private buildQueryKeywordList(mapperResult: TrendKeywordMapperResult): string[] {
@@ -885,51 +845,26 @@ export class TrendService {
       let keywordProducts: ProductWithVariantsResponse[] = [];
 
       try {
-        const aiSearchResult = await this.productService.getProductsUsingAiSearch(
-          keyword,
-          queryRequest
-        );
+        const semanticSearchResult =
+          await this.productService.getProductsUsingSemanticSearch(
+            keyword,
+            queryRequest
+          );
 
-        keywordProducts = aiSearchResult.success
-          ? aiSearchResult.payload?.items ?? []
+        keywordProducts = semanticSearchResult.success
+          ? semanticSearchResult.payload?.items ?? []
           : [];
 
         this.logger.log(
-          `[Trend][ProductQuery][AI] requestId=${requestId} keyword="${keyword}" resultCount=${keywordProducts.length} durationMs=${Date.now() - keywordStart}`
+          `[Trend][ProductQuery][NLP] requestId=${requestId} keyword="${keyword}" resultCount=${keywordProducts.length} durationMs=${Date.now() - keywordStart}`
         );
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : JSON.stringify(error);
 
         this.logger.warn(
-          `[Trend][ProductQuery][AI][FAIL] requestId=${requestId} keyword="${keyword}" error=${errorMessage}`
+          `[Trend][ProductQuery][NLP][FAIL] requestId=${requestId} keyword="${keyword}" error=${errorMessage}`
         );
-      }
-
-      if (keywordProducts.length === 0) {
-        const semanticStartedAt = Date.now();
-        try {
-          const semanticSearchResult =
-            await this.productService.getProductsUsingSemanticSearch(
-              keyword,
-              queryRequest
-            );
-
-          keywordProducts = semanticSearchResult.success
-            ? semanticSearchResult.payload?.items ?? []
-            : [];
-
-          this.logger.log(
-            `[Trend][ProductQuery][SEMANTIC] requestId=${requestId} keyword="${keyword}" resultCount=${keywordProducts.length} durationMs=${Date.now() - semanticStartedAt}`
-          );
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : JSON.stringify(error);
-
-          this.logger.warn(
-            `[Trend][ProductQuery][SEMANTIC][FAIL] requestId=${requestId} keyword="${keyword}" error=${errorMessage}`
-          );
-        }
       }
 
       aggregatedProducts.push(...keywordProducts);
@@ -1181,8 +1116,7 @@ export class TrendService {
     allUserLogRequest: AllUserLogRequest
   ): Promise<TrendPipelineResult> {
     const range = this.resolveDateRange(allUserLogRequest);
-    const dynamicNameSeeds = await this.collectTrendLogNameSeeds(requestId);
-    const seedKeywords = this.buildSeedKeywords(dynamicNameSeeds);
+    const seedKeywords = this.buildSeedKeywords();
 
     const googleSignals = await this.fetchGoogleSignals(
       requestId,

@@ -6,11 +6,11 @@ export const embeddingModel: EmbeddingModel = openai.embedding('text-embedding-3
 
 export const aiModel = gemma4;
 
-export const aiModelForSurvey = gpt5_4nano;
+export const aiModelForSurvey = gemma4;
 
 export const aiModelForTrend = gpt5_4nano;
 
-export const aiModelForRestock = gpt5_4nano;
+export const aiModelForRestock = gemma4;
 
 export const aiModelForReview = llama_3_1_8b_instruct;
 

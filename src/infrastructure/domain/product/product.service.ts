@@ -186,6 +186,40 @@ export class ProductService {
     private readonly dictionaryBuilderService: DictionaryBuilderService,
   ) { }
 
+  private createEmptyPagedProducts(
+    request: PagedAndSortedRequest
+  ): PagedResult<ProductWithVariantsResponse> {
+    return new PagedResult<ProductWithVariantsResponse>({
+      items: [],
+      pageNumber: request.PageNumber,
+      pageSize: request.PageSize,
+      totalCount: 0,
+      totalPages: 0
+    });
+  }
+
+  private async runParsedQuerySearch(
+    searchText: string,
+    request: PagedAndSortedRequest
+  ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
+    const parsedResult = this.nlpEngineService.parseAndNormalize(searchText);
+    const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
+    const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
+
+    if (!structuredResult.success || !structuredResult.data) {
+      return {
+        success: false,
+        error: structuredResult.error || 'Failed to fetch products by parsed query',
+        payload: this.createEmptyPagedProducts(request)
+      };
+    }
+
+    return {
+      success: true,
+      payload: structuredResult.data
+    };
+  }
+
   async getAllProducts(
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
@@ -223,38 +257,20 @@ export class ProductService {
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const { items, totalCount } = await this.searchService.searchProducts(searchText, request);
+        if (!searchText?.trim()) {
+          return { success: true, payload: this.createEmptyPagedProducts(request) };
+        }
 
-        // Enrich the items with full variant info from Prisma
-        const productIds = items.map((p: any) => p.id);
-        const productsFromDb = await this.prisma.products.findMany({
-          where: { Id: { in: productIds }, IsDeleted: false },
-          include: productWithVariantsInclude
-        });
-
-        // Maintain the order from Elasticsearch
-        const productMap = new Map(productsFromDb.map(p => [p.Id, p]));
-        const enrichedItems = productIds
-          .map(id => productMap.get(id))
-          .filter(p => !!p)
-          .map(p => mapProductWithVariants(p as ProductWithVariantsRelations));
-
-        const result = new PagedResult<ProductWithVariantsResponse>({
-          items: enrichedItems,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        });
-        return { success: true, payload: result };
+        this.logger.log('[SEARCH][QUERY_ONLY] getProductsUsingSemanticSearch -> parsed query path');
+        return await this.runParsedQuerySearch(searchText, request);
       },
-      'Failed to fetch products using heuristic semantic search',
+      'Failed to fetch products using semantic query path',
       true
     );
   }
 
   /**
-   * Search sản phẩm sử dụng AI để trích xuất intent (brand, price, gender, notes, etc.)
+   * Backward-compat endpoint: currently runs NLP parsed-query path only.
    */
   async getProductsUsingAiSearch(
     searchText: string,
@@ -262,32 +278,14 @@ export class ProductService {
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const { items, totalCount } = await this.searchService.searchWithAi(searchText, request);
+        if (!searchText?.trim()) {
+          return { success: true, payload: this.createEmptyPagedProducts(request) };
+        }
 
-        // Enrich the items with full variant info from Prisma
-        const productIds = items.map((p: any) => p.id);
-        const productsFromDb = await this.prisma.products.findMany({
-          where: { Id: { in: productIds }, IsDeleted: false },
-          include: productWithVariantsInclude
-        });
-
-        // Maintain the order from Elasticsearch
-        const productMap = new Map(productsFromDb.map(p => [p.Id, p]));
-        const enrichedItems = productIds
-          .map(id => productMap.get(id))
-          .filter(p => !!p)
-          .map(p => mapProductWithVariants(p as ProductWithVariantsRelations));
-
-        const result = new PagedResult<ProductWithVariantsResponse>({
-          items: enrichedItems,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        });
-        return { success: true, payload: result };
+        this.logger.log('[SEARCH][NLP_ONLY] getProductsUsingAiSearch -> parsed query path');
+        return await this.runParsedQuerySearch(searchText, request);
       },
-      'Failed to fetch products using semantic search v2',
+      'Failed to fetch products using NLP query path',
       true
     );
   }
@@ -576,7 +574,7 @@ export class ProductService {
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    // Both methods now essentially do the same thing with the internal SearchService
+    // Reuse the semantic query path and return the same paged payload contract.
     const result = await this.getProductsUsingSemanticSearch(searchText, request);
     return {
       success: result.success,

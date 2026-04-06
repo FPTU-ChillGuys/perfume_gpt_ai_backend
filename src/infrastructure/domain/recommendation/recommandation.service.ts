@@ -13,13 +13,39 @@ import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { AI_RECOMMENDATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { EmailService, EmailProduct, EmailTemplate } from 'src/infrastructure/domain/common/mail.service';
-import { UserService } from 'src/infrastructure/domain/user/user.service';
+import {
+  ActiveDailyRecommendationRecipient,
+  UserService
+} from 'src/infrastructure/domain/user/user.service';
 import { OrderService } from 'src/infrastructure/domain/order/order.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
+import { RecommendationV3Service } from './recommendation-v3.service';
+import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
+
+export type DailyRecommendationTrigger = 'cron' | 'manual';
+type DailyRecommendationUserResult =
+  | 'sent'
+  | 'skipped-no-recommendation'
+  | 'skipped-invalid-recipient'
+  | 'failed';
+
+export interface DailyRecommendationBatchSummary {
+  triggeredBy: DailyRecommendationTrigger;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  totalRecipients: number;
+  sentCount: number;
+  skippedNoRecommendation: number;
+  skippedInvalidRecipient: number;
+  failedCount: number;
+}
 
 @Injectable()
 export class RecommendationService {
   private readonly logger = new Logger(RecommendationService.name);
+  private readonly dailyRecommendationTag = '[DailyRecommendationV3]';
+  private readonly dailyRecommendationProductLimit = 2;
 
   constructor(
     @Inject(AI_RECOMMENDATION_HELPER) private readonly aiHelper: AIHelper,
@@ -28,7 +54,8 @@ export class RecommendationService {
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly orderService: OrderService,
-    private readonly productService: ProductService
+    private readonly productService: ProductService,
+    private readonly recommendationV3Service: RecommendationV3Service
   ) { }
 
   private async hasPurchaseHistory(userId: string): Promise<boolean> {
@@ -130,6 +157,235 @@ export class RecommendationService {
     return Ok(text);
   }
 
+  private buildDailyRecommendationMessage(productCount: number): string {
+    if (productCount <= 1) {
+      return 'Dựa trên hồ sơ và hành vi gần đây, PerfumeGPT đã chọn cho bạn 1 gợi ý phù hợp nhất hôm nay.';
+    }
+
+    return `Dựa trên hồ sơ và hành vi gần đây, PerfumeGPT đã chọn ${productCount} gợi ý phù hợp nhất cho bạn hôm nay.`;
+  }
+
+  private mapProductToEmailProduct(
+    product: ProductWithVariantsResponse,
+    fallbackVariant?: { variantId?: string; basePrice?: number }
+  ): EmailProduct {
+    const activeVariants = (product.variants ?? []).filter(
+      (variant) => variant.status?.toLowerCase() === 'active'
+    );
+    const sourceVariants =
+      activeVariants.length > 0 ? activeVariants : product.variants ?? [];
+
+    const variants = sourceVariants.slice(0, 3).map((variant) => ({
+      id: variant.id,
+      sku: variant.sku,
+      volumeMl: variant.volumeMl,
+      type: variant.type,
+      basePrice: Number(variant.basePrice),
+      status: variant.status,
+      concentrationName: variant.concentration?.name ?? 'N/A'
+    }));
+
+    if (variants.length === 0 && fallbackVariant?.basePrice !== undefined) {
+      variants.push({
+        id: fallbackVariant.variantId ?? 'fallback-variant',
+        sku: 'N/A',
+        volumeMl: 50,
+        type: 'Standard',
+        basePrice: Number(fallbackVariant.basePrice),
+        status: 'Active',
+        concentrationName: 'N/A'
+      });
+    }
+
+    return {
+      id: product.id,
+      name: product.name,
+      description: product.description || 'Hương nước hoa được gợi ý theo hồ sơ của bạn.',
+      brandName: product.brandName,
+      categoryName: product.categoryName || 'Perfume',
+      primaryImage: product.primaryImage ?? undefined,
+      variants
+    };
+  }
+
+  private async buildDailyEmailProductsFromV3(
+    userId: string
+  ): Promise<EmailProduct[]> {
+    const recommendationResult = await this.recommendationV3Service.getRecommendations(
+      userId,
+      this.dailyRecommendationProductLimit
+    );
+
+    if (!recommendationResult.success) {
+      this.logger.warn(
+        `${this.dailyRecommendationTag}[V3_FAIL] userId=${userId} reason=RECOMMENDATION_QUERY_FAILED`
+      );
+      return [];
+    }
+
+    const recommendations = recommendationResult.data?.recommendations ?? [];
+    if (recommendations.length === 0) {
+      this.logger.log(
+        `${this.dailyRecommendationTag}[V3_EMPTY] userId=${userId} reason=NO_RECOMMENDATION`
+      );
+      return [];
+    }
+
+    const rankedRecommendations = recommendations.slice(
+      0,
+      this.dailyRecommendationProductLimit
+    );
+
+    const hydratedProducts = await Promise.all(
+      rankedRecommendations.map(async (item) => {
+        const productResult = await this.productService.getProductWithVariants(
+          item.productId
+        );
+
+        if (!productResult.success || !productResult.data) {
+          this.logger.warn(
+            `${this.dailyRecommendationTag}[HYDRATE_SKIP] userId=${userId} productId=${item.productId}`
+          );
+          return null;
+        }
+
+        return this.mapProductToEmailProduct(productResult.data, {
+          variantId: item.variantId,
+          basePrice: item.basePrice
+        });
+      })
+    );
+
+    return hydratedProducts
+      .filter((product): product is EmailProduct => Boolean(product))
+      .slice(0, this.dailyRecommendationProductLimit);
+  }
+
+  private async sendDailyRecommendationForRecipient(
+    recipient: ActiveDailyRecommendationRecipient
+  ): Promise<DailyRecommendationUserResult> {
+    const email = recipient.email?.trim();
+    if (!email) {
+      this.logger.warn(
+        `${this.dailyRecommendationTag}[USER_SKIPPED] userId=${recipient.id} reason=INVALID_RECIPIENT`
+      );
+      return 'skipped-invalid-recipient';
+    }
+
+    const products = await this.buildDailyEmailProductsFromV3(recipient.id);
+    if (products.length === 0) {
+      this.logger.log(
+        `${this.dailyRecommendationTag}[USER_SKIPPED] userId=${recipient.id} reason=NO_RECOMMENDATION`
+      );
+      return 'skipped-no-recommendation';
+    }
+
+    const frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'https://perfumegpt.com'
+    );
+
+    const emailResult = await this.emailService.sendTemplateEmail(
+      email,
+      '🌸 Gợi ý nước hoa hằng ngày từ AI | PerfumeGPT',
+      EmailTemplate.RECOMMENDATION,
+      {
+        userName: recipient.userName || 'Khách hàng',
+        heading: 'Gợi ý nước hoa hôm nay dành cho bạn',
+        message: this.buildDailyRecommendationMessage(products.length),
+        products,
+        frontendUrl
+      }
+    );
+
+    if (!emailResult.success) {
+      this.logger.error(
+        `${this.dailyRecommendationTag}[USER_FAILED] userId=${recipient.id} email=${email}`
+      );
+      return 'failed';
+    }
+
+    this.logger.log(
+      `${this.dailyRecommendationTag}[USER_SENT] userId=${recipient.id} email=${email} productCount=${products.length}`
+    );
+    return 'sent';
+  }
+
+  async sendRecommendationToAllUsers(
+    triggeredBy: DailyRecommendationTrigger = 'manual'
+  ): Promise<DailyRecommendationBatchSummary> {
+    const startedAt = new Date();
+    const startedAtMs = Date.now();
+
+    this.logger.log(
+      `${this.dailyRecommendationTag}[START] triggeredBy=${triggeredBy} startedAt=${startedAt.toISOString()}`
+    );
+
+    const recipientsResponse =
+      await this.userService.getActiveUsersForDailyRecommendationEmail();
+
+    if (!recipientsResponse.success || !recipientsResponse.payload) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to load active users for daily recommendation email',
+        {
+          service: 'UserService',
+          endpoint: 'sendRecommendationToAllUsers',
+          triggeredBy
+        }
+      );
+    }
+
+    const recipients = recipientsResponse.payload;
+    this.logger.log(
+      `${this.dailyRecommendationTag}[RECIPIENTS_LOADED] triggeredBy=${triggeredBy} totalRecipients=${recipients.length}`
+    );
+
+    let sentCount = 0;
+    let skippedNoRecommendation = 0;
+    let skippedInvalidRecipient = 0;
+    let failedCount = 0;
+
+    for (const recipient of recipients) {
+      try {
+        const result = await this.sendDailyRecommendationForRecipient(recipient);
+        if (result === 'sent') {
+          sentCount += 1;
+        } else if (result === 'skipped-no-recommendation') {
+          skippedNoRecommendation += 1;
+        } else if (result === 'skipped-invalid-recipient') {
+          skippedInvalidRecipient += 1;
+        } else {
+          failedCount += 1;
+        }
+      } catch (error) {
+        failedCount += 1;
+        this.logger.error(
+          `${this.dailyRecommendationTag}[USER_FAILED] userId=${recipient.id}`,
+          error
+        );
+      }
+    }
+
+    const finishedAt = new Date();
+    const summary: DailyRecommendationBatchSummary = {
+      triggeredBy,
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      durationMs: Date.now() - startedAtMs,
+      totalRecipients: recipients.length,
+      sentCount,
+      skippedNoRecommendation,
+      skippedInvalidRecipient,
+      failedCount
+    };
+
+    this.logger.log(
+      `${this.dailyRecommendationTag}[END] triggeredBy=${triggeredBy} totalRecipients=${summary.totalRecipients} sent=${summary.sentCount} skippedNoRecommendation=${summary.skippedNoRecommendation} skippedInvalidRecipient=${summary.skippedInvalidRecipient} failed=${summary.failedCount} durationMs=${summary.durationMs}`
+    );
+
+    return summary;
+  }
+
   async sendRecommendation(userId: string): Promise<boolean> {
     try {
       const userInfo = await this.userService.getUserEmailInfo(userId);
@@ -223,17 +479,15 @@ export class RecommendationService {
     }
   }
 
-  // @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: 'Asia/Ho_Chi_Minh' }) // Chạy vào 8h sáng mỗi ngày
-  async sendRecommendationToAllUsers(): Promise<void> {
-    this.logger.log('Bắt đầu chạy cron job: Gửi daily recommendation cho tất cả người dùng');
+  @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: 'Asia/Ho_Chi_Minh' })
+  async runDailyRecommendationCron(): Promise<void> {
     try {
-      const userIds = await this.userService.getAllUserIds();
-      for (const userId of userIds.payload ?? []) {
-        await this.sendRecommendation(userId);
-      }
-      this.logger.log('Đã hoàn thành cron job: Gửi daily recommendation');
+      await this.sendRecommendationToAllUsers('cron');
     } catch (error) {
-      this.logger.error('Lỗi khi chạy cron job daily recommendation:', error);
+      this.logger.error(
+        `${this.dailyRecommendationTag}[CRON_FAILED] reason=UNEXPECTED_ERROR`,
+        error
+      );
     }
   }
 

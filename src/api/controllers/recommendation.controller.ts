@@ -4,12 +4,15 @@ import {
   Logger,
   Post,
   Query} from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { Public } from 'src/application/common/Metadata';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Public, Role } from 'src/application/common/Metadata';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { RecommendationService } from 'src/infrastructure/domain/recommendation/recommandation.service';
+import {
+  DailyRecommendationBatchSummary,
+  RecommendationService
+} from 'src/infrastructure/domain/recommendation/recommandation.service';
 import { RecommendationV2Service } from 'src/infrastructure/domain/recommendation/recommendation-v2.service';
 import { RecommendationResponse } from 'src/infrastructure/domain/recommendation/recommendation-profile.type';
 
@@ -61,6 +64,23 @@ export class RecommendationController {
   ): Promise<BaseResponse<string>> {
     await this.recommendationService.sendRepurchase(userId);
     return Ok('Repurchase recommendation generated and email sent successfully');
+  }
+
+  @Post('daily/send')
+  @Role(['admin'])
+  @ApiBearerAuth('jwt')
+  @ApiOperation({
+    summary:
+      'Manual trigger gửi daily recommendation V3 cho user active (sync)'
+  })
+  @ApiBaseResponse(Object)
+  async sendDailyRecommendationManual(): Promise<
+    BaseResponse<DailyRecommendationBatchSummary>
+  > {
+    const summary = await this.recommendationService.sendRecommendationToAllUsers(
+      'manual'
+    );
+    return Ok(summary);
   }
 
   /**

@@ -10,7 +10,7 @@ export const aiModelForSurvey = gemma4;
 
 export const aiModelForTrend = gpt5_4nano;
 
-export const aiModelForRestock = gemma4;
+export const aiModelForRestock = gpt5_4nano;
 
 export const aiModelForReview = llama_3_1_8b_instruct;
 

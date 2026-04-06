@@ -1228,7 +1228,7 @@ export class ProductService {
             skip,
             take,
             orderBy
-          }),
+          }), 
           this.prisma.products.count({ where })
         ]);
       } else {

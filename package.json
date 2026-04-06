@@ -17,7 +17,7 @@
     "start:prod": "node dist/main",
     "clean": "rimraf dist coverage",
     "seed": "ts-node -r tsconfig-paths/register src/infrastructure/seed/run-seed.ts",
-    "sync:prompts": "ts-node -r tsconfig-paths/register src/infrastructure/seed/sync-prompts.ts",
+    "sync:prompts": "ts-node -r tsconfig-paths/register src/infrastructure/domain/common/seed/sync-prompts.ts",
     "migration:up": "mikro-orm migration:up",
     "migration:down": "mikro-orm migration:down",
     "migration:create": "mikro-orm migration:create --name",

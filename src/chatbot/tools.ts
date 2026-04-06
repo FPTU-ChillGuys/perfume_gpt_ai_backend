@@ -64,6 +64,7 @@ export class Tools implements OnModuleInit {
   get getToolsForRestock(): ToolSet {
     if (!this.inventoryTool) return {};
     return {
+      getInventoryStock: this.inventoryTool.getInventoryStock,
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
       getProductSalesAnalyticsForRestock:
         this.inventoryTool.getProductSalesAnalyticsForRestock

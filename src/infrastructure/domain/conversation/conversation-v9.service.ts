@@ -44,7 +44,7 @@ export class ConversationV9Service {
   /**
    * Xử lý luồng Chat V9 - Sử dụng NlpEngineService (local) và RecommendationV3Service 
    */
-  async chatV9(
+  async   chatV9(
     conversation: ConversationRequestDto
   ): Promise<BaseResponse<ConversationDto>> {
     const userId = conversation.userId ?? uuid();

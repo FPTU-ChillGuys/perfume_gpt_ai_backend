@@ -23,6 +23,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
 import { ConversationV9Service } from 'src/infrastructure/domain/conversation/conversation-v9.service';
+import { ConversationV10Service } from 'src/infrastructure/domain/conversation/conversationV10.service';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 
@@ -31,7 +32,8 @@ import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extr
 export class ConversationController {
   constructor(
     private conversationService: ConversationService,
-    private conversationV9Service: ConversationV9Service
+    private conversationV9Service: ConversationV9Service,
+    private conversationV10Service: ConversationV10Service
   ) {}
 
   /** Lấy tất cả cuộc hội thoại */
@@ -95,5 +97,20 @@ export class ConversationController {
       conversation.userId = getTokenPayloadFromRequest(request)?.id;
     }
     return this.conversationV9Service.chatV9(conversation);
+  }
+
+  @Public()
+  @Post('chat/v10')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat V10 (Profile-first + Structured Search)' })
+  @ApiBaseResponse(ConversationRequestDto)
+  async conversationV10(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    if (!conversation.userId) {
+      conversation.userId = getTokenPayloadFromRequest(request)?.id;
+    }
+    return this.conversationV10Service.chat(conversation);
   }
 }

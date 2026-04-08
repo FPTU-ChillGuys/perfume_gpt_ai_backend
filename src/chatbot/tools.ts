@@ -31,6 +31,7 @@ export class Tools implements OnModuleInit {
   get getToolsForAnalysis(): ToolSet {
     if (!this.masterDataTool) return {};
     return {
+      getProductNormalizationContext: this.masterDataTool.getProductNormalizationContext,
       searchMasterData: this.masterDataTool.searchMasterData,
     };
   }
@@ -112,15 +113,15 @@ export class Tools implements OnModuleInit {
     };
   }
 
-  private productTool: ProductTool;
-  private orderTool: OrderTool;
-  private profileTool: ProfileTool;
-  private logTool: LogTool;
-  private reviewTool: ReviewTool;
-  private userTool: UserTool;
-  private inventoryTool: InventoryTool;
-  private masterDataTool: MasterDataTool;
-  private cartTool: CartTool;
+  private productTool?: ProductTool;
+  private orderTool?: OrderTool;
+  private profileTool?: ProfileTool;
+  private logTool?: LogTool;
+  private reviewTool?: ReviewTool;
+  private userTool?: UserTool;
+  private inventoryTool?: InventoryTool;
+  private masterDataTool?: MasterDataTool;
+  private cartTool?: CartTool;
 
   constructor(private readonly moduleRef: ModuleRef) { }
 

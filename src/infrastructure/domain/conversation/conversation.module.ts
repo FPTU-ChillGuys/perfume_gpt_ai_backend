@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
 import { ConversationV9Service } from 'src/infrastructure/domain/conversation/conversation-v9.service';
+import { ConversationV10Service } from 'src/infrastructure/domain/conversation/conversationV10.service';
 import { AIModule } from 'src/infrastructure/domain/ai/ai.module';
 import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.module';
 import { ProductModule } from 'src/infrastructure/domain/product/product.module';
@@ -11,6 +12,9 @@ import { QueueName } from 'src/application/constant/processor';
 import { RecommendationModule } from 'src/infrastructure/domain/recommendation/recommendation.module';
 import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.module';
 import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.module';
+import { SurveyModule } from 'src/infrastructure/domain/survey/survey.module';
+import { OrderModule } from 'src/infrastructure/domain/order/order.module';
+import { ProfileModule } from 'src/infrastructure/domain/profile/profile.module';
 
 @Module({
     imports: [
@@ -18,13 +22,16 @@ import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-a
         AIModule,
         UserLogModule,
         ProductModule,
+        SurveyModule,
+        OrderModule,
+        ProfileModule,
         AIAcceptanceModule,
         AdminInstructionModule,
         DictionaryModule,
         forwardRef(() => RecommendationModule), // Avoid circular dependency if any
         BullModule.registerQueue({ name: QueueName.CONVERSATION_QUEUE }),
     ],
-    providers: [ConversationService, ConversationV9Service],
-    exports: [ConversationService, ConversationV9Service],
+    providers: [ConversationService, ConversationV9Service, ConversationV10Service],
+    exports: [ConversationService, ConversationV9Service, ConversationV10Service],
 })
 export class ConversationModule { }

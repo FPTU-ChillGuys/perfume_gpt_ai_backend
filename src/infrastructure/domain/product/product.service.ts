@@ -1455,6 +1455,8 @@ export class ProductService {
           name: p.Name,
           brandName: p.Brands.Name,
           primaryImage: p.Media[0]?.Url || null,
+          reasoning: null,
+          source: null,
           variants: (p.ProductVariants || []).map(v => ({
             id: v.Id,
             sku: v.Sku,

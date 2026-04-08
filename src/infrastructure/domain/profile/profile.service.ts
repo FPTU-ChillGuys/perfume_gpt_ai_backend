@@ -64,6 +64,9 @@ export class ProfileService {
         const response = new ProfileResponse({
           id: profile.Id,
           userId: profile.UserId,
+          dateOfBirth: profile.DateOfBirth
+            ? profile.DateOfBirth.toISOString()
+            : null,
           scentPreference,
           minBudget: profile.MinBudget ? Number(profile.MinBudget) : null,
           maxBudget: profile.MaxBudget ? Number(profile.MaxBudget) : null,

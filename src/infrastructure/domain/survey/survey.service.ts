@@ -212,11 +212,20 @@ export class SurveyService {
   }
 
   async getSurveyQuesAnwsByUserId(
-    userId: string
+    userId: string, limit: number = 1
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
     return await funcHandlerAsync(async () => {
-      const surveyQuestionAnswer =
-        await this.unitOfWork.AISurveyQuestionAnswerRepo.findOne({ userId }, { populate: ['details', 'details.question', 'details.answer'] });
+      const surveyQuestionAnswers =
+        await this.unitOfWork.AISurveyQuestionAnswerRepo.find(
+          { userId },
+          {
+            populate: ['details', 'details.question', 'details.answer'],
+            orderBy: { updatedAt: 'DESC' },
+            limit
+          }
+        );
+
+      const surveyQuestionAnswer = surveyQuestionAnswers[0];
       if (!surveyQuestionAnswer) {
         return { success: false, error: 'Survey question answer not found' };
       }
@@ -226,6 +235,12 @@ export class SurveyService {
       };
     }
       , 'Failed to get survey question answer by user id');
+  }
+
+  async getLatestSurveyQuesAnwsByUserId(
+    userId: string
+  ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
+    return this.getSurveyQuesAnwsByUserId(userId, 1);
   }
 
   async checkExistSurveyQuesAnwsByUserId(userId: string): Promise<boolean> {

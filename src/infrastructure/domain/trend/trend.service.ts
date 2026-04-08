@@ -481,6 +481,8 @@ export class TrendService {
         name,
         brandName,
         primaryImage: this.readNullableString(item.primaryImage),
+        reasoning: this.readNullableString(item.reasoning),
+        source: this.readNullableString(item.source),
         variants
       });
     }
@@ -919,13 +921,17 @@ export class TrendService {
           return null;
         }
 
-        return {
+        const outputItem: ProductCardOutputItem = {
           id: product.id,
           name: product.name,
           brandName: product.brandName,
           primaryImage: product.primaryImage,
+          reasoning: null,
+          source: null,
           variants
         };
+
+        return outputItem;
       })
       .filter((product): product is ProductCardOutputItem => product !== null);
   }

@@ -1,5 +1,4 @@
 import { forwardRef, Module, Provider } from '@nestjs/common';
-import { SearchModule } from 'src/infrastructure/domain/search/search.module';
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 import { SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
@@ -139,7 +138,7 @@ const aiInventoryReportProvider: Provider = {
 };
 
 @Module({
-  imports: [UnitOfWorkModule, ToolModule, forwardRef(() => SearchModule)],
+  imports: [UnitOfWorkModule, ToolModule],
   providers: [
     AiAnalysisService,
     aiProvider,

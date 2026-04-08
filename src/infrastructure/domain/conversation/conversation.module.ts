@@ -15,6 +15,7 @@ import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-a
 import { SurveyModule } from 'src/infrastructure/domain/survey/survey.module';
 import { OrderModule } from 'src/infrastructure/domain/order/order.module';
 import { ProfileModule } from 'src/infrastructure/domain/profile/profile.module';
+import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
 
 @Module({
     imports: [
@@ -22,6 +23,7 @@ import { ProfileModule } from 'src/infrastructure/domain/profile/profile.module'
         AIModule,
         UserLogModule,
         ProductModule,
+        CartModule,
         SurveyModule,
         OrderModule,
         ProfileModule,

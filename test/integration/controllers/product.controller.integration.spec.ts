@@ -33,7 +33,8 @@ describe('ProductController (Integration – mock HTTP)', () => {
     }).compile();
     service = module.get(ProductService);
     const mockUserLogService = { addSearchLogToUserLog: jest.fn() } as unknown as UserLogService;
-    controller = new ProductController(service, mockUserLogService);
+    const mockAiAnalysisService = { analyze: jest.fn() } as unknown as any;
+    controller = new ProductController(service, mockUserLogService, mockAiAnalysisService);
   });
 
   describe('getAllProducts', () => {
@@ -75,9 +76,10 @@ describe('ProductController (Integration – mock HTTP)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
-      const request = new PagedAndSortedRequest();
+      const request = new SearchRequest();
+      request.searchText = 'rose';
       const mockReq = { headers: {} } as any;
-      const result = await controller.getProductsBySemanticSearch(mockReq, 'rose', request);
+      const result = await controller.getProductsBySemanticSearch(mockReq, request);
 
       expect(result.success).toBe(true);
     });
@@ -89,9 +91,10 @@ describe('ProductController (Integration – mock HTTP)', () => {
       };
       mockHttpService.get.mockReturnValue(of(axiosResponse(apiData)));
 
-      const request = new PagedAndSortedRequest();
+      const request = new SearchRequest();
+      request.searchText = 'nonexistent';
       const mockReq = { headers: {} } as any;
-      const result = await controller.getProductsBySemanticSearch(mockReq, 'nonexistent', request);
+      const result = await controller.getProductsBySemanticSearch(mockReq, request);
 
       expect(result.success).toBe(true);
     });

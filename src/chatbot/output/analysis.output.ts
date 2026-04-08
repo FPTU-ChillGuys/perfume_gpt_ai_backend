@@ -15,6 +15,27 @@ export const analysisOutputSchema = z.object({
         min: z.number().nullable(),
         max: z.number().nullable()
     }).nullable(),
+    functionCall: z.object({
+        name: z.enum([
+            'getBestSellingProducts',
+            'getNewestProducts',
+            'getLeastSellingProducts',
+            'getOrdersByUserId',
+            'getStaticProductPolicy',
+            'getUserLogSummaryByUserId',
+            'addToCart',
+            'getCart',
+            'clearCart'
+        ]),
+        purpose: z.enum(['main', 'support', 'task']),
+        arguments: z.object({
+          items: z.array(z.any()).optional(),
+          content: z.string().optional(),
+          variantId: z.string().optional(),
+          quantity: z.number().optional()
+        }).nullable().optional()
+    }).nullable()
+        .describe('Instructs the system to use a specific backend function. Use "task" for actions like addToCart.'),
     pagination: z.object({
         pageNumber: z.number(),
         pageSize: z.number()

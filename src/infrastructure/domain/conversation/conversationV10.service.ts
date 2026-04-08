@@ -39,6 +39,9 @@ import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.serv
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { ProfileTool } from 'src/chatbot/tools/profile.tool';
 
+import { OrderService } from 'src/infrastructure/domain/order/order.service';
+import { CartService } from 'src/infrastructure/domain/cart/cart.service';
+
 @Injectable()
 export class ConversationV10Service {
   private readonly logger = new Logger(ConversationV10Service.name);
@@ -51,6 +54,8 @@ export class ConversationV10Service {
     @InjectQueue(QueueName.CONVERSATION_QUEUE)
     private readonly conversationQueue: Queue,
     private readonly productService: ProductService,
+    private readonly cartService: CartService,
+    private readonly orderService: OrderService,
     private readonly analysisService: AiAnalysisService,
     private readonly profileTool: ProfileTool
   ) {}
@@ -251,6 +256,7 @@ export class ConversationV10Service {
       productNames: null,
       sorting: null,
       budget: null,
+      functionCall: null,
       pagination: { pageNumber: 1, pageSize: 5 },
       originalRequestVietnamese: messageText,
       normalizationMetadata: null,
@@ -266,6 +272,7 @@ export class ConversationV10Service {
 
     return {
       ...analysis,
+      functionCall: analysis.functionCall || null,
       logic: normalizedLogic,
       productNames: normalizedProductNames.length > 0 ? normalizedProductNames : null,
       pagination: analysis.pagination || { pageNumber: 1, pageSize: 5 }
@@ -428,6 +435,14 @@ export class ConversationV10Service {
 
     const finalAnalysis = this.normalizeAnalysisForQuery(rawAnalysis);
 
+    this.logger.log(
+      `[processAiChatResponseV10] Analysis Result -> Intent: ${finalAnalysis.intent}, functionCall: ${
+        finalAnalysis.functionCall
+          ? `${finalAnalysis.functionCall.name} (purpose: ${finalAnalysis.functionCall.purpose})`
+          : 'None'
+      }`
+    );
+
     let finalMessages = [...convertedMessages];
 
     const personalizationToonMessages = await this.buildPersonalizationToonMessages(
@@ -452,17 +467,44 @@ export class ConversationV10Service {
 
     let hasSearchProducts = false;
 
-    if (shouldQueryProducts) {
-      this.logger.log(
-        `[processAiChatResponseV10] Querying products with structured analysis. intent=${finalAnalysis.intent}`
-      );
+    if (finalAnalysis.functionCall) {
+      const funcName = finalAnalysis.functionCall.name;
+      const purpose = finalAnalysis.functionCall.purpose;
+      const args = finalAnalysis.functionCall.arguments || {};
+      
+      this.logger.log(`[processAiChatResponseV10] functionCall: ${funcName} intercepted, purpose=${purpose}`);
 
-      const searchResponse = await this.productService.getProductsByStructuredQuery(
-        finalAnalysis
-      );
+      if (['getBestSellingProducts'].includes(funcName)) {
+        let products: any[] = [];
+        let targetItems: any[] = [];
 
-      if (searchResponse.success && searchResponse.data) {
-        const products = searchResponse.data.items;
+        if (funcName === 'getBestSellingProducts') {
+          const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
+          if (res.success && res.data) targetItems = res.data.items.map(i => i.product);
+        }
+
+        if (purpose === 'main') {
+          products = targetItems.slice(0, finalAnalysis.pagination?.pageSize || 5);
+        } else if (purpose === 'support' && shouldQueryProducts) {
+          const expandedAnalysis = { ...finalAnalysis, pagination: { pageNumber: 1, pageSize: 50 } };
+          const searchResponse = await this.productService.getProductsByStructuredQuery(expandedAnalysis);
+          const queryProducts = searchResponse.success && searchResponse.data ? searchResponse.data.items : [];
+
+          if (targetItems.length > 0 && queryProducts.length > 0) {
+            const queryProductIds = new Set(queryProducts.map((p) => p.id));
+            const intersection = targetItems.filter((p) => queryProductIds.has(p.id));
+            if (intersection.length > 0) {
+              products = intersection.slice(0, finalAnalysis.pagination?.pageSize || 5);
+              this.logger.log(`[processAiChatResponseV10] Support merge: Found matching products, kept top ${products.length} by function rank.`);
+            } else {
+              products = queryProducts.slice(0, finalAnalysis.pagination?.pageSize || 5);
+              this.logger.log(`[processAiChatResponseV10] Support merge: No intersection, fallback to raw query products.`);
+            }
+          } else {
+            products = queryProducts.slice(0, finalAnalysis.pagination?.pageSize || 5);
+          }
+        }
+
         if (products.length > 0) {
           const minimalProducts = products.map((product) => ({
             id: product.id,
@@ -470,25 +512,77 @@ export class ConversationV10Service {
             brand: product.brandName,
             category: product.categoryName,
             image: product.primaryImage,
-            attributes: (product.attributes || []).map(
-              (attr) => `${attr.attribute}: ${attr.value}`
-            ),
+            attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
             scentNotes: product.scentNotes,
             olfactoryFamilies: product.olfactoryFamilies,
-            variants: (product.variants || []).map((variant) => ({
-              id: variant.id,
-              volume: variant.volumeMl,
-              price: variant.basePrice
-            })),
-            source: 'SEARCH_RESULTS'
+            variants: (product.variants || []).map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
+            source: 'FUNCTION_RESULTS'
           }));
-
-          const encodedResults = encodeToolOutput(minimalProducts).encoded;
-          finalMessages.push(
-            this.createSystemMessage(`SEARCH_RESULTS: ${encodedResults}`)
-          );
+          finalMessages.push(this.createSystemMessage(`FUNCTION_RESULTS: ${encodeToolOutput(minimalProducts).encoded}`));
           hasSearchProducts = true;
         }
+      } 
+      else if (['addToCart', 'getCart', 'clearCart'].includes(funcName)) {
+        if (!isGuestUser) {
+          let res: any;
+          if (funcName === 'addToCart') {
+            const items: any[] = Array.isArray(args.items) ? args.items : [];
+            const results: any[] = [];
+            for (const item of items) {
+               if (item.variantId) {
+                  const addRes = await this.cartService.addToCart(userId, { variantId: item.variantId, quantity: item.quantity || 1 });
+                  results.push({ variantId: item.variantId, success: addRes.success, error: addRes.error });
+               }
+            }
+            res = results;
+          } else if (funcName === 'getCart') {
+            const cartRes = await this.cartService.getCart(userId);
+            res = cartRes.success ? cartRes.data : cartRes.error;
+          } else if (funcName === 'clearCart') {
+            const clearRes = await this.cartService.clearCart(userId);
+            res = clearRes.success ? 'Cart Cleared' : clearRes.error;
+          }
+          finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`));
+        } else {
+          finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: User must be logged in to use ${funcName}`));
+        }
+      } 
+      else if (funcName === 'getOrdersByUserId') {
+        if (!isGuestUser) {
+          const res = await this.orderService.getOrdersByUserId(userId, { PageNumber: 1, PageSize: 5, SortOrder: 'desc', IsDescending: true });
+          const resAny = res as any;
+          const itemsData: any[] = resAny.data ? resAny.data.items : (resAny.items ? resAny.items : []);
+          const orderItems = itemsData.map((i: any) => ({ id: i.id, code: i.code, status: i.status, total: i.totalAmount }));
+          finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: getOrdersByUserId executed: ${JSON.stringify(orderItems)}`));
+        } else {
+          finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: User must be logged in to view orders`));
+        }
+      } 
+      else if (funcName === 'getUserLogSummaryByUserId') {
+        finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: getUserLogSummaryByUserId not fully implemented directly in wrapper, please rely on Profile Tool`));
+      } 
+      else if (funcName === 'getStaticProductPolicy') {
+        finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: Information is available in policies or general instructions.`));
+      }
+    } 
+    else if (shouldQueryProducts) {
+      this.logger.log(`[processAiChatResponseV10] Querying products with structured analysis. intent=${finalAnalysis.intent}`);
+      const searchResponse = await this.productService.getProductsByStructuredQuery(finalAnalysis);
+      if (searchResponse.success && searchResponse.data && searchResponse.data.items.length > 0) {
+        const minimalProducts = searchResponse.data.items.map((product) => ({
+            id: product.id,
+            name: product.name,
+            brand: product.brandName,
+            category: product.categoryName,
+            image: product.primaryImage,
+            attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
+            scentNotes: product.scentNotes,
+            olfactoryFamilies: product.olfactoryFamilies,
+            variants: (product.variants || []).map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
+            source: 'SEARCH_RESULTS'
+        }));
+        finalMessages.push(this.createSystemMessage(`SEARCH_RESULTS: ${encodeToolOutput(minimalProducts).encoded}`));
+        hasSearchProducts = true;
       }
     }
 

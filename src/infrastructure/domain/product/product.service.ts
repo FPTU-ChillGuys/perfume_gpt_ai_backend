@@ -20,7 +20,6 @@ import { Prisma } from 'generated/prisma/client';
 import ApiUrl from 'src/infrastructure/domain/common/api/api_url';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
-import { SearchService } from 'src/infrastructure/domain/search/search.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProductCardOutputItem } from 'src/chatbot/output/product.output';
 import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
@@ -186,7 +185,6 @@ export class ProductService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly searchService: SearchService,
     private readonly nlpEngineService: NlpEngineService,
     private readonly dictionaryBuilderService: DictionaryBuilderService,
   ) { }
@@ -658,17 +656,6 @@ export class ProductService {
       success: result.success,
       data: result.payload
     };
-  }
-
-  async syncAllProductsToIndex() {
-    return await funcHandlerAsync(
-      async () => {
-        await this.searchService.syncAllProducts();
-        return { success: true, message: 'Products sync triggered successfully' };
-      },
-      'Failed to sync products to index',
-      true
-    );
   }
 
   async resolveProductViewInfo(

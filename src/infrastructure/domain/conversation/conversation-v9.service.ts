@@ -121,6 +121,7 @@ export class ConversationV9Service {
       budget: null, 
       sorting: null,
       pagination: null,
+      functionCall: null,
       originalRequestVietnamese: messageText,
       explanation: 'NLP parsed intent and keywords',
       normalizationMetadata: null

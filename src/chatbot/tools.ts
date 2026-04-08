@@ -14,18 +14,10 @@ import { CartTool } from './tools/cart.tool';
 @Injectable()
 export class Tools implements OnModuleInit {
   get getToolsForChatbot(): ToolSet {
-    if (!this.productTool || !this.orderTool || !this.logTool || !this.cartTool) return {};
-    return {
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getLeastSellingProducts: this.productTool.getLeastSellingProducts,
-      getOrdersByUserId: this.orderTool.getOrdersByUserId,
-      getStaticProductPolicy: this.productTool.getStaticProductPolicy,
-      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId,
-      addToCart: this.cartTool.addToCart,
-      getCart: this.cartTool.getCart,
-      clearCart: this.cartTool.clearCart,
-    };
+    // Không cho phép gọi trực tiếp qua AI chính.
+    // Tất cả function giờ chuyển sang được gọi gián tiếp bởi Intermediate AI (thông qua analysis functionCall).
+    // Giao quyền lại cho ConversationV10Service xử lý payload.
+    return {};
   }
 
   get getToolsForAnalysis(): ToolSet {

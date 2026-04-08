@@ -18,7 +18,6 @@ import { EjsAdapter } from '@nestjs-modules/mailer/dist/adapters/ejs.adapter';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import * as path from 'path';
-import { SearchModule } from 'src/infrastructure/domain/search/search.module';
 
 @Module({
   imports: [
@@ -132,8 +131,7 @@ import { SearchModule } from 'src/infrastructure/domain/search/search.module';
           port: config.get<number>('REDIS_PORT')
         }
       })
-    }),
-    SearchModule
+    })
   ],
   controllers: [AppController],
   providers: [

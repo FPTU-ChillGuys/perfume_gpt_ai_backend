@@ -243,7 +243,7 @@ export class ProductService {
     // Build WHERE condition for gender filter
     const where: Prisma.ProductsWhereInput = {
       IsDeleted: false,
-      Gender: { equals: genderKeyword }
+      Gender: { equals : genderKeyword }
     };
 
     this.logger.debug(`[GENDER_TEST] Testing filter for keyword: "${genderKeyword}"`);
@@ -1113,7 +1113,7 @@ export class ProductService {
 
       // Build Name-specific conditions
       const nameConditions: Prisma.ProductsWhereInput[] = (productNames || []).map((name: string) => ({
-        Name: { equals: name }
+        Name: { contains : name }
       }));
 
       // Filter out generic keywords that don't help with specific search
@@ -1138,17 +1138,17 @@ export class ProductService {
         
         for (const item of orItems) {
           flattenedOrConditions.push(
-            { Name: { equals: item } },
-            { Brands: { Name: { equals: item } } },
-            { Categories: { Name: { equals: item } } },
-            { Gender: { equals: item } },
-            { Origin: { equals: item } },
-            { ProductNoteMaps: { some: { ScentNotes: { Name: { equals: item } } } } },
-            { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { equals: item } } } } },
-            { ProductAttributes: { some: { AttributeValues: { Value: { equals: item } } } } },
-            { ProductVariants: { some: { Type: { equals: item } } } },
-            { ProductVariants: { some: { Concentrations: { Name: { equals: item } } } } },
-            { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { equals: item } } } } } } },
+            { Name: { contains : item } },
+            { Brands: { Name: { contains : item } } },
+            { Categories: { Name: { contains : item } } },
+            { Gender: { equals : item } },
+            { Origin: { contains : item } },
+            { ProductNoteMaps: { some: { ScentNotes: { Name: { contains : item } } } } },
+            { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains : item } } } } },
+            { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } },
+            { ProductVariants: { some: { Type: { contains : item } } } },
+            { ProductVariants: { some: { Concentrations: { Name: { contains : item } } } } },
+            { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } } } },
             ...(this.extractReleaseYear(item) ? [{ ReleaseYear: this.extractReleaseYear(item)! }] : []),
             ...(this.extractVolumeValues(item).length > 0 ? [{ ProductVariants: { some: { VolumeMl: { in: this.extractVolumeValues(item) } } } }] : []),
             ...(this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i) !== undefined
@@ -1179,7 +1179,7 @@ export class ProductService {
             some: {
               OR: ageTerms.map(value => ({
                 AttributeValues: {
-                  Value: { equals: value }
+                  Value: { contains : value }
                 }
               }))
             }
@@ -1190,7 +1190,7 @@ export class ProductService {
       if (genderValues.length > 0) {
         const genderCondition = {
           OR: genderValues.map(value => ({
-            Gender: { equals: value }
+            Gender: { equals : value }
           }))
         };
         this.logger.debug(`[SEARCH][GENDER] Building gender filter with ${genderValues.length} values: ${JSON.stringify(genderValues)}`);
@@ -1203,7 +1203,7 @@ export class ProductService {
       if (originValues.length > 0) {
         andConditionsForWhere.push({
           OR: originValues.map(value => ({
-            Origin: { equals: value }
+            Origin: { contains : value }
           }))
         });
       }
@@ -1230,7 +1230,7 @@ export class ProductService {
               IsDeleted: false,
               OR: concentrationValues.map(value => ({
                 Concentrations: {
-                  Name: { equals: value }
+                  Name: { contains : value }
                 }
               }))
             }
@@ -1244,7 +1244,7 @@ export class ProductService {
             some: {
               IsDeleted: false,
               OR: variantTypeValues.map(value => ({
-                Type: { equals: value }
+                Type: { contains : value }
               }))
             }
           }

@@ -29,11 +29,16 @@ export const analysisOutputSchema = z.object({
         ]),
         purpose: z.enum(['main', 'support', 'task']),
         arguments: z.object({
-          items: z.array(z.any()).optional(),
-          content: z.string().optional(),
-          variantId: z.string().optional(),
-          quantity: z.number().optional()
-        }).nullable().optional()
+                    items: z.array(
+                        z.object({
+                            variantId: z.string().nullable(),
+                            quantity: z.number().nullable()
+                        })
+                    ).nullable(),
+                    content: z.string().nullable(),
+                    variantId: z.string().nullable(),
+                    quantity: z.number().nullable()
+                }).nullable()
     }).nullable()
         .describe('Instructs the system to use a specific backend function. Use "task" for actions like addToCart.'),
     pagination: z.object({

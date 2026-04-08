@@ -470,7 +470,7 @@ export class ConversationV10Service {
     if (finalAnalysis.functionCall) {
       const funcName = finalAnalysis.functionCall.name;
       const purpose = finalAnalysis.functionCall.purpose;
-      const args = finalAnalysis.functionCall.arguments || {};
+      const args: any = finalAnalysis.functionCall.arguments || {};
       
       this.logger.log(`[processAiChatResponseV10] functionCall: ${funcName} intercepted, purpose=${purpose}`);
 

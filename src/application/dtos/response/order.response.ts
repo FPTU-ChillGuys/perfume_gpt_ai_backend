@@ -27,6 +27,12 @@ export class OrderListItemResponse {
   })
   id: string;
 
+  @ApiProperty({
+    description: 'Order code',
+    example: 'ORD-20260408-0001'
+  })
+  code: string;
+
   @ApiProperty({ description: 'Number of items in the order', example: 3 })
   itemCount: number;
 
@@ -156,6 +162,12 @@ export class OrderResponse {
     description: 'Order ID'
   })
   id: string;
+
+  @ApiProperty({
+    description: 'Order code',
+    example: 'ORD-20260408-0001'
+  })
+  code: string;
 
   @ApiProperty({
     description: 'Order details',

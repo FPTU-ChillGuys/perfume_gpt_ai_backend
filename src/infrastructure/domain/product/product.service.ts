@@ -1294,7 +1294,6 @@ export class ProductService {
 
       // ======== DEBUG: Log complete WHERE clause ========
       this.logger.debug(`[SEARCH][WHERE] Number of AND conditions: ${andConditionsForWhere.length}`);
-      this.logger.debug(`[SEARCH][WHERE] Complete WHERE clause: ${JSON.stringify(where, null, 2)}`);
 
       // Sorting logic
       let orderBy: Prisma.ProductsOrderByWithRelationInput = { CreatedAt: 'desc' };

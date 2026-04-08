@@ -37,30 +37,7 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { PagedConversationRequest } from 'src/application/dtos/request/paged-conversation.request';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
-import { OrderService } from 'src/infrastructure/domain/order/order.service';
-import { SurveyService } from 'src/infrastructure/domain/survey/survey.service';
-import { ProfileService } from 'src/infrastructure/domain/profile/profile.service';
-import { OrderResponse } from 'src/application/dtos/response/order.response';
-import { SurveyQuestionAnswerResponse } from 'src/application/dtos/response/survey-question-answer.response';
-import { ProfileResponse } from 'src/application/dtos/response/profile.response';
-
-type ProfileContextSource = 'order' | 'survey' | 'chat' | 'none';
-
-type BudgetHint = {
-  min: number | null;
-  max: number | null;
-};
-
-type ProfileContextPayload = {
-  source: ProfileContextSource;
-  summary: string;
-  augmentedKeywords: string[];
-  productNames: string[];
-  budget: BudgetHint | null;
-  dynamicAge: number | null;
-  shouldUseBestSellerFallback: boolean;
-  shouldAskProfileUpdate: boolean;
-};
+import { ProfileTool } from 'src/chatbot/tools/profile.tool';
 
 @Injectable()
 export class ConversationV10Service {
@@ -75,9 +52,7 @@ export class ConversationV10Service {
     private readonly conversationQueue: Queue,
     private readonly productService: ProductService,
     private readonly analysisService: AiAnalysisService,
-    private readonly orderService: OrderService,
-    private readonly surveyService: SurveyService,
-    private readonly profileService: ProfileService
+    private readonly profileTool: ProfileTool
   ) {}
 
   async addConversation(
@@ -283,342 +258,31 @@ export class ConversationV10Service {
     };
   }
 
-  private calculateDynamicAge(dateOfBirth?: string | null): number | null {
-    if (!dateOfBirth) {
-      return null;
-    }
-
-    const dob = new Date(dateOfBirth);
-    if (Number.isNaN(dob.getTime())) {
-      return null;
-    }
-
-    const now = new Date();
-    let age = now.getFullYear() - dob.getFullYear();
-    const monthDiff = now.getMonth() - dob.getMonth();
-    const dayDiff = now.getDate() - dob.getDate();
-
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-      age -= 1;
-    }
-
-    return age >= 0 ? age : null;
-  }
-
-  private getSeasonByLocalTime(): string {
-    const month = new Date().getMonth() + 1;
-    if (month >= 4 && month <= 9) {
-      return 'spring-summer';
-    }
-    return 'autumn-winter';
-  }
-
-  private splitTerms(input?: string | null): string[] {
-    if (!input) {
-      return [];
-    }
-
-    return input
-      .split(/[;,/|\n]/g)
-      .map((item) => item.trim())
-      .filter((item) => item.length >= 2 && item.length <= 50);
-  }
-
-  private uniqueKeywords(items: string[]): string[] {
-    return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean))).slice(0, 12);
-  }
-
-  private buildOrderSummary(orders: OrderResponse[]): {
-    topProducts: string[];
-    repurchaseHints: string[];
-    lines: string[];
-  } {
-    const productCounter = new Map<string, number>();
-    const variantPurchaseDates = new Map<string, { variantName: string; dates: Date[] }>();
-
-    for (const order of orders) {
-      const orderDate = new Date(order.createdAt);
-      for (const detail of order.orderDetails || []) {
-        const variantName = detail.variantName || 'Unknown Variant';
-        productCounter.set(variantName, (productCounter.get(variantName) || 0) + detail.quantity);
-
-        if (!variantPurchaseDates.has(detail.variantId)) {
-          variantPurchaseDates.set(detail.variantId, {
-            variantName,
-            dates: []
-          });
-        }
-        variantPurchaseDates.get(detail.variantId)!.dates.push(orderDate);
-      }
-    }
-
-    const topProducts = Array.from(productCounter.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([name]) => name);
-
-    const repurchaseHints: string[] = [];
-    for (const item of variantPurchaseDates.values()) {
-      const sortedDates = item.dates
-        .filter((date) => !Number.isNaN(date.getTime()))
-        .sort((a, b) => a.getTime() - b.getTime());
-
-      if (sortedDates.length < 2) {
-        continue;
-      }
-
-      let sumIntervals = 0;
-      for (let i = 1; i < sortedDates.length; i += 1) {
-        const diffMs = sortedDates[i].getTime() - sortedDates[i - 1].getTime();
-        sumIntervals += Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-      }
-
-      const avgDays = Math.round(sumIntervals / (sortedDates.length - 1));
-      repurchaseHints.push(`${item.variantName}: cycle~${avgDays} days`);
-      if (repurchaseHints.length >= 6) {
-        break;
-      }
-    }
-
-    const lines = [
-      `ordersInHistory=${orders.length}`,
-      `topPurchasedProducts=${topProducts.join(' | ') || 'N/A'}`,
-      `repurchaseHints=${repurchaseHints.join(' | ') || 'N/A'}`
-    ];
-
-    return { topProducts, repurchaseHints, lines };
-  }
-
-  private deriveBudgetHint(
-    orders: OrderResponse[],
-    profile?: ProfileResponse | null
-  ): BudgetHint | null {
-    const profileMin = profile?.minBudget != null ? Number(profile.minBudget) : null;
-    const profileMax = profile?.maxBudget != null ? Number(profile.maxBudget) : null;
-
-    if (profileMin != null || profileMax != null) {
-      return {
-        min: profileMin,
-        max: profileMax
-      };
-    }
-
-    if (!orders.length) {
-      return null;
-    }
-
-    const now = Date.now();
-    const threeMonthsAgo = now - 90 * 24 * 60 * 60 * 1000;
-    const recentOrders = orders.filter((order) => {
-      const time = new Date(order.createdAt).getTime();
-      return Number.isFinite(time) && time >= threeMonthsAgo;
-    });
-
-    const source = recentOrders.length > 0 ? recentOrders : orders;
-    const amounts = source.map((order) => Number(order.totalAmount)).filter((amount) => Number.isFinite(amount));
-
-    if (!amounts.length) {
-      return null;
-    }
-
-    const avg = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
-
-    return {
-      min: Math.round(avg * 0.7),
-      max: Math.round(avg * 1.3)
-    };
-  }
-
-  private buildSurveySummary(survey?: SurveyQuestionAnswerResponse | null): {
-    lines: string[];
-    keywords: string[];
-  } {
-    if (!survey || !Array.isArray(survey.details) || survey.details.length === 0) {
-      return {
-        lines: ['surveyDetails=N/A'],
-        keywords: []
-      };
-    }
-
-    const lines: string[] = [];
-    const keywords: string[] = [];
-
-    for (const detail of survey.details) {
-      const question = detail.question || 'Unknown question';
-      const answer = detail.answer || 'Unknown answer';
-      lines.push(`${question}: ${answer}`);
-      keywords.push(...this.splitTerms(answer));
-    }
-
-    return {
-      lines,
-      keywords: this.uniqueKeywords(keywords)
-    };
-  }
-
-  private extractProfileKeywords(profile?: ProfileResponse | null): string[] {
-    if (!profile) {
-      return [];
-    }
-
-    return this.uniqueKeywords([
-      ...this.splitTerms(profile.favoriteNotes),
-      ...this.splitTerms(profile.scentPreference),
-      ...this.splitTerms(profile.preferredStyle)
-    ]);
-  }
-
-  private async buildProfileContext(
-    userId: string,
-    isGuestUser: boolean,
-    messageText: string,
-    previousContext: string
-  ): Promise<ProfileContextPayload> {
-    const season = this.getSeasonByLocalTime();
-
-    if (isGuestUser) {
-      return {
-        source: 'chat',
-        summary: [
-          'profileSource=chat',
-          `seasonHint=${season}`,
-          `chatMessage=${messageText}`,
-          'reason=guest-user-no-profile'
-        ].join('\n'),
-        augmentedKeywords: [],
-        productNames: [],
-        budget: null,
-        dynamicAge: null,
-        shouldUseBestSellerFallback: true,
-        shouldAskProfileUpdate: true
-      };
-    }
-
-    const [ordersResult, surveyResult, profileResult] = await Promise.all([
-      this.orderService.getOrderDetailsWithOrdersByUserId(userId).catch(() => ({ success: false } as any)),
-      this.surveyService.getLatestSurveyQuesAnwsByUserId(userId).catch(() => ({ success: false } as any)),
-      this.profileService.getOwnProfile(userId).catch(() => ({ success: false } as any))
-    ]);
-
-    const orders: OrderResponse[] =
-      ordersResult?.success && Array.isArray(ordersResult.data)
-        ? ordersResult.data.filter(
-            (order) => !['Canceled', 'Returned'].includes(order.orderStatus)
-          )
-        : [];
-
-    const survey = surveyResult?.success ? surveyResult.data : null;
-    const profile = profileResult?.success ? profileResult.payload : null;
-
-    const dynamicAge = this.calculateDynamicAge(profile?.dateOfBirth);
-    const budget = this.deriveBudgetHint(orders, profile);
-
-    const orderSummary = this.buildOrderSummary(orders);
-    const surveySummary = this.buildSurveySummary(survey);
-    const profileKeywords = this.extractProfileKeywords(profile);
-
-    const chatFallbackSummary = previousContext
-      ? `chatHistoryAvailable=true\nchatContextPreview=${previousContext.substring(0, 250)}`
-      : 'chatHistoryAvailable=false';
-
-    if (orders.length > 0) {
-      return {
-        source: 'order',
-        summary: [
-          'profileSource=order',
-          `seasonHint=${season}`,
-          `dynamicAge=${dynamicAge ?? 'unknown'}`,
-          `budgetHint=${budget ? `${budget.min ?? 'null'}-${budget.max ?? 'null'}` : 'N/A'}`,
-          ...orderSummary.lines,
-          `surveyKeywords=${surveySummary.keywords.join(' | ') || 'N/A'}`
-        ].join('\n'),
-        augmentedKeywords: this.uniqueKeywords([
-          ...surveySummary.keywords,
-          ...profileKeywords
-        ]),
-        productNames: orderSummary.topProducts,
-        budget,
-        dynamicAge,
-        shouldUseBestSellerFallback: false,
-        shouldAskProfileUpdate: false
-      };
-    }
-
-    if (surveySummary.keywords.length > 0) {
-      return {
-        source: 'survey',
-        summary: [
-          'profileSource=survey',
-          `seasonHint=${season}`,
-          `dynamicAge=${dynamicAge ?? 'unknown'}`,
-          `budgetHint=${budget ? `${budget.min ?? 'null'}-${budget.max ?? 'null'}` : 'N/A'}`,
-          ...surveySummary.lines
-        ].join('\n'),
-        augmentedKeywords: this.uniqueKeywords([
-          ...surveySummary.keywords,
-          ...profileKeywords
-        ]),
-        productNames: [],
-        budget,
-        dynamicAge,
-        shouldUseBestSellerFallback: false,
-        shouldAskProfileUpdate: false
-      };
-    }
-
-    return {
-      source: 'chat',
-      summary: [
-        'profileSource=chat',
-        `seasonHint=${season}`,
-        `dynamicAge=${dynamicAge ?? 'unknown'}`,
-        `budgetHint=${budget ? `${budget.min ?? 'null'}-${budget.max ?? 'null'}` : 'N/A'}`,
-        chatFallbackSummary,
-        'reason=no-order-and-no-survey'
-      ].join('\n'),
-      augmentedKeywords: this.uniqueKeywords(profileKeywords),
-      productNames: [],
-      budget,
-      dynamicAge,
-      shouldUseBestSellerFallback: true,
-      shouldAskProfileUpdate: true
-    };
-  }
-
-  private mergeAnalysisWithProfile(
-    analysis: AnalysisObject,
-    profileContext: ProfileContextPayload
-  ): AnalysisObject {
-    const mergedLogic: Array<string | string[]> = Array.isArray(analysis.logic)
-      ? [...analysis.logic]
+  private normalizeAnalysisForQuery(analysis: AnalysisObject): AnalysisObject {
+    const normalizedLogic = Array.isArray(analysis.logic) ? analysis.logic : [];
+    const normalizedProductNames = Array.isArray(analysis.productNames)
+      ? Array.from(new Set(analysis.productNames)).slice(0, 8)
       : [];
-
-    const keywordAugments = profileContext.augmentedKeywords.slice(0, 6);
-    if (keywordAugments.length > 0) {
-      if (mergedLogic.length === 0) {
-        mergedLogic.push(keywordAugments);
-      } else {
-        const first = mergedLogic[0];
-        if (Array.isArray(first)) {
-          mergedLogic[0] = Array.from(new Set([...first, ...keywordAugments]));
-        } else {
-          mergedLogic[0] = Array.from(new Set([first, ...keywordAugments]));
-        }
-      }
-    }
-
-    const mergedProductNames = Array.from(
-      new Set([...(analysis.productNames || []), ...profileContext.productNames])
-    ).slice(0, 8);
 
     return {
       ...analysis,
-      logic: mergedLogic,
-      productNames: mergedProductNames.length > 0 ? mergedProductNames : null,
-      budget: analysis.budget || profileContext.budget,
-      pagination: analysis.pagination || { pageNumber: 1, pageSize: 5 },
-      explanation: `${analysis.explanation || ''} | profileSource=${profileContext.source}`.trim()
+      logic: normalizedLogic,
+      productNames: normalizedProductNames.length > 0 ? normalizedProductNames : null,
+      pagination: analysis.pagination || { pageNumber: 1, pageSize: 5 }
     };
+  }
+
+  private hasAnalysisFlag(analysis: AnalysisObject, flag: string): boolean {
+    const explanation = (analysis.explanation || '').toUpperCase();
+    return explanation.includes(flag.toUpperCase());
+  }
+
+  private isObjectiveOrGiftFlow(analysis: AnalysisObject): boolean {
+    return (
+      this.hasAnalysisFlag(analysis, 'PURE_TREND_QUERY') ||
+      this.hasAnalysisFlag(analysis, 'OBJECTIVE_CATALOG_QUERY') ||
+      this.hasAnalysisFlag(analysis, 'GIFT_INTENT')
+    );
   }
 
   private async buildBestSellerFallbackMessage(limit: number = 5): Promise<UIMessage | null> {
@@ -660,6 +324,73 @@ export class ConversationV10Service {
     return this.createSystemMessage(`BEST_SELLER_FALLBACK_RESULTS: ${encoded}`);
   }
 
+  private async buildPersonalizationToonMessages(
+    userId: string,
+    isGuestUser: boolean,
+    analysis: AnalysisObject
+  ): Promise<UIMessage[]> {
+    if (isGuestUser || this.isObjectiveOrGiftFlow(analysis)) {
+      return [];
+    }
+
+    if (!['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)) {
+      return [];
+    }
+
+    try {
+      const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
+      if (!payload || payload.source === 'none') {
+        return [];
+      }
+
+      const sourcePriority = Array.isArray(payload.sourcePriority)
+        ? payload.sourcePriority.join(' > ')
+        : 'INPUT > ORDER > SURVEY > PROFILE';
+
+      const messages: UIMessage[] = [
+        this.createSystemMessage(
+          `PERSONALIZATION_SOURCE_PRIORITY: ${sourcePriority}. Khi dữ liệu xung đột, phải ưu tiên từ trái sang phải.`
+        ),
+        this.createSystemMessage(
+          `PERSONALIZATION_CONTEXT_SUMMARY: ${JSON.stringify(payload.contextSummaries || {})}`
+        ),
+        this.createSystemMessage(
+          `PERSONALIZATION_SIGNALS: ${JSON.stringify({
+            source: payload.source,
+            budgetHint: payload.budgetHint,
+            topOrderProducts: payload.topOrderProducts,
+            signals: payload.signals
+          })}`
+        )
+      ];
+
+      const orderToon = payload?.toonContext?.orderDataToon?.encoded;
+      const surveyToon = payload?.toonContext?.surveyDataToon?.encoded;
+      const profileToon = payload?.toonContext?.profileDataToon?.encoded;
+
+      if (orderToon) {
+        messages.push(this.createSystemMessage(`ORDER_CONTEXT_TOON: ${orderToon}`));
+      }
+
+      if (surveyToon) {
+        messages.push(this.createSystemMessage(`SURVEY_CONTEXT_TOON: ${surveyToon}`));
+      }
+
+      if (profileToon) {
+        messages.push(this.createSystemMessage(`PROFILE_CONTEXT_TOON: ${profileToon}`));
+      }
+
+      return messages;
+    } catch (error) {
+      this.logger.warn(
+        `[processAiChatResponseV10] Failed to build personalization TOON context: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return [];
+    }
+  }
+
   private async processAiChatResponse(
     convertedMessages: UIMessage[],
     conversationMessages: any[],
@@ -689,44 +420,45 @@ export class ConversationV10Service {
     );
 
     const rawAnalysis =
-      (await this.analysisService.analyze(messageText, previousContext)) ||
+      (await this.analysisService.analyze(messageText, previousContext, {
+        userId,
+        isGuestUser
+      })) ||
       this.createFallbackAnalysis(messageText);
 
-    const profileContext = await this.buildProfileContext(
-      userId,
-      isGuestUser,
-      messageText,
-      previousContext
-    );
-
-    const mergedAnalysis = this.mergeAnalysisWithProfile(rawAnalysis, profileContext);
+    const finalAnalysis = this.normalizeAnalysisForQuery(rawAnalysis);
 
     let finalMessages = [...convertedMessages];
-    finalMessages.push(
-      this.createSystemMessage(
-        `PROFILE_RECOMMENDATION_CONTEXT:\n${profileContext.summary}`
-      )
+
+    const personalizationToonMessages = await this.buildPersonalizationToonMessages(
+      userId,
+      isGuestUser,
+      finalAnalysis
     );
+
+    if (personalizationToonMessages.length > 0) {
+      finalMessages.push(...personalizationToonMessages);
+    }
 
     finalMessages.push(
       this.createSystemMessage(
-        `NORMALIZED_QUERY_ANALYSIS: ${JSON.stringify(mergedAnalysis)}`
+        `NORMALIZED_QUERY_ANALYSIS: ${JSON.stringify(finalAnalysis)}`
       )
     );
 
     const shouldQueryProducts = ['Search', 'Consult', 'Recommend', 'Compare'].includes(
-      mergedAnalysis.intent
+      finalAnalysis.intent
     );
 
     let hasSearchProducts = false;
 
     if (shouldQueryProducts) {
       this.logger.log(
-        `[processAiChatResponseV10] Querying products with structured analysis. intent=${mergedAnalysis.intent}`
+        `[processAiChatResponseV10] Querying products with structured analysis. intent=${finalAnalysis.intent}`
       );
 
       const searchResponse = await this.productService.getProductsByStructuredQuery(
-        mergedAnalysis
+        finalAnalysis
       );
 
       if (searchResponse.success && searchResponse.data) {
@@ -760,14 +492,18 @@ export class ConversationV10Service {
       }
     }
 
-    if (profileContext.shouldUseBestSellerFallback && !hasSearchProducts) {
+    const shouldUseTrendFallback = this.hasAnalysisFlag(finalAnalysis, 'PURE_TREND_QUERY');
+    const isObjectiveFlow = this.isObjectiveOrGiftFlow(finalAnalysis);
+    const shouldUseBestSellerFallback = shouldUseTrendFallback || isGuestUser;
+
+    if (shouldUseBestSellerFallback && !hasSearchProducts) {
       const fallbackMessage = await this.buildBestSellerFallbackMessage(5);
       if (fallbackMessage) {
         finalMessages.push(fallbackMessage);
       }
     }
 
-    if (profileContext.shouldAskProfileUpdate) {
+    if (!isObjectiveFlow && this.hasAnalysisFlag(finalAnalysis, 'PROFILE_ENRICHMENT_SKIPPED')) {
       finalMessages.push(
         this.createSystemMessage(
           'PROFILE_UPDATE_REQUIRED: true. Bạn phải nhắc người dùng cập nhật profile (sở thích, ngân sách, độ tuổi/survey) nhưng vẫn cần đưa gợi ý sản phẩm từ SEARCH_RESULTS hoặc BEST_SELLER_FALLBACK_RESULTS nếu có.'

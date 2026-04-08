@@ -29,11 +29,26 @@ export class Tools implements OnModuleInit {
   }
 
   get getToolsForAnalysis(): ToolSet {
-    if (!this.masterDataTool) return {};
-    return {
-      getProductNormalizationContext: this.masterDataTool.getProductNormalizationContext,
-      searchMasterData: this.masterDataTool.searchMasterData,
-    };
+    const analysisTools: ToolSet = {};
+
+    if (this.masterDataTool) {
+      analysisTools.getProductNormalizationContext =
+        this.masterDataTool.getProductNormalizationContext;
+      analysisTools.searchMasterData = this.masterDataTool.searchMasterData;
+    }
+
+    if (this.profileTool) {
+      analysisTools.getOwnProfile = this.profileTool.getOwnProfile;
+      analysisTools.getProfileRecommendationContext =
+        this.profileTool.getProfileRecommendationContext;
+    }
+
+    if (this.orderTool) {
+      analysisTools.getOrderDetailsWithOrdersByUserId =
+        this.orderTool.getOrderDetailsWithOrdersByUserId;
+    }
+
+    return analysisTools;
   }
 
   get getToolsForSurvey(): ToolSet {

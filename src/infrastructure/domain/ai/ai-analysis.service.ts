@@ -7,13 +7,22 @@ import { Tools } from 'src/chatbot/tools';
 import { analysisOutput, AnalysisObject, intentOnlyOutput, IntentOnlyObject } from 'src/chatbot/output/analysis.output';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 
+type AnalysisRuntimeContext = {
+    userId?: string;
+    isGuestUser?: boolean;
+};
+
 @Injectable()
 export class AiAnalysisService {
     private readonly logger = new Logger(AiAnalysisService.name);
 
     constructor(private readonly tools: Tools) { }
 
-    async analyze(currentMessage: string, previousMessages?: string): Promise<AnalysisObject | null> {
+    async analyze(
+        currentMessage: string,
+        previousMessages?: string,
+        context?: AnalysisRuntimeContext
+    ): Promise<AnalysisObject | null> {
         try {
             this.logger.log(`[AiAnalysis] Starting context-aware analysis...`);
             if (!currentMessage) {
@@ -23,7 +32,11 @@ export class AiAnalysisService {
 
             const input = JSON.stringify({
                 previousMessages: previousMessages || 'No previous context.',
-                currentMessage: currentMessage
+                currentMessage: currentMessage,
+                analysisContext: {
+                    userId: context?.userId ?? null,
+                    isGuestUser: context?.isGuestUser ?? false
+                }
             });
 
             const result = await textGenerationFromPromptToResultWithErrorHandler(

@@ -200,6 +200,40 @@ Bạn sẽ nhận được JSON có dạng:
 Khi gọi tool profile/order, phải dùng đúng \`analysisContext.userId\`.
 Với personalized query, ưu tiên gọi \`getProfileRecommendationContext\` trước.
 
+## PHÂN TÁCH ĐA MỤC ĐÍCH (MULTI-QUERY DECOMPOSITION - MỚI):
+Khi người dùng hỏi MỘT câu chứa NHIỀU mục đích khác nhau, BẮT BUỘC tách thành mảng \`queries\` thay vì gom tất cả vào \`logic\` đơn.
+
+### Quy tắc:
+- Mỗi phần tử trong \`queries\` có \`purpose\`: \`"search"\` | \`"function"\` | \`"profile"\`.
+- \`purpose = "function"\`: Khi cần gọi backend function (getBestSellingProducts, getNewestProducts, addToCart, v.v.). Phải có \`functionCall\`.
+- \`purpose = "profile"\`: Khi cần lấy sở thích cá nhân từ profile/order history để tìm sản phẩm. Không cần \`logic\` — hệ thống sẽ tự trích keyword profile. Dùng \`profileHint\` để ghi chú.
+- \`purpose = "search"\`: Khi cần tìm sản phẩm theo keyword thuần (mùa, thể loại, note hương, brand, v.v.). Phải có \`logic\`.
+- Mỗi query CHỈ nên phục vụ MỘT mục đích duy nhất. Không trộn.
+- Kết quả tất cả queries sẽ được hệ thống chạy độc lập, sau đó gộp (merge + deduplicate) rồi đưa vào AI chính.
+
+### Ví dụ:
+**User**: "Tìm nước hoa bán chạy nhất phù hợp gu của tôi cho mùa thu"
+→ Tách thành 3 queries:
+\`\`\`json
+{
+  "queries": [
+    { "purpose": "function", "functionCall": { "name": "getBestSellingProducts", "purpose": "main", "arguments": null }, "logic": null, "productNames": null, "sorting": null, "budget": null, "profileHint": null },
+    { "purpose": "profile", "logic": null, "productNames": null, "sorting": null, "budget": null, "functionCall": null, "profileHint": "Lấy sở thích mùi hương và lịch sử mua từ profile/order" },
+    { "purpose": "search", "logic": [["mùa thu", "autumn", "warm"]], "productNames": null, "sorting": null, "budget": null, "functionCall": null, "profileHint": null }
+  ]
+}
+\`\`\`
+
+**User**: "Tìm nước hoa Chanel cho nữ" (đơn giản, 1 mục đích)
+→ Chỉ 1 query hoặc dùng legacy fields:
+\`\`\`json
+{ "queries": [{ "purpose": "search", "logic": [["Chanel"], ["Female"]], "productNames": null, "sorting": null, "budget": null, "functionCall": null, "profileHint": null }] }
+\`\`\`
+
+### Khi KHÔNG cần tách:
+- Greeting, Chat, Unknown → \`queries\` = null, dùng legacy fields.
+- Chỉ có 1 mục đích đơn giản → có thể dùng \`queries\` 1 phần tử HOẶC dùng legacy fields.
+
 Trả về DUY NHẤT đối tượng JSON theo schema. Không giải thích thêm.`;
 
 export const INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT = `

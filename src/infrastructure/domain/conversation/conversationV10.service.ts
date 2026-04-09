@@ -12,7 +12,7 @@ import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/co
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { conversationOutput } from 'src/chatbot/output/search.output';
-import { AnalysisObject } from 'src/chatbot/output/analysis.output';
+import { AnalysisObject, QueryItemObject } from 'src/chatbot/output/analysis.output';
 import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
 import {
   addMessageToMessages,
@@ -252,6 +252,7 @@ export class ConversationV10Service {
   private createFallbackAnalysis(messageText: string): AnalysisObject {
     return {
       intent: 'Chat',
+      queries: null,
       logic: [],
       productNames: null,
       sorting: null,
@@ -398,6 +399,230 @@ export class ConversationV10Service {
     }
   }
 
+  // ====== Multi-Query Decomposition Methods ======
+
+  private mapToMinimalProduct(product: any, source: string) {
+    return {
+      id: product.id,
+      name: product.name,
+      brand: product.brandName,
+      category: product.categoryName,
+      image: product.primaryImage,
+      attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
+      scentNotes: product.scentNotes,
+      olfactoryFamilies: product.olfactoryFamilies,
+      variants: (product.variants || []).map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
+      source
+    };
+  }
+
+  /**
+   * Execute a function-type query (getBestSellingProducts, getNewestProducts, etc.)
+   * Returns an array of minimal product objects.
+   */
+  private async executeFunctionQuery(query: QueryItemObject): Promise<any[]> {
+    if (!query.functionCall) return [];
+    const funcName = query.functionCall.name;
+    this.logger.log(`[V10_MULTI_QUERY][FUNCTION] Executing ${funcName}`);
+
+    let targetItems: any[] = [];
+    if (funcName === 'getBestSellingProducts') {
+      const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
+      if (res.success && res.data) targetItems = res.data.items.map((i: any) => i.product);
+    } else if (funcName === 'getNewestProducts') {
+      const res = await this.productService.getNewestProductsWithVariants({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
+      if (res.success && res.data) targetItems = res.data.items;
+    } else if (funcName === 'getLeastSellingProducts') {
+      const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'asc', IsDescending: false });
+      if (res.success && res.data) targetItems = res.data.items.map((i: any) => i.product);
+    }
+
+    const productNames = targetItems.slice(0, 5).map(p => p.name).join(', ') + (targetItems.length > 5 ? '...' : '');
+    this.logger.log(`[V10_MULTI_QUERY][FUNCTION] ${funcName} returned ${targetItems.length} items. Top: [${productNames}]`);
+    return targetItems;
+  }
+
+  /**
+   * Execute a profile-type query: fetch user profile/order keywords, then search products.
+   */
+  private async executeProfileQuery(userId: string, query: QueryItemObject): Promise<any[]> {
+    this.logger.log(`[V10_MULTI_QUERY][PROFILE] Fetching profile context for userId=${userId}`);
+    try {
+      const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
+      if (!payload || payload.source === 'none') {
+        this.logger.warn(`[V10_MULTI_QUERY][PROFILE] No profile data for userId=${userId}`);
+        return [];
+      }
+
+      // Extract keywords from profile
+      const keywords: string[] = [
+        ...(payload.profileKeywords || []),
+        ...(payload.topOrderProducts || []).slice(0, 3)
+      ].filter(Boolean);
+
+      if (keywords.length === 0) {
+        this.logger.warn(`[V10_MULTI_QUERY][PROFILE] No keywords extracted from profile`);
+        return [];
+      }
+
+      this.logger.log(`[V10_MULTI_QUERY][PROFILE] Profile keywords: ${keywords.slice(0, 5).join(', ')}`);
+
+      // Build a mini-analysis with profile keywords and run search
+      const miniAnalysis: any = {
+        logic: [keywords], // OR between all profile keywords
+        productNames: null,
+        sorting: query.sorting || null,
+        budget: query.budget || (payload.budgetHint ? { min: payload.budgetHint.min, max: payload.budgetHint.max } : null),
+        pagination: { pageNumber: 1, pageSize: 20 }
+      };
+
+      const searchResponse = await this.productService.getProductsByStructuredQuery(miniAnalysis);
+      if (searchResponse.success && searchResponse.data) {
+        const productNames = searchResponse.data.items.slice(0, 5).map(p => p.name).join(', ') + (searchResponse.data.items.length > 5 ? '...' : '');
+        this.logger.log(`[V10_MULTI_QUERY][PROFILE] Found ${searchResponse.data.items.length} products from profile query. Top: [${productNames}]`);
+        return searchResponse.data.items;
+      }
+      return [];
+    } catch (err) {
+      this.logger.warn(`[V10_MULTI_QUERY][PROFILE] Error: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    }
+  }
+
+  /**
+   * Execute a search-type query: build mini-analysis from query's logic/budget/sorting.
+   */
+  private async executeSearchQuery(query: QueryItemObject, rootAnalysis: AnalysisObject): Promise<any[]> {
+    const miniAnalysis: any = {
+      logic: query.logic || [],
+      productNames: query.productNames || null,
+      sorting: query.sorting || rootAnalysis.sorting || null,
+      budget: query.budget || rootAnalysis.budget || null,
+      pagination: { pageNumber: 1, pageSize: 20 }
+    };
+
+    this.logger.log(`[V10_MULTI_QUERY][SEARCH] logic=${JSON.stringify(query.logic?.slice(0, 3))}`);
+    const searchResponse = await this.productService.getProductsByStructuredQuery(miniAnalysis);
+    if (searchResponse.success && searchResponse.data) {
+      const productNames = searchResponse.data.items.slice(0, 5).map(p => p.name).join(', ') + (searchResponse.data.items.length > 5 ? '...' : '');
+      this.logger.log(`[V10_MULTI_QUERY][SEARCH] Found ${searchResponse.data.items.length} products. Top: [${productNames}]`);
+      return searchResponse.data.items;
+    }
+    return [];
+  }
+
+  /**
+   * Orchestrate execution of all decomposed queries, merge and deduplicate results.
+   */
+  private async executeMultiQueries(
+    queries: QueryItemObject[],
+    rootAnalysis: AnalysisObject,
+    userId: string,
+    isGuestUser: boolean,
+    pageSize: number
+  ): Promise<{ mergedProducts: any[]; taskResults: UIMessage[] }> {
+    const allProducts: any[] = [];
+    const functionProducts: any[] = [];
+    const taskResults: UIMessage[] = [];
+    const seenProductIds = new Set<string>();
+
+    this.logger.log(`[V10_MULTI_QUERY] Executing ${queries.length} decomposed queries`);
+
+    for (const query of queries) {
+      switch (query.purpose) {
+        case 'function': {
+          if (!query.functionCall) break;
+          const funcName = query.functionCall.name;
+          
+          // Handle task-type functions (cart, orders) — these don't produce products
+          if (['addToCart', 'getCart', 'clearCart'].includes(funcName)) {
+            const args: any = query.functionCall.arguments || {};
+            if (!isGuestUser) {
+              let res: any;
+              if (funcName === 'addToCart') {
+                const items: any[] = Array.isArray(args.items) ? args.items : [];
+                const results: any[] = [];
+                for (const item of items) {
+                  if (item.variantId) {
+                    const addRes = await this.cartService.addToCart(userId, { variantId: item.variantId, quantity: item.quantity || 1 });
+                    results.push({ variantId: item.variantId, success: addRes.success, error: addRes.error });
+                  }
+                }
+                res = results;
+              } else if (funcName === 'getCart') {
+                const cartRes = await this.cartService.getCart(userId);
+                res = cartRes.success ? cartRes.data : cartRes.error;
+              } else if (funcName === 'clearCart') {
+                const clearRes = await this.cartService.clearCart(userId);
+                res = clearRes.success ? 'Cart Cleared' : clearRes.error;
+              }
+              taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`));
+            } else {
+              taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: User must be logged in to use ${funcName}`));
+            }
+          } else if (funcName === 'getOrdersByUserId') {
+            if (!isGuestUser) {
+              const res = await this.orderService.getOrdersByUserId(userId, { PageNumber: 1, PageSize: 5, SortOrder: 'desc', IsDescending: true });
+              const resAny = res as any;
+              const itemsData: any[] = resAny.data ? resAny.data.items : (resAny.items ? resAny.items : []);
+              const orderItems = itemsData.map((i: any) => ({ id: i.id, code: i.code, status: i.status, total: i.totalAmount }));
+              taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: getOrdersByUserId executed: ${JSON.stringify(orderItems)}`));
+            } else {
+              taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: User must be logged in to view orders`));
+            }
+          } else {
+            // Product-returning functions (getBestSellingProducts, etc.)
+            const items = await this.executeFunctionQuery(query);
+            for (const p of items) {
+              const pid = p.id;
+              if (pid && !seenProductIds.has(pid)) {
+                seenProductIds.add(pid);
+                functionProducts.push(p);
+              }
+            }
+          }
+          break;
+        }
+
+        case 'profile': {
+          if (isGuestUser) break;
+          const items = await this.executeProfileQuery(userId, query);
+          for (const p of items) {
+            const pid = p.id;
+            if (pid && !seenProductIds.has(pid)) {
+              seenProductIds.add(pid);
+              allProducts.push(this.mapToMinimalProduct(p, 'PROFILE_QUERY'));
+            }
+          }
+          break;
+        }
+
+        case 'search': {
+          const items = await this.executeSearchQuery(query, rootAnalysis);
+          for (const p of items) {
+            const pid = p.id;
+            if (pid && !seenProductIds.has(pid)) {
+              seenProductIds.add(pid);
+              allProducts.push(this.mapToMinimalProduct(p, 'SEARCH_QUERY'));
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    // Merge strategy: function products come first, then search/profile products
+    const functionMinimal = functionProducts.map(p => this.mapToMinimalProduct(p, 'FUNCTION_RESULTS'));
+    const mergedProducts = [...functionMinimal, ...allProducts].slice(0, pageSize);
+
+    const mergedNames = mergedProducts.slice(0, 5).map(p => p.name).join(', ') + (mergedProducts.length > 5 ? '...' : '');
+    this.logger.log(
+      `[V10_MULTI_QUERY] Merge complete: function=${functionMinimal.length} search/profile=${allProducts.length} final=${mergedProducts.length}. Result: [${mergedNames}]`
+    );
+
+    return { mergedProducts, taskResults };
+  }
+
   private async processAiChatResponse(
     convertedMessages: UIMessage[],
     conversationMessages: any[],
@@ -436,7 +661,9 @@ export class ConversationV10Service {
     const finalAnalysis = this.normalizeAnalysisForQuery(rawAnalysis);
 
     this.logger.log(
-      `[processAiChatResponseV10] Analysis Result -> Intent: ${finalAnalysis.intent}, functionCall: ${
+      `[processAiChatResponseV10] Analysis Result -> Intent: ${finalAnalysis.intent}, queries: ${
+        finalAnalysis.queries?.length ?? 0
+      }, legacyFunctionCall: ${
         finalAnalysis.functionCall
           ? `${finalAnalysis.functionCall.name} (purpose: ${finalAnalysis.functionCall.purpose})`
           : 'None'
@@ -466,13 +693,42 @@ export class ConversationV10Service {
     );
 
     let hasSearchProducts = false;
+    const pageSize = finalAnalysis.pagination?.pageSize || 5;
 
-    if (finalAnalysis.functionCall) {
+    // ====== NEW: Multi-Query Decomposition Path ======
+    const hasDecomposedQueries = Array.isArray(finalAnalysis.queries) && finalAnalysis.queries.length > 0;
+
+    if (hasDecomposedQueries) {
+      this.logger.log(`[processAiChatResponseV10] Using MULTI-QUERY path with ${finalAnalysis.queries!.length} queries`);
+
+      const { mergedProducts, taskResults } = await this.executeMultiQueries(
+        finalAnalysis.queries!,
+        finalAnalysis,
+        userId,
+        isGuestUser,
+        pageSize
+      );
+
+      // Inject task results (cart/order actions)
+      for (const taskMsg of taskResults) {
+        finalMessages.push(taskMsg);
+      }
+
+      // Inject merged product results
+      if (mergedProducts.length > 0) {
+        finalMessages.push(
+          this.createSystemMessage(`SEARCH_RESULTS: ${encodeToolOutput(mergedProducts).encoded}`)
+        );
+        hasSearchProducts = true;
+      }
+    }
+    // ====== LEGACY: Single-query path (backward-compatible) ======
+    else if (finalAnalysis.functionCall) {
       const funcName = finalAnalysis.functionCall.name;
       const purpose = finalAnalysis.functionCall.purpose;
       const args: any = finalAnalysis.functionCall.arguments || {};
       
-      this.logger.log(`[processAiChatResponseV10] functionCall: ${funcName} intercepted, purpose=${purpose}`);
+      this.logger.log(`[processAiChatResponseV10] LEGACY functionCall: ${funcName} intercepted, purpose=${purpose}`);
 
       if (['getBestSellingProducts'].includes(funcName)) {
         let products: any[] = [];

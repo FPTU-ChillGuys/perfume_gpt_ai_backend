@@ -8,6 +8,7 @@ import { ProfileService } from 'src/infrastructure/domain/profile/profile.servic
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 type RecommendationContextSource = 'order' | 'profile' | 'none';
 
@@ -30,8 +31,17 @@ export class ProfileTool {
 
   private profileService?: ProfileService;
   private orderService?: OrderService;
+  private prismaService?: PrismaService;
 
   constructor(private readonly moduleRef: ModuleRef) {}
+
+  private getPrismaService(): PrismaService {
+    if (!this.prismaService) {
+      this.prismaService = this.moduleRef.get(PrismaService, { strict: false });
+    }
+    if (!this.prismaService) throw new Error('PrismaService is not available');
+    return this.prismaService;
+  }
 
   private getProfileService(): ProfileService {
     if (!this.profileService) {
@@ -175,7 +185,8 @@ export class ProfileTool {
   }
 
   private buildOrderContextPayload(
-    orders: OrderResponse[]
+    orders: OrderResponse[],
+    attributeAggregates?: Record<string, any>
   ): Record<string, any> {
     const normalizedOrders = [...orders]
       .sort((a, b) => {
@@ -208,8 +219,88 @@ export class ProfileTool {
       orderCount: normalizedOrders.length,
       totalSpent,
       latestOrderAt: normalizedOrders[0]?.createdAt || null,
-      orders: normalizedOrders
+      orders: normalizedOrders,
+      ...(attributeAggregates ? { attributeAggregates } : {})
     };
+  }
+
+  private async extractOrderAttributes(orders: OrderResponse[]): Promise<Record<string, any>> {
+    const variantQuantities = new Map<string, number>();
+
+    for (const order of orders) {
+      for (const item of order.orderDetails || []) {
+        if (!item.variantId) continue;
+        variantQuantities.set(item.variantId, (variantQuantities.get(item.variantId) || 0) + item.quantity);
+      }
+    }
+
+    if (variantQuantities.size === 0) return {};
+
+    try {
+      const prisma = this.getPrismaService();
+      const variantIds = Array.from(variantQuantities.keys());
+      const variants = await prisma.productVariants.findMany({
+        where: { Id: { in: variantIds } },
+        include: {
+          Concentrations: true,
+          Products: {
+            include: {
+              Brands: true,
+              ProductNoteMaps: { include: { ScentNotes: true } },
+              ProductFamilyMaps: { include: { OlfactoryFamilies: true } },
+              ProductAttributes: { include: { AttributeValues: true } }
+            }
+          }
+        }
+      });
+
+      const counters = {
+        brands: new Map<string, number>(),
+        genders: new Map<string, number>(),
+        origins: new Map<string, number>(),
+        concentrations: new Map<string, number>(),
+        scentNotes: new Map<string, number>(),
+        olfactoryFamilies: new Map<string, number>(),
+        attributes: new Map<string, number>()
+      };
+
+      const addCount = (map: Map<string, number>, key: string | null | undefined, weight: number) => {
+        if (!key) return;
+        const normalized = key.trim();
+        if (normalized) map.set(normalized, (map.get(normalized) || 0) + weight);
+      };
+
+      for (const v of variants) {
+        const qty = variantQuantities.get(v.Id) || 1;
+        const p = v.Products;
+        if (!p) continue;
+
+        addCount(counters.brands, p.Brands?.Name, qty);
+        addCount(counters.genders, p.Gender, qty);
+        addCount(counters.origins, p.Origin, qty);
+        addCount(counters.concentrations, v.Concentrations?.Name, qty);
+
+        for (const nm of p.ProductNoteMaps || []) addCount(counters.scentNotes, nm.ScentNotes?.Name, qty);
+        for (const fm of p.ProductFamilyMaps || []) addCount(counters.olfactoryFamilies, fm.OlfactoryFamilies?.Name, qty);
+        for (const attr of p.ProductAttributes || []) addCount(counters.attributes, attr.AttributeValues?.Value, qty);
+      }
+
+      const getTop = (map: Map<string, number>, limit: number) =>
+        Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, count }));
+
+      return {
+        brands: getTop(counters.brands, 5),
+        genders: getTop(counters.genders, 3),
+        origins: getTop(counters.origins, 3),
+        concentrations: getTop(counters.concentrations, 3),
+        scentNotes: getTop(counters.scentNotes, 6),
+        olfactoryFamilies: getTop(counters.olfactoryFamilies, 6),
+        attributes: getTop(counters.attributes, 6)
+      };
+    } catch (e) {
+      this.logger.warn(`Failed to extract order attributes: ${e instanceof Error ? e.message : String(e)}`);
+      return {};
+    }
   }
 
   private buildProfileContextPayload(
@@ -279,7 +370,9 @@ export class ProfileTool {
     const budgetHint = this.deriveBudgetHint(orders, profile);
     const dynamicAge = this.calculateDynamicAge(profile?.dateOfBirth);
 
-    const orderContext = this.buildOrderContextPayload(orders);
+    const orderAggregates = await this.extractOrderAttributes(orders);
+
+    const orderContext = this.buildOrderContextPayload(orders, orderAggregates);
     const profileContext = this.buildProfileContextPayload(profile);
 
     const orderDataToon = this.encodeToonContext('order', orderContext);
@@ -309,6 +402,15 @@ export class ProfileTool {
         source = 'profile';
         selectedComponentsData.profileDataToon = profileDataToon;
       }
+    }
+
+    // Enrich profileKeywords with order-derived insights if available
+    if (orders.length > 0 && Object.keys(orderAggregates).length > 0) {
+      const orderInsights = [
+        ...(orderAggregates.scentNotes || []).map((i: any) => i.name),
+        ...(orderAggregates.olfactoryFamilies || []).map((i: any) => i.name)
+      ];
+      profileKeywords.push(...orderInsights);
     }
 
     const augmentedKeywords =

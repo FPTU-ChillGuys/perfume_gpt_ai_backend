@@ -25,7 +25,7 @@ import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
-import { ProfileService } from 'src/infrastructure/domain/profile/profile.service';
+import { ProfileTool } from 'src/chatbot/tools/profile.tool';
 
 
 export type DailyRecommendationTrigger = 'cron' | 'manual';
@@ -63,7 +63,7 @@ export class RecommendationService {
     private readonly productService: ProductService,
     private readonly prisma: PrismaService,
     private readonly aiAcceptanceService: AIAcceptanceService,
-    private readonly profileService: ProfileService
+    private readonly profileTool: ProfileTool
   ) { }
 
   private uniqueKeywords(items: string[]): string[] {
@@ -159,7 +159,13 @@ export class RecommendationService {
     );
 
     // Step 2: Build messages array with RECOMMENDATION_CONTEXT (TOON encoded)
-    const encoded = encodeToolOutput(minimalProducts).encoded;
+    const encodedContext = encodeToolOutput(minimalProducts);
+    const encoded = encodedContext.encoded;
+    
+    this.logger.debug(
+      `[RecommendationService] [getProfileRecommendationContext] recommendation TOON: ${encoded.length}/${encodedContext.originalSize} (${encodedContext.compressionRatio}%)`
+    );
+
     const contextMessage: UIMessage = {
       id: uuid(),
       role: 'system' as const,
@@ -180,7 +186,7 @@ export class RecommendationService {
     );
 
     const rawMessage = aiResponse.success ? aiResponse.data ?? '' : '';
-    let parsedAI: { message?: string; productTemp?: any[] } = {};
+    let parsedAI: { message?: string; productTemp?: any[]; products?: any[] } = {};
     try {
       parsedAI = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
     } catch {
@@ -189,9 +195,12 @@ export class RecommendationService {
 
     const aiMessage = parsedAI.message ?? '';
 
-    // Step 4: Hydrate productTemp exactly like conversationV10
+    // Step 4: Hydrate productTemp exactly like conversationV10, but fallback to "products" 
+    // because the instruction prompts often tell the AI to use the "products" array.
     let emailProducts: EmailProduct[] = [];
-    const productTemp = Array.isArray(parsedAI.productTemp) ? parsedAI.productTemp : [];
+    let productTemp = Array.isArray(parsedAI.productTemp) && parsedAI.productTemp.length > 0
+      ? parsedAI.productTemp
+      : (Array.isArray(parsedAI.products) ? parsedAI.products : []);
 
     if (productTemp.length > 0) {
       const ids = productTemp.map((item: any) => item.id).filter((id: any) => !!id);
@@ -690,12 +699,245 @@ export class RecommendationService {
     }
   }
 
+  // --- MULTI-QUERY Helpers ---
+
   /**
-   * Simple recommendation: Order history → Best Seller fallback
-   * Step 1: Extract brand/scent preferences from ALL user orders
-   * Step 2a: Query products matching OR(brand, scents)
-   * Step 2b: Supplement with best sellers if results are insufficient
-   * Step 3: Rank and return top N
+   * Builds preference context via ProfileTool (same as ConversationV10).
+   * Priority: order history → profile keywords → new_user fallback (best-sellers)
+   */
+  private async buildPreferencesFromProfileTool(userId: string): Promise<{
+    source: string;
+    userType: string;
+    topBrands: string[];
+    topOrderProducts: string[];
+    profileKeywords: string[];
+    budgetHint: { min: number; max: number } | null;
+    budgetMin: number;
+    budgetMax: number;
+    avgPrice: number;
+    purchasedProductIds: Set<string>;
+    hasPreferences: boolean;
+    contextSummaries: Record<string, any>;
+  }> {
+    const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
+
+    const source = payload?.source ?? 'none';
+    const userType = source === 'none' ? 'new_user' : 'returning_user';
+    const budgetHint = payload?.budgetHint ?? null;
+    const topOrderProducts: string[] = payload?.topOrderProducts ?? [];
+    const profileKeywords: string[] = payload?.profileKeywords ?? [];
+    const contextSummaries = payload?.contextSummaries ?? {};
+
+    // Extract brand names from topOrderProducts (first word if brand is unknown).
+    // e.g. "Dior Sauvage EDT 100ml" → "Dior"
+    const topBrands = Array.from(
+      new Set(
+        topOrderProducts
+          .map(name => name.split(' ')[0])
+          .filter(Boolean)
+      )
+    ).slice(0, 3);
+
+    const budgetMin = budgetHint?.min ?? 500_000;
+    const budgetMax = budgetHint?.max ?? 5_000_000;
+    const avgPrice = Math.round((budgetMin + budgetMax) / 2);
+
+    // Collect purchased product IDs to exclude from sub-queries
+    const purchasedProductIds = new Set<string>();
+    const orderContext = payload?.toonContext?.orderDataToon;
+    // Note: PurchasedProductIds are not encoded in toon; we keep this set empty here.
+    // Brand/product sub-queries already exclude via label matching.
+
+    const hasPreferences = source !== 'none' && (topOrderProducts.length > 0 || profileKeywords.length > 0);
+
+    this.logger.log(
+      `[V3_MULTI_QUERY][PROFILE_CONTEXT] source=${source} userType=${userType} ` +
+      `orderCount=${contextSummaries.order?.orderCount ?? 0} ` +
+      `topOrderProducts=[${topOrderProducts.slice(0, 3).join(', ')}] ` +
+      `budgetHint=${JSON.stringify(budgetHint)}`
+    );
+    this.logger.log(
+      `[V3_MULTI_QUERY][PROFILE_CONTEXT] profileKeywords=[${profileKeywords.join(', ')}] ` +
+      `contextSummaries=${JSON.stringify(contextSummaries)}`
+    );
+
+    if (!hasPreferences) {
+      this.logger.log(`[V3_MULTI_QUERY][NEW_USER] userId=${userId} — No order/profile data, using best-sellers only`);
+    }
+
+    return {
+      source,
+      userType,
+      topBrands,
+      topOrderProducts,
+      profileKeywords,
+      budgetHint,
+      budgetMin,
+      budgetMax,
+      avgPrice,
+      purchasedProductIds,
+      hasPreferences,
+      contextSummaries,
+    };
+  }
+
+  private readonly productInclude = {
+    Brands: true,
+    Media: { where: { IsPrimary: true } },
+    ProductVariants: {
+      where: { IsDeleted: false, Status: 'Active' },
+      take: 3,
+      orderBy: { BasePrice: 'asc' as const }
+    }
+  };
+
+  private async runBrandSubQuery(brand: string, excludeIds: Set<string>, limit: number): Promise<any[]> {
+    const products = await this.prisma.products.findMany({
+      where: {
+        IsDeleted: false,
+        Brands: { Name: brand },
+        ...(excludeIds.size > 0 ? { Id: { notIn: Array.from(excludeIds) } } : {})
+      },
+      include: this.productInclude,
+      take: limit
+    });
+    const topNames = products.slice(0, 5).map(p => p.Name).join(', ');
+    this.logger.log(`[V3_MULTI_QUERY][BRAND] brand="${brand}" found=${products.length}. Top: [${topNames}]`);
+    return products;
+  }
+
+  private async runScentSubQuery(scent: string, excludeIds: Set<string>, limit: number): Promise<any[]> {
+    const products = await this.prisma.products.findMany({
+      where: {
+        IsDeleted: false,
+        OR: [
+          {
+            ProductNoteMaps: {
+              some: {
+                ScentNotes: { Name: { contains: scent } }
+              }
+            }
+          },
+          {
+            Brands: { OR: [{ Name: { contains: scent } }] }
+          }
+        ],
+        ...(excludeIds.size > 0 ? { Id: { notIn: Array.from(excludeIds) } } : {})
+      },
+      include: this.productInclude,
+      take: limit
+    });
+    const topNames = products.slice(0, 5).map(p => p.Name).join(', ');
+    this.logger.log(`[V3_MULTI_QUERY][SCENT] scent="${scent}" found=${products.length}. Top: [${topNames}]`);
+    return products;
+  }
+
+  /**
+   * Profile-based product sub-query — mirrors ConversationV10's executeProfileQuery.
+   * Keywords = profileKeywords (scent/style from profile) + topOrderProducts.slice(0,3)
+   * Budget filter applied to narrow results to user's price range.
+   */
+  private async runTopProductsSubQuery(
+    keywords: string[],
+    budgetHint: { min: number; max: number } | null,
+    limit: number
+  ): Promise<any[]> {
+    if (keywords.length === 0) return [];
+
+    const miniAnalysis: any = {
+      logic: [keywords],     // OR between all combined keywords — same as V10
+      productNames: null,
+      sorting: null,
+      budget: budgetHint,    // KEY: apply budget filter like V10
+      pagination: { pageNumber: 1, pageSize: limit }
+    };
+
+    const res = await this.productService.getProductsByStructuredQuery(miniAnalysis);
+    if (res.success && res.data) {
+      const items = res.data.items;
+      const topNames = items.slice(0, 5).map((p: any) => p.name).join(', ');
+      this.logger.log(
+        `[V3_MULTI_QUERY][PROFILE_QUERY] keywords=[${keywords.slice(0, 3).join(', ')}...] ` +
+        `budget=${JSON.stringify(budgetHint)} found=${items.length}. Top: [${topNames}]`
+      );
+      return items;
+    }
+    this.logger.log(`[V3_MULTI_QUERY][PROFILE_QUERY] found=0`);
+    return [];
+  }
+
+  private async runBestSellerSubQuery(limit: number): Promise<any[]> {
+    const res = await this.productService.getBestSellingProducts({
+      PageNumber: 1,
+      PageSize: limit,
+      SortOrder: 'desc',
+      IsDescending: true
+    } as PagedAndSortedRequest);
+    
+    if (res.success && res.data) {
+      const items = res.data.items.map((item: any) => ({ _isBestSeller: true, ...item.product }));
+      const topNames = items.slice(0, 5).map(p => p.name).join(', ');
+      this.logger.log(`[V3_MULTI_QUERY][BESTSELLER] found=${items.length}. Top: [${topNames}]`);
+      return items;
+    }
+    this.logger.log(`[V3_MULTI_QUERY][BESTSELLER] found=0`);
+    return [];
+  }
+
+  private mergeByIntersectionScore(
+    subResults: Array<{ label: string; products: any[] }>,
+    size: number
+  ): any[] {
+    const scoreMap = new Map<string, { product: any; score: number; sources: Set<string> }>();
+
+    for (const sub of subResults) {
+      for (const p of sub.products) {
+        const pId = p.Id || p.id; // Prisma uses Id, bestseller uses id
+        if (!pId) continue;
+
+        if (!scoreMap.has(pId)) {
+          scoreMap.set(pId, { product: p, score: 0, sources: new Set() });
+        }
+        const entry = scoreMap.get(pId)!;
+        entry.score += 1;
+        entry.sources.add(sub.label);
+      }
+    }
+
+    const allScored = Array.from(scoreMap.values());
+    allScored.sort((a, b) => b.score - a.score); // Highest score first
+
+    // Prefer intersection (score >= 2)
+    const intersections = allScored.filter(x => x.score >= 2);
+    const unions = allScored.filter(x => x.score < 2);
+
+    const finalResults: any[] = [];
+    
+    // Fill from intersections
+    for (const item of intersections) {
+      if (finalResults.length < size) {
+        finalResults.push({ ...item.product, _matchScore: item.score });
+      }
+    }
+
+    // Fill from unions if still needed
+    for (const item of unions) {
+      if (finalResults.length < size) {
+        finalResults.push({ ...item.product, _matchScore: item.score });
+      }
+    }
+
+    const finalNames = finalResults.map(p => p.Name || p.name).join(', ');
+    this.logger.log(`[V3_MULTI_QUERY][MERGE] Total unique=${allScored.length}, Intersections(>=2)=${intersections.length}, Unions=${unions.length}. Result: [${finalNames}]`);
+
+    return finalResults;
+  }
+
+  /**
+   * Recommendation Pipeline V3 (Multi-Query Decomposition)
+   * 1. Extract preference profile
+   * 2. Run independent sub-queries for brands, scents, and best-sellers
+   * 3. Merge products using an intersection score mechanism
    */
   async getRecommendationsSimple(
     userIdRaw: string,
@@ -703,210 +945,57 @@ export class RecommendationService {
   ): Promise<BaseResponse<any>> {
     try {
       const userId = userIdRaw.toLowerCase();
-      this.logger.log(`[V3_SIMPLE][START] userId=${userId} size=${size}`);
+      this.logger.log(`[V3_MULTI_QUERY][START] userId=${userId} size=${size}`);
 
-      // Step 1: Fetch all orders (any status) to build preference profile
-      const orders = await this.prisma.orders.findMany({
-        where: { CustomerId: userId },
-        include: {
-          OrderDetails: {
-            include: {
-              ProductVariants: {
-                include: {
-                  Products: {
-                    include: {
-                      Brands: true,
-                      ProductNoteMaps: { include: { ScentNotes: true } }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        orderBy: { CreatedAt: 'desc' },
-        take: 50 // cap to recent 50 orders for performance
-      });
+      // 1. Build profile/preferences via ProfileTool (same as ConversationV10)
+      const prefs = await this.buildPreferencesFromProfileTool(userId);
 
-      const brandCount = new Map<string, number>();
-      const scentCount = new Map<string, number>();
-      const purchasedProductIds = new Set<string>();
-      let totalPrice = 0;
-      let totalItems = 0;
+      // 2. Run sub-queries concurrently
+      const promises: Promise<{ label: string; products: any[] }>[] = [];
+      const subQueryLimit = size * 2; // Fetch more per sub-query to allow overlap
 
-      for (const order of orders) {
-        for (const detail of order.OrderDetails) {
-          const pv = detail.ProductVariants;
-          if (!pv) continue;
+      // 2.a Brand sub-queries (from order-derived brand names)
+      for (const brand of prefs.topBrands) {
+        promises.push(this.runBrandSubQuery(brand, prefs.purchasedProductIds, subQueryLimit).then(products => ({ label: `BRAND:${brand}`, products })));
+      }
 
-          const productId = pv.Products?.Id;
-          if (productId) purchasedProductIds.add(productId);
+      // 2.b Profile-based sub-query — combines profileKeywords + topOrderProducts like V10's executeProfileQuery
+      if (prefs.hasPreferences) {
+        const profileQueryKeywords = [
+          ...prefs.profileKeywords,
+          ...prefs.topOrderProducts.slice(0, 3)
+        ].filter(Boolean);
 
-          if (pv.BasePrice) {
-            totalPrice += Number(pv.BasePrice) * Number(detail.Quantity || 1);
-            totalItems += Number(detail.Quantity || 1);
-          }
-
-          const brandName = pv.Products?.Brands?.Name;
-          if (brandName) brandCount.set(brandName, (brandCount.get(brandName) || 0) + 1);
-
-          const notes = pv.Products?.ProductNoteMaps || [];
-          for (const nm of notes) {
-            const note = nm.ScentNotes?.Name?.trim();
-            if (note) scentCount.set(note, (scentCount.get(note) || 0) + 1);
-          }
+        if (profileQueryKeywords.length > 0) {
+          promises.push(
+            this.runTopProductsSubQuery(profileQueryKeywords, prefs.budgetHint, subQueryLimit * 2)
+              .then(products => ({ label: 'PROFILE_QUERY', products }))
+          );
         }
       }
 
-      const topBrands = Array.from(brandCount.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([name]) => name);
-
-      const topScents = Array.from(scentCount.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name]) => name);
-
-      let avgPrice = totalItems > 0 ? Math.round(totalPrice / totalItems) : 1_500_000;
-      let budgetMin = Math.round(avgPrice * 0.5);
-      let budgetMax = Math.round(avgPrice * 2.0);
-
-      // --- PRIORITY 2: PROFILE FALLBACK ---
-      const hasOrderPreferences = topBrands.length > 0 || topScents.length > 0;
-      if (!hasOrderPreferences) {
-        try {
-          const profileRes = await this.profileService.getOwnProfile(userId);
-          if (profileRes.success && profileRes.payload) {
-            const p = profileRes.payload;
-            const keywords = this.uniqueKeywords([
-              ...this.splitTerms(p.favoriteNotes),
-              ...this.splitTerms(p.scentPreference),
-              ...this.splitTerms(p.preferredStyle)
-            ]);
-            
-            if (keywords.length > 0) {
-              topScents.push(...keywords);
-              this.logger.log(`[V3_SIMPLE] Picked up ${keywords.length} keywords from Profile`);
-            }
-            if (p.minBudget != null && p.maxBudget != null) {
-              budgetMin = Number(p.minBudget);
-              budgetMax = Number(p.maxBudget);
-              avgPrice = (budgetMin + budgetMax) / 2;
-            }
-          }
-        } catch (err: any) {
-          this.logger.warn(`[V3_SIMPLE] Profile fallback failed: ${err.message}`);
+      // 2.c Profile keyword scent sub-queries (for users with profile but no orders)
+      if (prefs.source === 'profile' && prefs.profileKeywords.length > 0) {
+        for (const scent of prefs.profileKeywords.slice(0, 5)) {
+          promises.push(this.runScentSubQuery(scent, prefs.purchasedProductIds, subQueryLimit).then(products => ({ label: `SCENT:${scent}`, products })));
         }
       }
 
-      this.logger.log(
-        `[V3_SIMPLE][PROFILE] userId=${userId} orderPrefs=${hasOrderPreferences} brands=[${topBrands}] scents=[${topScents.slice(0, 5)}] budget=${budgetMin}-${budgetMax}`
-      );
+      // 2.d Best Seller default query (always run)
+      promises.push(this.runBestSellerSubQuery(size * 2).then(products => {
+        // Exclude purchased products explicitly here since bestseller query doesn't accept exclude
+        const filtered = products.filter(p => !prefs.purchasedProductIds.has(p.id));
+        return { label: 'BESTSELLER', products: filtered };
+      }));
 
-      const productInclude = {
-        Brands: true,
-        Media: { where: { IsPrimary: true } },
-        ProductVariants: {
-          where: { IsDeleted: false, Status: 'Active' },
-          take: 3,
-          orderBy: { BasePrice: 'asc' as const }
-        }
-      };
+      const subResults = await Promise.all(promises);
 
-      let recommendedProducts: any[] = [];
-      const seenIds = new Set<string>();
+      // 3. Merge by intersection score
+      const mergedProducts = this.mergeByIntersectionScore(subResults, size);
 
-      // Step 2a: Query by order-derived or profile-derived preferences (if any)
-      const hasPreferences = topBrands.length > 0 || topScents.length > 0;
-      if (hasPreferences) {
-        const orConditions: any[] = [];
-
-        if (topBrands.length > 0) {
-          orConditions.push({ Brands: { Name: { in: topBrands } } });
-        }
-
-        if (topScents.length > 0) {
-          // Use fuzzy contains for profile keyword flexibility
-          orConditions.push({
-            ProductNoteMaps: {
-              some: {
-                ScentNotes: {
-                  OR: topScents.map(scent => ({ Name: { contains: scent } }))
-                }
-              }
-            }
-          });
-          
-          // Also try matching brand just in case the profile keyword is a brand
-          orConditions.push({
-            Brands: {
-              OR: topScents.map(scent => ({ Name: { contains: scent } }))
-            }
-          });
-        }
-
-        const preferenceProducts = await this.prisma.products.findMany({
-          where: {
-            IsDeleted: false,
-            OR: orConditions,
-            // Exclude products already purchased
-            ...(purchasedProductIds.size > 0
-              ? { Id: { notIn: Array.from(purchasedProductIds) } }
-              : {})
-          },
-          include: productInclude,
-          take: size * 4
-        });
-
-        const sortedByBrand = preferenceProducts.sort((a, b) => {
-          const aIsBrand = topBrands.includes(a.Brands?.Name ?? '') ? 1 : 0;
-          const bIsBrand = topBrands.includes(b.Brands?.Name ?? '') ? 1 : 0;
-          return bIsBrand - aIsBrand;
-        });
-
-        for (const p of sortedByBrand) {
-          if (!seenIds.has(p.Id)) {
-            seenIds.add(p.Id);
-            recommendedProducts.push(p);
-          }
-        }
-
-        this.logger.log(
-          `[V3_SIMPLE][PREFERENCE_QUERY] userId=${userId} found=${recommendedProducts.length}`
-        );
-      }
-
-      // Step 2b: Supplement with best sellers if results are insufficient
-      if (recommendedProducts.length < size) {
-        const needed = size - recommendedProducts.length;
-        this.logger.log(
-          `[V3_SIMPLE][BESTSELLER_FILL] userId=${userId} need=${needed} more products`
-        );
-
-        const bestSellerResponse = await this.productService.getBestSellingProducts({
-          PageNumber: 1,
-          PageSize: size * 2,
-          SortOrder: 'desc',
-          IsDescending: true
-        } as PagedAndSortedRequest);
-
-        const bestSellers = bestSellerResponse.success && bestSellerResponse.data
-          ? bestSellerResponse.data.items.map((item: any) => item.product)
-          : [];
-
-        for (const p of bestSellers) {
-          if (!seenIds.has(p.id) && recommendedProducts.length < size * 2) {
-            seenIds.add(p.id);
-            // Best sellers use a slightly different shape — store as-is for formatting below
-            recommendedProducts.push({ _isBestSeller: true, ...p });
-          }
-        }
-      }
-
-      // Step 3: Format and slice final results
-      const results = recommendedProducts.slice(0, size).map(p => {
-        // Best seller items already have a ProductWithVariantsResponse shape
+      // 4. Format output
+      const results = mergedProducts.map(p => {
+        // Best seller or already matched items format check
         if (p._isBestSeller) {
           return {
             productId: p.id,
@@ -919,7 +1008,7 @@ export class RecommendationService {
               volumeMl: v.volumeMl,
               basePrice: v.basePrice
             })),
-            source: 'best_seller'
+            source: prefs.hasPreferences ? (p._matchScore >= 2 ? 'matched_preference' : 'best_seller') : 'best_seller'
           };
         }
 
@@ -935,12 +1024,12 @@ export class RecommendationService {
             volumeMl: v.VolumeMl,
             basePrice: Number(v.BasePrice)
           })),
-          source: hasPreferences ? 'order_preference' : 'best_seller'
+          source: (p._matchScore && p._matchScore >= 2) ? 'matched_intersection' : 'order_preference'
         };
       });
 
       this.logger.log(
-        `[V3_SIMPLE][DONE] userId=${userId} returning=${results.length} products`
+        `[V3_MULTI_QUERY][DONE] userId=${userId} returning=${results.length} products`
       );
 
       return {
@@ -950,16 +1039,19 @@ export class RecommendationService {
           recommendations: results,
           totalProducts: results.length,
           profile: {
-            topBrands,
-            topScents,
-            avgPrice,
-            budgetRange: [budgetMin, budgetMax]
+            source: prefs.source,
+            userType: prefs.userType,
+            topBrands: prefs.topBrands,
+            topOrderProducts: prefs.topOrderProducts,
+            profileKeywords: prefs.profileKeywords,
+            avgPrice: prefs.avgPrice,
+            budgetRange: [prefs.budgetMin, prefs.budgetMax]
           }
         }
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.error(`[V3_SIMPLE][ERROR] userId=${userIdRaw} error=${errorMessage}`);
+      this.logger.error(`[V3_MULTI_QUERY][ERROR] userId=${userIdRaw} error=${errorMessage}`);
       return { success: false, data: null };
     }
   }

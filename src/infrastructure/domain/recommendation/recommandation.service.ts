@@ -822,54 +822,115 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
   private async buildPreferencesFromOrder(userId: string, orderId: string): Promise<{
     topBrands: string[];
     topOrderProducts: string[];
+    genders: string[];
+    scentKeywords: string[];
+    olfactoryKeywords: string[];
     budgetHint: { min: number; max: number } | null;
     purchasedProductIds: Set<string>;
     hasPreferences: boolean;
   }> {
+    const empty = { topBrands: [], topOrderProducts: [], genders: [], scentKeywords: [], olfactoryKeywords: [], budgetHint: null, purchasedProductIds: new Set<string>(), hasPreferences: false };
+
     const orderRes = await this.orderService.getOrderById(orderId);
     const order = orderRes.success ? orderRes.payload : null;
-    
+
     if (!order || order.orderDetails.length === 0) {
-      return { topBrands: [], topOrderProducts: [], budgetHint: null, purchasedProductIds: new Set(), hasPreferences: false };
+      this.logger.warn(`[REPURCHASE][BUILD_PREFS] orderId=${orderId} — no order details found`);
+      return empty;
     }
 
+    // ── Budget from unit prices ────────────────────────────────────────────────
     let minPrice = Infinity;
     let maxPrice = 0;
-    const variantIds = order.orderDetails.map(d => d.variantId);
-    
+    const variantIds = order.orderDetails.map(d => d.variantId).filter(Boolean);
+
     order.orderDetails.forEach(item => {
       if (item.unitPrice < minPrice) minPrice = item.unitPrice;
       if (item.unitPrice > maxPrice) maxPrice = item.unitPrice;
     });
-
     if (minPrice === Infinity) minPrice = 0;
-
     const budgetHint = { min: minPrice, max: maxPrice + 200000 };
 
-    const topOrderProducts = order.orderDetails.map(d => d.variantName);
+    // ── Full attribute aggregation (mirroring ProfileTool.extractOrderAttributes) ──
+    const variantQuantities = new Map<string, number>();
+    for (const item of order.orderDetails) {
+      if (!item.variantId) continue;
+      variantQuantities.set(item.variantId, (variantQuantities.get(item.variantId) || 0) + item.quantity);
+    }
 
-    const topBrands = Array.from(
-      new Set(
-        topOrderProducts
-          .map(name => name.split(' ')[0])
-          .filter(Boolean)
-      )
-    ).slice(0, 3);
+    const counters = {
+      brands: new Map<string, number>(),
+      genders: new Map<string, number>(),
+      concentrations: new Map<string, number>(),
+      scentNotes: new Map<string, number>(),
+      olfactoryFamilies: new Map<string, number>(),
+    };
+    const addCount = (map: Map<string, number>, key: string | null | undefined, weight: number) => {
+      if (!key) return;
+      const k = key.trim();
+      if (k) map.set(k, (map.get(k) || 0) + weight);
+    };
 
     const variants = await this.prisma.productVariants.findMany({
       where: { Id: { in: variantIds } },
-      select: { ProductId: true }
+      include: {
+        Products: {
+          include: {
+            Brands: true,
+            ProductNoteMaps: { include: { ScentNotes: true } },
+            ProductFamilyMaps: { include: { OlfactoryFamilies: true } },
+          }
+        }
+      }
     });
 
-    const purchasedProductIds = new Set(variants.map(v => v.ProductId));
+    const purchasedProductIds = new Set<string>();
 
-    this.logger.log(`[V3_MULTI_QUERY][ORDER_CONTEXT] orderId=${orderId} minPrice=${budgetHint.min} maxPrice=${budgetHint.max} topBrands=[${topBrands.join(',')}]`);
+    for (const v of variants) {
+      const qty = variantQuantities.get(v.Id) || 1;
+      const p = v.Products;
+      if (!p) continue;
+      purchasedProductIds.add(p.Id);
+
+      addCount(counters.brands, p.Brands?.Name, qty);
+      addCount(counters.genders, p.Gender, qty);
+      for (const nm of p.ProductNoteMaps || []) addCount(counters.scentNotes, nm.ScentNotes?.Name, qty);
+      for (const fm of p.ProductFamilyMaps || []) addCount(counters.olfactoryFamilies, fm.OlfactoryFamilies?.Name, qty);
+    }
+
+    const getTop = (map: Map<string, number>, limit: number) =>
+      Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name]) => name);
+
+    const topBrands = getTop(counters.brands, 3);
+    const genders = getTop(counters.genders, 2);
+    const scentKeywords = getTop(counters.scentNotes, 6);
+    const olfactoryKeywords = getTop(counters.olfactoryFamilies, 4);
+
+    // Rich keyword set for ORDER_QUERY sub-query: scent > olfactory > brand
+    const topOrderProducts = [
+      ...scentKeywords.slice(0, 3),
+      ...olfactoryKeywords.slice(0, 2),
+      ...topBrands.slice(0, 1),
+    ].filter(Boolean).slice(0, 6);
+
+    this.logger.log(
+      `[REPURCHASE][BUILD_PREFS] orderId=${orderId} ` +
+      `budget=[${budgetHint.min}→${budgetHint.max}] ` +
+      `brands=[${topBrands.join(',')}] ` +
+      `genders=[${genders.join(',')}] ` +
+      `scentNotes=[${scentKeywords.join(',')}] ` +
+      `olfactory=[${olfactoryKeywords.join(',')}] ` +
+      `excludeCount=${purchasedProductIds.size}`
+    );
 
     return {
       topBrands,
-      topOrderProducts: topOrderProducts.slice(0, 3), // limit keywords to 3
+      topOrderProducts,
+      genders,
+      scentKeywords,
+      olfactoryKeywords,
       budgetHint,
-      purchasedProductIds, // Will be excluded exactly as requested
+      purchasedProductIds,
       hasPreferences: true
     };
   }
@@ -893,24 +954,37 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       const promises: Promise<{ label: string; products: any[] }>[] = [];
       const subQueryLimit = size * 2;
 
+      // Brand sub-queries (with budget filter)
       for (const brand of prefs.topBrands) {
-        promises.push(this.runBrandSubQuery(brand, prefs.purchasedProductIds, subQueryLimit, prefs.budgetHint).then(products => ({ label: `BRAND:${brand}`, products })));
+        promises.push(
+          this.runBrandSubQuery(brand, prefs.purchasedProductIds, subQueryLimit, prefs.budgetHint)
+            .then(products => ({ label: `BRAND:${brand}`, products }))
+        );
       }
 
-      if (prefs.hasPreferences && prefs.topOrderProducts.length > 0) {
+      // Scent note sub-queries - using real DB scent notes
+      for (const scent of prefs.scentKeywords.slice(0, 3)) {
+        promises.push(
+          this.runScentSubQuery(scent, prefs.purchasedProductIds, subQueryLimit, prefs.budgetHint)
+            .then(products => ({ label: `SCENT:${scent}`, products }))
+        );
+      }
+
+      // Top product/keyword sub-query (scentNotes + olfactory + brand keywords)
+      if (prefs.topOrderProducts.length > 0) {
         promises.push(
           this.runTopProductsSubQuery(prefs.topOrderProducts, prefs.budgetHint, subQueryLimit * 2)
             .then(products => ({ label: 'ORDER_QUERY', products }))
         );
       }
 
+      // Best seller fallback with budget + exclude filter
       promises.push(this.runBestSellerSubQuery(size * 2).then(products => {
         const filtered = products.filter(p => !prefs.purchasedProductIds.has(p.id));
         const budgetFiltered = prefs.budgetHint ? filtered.filter(p => {
-            const minV = Math.min(...(p.variants||[]).map((v:any) => v.basePrice));
-            return minV >= prefs.budgetHint!.min && minV <= prefs.budgetHint!.max;
+          const minV = Math.min(...(p.variants || []).map((v: any) => v.basePrice));
+          return minV >= prefs.budgetHint!.min && minV <= prefs.budgetHint!.max;
         }) : filtered;
-
         return { label: 'BESTSELLER', products: budgetFiltered.length > 0 ? budgetFiltered : filtered };
       }));
 
@@ -961,6 +1035,9 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
             source: 'order',
             userType: 'returning_user',
             topBrands: prefs.topBrands,
+            genders: prefs.genders,
+            scentKeywords: prefs.scentKeywords,
+            olfactoryKeywords: prefs.olfactoryKeywords,
             topOrderProducts: prefs.topOrderProducts,
             budgetRange: prefs.budgetHint ? [prefs.budgetHint.min, prefs.budgetHint.max] : null
           }

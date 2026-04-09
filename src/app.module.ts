@@ -18,10 +18,12 @@ import { EjsAdapter } from '@nestjs-modules/mailer/dist/adapters/ejs.adapter';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import * as path from 'path';
+import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
 
 @Module({
   imports: [
     PrismaModule,
+    RedisModule,
     ConfigModule.forRoot({ isGlobal: true }),
     AutomapperModule.forRoot({
       strategyInitializer: mikro(),

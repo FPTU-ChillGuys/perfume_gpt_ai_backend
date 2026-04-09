@@ -59,11 +59,17 @@ export class RecommendationController {
     name: 'userId',
     description: 'ID của user để test repurchase recommendation'
   })
+  @ApiQuery({
+    name: 'orderId',
+    required: true,
+    description: 'ID của đơn hàng để phân tích khuyến nghị'
+  })
   @ApiBaseResponse(String)
   async testRepurchase(
-    @Query('userId') userId: string
+    @Query('userId') userId: string,
+    @Query('orderId') orderId: string
   ): Promise<BaseResponse<string>> {
-    await this.recommendationService.sendRepurchase(userId);
+    await this.recommendationService.sendRepurchase(userId, orderId);
     return Ok('Repurchase recommendation generated and email sent successfully');
   }
 

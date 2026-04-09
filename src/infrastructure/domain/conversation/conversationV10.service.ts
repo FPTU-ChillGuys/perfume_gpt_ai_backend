@@ -490,25 +490,99 @@ export class ConversationV10Service {
   }
 
   /**
-   * Execute a search-type query: build mini-analysis from query's logic/budget/sorting.
+   * Execute a search-type query using AND-decomposition.
+   * Each AND group in logic[] runs as a separate sub-query independently.
+   * Results are merged by intersection-score (products matching most sub-queries rank first).
+   * Falls back to union if no intersection found.
    */
   private async executeSearchQuery(query: QueryItemObject, rootAnalysis: AnalysisObject): Promise<any[]> {
-    const miniAnalysis: any = {
-      logic: query.logic || [],
+    const logicGroups = query.logic || [];
+    const shared = {
       productNames: query.productNames || null,
       sorting: query.sorting || rootAnalysis.sorting || null,
       budget: query.budget || rootAnalysis.budget || null,
-      pagination: { pageNumber: 1, pageSize: 20 }
     };
 
-    this.logger.log(`[V10_MULTI_QUERY][SEARCH] logic=${JSON.stringify(query.logic?.slice(0, 3))}`);
-    const searchResponse = await this.productService.getProductsByStructuredQuery(miniAnalysis);
-    if (searchResponse.success && searchResponse.data) {
-      const productNames = searchResponse.data.items.slice(0, 5).map(p => p.name).join(', ') + (searchResponse.data.items.length > 5 ? '...' : '');
-      this.logger.log(`[V10_MULTI_QUERY][SEARCH] Found ${searchResponse.data.items.length} products. Top: [${productNames}]`);
-      return searchResponse.data.items;
+    // If only 0-1 group, skip decomposition and just run normally
+    if (logicGroups.length <= 1) {
+      const miniAnalysis: any = {
+        logic: logicGroups,
+        ...shared,
+        pagination: { pageNumber: 1, pageSize: 20 }
+      };
+      this.logger.log(`[V10_MULTI_QUERY][SEARCH] Single group, no decomposition. logic=${JSON.stringify(logicGroups)}`);
+      const searchResponse = await this.productService.getProductsByStructuredQuery(miniAnalysis);
+      if (searchResponse.success && searchResponse.data) {
+        const names = searchResponse.data.items.slice(0, 5).map((p: any) => p.name).join(', ') + (searchResponse.data.items.length > 5 ? '...' : '');
+        this.logger.log(`[V10_MULTI_QUERY][SEARCH] Found ${searchResponse.data.items.length} products. Top: [${names}]`);
+        return searchResponse.data.items;
+      }
+      return [];
     }
-    return [];
+
+    // AND-DECOMPOSITION: run each AND group as its own sub-query
+    this.logger.log(`[V10_MULTI_QUERY][SEARCH] AND-decomposition: splitting ${logicGroups.length} AND groups into sub-queries`);
+
+    const subQueryResults: Array<{ group: any; products: any[] }> = [];
+
+    for (let i = 0; i < logicGroups.length; i++) {
+      const group = logicGroups[i];
+      const miniAnalysis: any = {
+        logic: [group], // single AND group = just one condition block
+        ...shared,
+        budget: i === 0 ? shared.budget : null, // only apply budget to first sub-query to avoid over-filtering
+        pagination: { pageNumber: 1, pageSize: 50 }
+      };
+
+      this.logger.log(`[V10_MULTI_QUERY][SEARCH][SUB-${i + 1}/${logicGroups.length}] Running sub-query for group: ${JSON.stringify(group)}`);
+      const subResponse = await this.productService.getProductsByStructuredQuery(miniAnalysis);
+
+      if (subResponse.success && subResponse.data && subResponse.data.items.length > 0) {
+        const names = subResponse.data.items.slice(0, 5).map((p: any) => p.name).join(', ') + (subResponse.data.items.length > 5 ? '...' : '');
+        this.logger.log(`[V10_MULTI_QUERY][SEARCH][SUB-${i + 1}/${logicGroups.length}] Found ${subResponse.data.items.length} products. Top: [${names}]`);
+        subQueryResults.push({ group, products: subResponse.data.items });
+      } else {
+        this.logger.warn(`[V10_MULTI_QUERY][SEARCH][SUB-${i + 1}/${logicGroups.length}] No results for group: ${JSON.stringify(group)}`);
+        subQueryResults.push({ group, products: [] });
+      }
+    }
+
+    // INTERSECTION-SCORE MERGE: score each product by how many sub-queries it appears in
+    const scoreMap = new Map<string, { product: any; score: number }>();
+
+    for (const { products } of subQueryResults) {
+      for (const p of products) {
+        const existing = scoreMap.get(p.id);
+        if (existing) {
+          existing.score += 1;
+        } else {
+          scoreMap.set(p.id, { product: p, score: 1 });
+        }
+      }
+    }
+
+    // Sort by score descending (most sub-queries matched = highest priority)
+    const sorted = Array.from(scoreMap.values()).sort((a, b) => b.score - a.score);
+
+    // Try intersection first (score === total number of sub-queries with results)
+    const subQueriesWithResults = subQueryResults.filter(r => r.products.length > 0).length;
+    const intersection = sorted.filter(e => e.score === subQueriesWithResults).map(e => e.product);
+    const union = sorted.map(e => e.product);
+
+    if (intersection.length > 0) {
+      const names = intersection.slice(0, 5).map((p: any) => p.name).join(', ') + (intersection.length > 5 ? '...' : '');
+      this.logger.log(
+        `[V10_MULTI_QUERY][SEARCH] Intersection merge: ${intersection.length} products matched ALL ${subQueriesWithResults} sub-queries. Top: [${names}]`
+      );
+      return intersection;
+    }
+
+    // Fallback: union sorted by score
+    const names = union.slice(0, 5).map((p: any) => p.name).join(', ') + (union.length > 5 ? '...' : '');
+    this.logger.warn(
+      `[V10_MULTI_QUERY][SEARCH] No full intersection. Falling back to UNION (${union.length} unique products, ranked by match score). Top: [${names}]`
+    );
+    return union;
   }
 
   /**

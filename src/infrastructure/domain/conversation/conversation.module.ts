@@ -1,6 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
-import { ConversationV9Service } from 'src/infrastructure/domain/conversation/conversation-v9.service';
 import { ConversationV10Service } from 'src/infrastructure/domain/conversation/conversationV10.service';
 import { AIModule } from 'src/infrastructure/domain/ai/ai.module';
 import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.module';
@@ -33,7 +32,7 @@ import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
         forwardRef(() => RecommendationModule), // Avoid circular dependency if any
         BullModule.registerQueue({ name: QueueName.CONVERSATION_QUEUE }),
     ],
-    providers: [ConversationService, ConversationV9Service, ConversationV10Service],
-    exports: [ConversationService, ConversationV9Service, ConversationV10Service],
+    providers: [ConversationService, ConversationV10Service],
+    exports: [ConversationService, ConversationV10Service],
 })
 export class ConversationModule { }

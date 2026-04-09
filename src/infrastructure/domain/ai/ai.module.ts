@@ -75,7 +75,7 @@ const aiRecommendationProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      () => tools.getToolsForRecomendationAndRepurchase,
+      undefined,
       10
     ),
   inject: [Tools]
@@ -163,4 +163,4 @@ const aiInventoryReportProvider: Provider = {
     aiReviewProvider
   ]
 })
-export class AIModule {}
+export class AIModule { }

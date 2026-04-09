@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Output } from 'ai';
+import { Output, UIMessage } from 'ai';
+import { v4 as uuid } from 'uuid';
 import { INSTRUCTION_TYPE_RECOMMENDATION, INSTRUCTION_TYPE_REPURCHASE } from 'src/application/constant/prompts';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
@@ -19,9 +20,13 @@ import {
 } from 'src/infrastructure/domain/user/user.service';
 import { OrderService } from 'src/infrastructure/domain/order/order.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
-import { RecommendationV3Service } from './recommendation-v3.service';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
+import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
+import { ProfileService } from 'src/infrastructure/domain/profile/profile.service';
+
 
 export type DailyRecommendationTrigger = 'cron' | 'manual';
 type DailyRecommendationUserResult =
@@ -56,9 +61,22 @@ export class RecommendationService {
     private readonly configService: ConfigService,
     private readonly orderService: OrderService,
     private readonly productService: ProductService,
-    private readonly recommendationV3Service: RecommendationV3Service,
-    private readonly aiAcceptanceService: AIAcceptanceService
+    private readonly prisma: PrismaService,
+    private readonly aiAcceptanceService: AIAcceptanceService,
+    private readonly profileService: ProfileService
   ) { }
+
+  private uniqueKeywords(items: string[]): string[] {
+    return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean))).slice(0, 16);
+  }
+
+  private splitTerms(input?: string | null): string[] {
+    if (!input) return [];
+    return input
+      .split(/[;,/|\n]/g)
+      .map((item) => item.trim())
+      .filter((item) => item.length >= 2 && item.length <= 50);
+  }
 
   private async hasPurchaseHistory(userId: string): Promise<boolean> {
     const orderResponse = await this.orderService.getOrderDetailsWithOrdersByUserId(userId);
@@ -103,6 +121,146 @@ export class RecommendationService {
       });
     }
     return response.data ?? '';
+  }
+
+  /**
+   * Builds a personalized recommendation message + email products using the ConversationV10 pattern:
+   * 1. Fetch products from getRecommendationsSimple (Order → Best Seller fallback)
+   * 2. Encode them as TOON and inject as RECOMMENDATION_CONTEXT
+   * 3. Call the main AI to generate {message, productTemp}
+   * 4. Hydrate productTemp into EmailProduct[]
+   */
+  private async generateRecommendationTextWithProducts(
+    userId: string,
+    systemPrompt: string,
+    combinedPrompt: string,
+    limit: number = 3
+  ): Promise<{ message: string; emailProducts: EmailProduct[] }> {
+    // Step 1: Fetch products from Simple Recommendation (always has results)
+    const simpleResult = await this.getRecommendationsSimple(userId, limit);
+    const simpleRecs: any[] = simpleResult.success ? (simpleResult.data?.recommendations ?? []) : [];
+
+    // Map to the minimal format the AI understands (same as conversationV10)
+    const minimalProducts = simpleRecs.map((rec: any) => ({
+      id: rec.productId,
+      name: rec.productName,
+      brand: rec.brand,
+      image: rec.primaryImage,
+      variants: (rec.variants || []).map((v: any) => ({
+        id: v.id,
+        volume: v.volumeMl,
+        price: v.basePrice
+      })),
+      source: rec.source ?? 'RECOMMENDATION'
+    }));
+
+    this.logger.log(
+      `[RecommendationService][V10_PATTERN] userId=${userId} injecting ${minimalProducts.length} products into AI context`
+    );
+
+    // Step 2: Build messages array with RECOMMENDATION_CONTEXT (TOON encoded)
+    const encoded = encodeToolOutput(minimalProducts).encoded;
+    const contextMessage: UIMessage = {
+      id: uuid(),
+      role: 'system' as const,
+      parts: [{ type: 'text', text: `RECOMMENDATION_CONTEXT: ${encoded}` }]
+    };
+
+    const userMessage: UIMessage = {
+      id: uuid(),
+      role: 'user' as const,
+      parts: [{ type: 'text', text: combinedPrompt }]
+    };
+
+    // Step 3: Call AI main with textGenerateFromMessages
+    const aiResponse = await this.aiHelper.textGenerateFromMessages(
+      [contextMessage, userMessage],
+      systemPrompt,
+      Output.object(searchOutput)
+    );
+
+    const rawMessage = aiResponse.success ? aiResponse.data ?? '' : '';
+    let parsedAI: { message?: string; productTemp?: any[] } = {};
+    try {
+      parsedAI = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
+    } catch {
+      parsedAI = { message: rawMessage };
+    }
+
+    const aiMessage = parsedAI.message ?? '';
+
+    // Step 4: Hydrate productTemp exactly like conversationV10
+    let emailProducts: EmailProduct[] = [];
+    const productTemp = Array.isArray(parsedAI.productTemp) ? parsedAI.productTemp : [];
+
+    if (productTemp.length > 0) {
+      const ids = productTemp.map((item: any) => item.id).filter((id: any) => !!id);
+      if (ids.length > 0) {
+        const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+        if (productResponse.success && Array.isArray(productResponse.data)) {
+          const recommendationsMap = new Map<string, Set<string>>();
+          productTemp.forEach((item: any) => {
+            if (item.id && Array.isArray(item.variants)) {
+              recommendationsMap.set(item.id, new Set(item.variants.map((v: any) => v.id)));
+            }
+          });
+
+          emailProducts = productResponse.data
+            .map((product) => {
+              const allowedVariantIds = recommendationsMap.get(product.id);
+              const variants = (product.variants || []).filter(v =>
+                !allowedVariantIds || allowedVariantIds.has(v.id)
+              );
+              if (variants.length === 0) return null;
+              return this.mapProductCardOutputToEmailProduct(product, variants);
+            })
+            .filter((p): p is EmailProduct => p !== null)
+            .slice(0, limit);
+        }
+      }
+    }
+
+    // If AI didn't produce productTemp or hydration failed, fall back to the Simple products directly
+    if (emailProducts.length === 0 && simpleRecs.length > 0) {
+      this.logger.warn(
+        `[RecommendationService][V10_PATTERN] userId=${userId} productTemp hydration failed, falling back to Simple products directly`
+      );
+      const ids = simpleRecs.map((r: any) => r.productId).filter(Boolean);
+      const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+      if (productResponse.success && Array.isArray(productResponse.data)) {
+        emailProducts = productResponse.data
+          .map((product) => this.mapProductCardOutputToEmailProduct(product, product.variants || []))
+          .slice(0, limit);
+      }
+    }
+
+    return { message: aiMessage, emailProducts };
+  }
+
+  /**
+   * Maps a ProductCardOutputItem to a EmailProduct for use in email templates.
+   */
+  private mapProductCardOutputToEmailProduct(
+    product: import('src/chatbot/output/product.output').ProductCardOutputItem,
+    variants: any[]
+  ): EmailProduct {
+    return {
+      id: product.id,
+      name: product.name,
+      description: 'Hương nước hoa được gợi ý theo hồ sơ của bạn.',
+      brandName: product.brandName ?? 'Unknown',
+      categoryName: 'Perfume',
+      primaryImage: product.primaryImage ?? undefined,
+      variants: variants.slice(0, 3).map((v: any) => ({
+        id: v.id,
+        sku: v.sku ?? 'N/A',
+        volumeMl: Number(v.volumeMl),
+        type: 'Standard',
+        basePrice: Number(v.basePrice),
+        status: 'Active',
+        concentrationName: 'N/A'
+      }))
+    };
   }
 
   async generateRecommendationText(userId: string): Promise<BaseResponse<string>> {
@@ -237,61 +395,33 @@ export class RecommendationService {
   private async buildDailyEmailProductsFromV3(
     userId: string
   ): Promise<EmailProduct[]> {
-    const recommendationResult = await this.recommendationV3Service.getRecommendations(
-      userId,
-      this.dailyRecommendationProductLimit
-    );
+    try {
+      const systemPrompt = '📧 Bạn là chuyên gia tư vấn nước hoa cá nhân hóa của PerfumeGPT. Dựa trên RECOMMENDATION_CONTEXT, viết lời chào cá nhân đến khách hàng và gợi ý các sản phẩm trong context.';
+      const combinedPrompt = 'Hãy viết lời tư vấn chân thành cho khách hàng dựa trên các sản phẩm trong RECOMMENDATION_CONTEXT.';
 
-    if (!recommendationResult.success) {
-      this.logger.warn(
-        `${this.dailyRecommendationTag}[V3_FAIL] userId=${userId} reason=RECOMMENDATION_QUERY_FAILED`
+      const { message, emailProducts } = await this.generateRecommendationTextWithProducts(
+        userId,
+        systemPrompt,
+        combinedPrompt,
+        this.dailyRecommendationProductLimit
       );
+
+      if (emailProducts.length === 0) {
+        this.logger.warn(`${this.dailyRecommendationTag}[V3_EMPTY] userId=${userId} reason=NO_PRODUCTS_AFTER_AI`);
+        return [];
+      }
+
+      return this.attachAcceptanceForEmailProducts(
+        userId,
+        'recommendation',
+        emailProducts,
+        `daily-recommendation-${userId}-${Date.now()}`
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.warn(`${this.dailyRecommendationTag}[V3_FAIL] userId=${userId} error=${errorMessage}`);
       return [];
     }
-
-    const recommendations = recommendationResult.data?.recommendations ?? [];
-    if (recommendations.length === 0) {
-      this.logger.log(
-        `${this.dailyRecommendationTag}[V3_EMPTY] userId=${userId} reason=NO_RECOMMENDATION`
-      );
-      return [];
-    }
-
-    const rankedRecommendations = recommendations.slice(
-      0,
-      this.dailyRecommendationProductLimit
-    );
-
-    const hydratedProducts = await Promise.all(
-      rankedRecommendations.map(async (item) => {
-        const productResult = await this.productService.getProductWithVariants(
-          item.productId
-        );
-
-        if (!productResult.success || !productResult.data) {
-          this.logger.warn(
-            `${this.dailyRecommendationTag}[HYDRATE_SKIP] userId=${userId} productId=${item.productId}`
-          );
-          return null;
-        }
-
-        return this.mapProductToEmailProduct(productResult.data, {
-          variantId: item.variantId,
-          basePrice: item.basePrice
-        });
-      })
-    );
-
-    const mappedProducts = hydratedProducts
-      .filter((product): product is EmailProduct => Boolean(product))
-      .slice(0, this.dailyRecommendationProductLimit);
-
-    return this.attachAcceptanceForEmailProducts(
-      userId,
-      'recommendation',
-      mappedProducts,
-      `daily-recommendation-${userId}-${Date.now()}`
-    );
   }
 
   private async sendDailyRecommendationForRecipient(
@@ -428,18 +558,28 @@ export class RecommendationService {
       }
       const { email, userName } = userInfo.payload;
 
-      const result = await this.generateRecommendationText(userId);
-      if (!result.success) {
-        this.logger.error(`Failed to generate recommendation for user ${userId}`);
-        return false;
-      }
+      // Build prompt for AI recommendation using the V10 pattern
+      const promptResult = await buildCombinedPromptV5(
+        INSTRUCTION_TYPE_RECOMMENDATION,
+        this.adminInstructionService,
+        userId
+      );
 
-      const parsed = parseAIRecommendationResponse(result.data ?? '');
+      const systemPrompt = promptResult.success ? (promptResult.data?.adminInstruction ?? '') : '';
+      const combinedPrompt = promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : '';
+
+      const { message, emailProducts } = await this.generateRecommendationTextWithProducts(
+        userId,
+        systemPrompt,
+        combinedPrompt,
+        3
+      );
+
       const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://perfumegpt.com');
       const productsWithAcceptance = await this.attachAcceptanceForEmailProducts(
         userId,
         'recommendation',
-        ((parsed.products as EmailProduct[]) || []),
+        emailProducts,
         `recommendation-email-${userId}-${Date.now()}`
       );
 
@@ -450,7 +590,7 @@ export class RecommendationService {
         {
           userName: userName || 'Khách hàng',
           heading: 'Hương nước hoa được gợi ý dành riêng cho bạn',
-          message: parsed.message,
+          message,
           products: productsWithAcceptance,
           frontendUrl
         }
@@ -547,6 +687,280 @@ export class RecommendationService {
       this.logger.log('Đã hoàn thành cron job: Gửi daily repurchase');
     } catch (error) {
       this.logger.error('Lỗi khi chạy cron job daily repurchase:', error);
+    }
+  }
+
+  /**
+   * Simple recommendation: Order history → Best Seller fallback
+   * Step 1: Extract brand/scent preferences from ALL user orders
+   * Step 2a: Query products matching OR(brand, scents)
+   * Step 2b: Supplement with best sellers if results are insufficient
+   * Step 3: Rank and return top N
+   */
+  async getRecommendationsSimple(
+    userIdRaw: string,
+    size: number = 10
+  ): Promise<BaseResponse<any>> {
+    try {
+      const userId = userIdRaw.toLowerCase();
+      this.logger.log(`[V3_SIMPLE][START] userId=${userId} size=${size}`);
+
+      // Step 1: Fetch all orders (any status) to build preference profile
+      const orders = await this.prisma.orders.findMany({
+        where: { CustomerId: userId },
+        include: {
+          OrderDetails: {
+            include: {
+              ProductVariants: {
+                include: {
+                  Products: {
+                    include: {
+                      Brands: true,
+                      ProductNoteMaps: { include: { ScentNotes: true } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: { CreatedAt: 'desc' },
+        take: 50 // cap to recent 50 orders for performance
+      });
+
+      const brandCount = new Map<string, number>();
+      const scentCount = new Map<string, number>();
+      const purchasedProductIds = new Set<string>();
+      let totalPrice = 0;
+      let totalItems = 0;
+
+      for (const order of orders) {
+        for (const detail of order.OrderDetails) {
+          const pv = detail.ProductVariants;
+          if (!pv) continue;
+
+          const productId = pv.Products?.Id;
+          if (productId) purchasedProductIds.add(productId);
+
+          if (pv.BasePrice) {
+            totalPrice += Number(pv.BasePrice) * Number(detail.Quantity || 1);
+            totalItems += Number(detail.Quantity || 1);
+          }
+
+          const brandName = pv.Products?.Brands?.Name;
+          if (brandName) brandCount.set(brandName, (brandCount.get(brandName) || 0) + 1);
+
+          const notes = pv.Products?.ProductNoteMaps || [];
+          for (const nm of notes) {
+            const note = nm.ScentNotes?.Name?.trim();
+            if (note) scentCount.set(note, (scentCount.get(note) || 0) + 1);
+          }
+        }
+      }
+
+      const topBrands = Array.from(brandCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([name]) => name);
+
+      const topScents = Array.from(scentCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name]) => name);
+
+      let avgPrice = totalItems > 0 ? Math.round(totalPrice / totalItems) : 1_500_000;
+      let budgetMin = Math.round(avgPrice * 0.5);
+      let budgetMax = Math.round(avgPrice * 2.0);
+
+      // --- PRIORITY 2: PROFILE FALLBACK ---
+      const hasOrderPreferences = topBrands.length > 0 || topScents.length > 0;
+      if (!hasOrderPreferences) {
+        try {
+          const profileRes = await this.profileService.getOwnProfile(userId);
+          if (profileRes.success && profileRes.payload) {
+            const p = profileRes.payload;
+            const keywords = this.uniqueKeywords([
+              ...this.splitTerms(p.favoriteNotes),
+              ...this.splitTerms(p.scentPreference),
+              ...this.splitTerms(p.preferredStyle)
+            ]);
+            
+            if (keywords.length > 0) {
+              topScents.push(...keywords);
+              this.logger.log(`[V3_SIMPLE] Picked up ${keywords.length} keywords from Profile`);
+            }
+            if (p.minBudget != null && p.maxBudget != null) {
+              budgetMin = Number(p.minBudget);
+              budgetMax = Number(p.maxBudget);
+              avgPrice = (budgetMin + budgetMax) / 2;
+            }
+          }
+        } catch (err: any) {
+          this.logger.warn(`[V3_SIMPLE] Profile fallback failed: ${err.message}`);
+        }
+      }
+
+      this.logger.log(
+        `[V3_SIMPLE][PROFILE] userId=${userId} orderPrefs=${hasOrderPreferences} brands=[${topBrands}] scents=[${topScents.slice(0, 5)}] budget=${budgetMin}-${budgetMax}`
+      );
+
+      const productInclude = {
+        Brands: true,
+        Media: { where: { IsPrimary: true } },
+        ProductVariants: {
+          where: { IsDeleted: false, Status: 'Active' },
+          take: 3,
+          orderBy: { BasePrice: 'asc' as const }
+        }
+      };
+
+      let recommendedProducts: any[] = [];
+      const seenIds = new Set<string>();
+
+      // Step 2a: Query by order-derived or profile-derived preferences (if any)
+      const hasPreferences = topBrands.length > 0 || topScents.length > 0;
+      if (hasPreferences) {
+        const orConditions: any[] = [];
+
+        if (topBrands.length > 0) {
+          orConditions.push({ Brands: { Name: { in: topBrands } } });
+        }
+
+        if (topScents.length > 0) {
+          // Use fuzzy contains for profile keyword flexibility
+          orConditions.push({
+            ProductNoteMaps: {
+              some: {
+                ScentNotes: {
+                  OR: topScents.map(scent => ({ Name: { contains: scent } }))
+                }
+              }
+            }
+          });
+          
+          // Also try matching brand just in case the profile keyword is a brand
+          orConditions.push({
+            Brands: {
+              OR: topScents.map(scent => ({ Name: { contains: scent } }))
+            }
+          });
+        }
+
+        const preferenceProducts = await this.prisma.products.findMany({
+          where: {
+            IsDeleted: false,
+            OR: orConditions,
+            // Exclude products already purchased
+            ...(purchasedProductIds.size > 0
+              ? { Id: { notIn: Array.from(purchasedProductIds) } }
+              : {})
+          },
+          include: productInclude,
+          take: size * 4
+        });
+
+        const sortedByBrand = preferenceProducts.sort((a, b) => {
+          const aIsBrand = topBrands.includes(a.Brands?.Name ?? '') ? 1 : 0;
+          const bIsBrand = topBrands.includes(b.Brands?.Name ?? '') ? 1 : 0;
+          return bIsBrand - aIsBrand;
+        });
+
+        for (const p of sortedByBrand) {
+          if (!seenIds.has(p.Id)) {
+            seenIds.add(p.Id);
+            recommendedProducts.push(p);
+          }
+        }
+
+        this.logger.log(
+          `[V3_SIMPLE][PREFERENCE_QUERY] userId=${userId} found=${recommendedProducts.length}`
+        );
+      }
+
+      // Step 2b: Supplement with best sellers if results are insufficient
+      if (recommendedProducts.length < size) {
+        const needed = size - recommendedProducts.length;
+        this.logger.log(
+          `[V3_SIMPLE][BESTSELLER_FILL] userId=${userId} need=${needed} more products`
+        );
+
+        const bestSellerResponse = await this.productService.getBestSellingProducts({
+          PageNumber: 1,
+          PageSize: size * 2,
+          SortOrder: 'desc',
+          IsDescending: true
+        } as PagedAndSortedRequest);
+
+        const bestSellers = bestSellerResponse.success && bestSellerResponse.data
+          ? bestSellerResponse.data.items.map((item: any) => item.product)
+          : [];
+
+        for (const p of bestSellers) {
+          if (!seenIds.has(p.id) && recommendedProducts.length < size * 2) {
+            seenIds.add(p.id);
+            // Best sellers use a slightly different shape — store as-is for formatting below
+            recommendedProducts.push({ _isBestSeller: true, ...p });
+          }
+        }
+      }
+
+      // Step 3: Format and slice final results
+      const results = recommendedProducts.slice(0, size).map(p => {
+        // Best seller items already have a ProductWithVariantsResponse shape
+        if (p._isBestSeller) {
+          return {
+            productId: p.id,
+            productName: p.name,
+            brand: p.brandName,
+            primaryImage: p.primaryImage,
+            variants: (p.variants || []).slice(0, 3).map((v: any) => ({
+              id: v.id,
+              sku: v.sku,
+              volumeMl: v.volumeMl,
+              basePrice: v.basePrice
+            })),
+            source: 'best_seller'
+          };
+        }
+
+        // Prisma product shape
+        return {
+          productId: p.Id,
+          productName: p.Name,
+          brand: p.Brands?.Name ?? null,
+          primaryImage: p.Media?.[0]?.Url ?? null,
+          variants: (p.ProductVariants || []).map((v: any) => ({
+            id: v.Id,
+            sku: v.Sku,
+            volumeMl: v.VolumeMl,
+            basePrice: Number(v.BasePrice)
+          })),
+          source: hasPreferences ? 'order_preference' : 'best_seller'
+        };
+      });
+
+      this.logger.log(
+        `[V3_SIMPLE][DONE] userId=${userId} returning=${results.length} products`
+      );
+
+      return {
+        success: true,
+        data: {
+          userId,
+          recommendations: results,
+          totalProducts: results.length,
+          profile: {
+            topBrands,
+            topScents,
+            avgPrice,
+            budgetRange: [budgetMin, budgetMax]
+          }
+        }
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.error(`[V3_SIMPLE][ERROR] userId=${userIdRaw} error=${errorMessage}`);
+      return { success: false, data: null };
     }
   }
 }

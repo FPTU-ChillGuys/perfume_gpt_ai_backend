@@ -26,6 +26,7 @@ import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
+import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 
 type VariantSalesSignal = {
   last30DaysSales: number;
@@ -104,7 +105,8 @@ export class TrendService {
     private readonly inventoryService: InventoryService,
     private readonly restockService: RestockService,
     private readonly productService: ProductService,
-    private readonly aiAcceptanceService: AIAcceptanceService
+    private readonly aiAcceptanceService: AIAcceptanceService,
+    private readonly aiAnalysisService: AiAnalysisService
   ) { }
 
   private readonly logger = new Logger(TrendService.name);
@@ -1117,6 +1119,152 @@ export class TrendService {
     }
   }
 
+  private async analyzeTrendWithAI(
+    requestId: string,
+    signals: GoogleTrendSignal[]
+  ): Promise<import('src/chatbot/output/analysis.output').AnalysisObject | null> {
+    const startedAt = Date.now();
+    try {
+      const compactSignals = signals
+        .sort((a, b) => b.score - a.score)
+        .slice(0, GOOGLE_SIGNAL_PROMPT_LIMIT)
+        .map(s => ({ keyword: s.keyword, score: s.score, source: s.source }));
+
+      this.logger.log(
+        `[Trend][AIAnalysis][START] requestId=${requestId} signalCount=${compactSignals.length}`
+      );
+
+      const analysisObject = await this.aiAnalysisService.analyzeTrend(compactSignals);
+
+      this.logger.log(
+        `[Trend][AIAnalysis][DONE] requestId=${requestId} success=${!!analysisObject} logicGroups=${analysisObject?.logic?.length ?? 0} durationMs=${Date.now() - startedAt}`
+      );
+
+      return analysisObject;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.warn(
+        `[Trend][AIAnalysis][FAIL] requestId=${requestId} error=${errorMessage} durationMs=${Date.now() - startedAt}`
+      );
+      return null;
+    }
+  }
+
+  private async mergeTrendProducts(
+    requestId: string,
+    signals: GoogleTrendSignal[]
+  ): Promise<ProductCardResponse[]> {
+    const startedAt = Date.now();
+    const allQueryProducts: import('src/application/dtos/response/product-with-variants.response').ProductWithVariantsResponse[] = [];
+
+    // Step 1: Process each signal individually
+    const topSignals = signals
+      .sort((a, b) => b.score - a.score)
+      .slice(0, GOOGLE_SIGNAL_PROMPT_LIMIT);
+
+    this.logger.log(
+      `[Trend][Merge][START] requestId=${requestId} signalCount=${topSignals.length} strategy=per-keyword`
+    );
+
+    for (const signal of topSignals) {
+      try {
+        // Analyze a single keyword to get a tight, focused AnalysisObject
+        const singleAnalysis = await this.aiAnalysisService.analyzeTrend([
+          { keyword: signal.keyword, score: signal.score, source: signal.source }
+        ]);
+
+        if (!singleAnalysis) {
+          this.logger.warn(
+            `[Trend][Merge][SKIP] requestId=${requestId} keyword="${signal.keyword}" reason=no-analysis`
+          );
+          continue;
+        }
+
+        const expandedAnalysis = {
+          ...singleAnalysis,
+          pagination: { pageNumber: 1, pageSize: 10 }
+        };
+
+        const searchResponse = await this.productService.getProductsByStructuredQuery(expandedAnalysis);
+        const products = searchResponse.success && searchResponse.data
+          ? searchResponse.data.items
+          : [];
+
+        this.logger.log(
+          `[Trend][Merge][KEYWORD] requestId=${requestId} keyword="${signal.keyword}" count=${products.length}`
+        );
+
+        allQueryProducts.push(...products);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        this.logger.warn(
+          `[Trend][Merge][KEYWORD][FAIL] requestId=${requestId} keyword="${signal.keyword}" error=${errorMessage}`
+        );
+      }
+
+      // Early exit if we already have enough candidates
+      if (allQueryProducts.length >= TREND_PRODUCT_LIMIT * 6) {
+        this.logger.log(
+          `[Trend][Merge][EARLY_EXIT] requestId=${requestId} accumulated=${allQueryProducts.length}`
+        );
+        break;
+      }
+    }
+
+    // Step 2: Best seller products for intersection boost
+    const bestSellerResponse = await this.productService.getBestSellingProducts({
+      PageNumber: 1,
+      PageSize: 50,
+      SortOrder: 'desc',
+      IsDescending: true
+    });
+    const bestSellerProducts = bestSellerResponse.success && bestSellerResponse.data
+      ? bestSellerResponse.data.items.map((item: any) => item.product)
+      : [];
+
+    this.logger.log(
+      `[Trend][Merge][BESTSELLER] requestId=${requestId} bestSellerCount=${bestSellerProducts.length}`
+    );
+
+    // Step 3: Support merge — deduplicate then intersect with best sellers
+    const dedupedQueryProducts = this.dedupeProductsById(allQueryProducts);
+
+    let mergedProducts: typeof dedupedQueryProducts;
+    if (bestSellerProducts.length > 0 && dedupedQueryProducts.length > 0) {
+      const queryProductIds = new Set(dedupedQueryProducts.map((p: any) => p.id));
+      const intersection = bestSellerProducts.filter((p: any) => queryProductIds.has(p.id));
+      if (intersection.length > 0) {
+        mergedProducts = intersection;
+        this.logger.log(
+          `[Trend][Merge][INTERSECTION] requestId=${requestId} intersectionCount=${intersection.length} — using best seller order`
+        );
+      } else {
+        mergedProducts = dedupedQueryProducts;
+        this.logger.log(
+          `[Trend][Merge][FALLBACK] requestId=${requestId} dedupedCount=${dedupedQueryProducts.length} — no intersection, fallback to query products`
+        );
+      }
+    } else {
+      mergedProducts = dedupedQueryProducts.length > 0 ? dedupedQueryProducts : bestSellerProducts;
+      this.logger.log(
+        `[Trend][Merge][ONE_SIDE] requestId=${requestId} using=${dedupedQueryProducts.length > 0 ? 'query' : 'bestseller'}`
+      );
+    }
+
+    // Step 4: Convert to ProductCardOutputItem and rank
+    const productOutputItems = this.toProductOutputItems(
+      this.dedupeProductsById(mergedProducts)
+    );
+    const rankedProducts = await this.toRankedProductCards(productOutputItems);
+
+    this.logger.log(
+      `[Trend][Merge][DONE] requestId=${requestId} rawAccumulated=${allQueryProducts.length} deduped=${this.dedupeProductsById(allQueryProducts).length} finalCount=${rankedProducts.length} durationMs=${Date.now() - startedAt}`
+    );
+
+    return rankedProducts;
+  }
+
+
   private async buildLiveTrendPipeline(
     requestId: string,
     allUserLogRequest: AllUserLogRequest
@@ -1131,24 +1279,42 @@ export class TrendService {
       range.endDate
     );
 
-    const mapperResult = await this.mapGoogleSignalsToKeywords(
-      requestId,
-      seedKeywords,
-      googleSignals
-    );
+    let rankedProducts: ProductCardResponse[];
+    let mapperResult: TrendKeywordMapperResult;
+    let queryKeywords: string[];
 
-    const queryKeywords = this.buildQueryKeywordList(mapperResult);
+    if (googleSignals.length > 0) {
+      // New pipeline: per-keyword AI analysis + support merge
+      rankedProducts = await this.mergeTrendProducts(requestId, googleSignals);
+      mapperResult = {
+        primaryKeywords: googleSignals
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10)
+          .map(s => s.keyword),
+        expansionKeywords: [],
+        negativeTerms: [],
+        confidence: 0.85,
+        explanation: 'Per-keyword AI analysis used for trend product resolution.'
+      };
+      queryKeywords = mapperResult.primaryKeywords;
+    } else {
+      // Fallback: legacy NLP pipeline
+      this.logger.warn(
+        `[Trend][Pipeline][FALLBACK] requestId=${requestId} No Google signals, falling back to NLP pipeline`
+      );
+      mapperResult = await this.mapGoogleSignalsToKeywords(requestId, seedKeywords, googleSignals);
+      queryKeywords = this.buildQueryKeywordList(mapperResult);
+      this.logger.log(
+        `[Trend][KeywordMap][RESULT] requestId=${requestId} queryKeywordCount=${queryKeywords.length} keywords=${JSON.stringify(queryKeywords)}`
+      );
+      const rawProducts = await this.queryProductsByKeywords(requestId, queryKeywords);
+      const dedupedProducts = this.dedupeProductsById(rawProducts);
+      const productOutputItems = this.toProductOutputItems(dedupedProducts);
+      rankedProducts = await this.toRankedProductCards(productOutputItems);
+    }
+
     this.logger.log(
-      `[Trend][KeywordMap][RESULT] requestId=${requestId} queryKeywordCount=${queryKeywords.length} keywords=${JSON.stringify(queryKeywords)}`
-    );
-
-    const rawProducts = await this.queryProductsByKeywords(requestId, queryKeywords);
-    const dedupedProducts = this.dedupeProductsById(rawProducts);
-    const productOutputItems = this.toProductOutputItems(dedupedProducts);
-    const rankedProducts = await this.toRankedProductCards(productOutputItems);
-
-    this.logger.log(
-      `[Trend][MergeRank] requestId=${requestId} rawProductCount=${rawProducts.length} dedupedCount=${dedupedProducts.length} rankedCount=${rankedProducts.length}`
+      `[Trend][MergeRank] requestId=${requestId} rankedCount=${rankedProducts.length}`
     );
 
     return {
@@ -1160,6 +1326,7 @@ export class TrendService {
       mapperResult
     };
   }
+
 
   private async resolveTrendPipeline(
     requestId: string,

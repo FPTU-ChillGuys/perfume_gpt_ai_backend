@@ -632,7 +632,11 @@ export class ConversationV10Service {
               }
               taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`));
             } else {
-              taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: User must be logged in to use ${funcName}`));
+              taskResults.push(
+                this.createSystemMessage(
+                  `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Tính năng ${funcName} yêu cầu đăng nhập. BẮT BUỘC phản hồi khách hàng: xin lỗi vì chưa đăng nhập nên không thể lưu giỏ hàng/thao tác, và hướng dẫn họ đăng nhập để hệ thống hỗ trợ tốt hơn.`
+                )
+              );
             }
           } else if (funcName === 'getOrdersByUserId') {
             if (!isGuestUser) {
@@ -642,7 +646,11 @@ export class ConversationV10Service {
               const orderItems = itemsData.map((i: any) => ({ id: i.id, code: i.code, status: i.status, total: i.totalAmount }));
               taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: getOrdersByUserId executed: ${JSON.stringify(orderItems)}`));
             } else {
-              taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: User must be logged in to view orders`));
+              taskResults.push(
+                this.createSystemMessage(
+                  `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Xem đơn hàng yêu cầu đăng nhập. BẮT BUỘC phản hồi khách hàng: xin lỗi vì chưa đăng nhập nên không có dữ liệu đơn hàng, và hướng dẫn họ đăng nhập để kiểm tra.`
+                )
+              );
             }
           } else {
             // Product-returning functions (getBestSellingProducts, etc.)
@@ -874,7 +882,11 @@ export class ConversationV10Service {
           }
           finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`));
         } else {
-          finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: User must be logged in to use ${funcName}`));
+          finalMessages.push(
+            this.createSystemMessage(
+              `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Tính năng ${funcName} yêu cầu đăng nhập. BẮT BUỘC phản hồi khách hàng: xin lỗi vì chưa đăng nhập nên không thể lưu giỏ hàng/thao tác, và hướng dẫn họ đăng nhập để hệ thống hỗ trợ tốt hơn.`
+            )
+          );
         }
       } 
       else if (funcName === 'getOrdersByUserId') {
@@ -885,7 +897,11 @@ export class ConversationV10Service {
           const orderItems = itemsData.map((i: any) => ({ id: i.id, code: i.code, status: i.status, total: i.totalAmount }));
           finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: getOrdersByUserId executed: ${JSON.stringify(orderItems)}`));
         } else {
-          finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: User must be logged in to view orders`));
+          finalMessages.push(
+            this.createSystemMessage(
+              `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Xem đơn hàng yêu cầu đăng nhập. BẮT BUỘC phản hồi khách hàng: xin lỗi vì chưa đăng nhập nên không có dữ liệu đơn hàng, và hướng dẫn họ đăng nhập để kiểm tra.`
+            )
+          );
         }
       } 
       else if (funcName === 'getUserLogSummaryByUserId') {

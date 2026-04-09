@@ -924,13 +924,30 @@ export class ConversationV10Service {
       const fallbackMessage = await this.buildBestSellerFallbackMessage(5);
       if (fallbackMessage) {
         finalMessages.push(fallbackMessage);
+        hasSearchProducts = true; // We now have products to show
       }
     }
 
     if (!isObjectiveFlow && this.hasAnalysisFlag(finalAnalysis, 'PROFILE_ENRICHMENT_SKIPPED')) {
+      if (isGuestUser) {
+        finalMessages.push(
+          this.createSystemMessage(
+            'GUEST_USER_PROMPT: true. Khách chưa đăng nhập. Nhắc khách ĐĂNG NHẬP để hệ thống lưu lại sở thích cá nhân. KHÔNG yêu cầu khách chọn số hay "cập nhật profile" vì họ không có tài khoản. Vẫn tiếp tục tư vấn bình thường nếu có SEARCH_RESULTS.'
+          )
+        );
+      } else {
+        finalMessages.push(
+          this.createSystemMessage(
+            'PROFILE_UPDATE_REQUIRED: true. Bạn phải nhắc người dùng cập nhật profile (sở thích, ngân sách, độ tuổi/survey) nhưng vẫn cần đưa gợi ý sản phẩm từ SEARCH_RESULTS (nếu có).'
+          )
+        );
+      }
+    }
+
+    if (!hasSearchProducts && shouldQueryProducts) {
       finalMessages.push(
         this.createSystemMessage(
-          'PROFILE_UPDATE_REQUIRED: true. Bạn phải nhắc người dùng cập nhật profile (sở thích, ngân sách, độ tuổi/survey) nhưng vẫn cần đưa gợi ý sản phẩm từ SEARCH_RESULTS hoặc BEST_SELLER_FALLBACK_RESULTS nếu có.'
+          'EMPTY_RESULTS_WARNING: Dữ liệu (SEARCH_RESULTS) hoàn toàn rỗng! BẮT BUỘC phản hồi là "hiện tại cửa hàng không tìm thấy sản phẩm nào phù hợp". TUYỆT ĐỐI KHÔNG ĐƯỢC tự nói "có một vài lựa chọn dưới đây" rồi để trống.'
         )
       );
     }

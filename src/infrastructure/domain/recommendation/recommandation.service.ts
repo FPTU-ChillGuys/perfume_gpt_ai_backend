@@ -167,16 +167,18 @@ export class RecommendationService {
       source: rec.source ?? 'RECOMMENDATION'
     }));
 
+    const tag = contextType === 'repurchase' ? '[REPURCHASE]' : '[RECOMMENDATION]';
+
     this.logger.log(
-      `[RecommendationService][V10_PATTERN] userId=${userId} injecting ${minimalProducts.length} products into AI context`
+      `${tag}[TOON_INJECT] userId=${userId} injecting ${minimalProducts.length} products into AI context`
     );
 
     // Step 2: Build messages array with RECOMMENDATION_CONTEXT (TOON encoded)
     const encodedContext = encodeToolOutput(minimalProducts);
     const encoded = encodedContext.encoded;
     
-    this.logger.debug(
-      `[RecommendationService] [getProfileRecommendationContext] recommendation TOON: ${encoded.length}/${encodedContext.originalSize} (${encodedContext.compressionRatio}%)`
+    this.logger.log(
+      `${tag}[TOON_ENCODED] size=${encoded.length}/${encodedContext.originalSize} ratio=${encodedContext.compressionRatio}%`
     );
 
     const contextMessage: UIMessage = {
@@ -199,6 +201,8 @@ export class RecommendationService {
     );
 
     const rawMessage = aiResponse.success ? aiResponse.data ?? '' : '';
+    this.logger.log(`${tag}[AI_RAW] length=${rawMessage.length} preview=${String(rawMessage).slice(0, 120)}`);
+
     let parsedAI: { message?: string; productTemp?: any[]; products?: any[] } = {};
     try {
       parsedAI = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
@@ -214,6 +218,8 @@ export class RecommendationService {
     let productTemp = Array.isArray(parsedAI.productTemp) && parsedAI.productTemp.length > 0
       ? parsedAI.productTemp
       : (Array.isArray(parsedAI.products) ? parsedAI.products : []);
+
+    this.logger.log(`${tag}[PRODUCT_TEMP] productTempCount=${productTemp.length} ids=[${productTemp.map((p:any) => p.id).join(',')}]`);
 
     if (productTemp.length > 0) {
       const ids = productTemp.map((item: any) => item.id).filter((id: any) => !!id);
@@ -255,6 +261,8 @@ export class RecommendationService {
           .slice(0, limit);
       }
     }
+
+    this.logger.log(`${tag}[HYDRATION_DONE] emailProductsCount=${emailProducts.length} ids=[${emailProducts.map(p => p.id).join(',')}]`);
 
     return { message: aiMessage, emailProducts };
   }
@@ -630,28 +638,55 @@ export class RecommendationService {
 
   async sendRepurchase(userId: string, orderId: string): Promise<boolean> {
     try {
+      this.logger.log(`[REPURCHASE][START] userId=${userId} orderId=${orderId}`);
+
       const userInfo = await this.userService.getUserEmailInfo(userId);
       if (!userInfo.success || !userInfo.payload) {
-        this.logger.error(`Failed to get user info for user ${userId}`);
+        this.logger.error(`[REPURCHASE][ERROR] Failed to get user info for user ${userId}`);
         return false;
       }
       const { email, userName } = userInfo.payload;
 
+      // Fetch order details for email table + AI context
+      const orderRes = await this.orderService.getOrderById(orderId);
+      const order = orderRes.success ? orderRes.payload : null;
+      const orderItems = order?.orderDetails ?? [];
+
+      this.logger.log(`[REPURCHASE][ORDER_FETCHED] orderId=${orderId} itemCount=${orderItems.length}`);
+
+      // Build rich combinedPrompt with ordered items context
       const promptResult = await buildCombinedPromptV5(
         INSTRUCTION_TYPE_REPURCHASE,
         this.adminInstructionService,
         userId
       );
-
       const systemPrompt = promptResult.success ? (promptResult.data?.adminInstruction ?? '') : '';
-      const combinedPrompt = promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : '';
+
+      // Build an order summary table for AI to understand what was purchased
+      const orderTableRows = orderItems.map(item =>
+        `| ${item.variantName} | ${item.quantity} | ${item.unitPrice.toLocaleString('vi-VN')}₫ |`
+      ).join('\n');
+
+      const repurchaseCombinedPrompt = `
+Khách hàng ${userName || userId} vừa chọn mua các sản phẩm từ đơn hàng #${orderId} tại PerfumeGPT:
+
+| Sản phẩm | SL | Đơn giá |
+| --- | --- | --- |
+${orderTableRows}
+
+Hãy bắt đầu tin nhắn bằng lời cảm ơn chân thành vì họ đã mua những sản phẩm trên, sau đó dựa trên RECOMMENDATION_CONTEXT gợi ý những sản phẩm mới phù hợp với hương thơm và sở thích họ đã thể hiện.
+${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim();
+
+      this.logger.log(`[REPURCHASE][PROMPT_BUILT] combinedPrompt length=${repurchaseCombinedPrompt.length}`);
 
       const { message, emailProducts } = await this.generateRecommendationTextWithProducts(
         userId,
         systemPrompt,
-        combinedPrompt,
+        repurchaseCombinedPrompt,
         { limit: 3, contextType: 'repurchase', orderId }
       );
+
+      this.logger.log(`[REPURCHASE][AI_DONE] userId=${userId} message length=${message.length} emailProductsCount=${emailProducts.length}`);
 
       const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://perfumegpt.com');
       const productsWithAcceptance = await this.attachAcceptanceForEmailProducts(
@@ -667,16 +702,18 @@ export class RecommendationService {
         EmailTemplate.REPURCHASE,
         {
           userName: userName || 'Khách hàng',
+          heading: 'Dựa trên đơn hàng của bạn, chúng tôi có một số gợi ý mới',
           message,
+          orderItems,   // order detail table for email template
           products: productsWithAcceptance,
           frontendUrl,
           savingsPercent: '15'
         }
       );
-      this.logger.log(`Sent repurchase email to ${email} for user ${userId} context order ${orderId}`);
+      this.logger.log(`[REPURCHASE][EMAIL_SENT] email=${email} userId=${userId} orderId=${orderId} productCount=${productsWithAcceptance.length}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send repurchase for user ${userId}:`, error);
+      this.logger.error(`[REPURCHASE][FAILED] userId=${userId} orderId=${orderId}`, error);
       return false;
     }
   }

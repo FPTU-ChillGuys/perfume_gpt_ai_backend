@@ -544,7 +544,7 @@ AI trả về kết quả theo hướng dẫn của admin
 ### File liên quan
 
 ```
-src/infrastructure/seed/
+src/infrastructure/domain/common/seed/
 ├── admin-instruction-seed-data.ts   # Dữ liệu mặc định
 ├── admin-instruction.seeder.ts      # Logic seed (idempotent)
 └── run-seed.ts                      # Standalone runner (pnpm run seed)

@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "setup": "ts-node setup.ts",
+    "setup": "ts-node -r tsconfig-paths/register setup.ts",
     "build": "nest build",
     "build:watch": "nest build --watch",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -16,7 +16,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "clean": "rimraf dist coverage",
-    "seed": "ts-node -r tsconfig-paths/register src/infrastructure/seed/run-seed.ts",
+    "seed": "ts-node -r tsconfig-paths/register src/infrastructure/domain/common/seed/run-seed.ts",
     "sync:prompts": "ts-node -r tsconfig-paths/register src/infrastructure/domain/common/seed/sync-prompts.ts",
     "migration:up": "mikro-orm migration:up",
     "migration:down": "mikro-orm migration:down",

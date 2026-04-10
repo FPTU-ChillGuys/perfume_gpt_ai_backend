@@ -47,6 +47,7 @@ type RestockVariantResult = {
   concentrationName: string | null;
   totalQuantity: number;
   reservedQuantity: number;
+  averageDailySales: number;
   suggestedRestockQuantity: number;
 };
 
@@ -120,6 +121,7 @@ export class InventoryService {
         concentrationName: stock.ProductVariants.Concentrations.Name,
         totalQuantity: stock.TotalQuantity,
         reservedQuantity: stock.ReservedQuantity,
+        averageDailySales: 0,
         suggestedRestockQuantity
       });
     }

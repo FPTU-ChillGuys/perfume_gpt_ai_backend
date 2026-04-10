@@ -12,6 +12,7 @@ export const restockVariantSchema = z.object({
     concentrationName: z.string().nullable(),
     totalQuantity: z.number(),
     reservedQuantity: z.number(),
+    averageDailySales: z.number(),
     suggestedRestockQuantity: z.number()
 });
 

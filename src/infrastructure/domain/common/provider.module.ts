@@ -29,6 +29,7 @@ const registerQueue = BullModule.registerQueue(
 
 @Module({
   imports: [...modules, registerQueue, ProcessorModule, CacheModule.registerAsync({
+    isGlobal: true,
     imports: [ConfigModule],
     inject: [ConfigService],
     useFactory: async (config: ConfigService) => {

@@ -8,6 +8,12 @@ export interface UserEmailInfo {
   userName?: string;
 }
 
+export interface ActiveDailyRecommendationRecipient {
+  id: string;
+  email: string;
+  userName: string;
+}
+
 @Injectable()
 export class UserService {
   constructor(private readonly prisma: PrismaService) {}
@@ -67,6 +73,46 @@ export class UserService {
         return { success: true, payload: userIds };
       },
       'Failed to fetch all user IDs',
+      true
+    );
+  }
+
+  /**
+   * Lấy danh sách user active có email hợp lệ cho luồng gửi recommendation hằng ngày.
+   */
+  async getActiveUsersForDailyRecommendationEmail(): Promise<
+    BaseResponseAPI<ActiveDailyRecommendationRecipient[]>
+  > {
+    return await funcHandlerAsync(
+      async () => {
+        const users = await this.prisma.aspNetUsers.findMany({
+          where: {
+            IsActive: true,
+            IsDeleted: false,
+            EmailConfirmed: true,
+            Email: { not: null }
+          },
+          select: {
+            Id: true,
+            Email: true,
+            UserName: true
+          }
+        });
+
+        const recipients: ActiveDailyRecommendationRecipient[] = users
+          .map((user) => ({
+            id: user.Id,
+            email: user.Email?.trim() ?? '',
+            userName: user.UserName?.trim() || 'Khách hàng'
+          }))
+          .filter((user) => user.email.length > 0);
+
+        return {
+          success: true,
+          payload: recipients
+        };
+      },
+      'Failed to fetch active users for daily recommendation email',
       true
     );
   }

@@ -1,12 +1,16 @@
 import { forwardRef, Module, Provider } from '@nestjs/common';
-import { SearchModule } from 'src/infrastructure/domain/search/search.module';
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 import { SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { Tools } from 'src/chatbot/tools';
 import { UnitOfWorkModule } from 'src/infrastructure/domain/common/unit-of-work.module';
 import { ToolModule } from 'src/infrastructure/domain/ai/tool.module';
-import { aiModelForSurvey, aiModelForRestock, aiModelForReview, aiModelForTrend } from 'src/chatbot/ai-model';
+import {
+  aiModelForSurvey,
+  aiModelForRestock,
+  aiModelForReview,
+  aiModelForTrend
+} from 'src/chatbot/ai-model';
 
 export const AI_HELPER = 'AI_HELPER';
 export const AI_CONVERSATION_HELPER = 'AI_CONVERSATION_HELPER';
@@ -27,7 +31,8 @@ export const AI_RESTOCK_SERVICE = AI_RESTOCK_HELPER;
 
 const aiProvider: Provider = {
   provide: AI_HELPER,
-  useFactory: (tools: Tools) => new AIHelper(SYSTEM_PROMPT, () => tools.getTools, 10),
+  useFactory: (tools: Tools) =>
+    new AIHelper(SYSTEM_PROMPT, () => tools.getTools, 10),
   inject: [Tools]
 };
 
@@ -55,13 +60,12 @@ const aiTrendProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      () => tools.getToolsForTrend,
+      () => tools.getToolsForAnalysis,
       10,
       undefined,
       undefined,
       aiModelForTrend,
-      undefined,
-      300000
+      undefined
     ),
   inject: [Tools]
 };
@@ -71,7 +75,7 @@ const aiRecommendationProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      () => tools.getToolsForRecomendationAndRepurchase,
+      undefined,
       10
     ),
   inject: [Tools]
@@ -80,7 +84,16 @@ const aiRecommendationProvider: Provider = {
 const aiRestockProvider: Provider = {
   provide: AI_RESTOCK_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(SYSTEM_PROMPT, () => tools.getToolsForRestock, 10, 0, 'auto', aiModelForRestock, undefined, 300000),
+    new AIHelper(
+      SYSTEM_PROMPT,
+      () => tools.getToolsForRestock,
+      10,
+      0,
+      'auto',
+      aiModelForRestock,
+      undefined,
+      300000
+    ),
   inject: [Tools]
 };
 
@@ -101,7 +114,14 @@ const aiSurveyProvider: Provider = {
 const aiReviewProvider: Provider = {
   provide: AI_REVIEW_HELPER,
   useFactory: (tools: Tools) =>
-    new AIHelper(SYSTEM_PROMPT, () => tools.getToolsForReview, 10, 0, 'auto', aiModelForReview),
+    new AIHelper(
+      SYSTEM_PROMPT,
+      () => tools.getToolsForReview,
+      10,
+      0,
+      'auto',
+      aiModelForReview
+    ),
   inject: [Tools]
 };
 
@@ -118,7 +138,7 @@ const aiInventoryReportProvider: Provider = {
 };
 
 @Module({
-  imports: [UnitOfWorkModule, ToolModule, forwardRef(() => SearchModule)],
+  imports: [UnitOfWorkModule, ToolModule],
   providers: [
     AiAnalysisService,
     aiProvider,

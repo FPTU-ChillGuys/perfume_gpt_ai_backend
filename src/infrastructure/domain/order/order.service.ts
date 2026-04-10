@@ -41,7 +41,7 @@ const orderDetailInclude = {
       Vouchers: true
     }
   },
-  RecipientInfos: true,
+  ContactAddresses: true,
   ShippingInfos: true
 } satisfies Prisma.OrdersInclude;
 
@@ -55,6 +55,7 @@ type OrderFull = Prisma.OrdersGetPayload<{
 function mapOrderListItem(o: OrderListItem): OrderListItemResponse {
   return new OrderListItemResponse({
     id: o.Id,
+    code: o.Code,
     customerId: o.CustomerId ?? null,
     customerName:
       o.AspNetUsers_Orders_CustomerIdToAspNetUsers?.FullName ?? null,
@@ -81,6 +82,7 @@ function mapOrderListItem(o: OrderListItem): OrderListItemResponse {
 function mapOrderFull(o: OrderFull): OrderResponse {
   return new OrderResponse({
     id: o.Id,
+    code: o.Code,
     customerId: o.CustomerId ?? null,
     customerName:
       o.AspNetUsers_Orders_CustomerIdToAspNetUsers?.FullName ?? null,
@@ -101,11 +103,11 @@ function mapOrderFull(o: OrderFull): OrderResponse {
     paymentExpiresAt: o.PaymentExpiresAt?.toISOString() ?? null,
     voucherId: o.UserVoucherId ?? null,
     voucherCode: o.UserVouchers?.Vouchers?.Code ?? null,
-    recipientInfo: o.RecipientInfos
+    recipientInfo: o.ContactAddresses
       ? {
-        fullName: o.RecipientInfos.RecipientName,
-        phone: o.RecipientInfos.RecipientPhoneNumber,
-        fullAddress: o.RecipientInfos.FullAddress
+        fullName: o.ContactAddresses.ContactName,
+        phone: o.ContactAddresses.ContactPhoneNumber,
+        fullAddress: o.ContactAddresses.FullAddress
       }
       : null,
     shippingInfo: o.ShippingInfos
@@ -257,7 +259,7 @@ export class OrderService {
         include: orderDetailInclude
       });
       return { success: true, data: orders.map(mapOrderFull) };
-    }, 'Failed to fetch order details with orders by user id');
+    }, 'Failed to fetch order details with orders by user id', true);
   }
 
   async getOrderReportFromGetOrderDetailsWithOrdersByUserId(

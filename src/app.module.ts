@@ -18,11 +18,12 @@ import { EjsAdapter } from '@nestjs-modules/mailer/dist/adapters/ejs.adapter';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import * as path from 'path';
-import { SearchModule } from 'src/infrastructure/domain/search/search.module';
+import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
 
 @Module({
   imports: [
     PrismaModule,
+    RedisModule,
     ConfigModule.forRoot({ isGlobal: true }),
     AutomapperModule.forRoot({
       strategyInitializer: mikro(),
@@ -57,17 +58,49 @@ import { SearchModule } from 'src/infrastructure/domain/search/search.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        // Xác định template directory dựa trên environment
-        const isProduction = process.env.NODE_ENV === 'production';
-        const templateDir = isProduction
-          ? path.join(__dirname, '..', 'infrastructure', 'templates', 'emails')
-          : path.join(
+        // Resolve the first existing template directory to avoid environment/path drift.
+        const templateDirCandidates = [
+          path.join(
             process.cwd(),
             'src',
             'infrastructure',
+            'domain',
+            'common',
             'templates',
             'emails'
-          );
+          ),
+          path.join(
+            process.cwd(),
+            'dist',
+            'src',
+            'infrastructure',
+            'domain',
+            'common',
+            'templates',
+            'emails'
+          ),
+          path.join(
+            __dirname,
+            'infrastructure',
+            'domain',
+            'common',
+            'templates',
+            'emails'
+          ),
+          path.join(
+            __dirname,
+            '..',
+            'infrastructure',
+            'domain',
+            'common',
+            'templates',
+            'emails'
+          )
+        ];
+
+        const templateDir =
+          templateDirCandidates.find((dirPath) => fs.existsSync(dirPath)) ??
+          templateDirCandidates[0];
 
         return {
           transport: {
@@ -100,8 +133,7 @@ import { SearchModule } from 'src/infrastructure/domain/search/search.module';
           port: config.get<number>('REDIS_PORT')
         }
       })
-    }),
-    SearchModule
+    })
   ],
   controllers: [AppController],
   providers: [

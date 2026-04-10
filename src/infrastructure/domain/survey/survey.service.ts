@@ -30,6 +30,7 @@ import { conversationOutput, searchOutput, surveyOutput } from 'src/chatbot/outp
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -41,7 +42,8 @@ export class SurveyService {
     private readonly userLogService: UserLogService,
     @InjectQueue(QueueName.SURVEY_QUEUE) private readonly surveyQueue: Queue,
     private readonly productService: ProductService,
-    private readonly analysisService: AiAnalysisService
+    private readonly analysisService: AiAnalysisService,
+    private readonly aiAcceptanceService: AIAcceptanceService
   ) { }
 
   async addSurveyQues(
@@ -210,11 +212,20 @@ export class SurveyService {
   }
 
   async getSurveyQuesAnwsByUserId(
-    userId: string
+    userId: string, limit: number = 1
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
     return await funcHandlerAsync(async () => {
-      const surveyQuestionAnswer =
-        await this.unitOfWork.AISurveyQuestionAnswerRepo.findOne({ userId }, { populate: ['details', 'details.question', 'details.answer'] });
+      const surveyQuestionAnswers =
+        await this.unitOfWork.AISurveyQuestionAnswerRepo.find(
+          { userId },
+          {
+            populate: ['details', 'details.question', 'details.answer'],
+            orderBy: { updatedAt: 'DESC' },
+            limit
+          }
+        );
+
+      const surveyQuestionAnswer = surveyQuestionAnswers[0];
       if (!surveyQuestionAnswer) {
         return { success: false, error: 'Survey question answer not found' };
       }
@@ -224,6 +235,12 @@ export class SurveyService {
       };
     }
       , 'Failed to get survey question answer by user id');
+  }
+
+  async getLatestSurveyQuesAnwsByUserId(
+    userId: string
+  ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
+    return this.getSurveyQuesAnwsByUserId(userId, 1);
   }
 
   async checkExistSurveyQuesAnwsByUserId(userId: string): Promise<boolean> {
@@ -323,7 +340,37 @@ export class SurveyService {
       );
     }
 
-    return Ok(aiResponse.data);
+    if (!aiResponse.data) {
+      return Ok('');
+    }
+
+    try {
+      const parsedResponse = typeof aiResponse.data === 'string'
+        ? JSON.parse(aiResponse.data)
+        : aiResponse.data;
+
+      if (Array.isArray(parsedResponse?.products) && parsedResponse.products.length > 0) {
+        const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+          userId,
+          contextType: 'survey',
+          sourceRefId: savedSurveyQuesAnsResponse.data.id,
+          products: parsedResponse.products,
+          metadata: {
+            flow: 'survey-v1',
+            productCount: parsedResponse.products.length
+          }
+        });
+
+        parsedResponse.products = attachResult.products;
+        if (attachResult.aiAcceptanceId) {
+          parsedResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+        }
+      }
+
+      return Ok(JSON.stringify(parsedResponse));
+    } catch {
+      return Ok(aiResponse.data);
+    }
   }
 
   /** Xử lý survey qua BullMQ queue và trả về gợi ý AI mang tính cá nhân hóa */
@@ -437,6 +484,25 @@ export class SurveyService {
             return product;
           }).filter(product => product.variants && product.variants.length > 0);
         }
+      }
+    }
+
+    if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
+      const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        userId,
+        contextType: 'survey',
+        sourceRefId: `survey-v2-${userId}-${Date.now()}`,
+        products: aiResponse.products,
+        metadata: {
+          flow: 'survey-v2',
+          questionCount: surveyAnswers.length,
+          productCount: aiResponse.products.length
+        }
+      });
+
+      aiResponse.products = attachResult.products;
+      if (attachResult.aiAcceptanceId) {
+        aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
       }
     }
 

@@ -123,17 +123,33 @@ export class MasterDataTool {
         }
     });
 
-    private async getNormalizationContext() {
-        const [notes, families, attributes] = await Promise.all([
-            this.masterDataService.searchScentNotes('').then(res => res.map(x => x.Name)),
-            this.masterDataService.searchOlfactoryFamilies('').then(res => res.map(x => x.Name)),
-            this.masterDataService.getAttributesWithValues().then(res => res.map(a => ({
-                name: a.Name,
-                values: a.AttributeValues.map(v => v.Value)
-            })))
-        ]);
+    getProductNormalizationContext: Tool = tool({
+        description: 'Get enriched normalization context for perfume search intent. Includes notes, families, attributes, genders, origins, release years, concentration names, variant types, longevity/sillage levels, and sample product metadata.',
+        inputSchema: z.object({}),
+        execute: async () => {
+            this.logger.log('[getProductNormalizationContext] called');
+            const context = await this.getNormalizationContext();
 
-        return { notes, families, attributes };
+            return {
+                success: true,
+                ...encodeToolOutput(context),
+                contextSummary: {
+                    notes: context.notes.length,
+                    families: context.families.length,
+                    attributes: context.attributes.length,
+                    genders: context.genders.length,
+                    origins: context.origins.length,
+                    releaseYears: context.releaseYears.length,
+                    concentrationNames: context.concentrationNames.length,
+                    variantTypes: context.variantTypes.length,
+                    sampleProducts: context.sampleProducts.length
+                }
+            };
+        }
+    });
+
+    private async getNormalizationContext() {
+        return this.masterDataService.getNormalizationContextData();
     }
 
     getAvailableAttributes: Tool = tool({

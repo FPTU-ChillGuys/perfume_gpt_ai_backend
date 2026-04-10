@@ -6,6 +6,123 @@ import { JaroWinklerDistance } from 'natural';
 export class MasterDataService {
     constructor(private readonly prisma: PrismaService) { }
 
+    async getNormalizationContextData() {
+        const [
+            notes,
+            families,
+            attributes,
+            products,
+            variants
+        ] = await Promise.all([
+            this.prisma.scentNotes.findMany({
+                select: { Name: true },
+                orderBy: { Name: 'asc' },
+                take: 300
+            }),
+            this.prisma.olfactoryFamilies.findMany({
+                select: { Name: true },
+                orderBy: { Name: 'asc' },
+                take: 200
+            }),
+            this.prisma.attributes.findMany({
+                include: {
+                    AttributeValues: true,
+                },
+            }),
+            this.prisma.products.findMany({
+                where: { IsDeleted: false },
+                select: {
+                    Id: true,
+                    Name: true,
+                    Origin: true,
+                    Gender: true,
+                    ReleaseYear: true,
+                    Brands: { select: { Name: true } },
+                    Categories: { select: { Name: true } }
+                },
+                orderBy: { UpdatedAt: 'desc' },
+                take: 300
+            }),
+            this.prisma.productVariants.findMany({
+                where: { IsDeleted: false },
+                select: {
+                    Type: true,
+                    Longevity: true,
+                    Sillage: true,
+                    Concentrations: { select: { Name: true } }
+                },
+                take: 600
+            })
+        ]);
+
+        const origins = Array.from(new Set(
+            products
+                .map((item) => item.Origin?.trim())
+                .filter((item): item is string => Boolean(item))
+        ));
+
+        const genders = Array.from(new Set(
+            products
+                .map((item) => item.Gender?.trim())
+                .filter((item): item is string => Boolean(item))
+        ));
+
+        const releaseYears = Array.from(new Set(
+            products
+                .map((item) => Number(item.ReleaseYear))
+                .filter((item) => Number.isFinite(item) && item > 0)
+        )).sort((a, b) => b - a);
+
+        const concentrationNames = Array.from(new Set(
+            variants
+                .map((item) => item.Concentrations?.Name?.trim())
+                .filter((item): item is string => Boolean(item))
+        ));
+
+        const variantTypes = Array.from(new Set(
+            variants
+                .map((item) => item.Type?.trim())
+                .filter((item): item is string => Boolean(item))
+        ));
+
+        const longevityLevels = Array.from(new Set(
+            variants
+                .map((item) => Number(item.Longevity))
+                .filter((item) => Number.isFinite(item) && item > 0)
+        )).sort((a, b) => a - b);
+
+        const sillageLevels = Array.from(new Set(
+            variants
+                .map((item) => Number(item.Sillage))
+                .filter((item) => Number.isFinite(item) && item > 0)
+        )).sort((a, b) => a - b);
+
+        return {
+            notes: notes.map((item) => item.Name),
+            families: families.map((item) => item.Name),
+            attributes: attributes.map((attribute) => ({
+                name: attribute.Name,
+                values: attribute.AttributeValues.map((value) => value.Value)
+            })),
+            genders,
+            origins,
+            releaseYears,
+            concentrationNames,
+            variantTypes,
+            longevityLevels,
+            sillageLevels,
+            sampleProducts: products.slice(0, 80).map((item) => ({
+                id: item.Id,
+                name: item.Name,
+                brand: item.Brands?.Name,
+                category: item.Categories?.Name,
+                origin: item.Origin,
+                gender: item.Gender,
+                releaseYear: item.ReleaseYear
+            }))
+        };
+    }
+
     async searchBrands(keyword: string) {
         return this.prisma.brands.findMany({
             where: { Name: { contains: keyword } },

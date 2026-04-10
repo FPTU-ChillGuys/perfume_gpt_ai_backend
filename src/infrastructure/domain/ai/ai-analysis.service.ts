@@ -2,10 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Output } from 'ai';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
-import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT, SURVEY_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
+import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT, SURVEY_ANALYSIS_SYSTEM_PROMPT, TREND_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { Tools } from 'src/chatbot/tools';
 import { analysisOutput, AnalysisObject, intentOnlyOutput, IntentOnlyObject } from 'src/chatbot/output/analysis.output';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
+
+type AnalysisRuntimeContext = {
+    userId?: string;
+    isGuestUser?: boolean;
+};
 
 @Injectable()
 export class AiAnalysisService {
@@ -13,7 +18,11 @@ export class AiAnalysisService {
 
     constructor(private readonly tools: Tools) { }
 
-    async analyze(currentMessage: string, previousMessages?: string): Promise<AnalysisObject | null> {
+    async analyze(
+        currentMessage: string,
+        previousMessages?: string,
+        context?: AnalysisRuntimeContext
+    ): Promise<AnalysisObject | null> {
         try {
             this.logger.log(`[AiAnalysis] Starting context-aware analysis...`);
             if (!currentMessage) {
@@ -23,7 +32,11 @@ export class AiAnalysisService {
 
             const input = JSON.stringify({
                 previousMessages: previousMessages || 'No previous context.',
-                currentMessage: currentMessage
+                currentMessage: currentMessage,
+                analysisContext: {
+                    userId: context?.userId ?? null,
+                    isGuestUser: context?.isGuestUser ?? false
+                }
             });
 
             const result = await textGenerationFromPromptToResultWithErrorHandler(
@@ -120,6 +133,51 @@ export class AiAnalysisService {
             return analysis;
         } catch (error) {
             this.logger.error('[AiAnalysis] Survey analysis failed', error);
+            return null;
+        }
+    }
+
+    async analyzeTrend(
+        trendSignals: Array<{ keyword: string; score: number; source: string }>
+    ): Promise<AnalysisObject | null> {
+        try {
+            this.logger.log(`[AiAnalysis] Starting trend analysis for ${trendSignals.length} signals...`);
+            if (!trendSignals || trendSignals.length === 0) {
+                this.logger.warn('[AiAnalysis] Trend signals are empty');
+                return null;
+            }
+
+            const input = JSON.stringify({ trendSignals });
+
+            const result = await textGenerationFromPromptToResultWithErrorHandler(
+                aiModelForOptimizePrompt,
+                input,
+                TREND_ANALYSIS_SYSTEM_PROMPT,
+                this.tools.getToolsForAnalysis,
+                'Failed to analyze trend signals',
+                10,
+                Output.object(analysisOutput),
+                0.2
+            );
+
+            if (!result) {
+                this.logger.warn('[AiAnalysis] Trend analysis returned null');
+                return null;
+            }
+
+            const analysis = JSON.parse(result) as AnalysisObject;
+
+            // Force no function call — trend pipeline always decides this externally
+            analysis.functionCall = null;
+            analysis.intent = 'Search';
+            if (!analysis.pagination) {
+                analysis.pagination = { pageNumber: 1, pageSize: 50 };
+            }
+
+            this.logger.log(`[AiAnalysis] Trend analysis completed. Logic groups: ${analysis.logic?.length ?? 0}`);
+            return analysis;
+        } catch (error) {
+            this.logger.error('[AiAnalysis] Trend analysis failed', error);
             return null;
         }
     }

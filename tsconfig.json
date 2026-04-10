@@ -10,9 +10,10 @@
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
     "paths": {
-      "src/*": ["src/*"],
+      "src/*": ["./src/*"],
+      "generated/*": ["./generated/*"],
+      "mikro-orm.config": ["./mikro-orm.config.ts"],
       "./*": ["./*"]
     },
     "incremental": true,

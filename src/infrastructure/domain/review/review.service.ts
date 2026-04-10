@@ -20,6 +20,7 @@ const reviewInclude = {
   AspNetUsers_Reviews_UserIdToAspNetUsers: {
     include: { Media: true }
   },
+  AspNetUsers_Reviews_StaffFeedbackByStaffIdToAspNetUsers: true,
   OrderDetails: {
     include: {
       ProductVariants: {
@@ -39,11 +40,11 @@ type ReviewWithRelations = Prisma.ReviewsGetPayload<{
 
 type ReviewStatus = 'Pending' | 'Approved' | 'Rejected';
 
-function deriveReviewStatus(review: Pick<ReviewWithRelations, 'ModeratedAt' | 'ModerationReason'>): ReviewStatus {
-  if (!review.ModeratedAt) {
+function deriveReviewStatus(review: Pick<ReviewWithRelations, 'StaffFeedbackAt' | 'StaffFeedbackComment'>): ReviewStatus {
+  if (!review.StaffFeedbackAt) {
     return 'Pending';
   }
-  if (review.ModerationReason && review.ModerationReason.trim().length > 0) {
+  if (review.StaffFeedbackComment && review.StaffFeedbackComment.trim().length > 0) {
     return 'Rejected';
   }
   return 'Approved';
@@ -52,15 +53,15 @@ function deriveReviewStatus(review: Pick<ReviewWithRelations, 'ModeratedAt' | 'M
 function buildReviewStatusWhere(status?: string): Prisma.ReviewsWhereInput {
   switch (status) {
     case 'Pending':
-      return { ModeratedAt: null };
+      return { StaffFeedbackAt: null };
     case 'Approved':
       return {
         AND: [
-          { ModeratedAt: { not: null } },
+          { StaffFeedbackAt: { not: null } },
           {
             OR: [
-              { ModerationReason: null },
-              { ModerationReason: '' },
+              { StaffFeedbackComment: null },
+              { StaffFeedbackComment: '' },
             ],
           },
         ],
@@ -68,9 +69,9 @@ function buildReviewStatusWhere(status?: string): Prisma.ReviewsWhereInput {
     case 'Rejected':
       return {
         AND: [
-          { ModeratedAt: { not: null } },
-          { ModerationReason: { not: null } },
-          { NOT: { ModerationReason: '' } },
+          { StaffFeedbackAt: { not: null } },
+          { StaffFeedbackComment: { not: null } },
+          { NOT: { StaffFeedbackComment: '' } },
         ],
       };
     default:
@@ -94,7 +95,7 @@ function mapToReviewResponse(review: ReviewWithRelations): ReviewResponse {
     variantId: review.OrderDetails.VariantId,
     variantName: buildVariantName(review),
     rating: review.Rating,
-    comment: review.Comment,
+    comment: review.Comment ?? '',
     status: deriveReviewStatus(review),
     images: review.Media.map(
       (m): MediaResponse => ({
@@ -125,7 +126,7 @@ function mapToReviewListItemResponse(
     variantName: buildVariantName(review),
     rating: review.Rating,
     status: deriveReviewStatus(review),
-    commentPreview: review.Comment.substring(0, 100),
+    commentPreview: (review.Comment ?? '').substring(0, 100),
     imageCount: review.Media.length,
     createdAt: review.CreatedAt.toISOString()
   };

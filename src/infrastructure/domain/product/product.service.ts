@@ -20,7 +20,6 @@ import { Prisma } from 'generated/prisma/client';
 import ApiUrl from 'src/infrastructure/domain/common/api/api_url';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
-import { SearchService } from 'src/infrastructure/domain/search/search.service';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ProductCardOutputItem } from 'src/chatbot/output/product.output';
 import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
@@ -178,13 +177,124 @@ function mapProduct(p: ProductWithRelations): ProductResponse {
 @Injectable()
 export class ProductService {
   private readonly logger = new Logger(ProductService.name);
+  // Fallback generic keywords to filter out when filtering logic (until vocabular parser rules are seeded)
+  private readonly GENERIC_FILTER_KEYWORDS_FALLBACK = [
+    'nước hoa', 'nước', 'hoa', 'perfume', 'dầu thơm', 'price', 'budget', 'gian hàng', 'giá',
+    'sản phẩm', 'product', 'tìm', 'find', 'search', 'gợi ý', 'recommend'
+  ];
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly searchService: SearchService,
     private readonly nlpEngineService: NlpEngineService,
     private readonly dictionaryBuilderService: DictionaryBuilderService,
   ) { }
+
+  /**
+   * Load generic filter keywords from VocabParserRule or fallback to hardcoded list
+   * These keywords are filtered out from the search logic to avoid generic matches
+   */
+  private async getGenericFilterKeywords(): Promise<string[]> {
+    try {
+      // TODO: Once VocabParserRule is seeded with 'filler_keyword' rule group,
+      // uncomment this to load from database:
+      // const rules = await this.prisma.vocabParserRule.findMany({
+      //   where: { ruleGroup: 'filler_keyword' }
+      // });
+      // return rules.map(r => r.pattern.toLowerCase()).filter(Boolean);
+      
+      // For now, use fallback hardcoded list
+      return this.GENERIC_FILTER_KEYWORDS_FALLBACK;
+    } catch (error) {
+      this.logger.warn('[SEARCH] Failed to load generic keywords from DB, using fallback', error);
+      return this.GENERIC_FILTER_KEYWORDS_FALLBACK;
+    }
+  }
+
+  private createEmptyPagedProducts(
+    request: PagedAndSortedRequest
+  ): PagedResult<ProductWithVariantsResponse> {
+    return new PagedResult<ProductWithVariantsResponse>({
+      items: [],
+      pageNumber: request.PageNumber,
+      pageSize: request.PageSize,
+      totalCount: 0,
+      totalPages: 0
+    });
+  }
+
+  /**
+   * DEBUG METHOD: Test gender filter independently.
+   * Call this to verify that gender filtering works as expected.
+   * Example: await productService.testGenderFilter('nam', 1, 5)
+   */
+  async testGenderFilter(
+    genderKeyword: string,
+    pageNumber: number = 1,
+    pageSize: number = 5
+  ): Promise<{
+    query: Prisma.ProductsWhereInput;
+    totalCount: number;
+    results: Array<{ id: string; name: string; gender: string | null }>;
+  }> {
+    const skip = (pageNumber - 1) * pageSize;
+
+    // Build WHERE condition for gender filter
+    const where: Prisma.ProductsWhereInput = {
+      IsDeleted: false,
+      Gender: { equals : genderKeyword }
+    };
+
+    this.logger.debug(`[GENDER_TEST] Testing filter for keyword: "${genderKeyword}"`);
+    this.logger.debug(`[GENDER_TEST] WHERE clause: ${JSON.stringify(where)}`);
+
+    const [totalCount, products] = await Promise.all([
+      this.prisma.products.count({ where }),
+      this.prisma.products.findMany({
+        where,
+        select: { Id: true, Name: true, Gender: true },
+        skip,
+        take: pageSize,
+        orderBy: { CreatedAt: 'desc' }
+      })
+    ]);
+
+    this.logger.debug(`[GENDER_TEST] Total found: ${totalCount}, Returned: ${products.length}`);
+    products.forEach((p, idx) => {
+      this.logger.debug(`[GENDER_TEST] [${idx}] ${p.Name} - Gender: "${p.Gender}"`);
+    });
+
+    return {
+      query: where,
+      totalCount,
+      results: products.map(p => ({
+        id: p.Id,
+        name: p.Name,
+        gender: p.Gender
+      }))
+    };
+  }
+
+  private async runParsedQuerySearch(
+    searchText: string,
+    request: PagedAndSortedRequest
+  ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
+    const parsedResult = this.nlpEngineService.parseAndNormalize(searchText);
+    const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
+    const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
+
+    if (!structuredResult.success || !structuredResult.data) {
+      return {
+        success: false,
+        error: structuredResult.error || 'Failed to fetch products by parsed query',
+        payload: this.createEmptyPagedProducts(request)
+      };
+    }
+
+    return {
+      success: true,
+      payload: structuredResult.data
+    };
+  }
 
   async getAllProducts(
     request: PagedAndSortedRequest
@@ -223,38 +333,20 @@ export class ProductService {
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const { items, totalCount } = await this.searchService.searchProducts(searchText, request);
+        if (!searchText?.trim()) {
+          return { success: true, payload: this.createEmptyPagedProducts(request) };
+        }
 
-        // Enrich the items with full variant info from Prisma
-        const productIds = items.map((p: any) => p.id);
-        const productsFromDb = await this.prisma.products.findMany({
-          where: { Id: { in: productIds }, IsDeleted: false },
-          include: productWithVariantsInclude
-        });
-
-        // Maintain the order from Elasticsearch
-        const productMap = new Map(productsFromDb.map(p => [p.Id, p]));
-        const enrichedItems = productIds
-          .map(id => productMap.get(id))
-          .filter(p => !!p)
-          .map(p => mapProductWithVariants(p as ProductWithVariantsRelations));
-
-        const result = new PagedResult<ProductWithVariantsResponse>({
-          items: enrichedItems,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        });
-        return { success: true, payload: result };
+        this.logger.log('[SEARCH][QUERY_ONLY] getProductsUsingSemanticSearch -> parsed query path');
+        return await this.runParsedQuerySearch(searchText, request);
       },
-      'Failed to fetch products using heuristic semantic search',
+      'Failed to fetch products using semantic query path',
       true
     );
   }
 
   /**
-   * Search sản phẩm sử dụng AI để trích xuất intent (brand, price, gender, notes, etc.)
+   * Backward-compat endpoint: currently runs NLP parsed-query path only.
    */
   async getProductsUsingAiSearch(
     searchText: string,
@@ -262,32 +354,14 @@ export class ProductService {
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const { items, totalCount } = await this.searchService.searchWithAi(searchText, request);
+        if (!searchText?.trim()) {
+          return { success: true, payload: this.createEmptyPagedProducts(request) };
+        }
 
-        // Enrich the items with full variant info from Prisma
-        const productIds = items.map((p: any) => p.id);
-        const productsFromDb = await this.prisma.products.findMany({
-          where: { Id: { in: productIds }, IsDeleted: false },
-          include: productWithVariantsInclude
-        });
-
-        // Maintain the order from Elasticsearch
-        const productMap = new Map(productsFromDb.map(p => [p.Id, p]));
-        const enrichedItems = productIds
-          .map(id => productMap.get(id))
-          .filter(p => !!p)
-          .map(p => mapProductWithVariants(p as ProductWithVariantsRelations));
-
-        const result = new PagedResult<ProductWithVariantsResponse>({
-          items: enrichedItems,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        });
-        return { success: true, payload: result };
+        this.logger.log('[SEARCH][NLP_ONLY] getProductsUsingAiSearch -> parsed query path');
+        return await this.runParsedQuerySearch(searchText, request);
       },
-      'Failed to fetch products using semantic search v2',
+      'Failed to fetch products using NLP query path',
       true
     );
   }
@@ -576,23 +650,12 @@ export class ProductService {
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    // Both methods now essentially do the same thing with the internal SearchService
+    // Reuse the semantic query path and return the same paged payload contract.
     const result = await this.getProductsUsingSemanticSearch(searchText, request);
     return {
       success: result.success,
       data: result.payload
     };
-  }
-
-  async syncAllProductsToIndex() {
-    return await funcHandlerAsync(
-      async () => {
-        await this.searchService.syncAllProducts();
-        return { success: true, message: 'Products sync triggered successfully' };
-      },
-      'Failed to sync products to index',
-      true
-    );
   }
 
   async resolveProductViewInfo(
@@ -1013,6 +1076,8 @@ export class ProductService {
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
     return await funcHandlerAsync(async () => {
       const { logic, sorting, budget, pagination, productNames } = analysis;
+      const genericFilterKeywords = await this.getGenericFilterKeywords();
+      
       const genderValues = this.asStringArray(analysis.genderValues ?? analysis.gender);
       const originValues = this.asStringArray(analysis.originValues ?? analysis.origin);
       const concentrationValues = this.asStringArray(analysis.concentrationValues ?? analysis.concentration);
@@ -1029,38 +1094,48 @@ export class ProductService {
       const skip = ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 5);
       const take = pagination?.pageSize || 5;
 
+      // ======== DEBUG: Log gender filter info ========
+      this.logger.debug(`[SEARCH][GENDER] Extracted genderValues: ${JSON.stringify(genderValues)}`);
+      this.logger.debug(`[SEARCH][GENDER] Analysis input - genderValues: ${JSON.stringify(analysis.genderValues)}, gender: ${JSON.stringify(analysis.gender)}`);
+
       // Build Name-specific conditions
       const nameConditions: Prisma.ProductsWhereInput[] = (productNames || []).map((name: string) => ({
-        Name: { contains: name }
+        Name: { contains : name }
       }));
 
-      // Purity check: Filter out generic or price-related keywords
+      // Filter out generic keywords that don't help with specific search
       const purifiedLogic = (logic || []).map((group: any) => {
         const andItems = Array.isArray(group) ? group : [group];
         const filtered = andItems.filter((item: string) => {
           const lower = item.toLowerCase();
-          return !['nước hoa', 'perfume', 'dầu thơm', 'price', 'budget', 'gian hàng', 'giá'].includes(lower) &&
+          return !genericFilterKeywords.includes(lower) &&
             !lower.includes('price<') && !lower.includes('price>');
         });
         return filtered.length > 0 ? filtered : null;
       }).filter(group => group !== null);
 
       // Build AND conditions (each group is a set of OR alternatives)
+      // IMPORTANT: Flatten the nested OR structure to avoid confusion in query execution
+      // Each keyword in a group can match across multiple fields (Name, Brands, Categories, etc)
       const groupConditions: Prisma.ProductsWhereInput[] = purifiedLogic.map((group: any) => {
         const orItems = group;
-        const orConditionsForGroup: Prisma.ProductsWhereInput[] = orItems.map((item: string) => ({
-          OR: [
-            { Name: { contains: item } },
-            { Brands: { Name: { contains: item } } },
-            { Categories: { Name: { contains: item } } },
-            { Gender: { contains: item } },
-            { Origin: { contains: item } },
-            { ProductNoteMaps: { some: { ScentNotes: { Name: { contains: item } } } } },
-            { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains: item } } } } },
-            { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } },
-            { ProductVariants: { some: { Type: { contains: item } } } },
-            { ProductVariants: { some: { Concentrations: { Name: { contains: item } } } } },
-            { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains: item } } } } } } },
+        // Flatten: instead of { OR: [{ OR: [...] }, { OR: [...] }] }, 
+        // create { OR: [field1, field2, ...] } with all fields for all items
+        const flattenedOrConditions: Prisma.ProductsWhereInput[] = [];
+        
+        for (const item of orItems) {
+          flattenedOrConditions.push(
+            { Name: { contains : item } },
+            { Brands: { Name: { contains : item } } },
+            { Categories: { Name: { contains : item } } },
+            { Gender: { equals : item } },
+            { Origin: { contains : item } },
+            { ProductNoteMaps: { some: { ScentNotes: { Name: { contains : item } } } } },
+            { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains : item } } } } },
+            { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } },
+            { ProductVariants: { some: { Type: { contains : item } } } },
+            { ProductVariants: { some: { Concentrations: { Name: { contains : item } } } } },
+            { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } } } },
             ...(this.extractReleaseYear(item) ? [{ ReleaseYear: this.extractReleaseYear(item)! }] : []),
             ...(this.extractVolumeValues(item).length > 0 ? [{ ProductVariants: { some: { VolumeMl: { in: this.extractVolumeValues(item) } } } }] : []),
             ...(this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i) !== undefined
@@ -1069,9 +1144,10 @@ export class ProductService {
             ...(this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i')) !== undefined
               ? [{ ProductVariants: { some: { Sillage: { gte: this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i'))! } } } }]
               : [])
-          ]
-        }));
-        return { OR: orConditionsForGroup };
+          );
+        }
+        
+        return { OR: flattenedOrConditions };
       });
 
       const andConditionsForWhere: Prisma.ProductsWhereInput[] = [];
@@ -1090,7 +1166,7 @@ export class ProductService {
             some: {
               OR: ageTerms.map(value => ({
                 AttributeValues: {
-                  Value: { contains: value }
+                  Value: { contains : value }
                 }
               }))
             }
@@ -1099,17 +1175,22 @@ export class ProductService {
       }
 
       if (genderValues.length > 0) {
-        andConditionsForWhere.push({
+        const genderCondition = {
           OR: genderValues.map(value => ({
-            Gender: { contains: value }
+            Gender: { equals : value }
           }))
-        });
+        };
+        this.logger.debug(`[SEARCH][GENDER] Building gender filter with ${genderValues.length} values: ${JSON.stringify(genderValues)}`);
+        this.logger.debug(`[SEARCH][GENDER] Gender WHERE condition: ${JSON.stringify(genderCondition)}`);
+        andConditionsForWhere.push(genderCondition);
+      } else {
+        this.logger.warn('[SEARCH][GENDER] ⚠️ No gender values extracted! All genders will be returned');
       }
 
       if (originValues.length > 0) {
         andConditionsForWhere.push({
           OR: originValues.map(value => ({
-            Origin: { contains: value }
+            Origin: { contains : value }
           }))
         });
       }
@@ -1136,7 +1217,7 @@ export class ProductService {
               IsDeleted: false,
               OR: concentrationValues.map(value => ({
                 Concentrations: {
-                  Name: { contains: value }
+                  Name: { contains : value }
                 }
               }))
             }
@@ -1150,7 +1231,7 @@ export class ProductService {
             some: {
               IsDeleted: false,
               OR: variantTypeValues.map(value => ({
-                Type: { contains: value }
+                Type: { contains : value }
               }))
             }
           }
@@ -1198,6 +1279,9 @@ export class ProductService {
         ...(andConditionsForWhere.length > 0 ? { AND: andConditionsForWhere } : {})
       };
 
+      // ======== DEBUG: Log complete WHERE clause ========
+      this.logger.debug(`[SEARCH][WHERE] Number of AND conditions: ${andConditionsForWhere.length}`);
+
       // Sorting logic
       let orderBy: Prisma.ProductsOrderByWithRelationInput = { CreatedAt: 'desc' };
       const isPriceSorting = sorting && sorting.field === 'Price';
@@ -1221,6 +1305,8 @@ export class ProductService {
       let products: ProductWithVariantsRelations[] = [];
       let totalCount = 0;
 
+      this.logger.log("Where clause for structured query: " + JSON.stringify(where));
+
       if (!isPriceSorting) {
         // Fallback or Normal Sorting behavior
         [products, totalCount] = await Promise.all([
@@ -1230,9 +1316,23 @@ export class ProductService {
             skip,
             take,
             orderBy
-          }),
+          }), 
           this.prisma.products.count({ where })
         ]);
+
+        // ======== DEBUG: Log result details ========
+        this.logger.debug(`[SEARCH][RESULTS] Total matched by WHERE: ${totalCount}, Returned on page: ${products.length}`);
+        if (genderValues.length > 0) {
+          const productsByGender = products.map(p => ({
+            name: p.Name,
+            gender: p.Gender || '(null)',
+            matches: genderValues.some(g => p.Gender?.toLowerCase().includes(g.toLowerCase()))
+          }));
+          this.logger.debug(`[SEARCH][RESULTS] Product gender check for filter [${genderValues.join(', ')}]:`);
+          productsByGender.forEach((p, idx) => {
+            this.logger.debug(`  [${idx}] "${p.name}" - Gender: "${p.gender}" - Matches filter: ${p.matches}`);
+          });
+        }
       } else {
         // ==========================================
         // Custom IN-MEMORY Price Sorting
@@ -1341,6 +1441,8 @@ export class ProductService {
           name: p.Name,
           brandName: p.Brands.Name,
           primaryImage: p.Media[0]?.Url || null,
+          reasoning: null,
+          source: null,
           variants: (p.ProductVariants || []).map(v => ({
             id: v.Id,
             sku: v.Sku,

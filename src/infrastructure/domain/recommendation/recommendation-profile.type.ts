@@ -43,6 +43,7 @@ export interface ProductScore {
   variantId: string;
   productName: string;
   variantName: string;
+  aiAcceptanceId?: string;
   brand?: string;
   basePrice?: number;
   gender?: string;
@@ -70,6 +71,7 @@ export interface ProductScore {
 
 export interface RecommendationResponse {
   userId: string;
+  aiAcceptanceId?: string;
   recommendations: ProductScore[];
   totalProducts: number;
   profile: {
@@ -146,6 +148,7 @@ export interface ProductScoreV3 {
   productId: string;
   variantId: string;
   productName: string;
+  aiAcceptanceId?: string;
   brand?: string;
   basePrice?: number;
   scentNotes?: string[];

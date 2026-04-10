@@ -14,25 +14,33 @@ import { CartTool } from './tools/cart.tool';
 @Injectable()
 export class Tools implements OnModuleInit {
   get getToolsForChatbot(): ToolSet {
-    if (!this.productTool || !this.orderTool || !this.logTool || !this.cartTool) return {};
-    return {
-      getNewestProducts: this.productTool.getNewestProducts,
-      getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getLeastSellingProducts: this.productTool.getLeastSellingProducts,
-      getOrdersByUserId: this.orderTool.getOrdersByUserId,
-      getStaticProductPolicy: this.productTool.getStaticProductPolicy,
-      getUserLogSummaryByUserId: this.logTool.getUserLogSummaryByUserId,
-      addToCart: this.cartTool.addToCart,
-      getCart: this.cartTool.getCart,
-      clearCart: this.cartTool.clearCart,
-    };
+    // Không cho phép gọi trực tiếp qua AI chính.
+    // Tất cả function giờ chuyển sang được gọi gián tiếp bởi Intermediate AI (thông qua analysis functionCall).
+    // Giao quyền lại cho ConversationV10Service xử lý payload.
+    return {};
   }
 
   get getToolsForAnalysis(): ToolSet {
-    if (!this.masterDataTool) return {};
-    return {
-      searchMasterData: this.masterDataTool.searchMasterData,
-    };
+    const analysisTools: ToolSet = {};
+
+    if (this.masterDataTool) {
+      analysisTools.getProductNormalizationContext =
+        this.masterDataTool.getProductNormalizationContext;
+      analysisTools.searchMasterData = this.masterDataTool.searchMasterData;
+    }
+
+    if (this.profileTool) {
+      analysisTools.getOwnProfile = this.profileTool.getOwnProfile;
+      analysisTools.getProfileRecommendationContext =
+        this.profileTool.getProfileRecommendationContext;
+    }
+
+    if (this.orderTool) {
+      analysisTools.getOrderDetailsWithOrdersByUserId =
+        this.orderTool.getOrderDetailsWithOrdersByUserId;
+    }
+
+    return analysisTools;
   }
 
   get getToolsForSurvey(): ToolSet {
@@ -64,6 +72,7 @@ export class Tools implements OnModuleInit {
   get getToolsForRestock(): ToolSet {
     if (!this.inventoryTool) return {};
     return {
+      getInventoryStock: this.inventoryTool.getInventoryStock,
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
       getProductSalesAnalyticsForRestock:
         this.inventoryTool.getProductSalesAnalyticsForRestock
@@ -111,15 +120,15 @@ export class Tools implements OnModuleInit {
     };
   }
 
-  private productTool: ProductTool;
-  private orderTool: OrderTool;
-  private profileTool: ProfileTool;
-  private logTool: LogTool;
-  private reviewTool: ReviewTool;
-  private userTool: UserTool;
-  private inventoryTool: InventoryTool;
-  private masterDataTool: MasterDataTool;
-  private cartTool: CartTool;
+  private productTool?: ProductTool;
+  private orderTool?: OrderTool;
+  private profileTool?: ProfileTool;
+  private logTool?: LogTool;
+  private reviewTool?: ReviewTool;
+  private userTool?: UserTool;
+  private inventoryTool?: InventoryTool;
+  private masterDataTool?: MasterDataTool;
+  private cartTool?: CartTool;
 
   constructor(private readonly moduleRef: ModuleRef) { }
 

@@ -24,6 +24,7 @@ export interface EmailProduct {
   categoryName: string;
   primaryImage?: string;
   variants?: ProductVariant[];
+  aiAcceptanceId?: string;
 }
 
 export interface EmailTemplateData {
@@ -55,7 +56,7 @@ export class EmailService {
    * Gửi email bằng template
    * @param to Email người nhận
    * @param subject Tiêu đề email
-   * @param template Template name (nằm trong src/infrastructure/templates/emails/)
+    * @param template Template name (nằm trong src/infrastructure/domain/common/templates/emails/)
    * @param context Data để fill vào template
    */
   async sendTemplateEmail(

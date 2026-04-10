@@ -3,15 +3,19 @@ import {
   Get,
   Logger,
   Post,
-  Query} from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { Public } from 'src/application/common/Metadata';
+  Query
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Public, Role } from 'src/application/common/Metadata';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { RecommendationService } from 'src/infrastructure/domain/recommendation/recommandation.service';
-import { RecommendationV2Service } from 'src/infrastructure/domain/recommendation/recommendation-v2.service';
+import {
+  DailyRecommendationBatchSummary,
+  RecommendationService
+} from 'src/infrastructure/domain/recommendation/recommandation.service';
 import { RecommendationResponse } from 'src/infrastructure/domain/recommendation/recommendation-profile.type';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -20,8 +24,8 @@ export class RecommendationController {
 
   constructor(
     private readonly recommendationService: RecommendationService,
-    private readonly recommendationV2Service: RecommendationV2Service
-  ) {}
+    private readonly aiAcceptanceService: AIAcceptanceService
+  ) { }
 
   /**
    * Test recommendation API
@@ -55,29 +59,49 @@ export class RecommendationController {
     name: 'userId',
     description: 'ID của user để test repurchase recommendation'
   })
+  @ApiQuery({
+    name: 'orderId',
+    required: true,
+    description: 'ID của đơn hàng để phân tích khuyến nghị'
+  })
   @ApiBaseResponse(String)
   async testRepurchase(
-    @Query('userId') userId: string
+    @Query('userId') userId: string,
+    @Query('orderId') orderId: string
   ): Promise<BaseResponse<string>> {
-    await this.recommendationService.sendRepurchase(userId);
+    await this.recommendationService.sendRepurchase(userId, orderId);
     return Ok('Repurchase recommendation generated and email sent successfully');
   }
 
-  /**
-   * Get intelligent product recommendations (V2)
-   * Dựa trên:
-   * - Lịch sử mua hàng 2 năm gần đây
-   * - Mùa hiện tại (summer/winter)
-   * - Hồ sơ khảo sát (nốt hương, dịp, phong cách)
-   * - Tuổi động (tính từ DateOfBirth)
-   * - Ngân sách hàng tháng (tính từ lịch sử order)
-   * - Tần suất tái mua (từ lịch sử đơn hàng)
-   */
-  @Public()
-  @Get('v2')
+  @Post('daily/send')
+  @Role(['admin'])
+  @ApiBearerAuth('jwt')
   @ApiOperation({
     summary:
-      'Thông minh recommend sản phẩm dựa trên 6 tiêu chí (mua/mùa/survey/tuổi/budget/tần suất)'
+      'Manual trigger gửi daily recommendation cho user active (sync)'
+  })
+  @ApiBaseResponse(Object)
+  async sendDailyRecommendationManual(): Promise<
+    BaseResponse<DailyRecommendationBatchSummary>
+  > {
+    const summary = await this.recommendationService.sendRecommendationToAllUsers(
+      'manual'
+    );
+    return Ok(summary);
+  }
+
+
+  /**
+   * Get simple robust practical recommendations (V3)
+   * Dựa trên:
+   * - Lịch sử mua hàng TẤT CẢ các trạng thái
+   * - Mở rộng với Best Sellers (Luôn có kết quả trả về)
+   */
+  @Public()
+  @Get('v3/simple')
+  @ApiOperation({
+    summary:
+      'Recommend đơn giản và ổn định dựa trên Order và Best Sellers (không fallback mảng rỗng)'
   })
   @ApiQuery({
     name: 'userId',
@@ -91,13 +115,34 @@ export class RecommendationController {
     description: 'Số sản phẩm recommend (default: 10)'
   })
   @ApiBaseResponse(Object)
-  async getRecommendationsV2(
+  async getRecommendationsV3Simple(
     @Query('userId') userId: string,
     @Query('size') size?: number
-  ): Promise<BaseResponse<RecommendationResponse>> {
-    return await this.recommendationV2Service.getRecommendations(
+  ): Promise<BaseResponse<any>> {
+    const result = await this.recommendationService.getRecommendationsSimple(
       userId,
       size || 10
     );
+
+    if (result.success && result.data?.recommendations?.length) {
+      const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        userId,
+        contextType: 'recommendation',
+        sourceRefId: `recommendation-v3-simple-${userId}-${Date.now()}`,
+        products: result.data.recommendations,
+        metadata: {
+          sizeRequested: size || 10,
+          productCount: result.data.recommendations.length
+        }
+      });
+
+      result.data.recommendations = attachResult.products as any;
+      if (attachResult.aiAcceptanceId) {
+        (result.data as any).aiAcceptanceId = attachResult.aiAcceptanceId;
+      }
+    }
+
+    return result;
   }
 }
+

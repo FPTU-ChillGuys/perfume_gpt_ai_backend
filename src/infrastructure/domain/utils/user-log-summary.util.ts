@@ -1,6 +1,7 @@
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { EventLog } from 'src/domain/entities/event-log.entity';
 import { EventLogEventType } from 'src/domain/enum/event-log-event-type.enum';
+import { tokenizeText } from './nlp-tokenizer';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { convertToUTC } from './time-zone';
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
@@ -8,265 +9,49 @@ import { AllUserLogRequest } from 'src/application/dtos/request/user-log.request
 
 export type RollingFeatureSnapshot = {
   eventTypeCounts: Record<string, number>;
+  keywordCounts: Record<string, number>;
   intentCounts: Record<string, number>;
   audienceCounts: Record<string, number>;
   hourCounts: Record<string, number>;
-  byEvent: {
-    click: PreferenceCounterGroup;
-    search: PreferenceCounterGroup;
-    survey: PreferenceCounterGroup;
-  };
-  merged: PreferenceCounterGroup;
-};
-
-export type PreferenceCounterGroup = {
-  brand: Record<string, number>;
-  scent: Record<string, number>;
-  priceRange: Record<string, number>;
-  occasion: Record<string, number>;
-  gender: Record<string, number>;
-  style: Record<string, number>;
 };
 
 export type DailyFeatureSnapshot = Record<string, RollingFeatureSnapshot>;
 
-function createEmptyPreferenceCounterGroup(): PreferenceCounterGroup {
-  return {
-    brand: {},
-    scent: {},
-    priceRange: {},
-    occasion: {},
-    gender: {},
-    style: {}
-  };
-}
-
 export function createEmptyRollingFeatureSnapshot(): RollingFeatureSnapshot {
   return {
     eventTypeCounts: {},
+    keywordCounts: {},
     intentCounts: {},
     audienceCounts: {},
-    hourCounts: {},
-    byEvent: {
-      click: createEmptyPreferenceCounterGroup(),
-      search: createEmptyPreferenceCounterGroup(),
-      survey: createEmptyPreferenceCounterGroup()
-    },
-    merged: createEmptyPreferenceCounterGroup()
-  };
-}
-
-function normalizeCounterRecord(value: unknown): Record<string, number> {
-  if (!value || typeof value !== 'object') {
-    return {};
-  }
-
-  const normalized: Record<string, number> = {};
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-    const numeric = Number(raw);
-    if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
-      normalized[key] = numeric;
-    }
-  }
-
-  return normalized;
-}
-
-function normalizePreferenceCounterGroup(value: unknown): PreferenceCounterGroup {
-  const source = value && typeof value === 'object'
-    ? (value as Record<string, unknown>)
-    : {};
-
-  return {
-    brand: normalizeCounterRecord(source.brand),
-    scent: normalizeCounterRecord(source.scent),
-    priceRange: normalizeCounterRecord(source.priceRange),
-    occasion: normalizeCounterRecord(source.occasion),
-    gender: normalizeCounterRecord(source.gender),
-    style: normalizeCounterRecord(source.style)
+    hourCounts: {}
   };
 }
 
 export function normalizeFeatureSnapshot(
   snapshot?: Record<string, unknown>
 ): RollingFeatureSnapshot {
-  const byEvent =
-    snapshot?.byEvent && typeof snapshot.byEvent === 'object'
-      ? (snapshot.byEvent as Record<string, unknown>)
-      : {};
+  const safe = (value: unknown): Record<string, number> => {
+    if (!value || typeof value !== 'object') {
+      return {};
+    }
+
+    const normalized: Record<string, number> = {};
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      const numeric = Number(raw);
+      if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
+        normalized[key] = numeric;
+      }
+    }
+    return normalized;
+  };
 
   return {
-    eventTypeCounts: normalizeCounterRecord(snapshot?.eventTypeCounts),
-    intentCounts: normalizeCounterRecord(snapshot?.intentCounts),
-    audienceCounts: normalizeCounterRecord(snapshot?.audienceCounts),
-    hourCounts: normalizeCounterRecord(snapshot?.hourCounts),
-    byEvent: {
-      click: normalizePreferenceCounterGroup(byEvent.click),
-      search: normalizePreferenceCounterGroup(byEvent.search),
-      survey: normalizePreferenceCounterGroup(byEvent.survey)
-    },
-    merged: normalizePreferenceCounterGroup(snapshot?.merged)
+    eventTypeCounts: safe(snapshot?.eventTypeCounts),
+    keywordCounts: safe(snapshot?.keywordCounts),
+    intentCounts: safe(snapshot?.intentCounts),
+    audienceCounts: safe(snapshot?.audienceCounts),
+    hourCounts: safe(snapshot?.hourCounts)
   };
-}
-
-function normalizePrimitiveValues(value: unknown): string[] {
-  if (value === null || value === undefined) {
-    return [];
-  }
-
-  if (typeof value === 'string') {
-    return [value.trim()].filter(Boolean);
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return [String(value).trim()].filter(Boolean);
-  }
-
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => normalizePrimitiveValues(item));
-  }
-
-  if (typeof value === 'object') {
-    return Object.values(value as Record<string, unknown>).flatMap((item) =>
-      normalizePrimitiveValues(item)
-    );
-  }
-
-  return [];
-}
-
-function collectValuesByKeys(
-  metadata: Record<string, unknown>,
-  keys: string[]
-): string[] {
-  const values = keys.flatMap((key) => {
-    const normalizedKey = key.toLowerCase();
-    const matchedEntry = Object.entries(metadata).find(
-      ([entryKey]) => entryKey.toLowerCase() === normalizedKey
-    );
-    return matchedEntry ? normalizePrimitiveValues(matchedEntry[1]) : [];
-  });
-
-  return dedupeNormalizedValues(values);
-}
-
-function dedupeNormalizedValues(values: string[]): string[] {
-  const deduped = new Set<string>();
-  for (const rawValue of values) {
-    const normalized = rawValue.trim().toLowerCase();
-    if (normalized) {
-      deduped.add(normalized);
-    }
-  }
-
-  return Array.from(deduped);
-}
-
-function normalizeScentValue(value: string): string {
-  return value
-    .replace(/\s*\([^)]*\)\s*/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-function getPriceRangeLabel(priceValue: unknown): string | undefined {
-  const amount = Number(priceValue);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return undefined;
-  }
-
-  if (amount < 500_000) return '< 500k';
-  if (amount < 1_000_000) return '500k-1m';
-  if (amount < 2_000_000) return '1m-2m';
-  if (amount < 3_000_000) return '2m-3m';
-  return '> 3m';
-}
-
-function collectPreferenceSignals(event: EventLog): PreferenceCounterGroup {
-  const metadata = event.metadata || {};
-  const signal = createEmptyPreferenceCounterGroup();
-
-  const brands = collectValuesByKeys(metadata, ['brand', 'brands']);
-  const scents = collectValuesByKeys(metadata, [
-    'scent',
-    'scents',
-    'scentnote',
-    'scentnotes',
-    'olfactoryfamily',
-    'olfactoryfamilies'
-  ]).map(normalizeScentValue).filter(Boolean);
-  const priceRanges = collectValuesByKeys(metadata, ['pricerange', 'price_range']);
-  const occasions = collectValuesByKeys(metadata, ['occasion', 'occasions']);
-  const genders = collectValuesByKeys(metadata, ['gender', 'genders']);
-  const styles = collectValuesByKeys(metadata, ['style', 'styles']);
-  const derivedPriceRange = getPriceRangeLabel(metadata.basePrice);
-
-  for (const key of brands) {
-    increaseCounter(signal.brand, key);
-  }
-  for (const key of scents) {
-    increaseCounter(signal.scent, key);
-  }
-  for (const key of priceRanges) {
-    increaseCounter(signal.priceRange, key);
-  }
-  for (const key of occasions) {
-    increaseCounter(signal.occasion, key);
-  }
-  for (const key of genders) {
-    increaseCounter(signal.gender, key);
-  }
-  for (const key of styles) {
-    increaseCounter(signal.style, key);
-  }
-
-  if (derivedPriceRange) {
-    increaseCounter(signal.priceRange, derivedPriceRange);
-  }
-
-  return signal;
-}
-
-function mergePreferenceCounters(
-  target: PreferenceCounterGroup,
-  source: PreferenceCounterGroup
-): void {
-  for (const [key, value] of Object.entries(source.brand)) {
-    increaseCounter(target.brand, key, value);
-  }
-  for (const [key, value] of Object.entries(source.scent)) {
-    increaseCounter(target.scent, key, value);
-  }
-  for (const [key, value] of Object.entries(source.priceRange)) {
-    increaseCounter(target.priceRange, key, value);
-  }
-  for (const [key, value] of Object.entries(source.occasion)) {
-    increaseCounter(target.occasion, key, value);
-  }
-  for (const [key, value] of Object.entries(source.gender)) {
-    increaseCounter(target.gender, key, value);
-  }
-  for (const [key, value] of Object.entries(source.style)) {
-    increaseCounter(target.style, key, value);
-  }
-}
-
-function resolveByEventBucket(
-  featureSnapshot: RollingFeatureSnapshot,
-  eventType: EventLogEventType
-): PreferenceCounterGroup | undefined {
-  if (eventType === EventLogEventType.PRODUCT) {
-    return featureSnapshot.byEvent.click;
-  }
-  if (eventType === EventLogEventType.SEARCH) {
-    return featureSnapshot.byEvent.search;
-  }
-  if (eventType === EventLogEventType.SURVEY) {
-    return featureSnapshot.byEvent.survey;
-  }
-
-  return undefined;
 }
 
 export function normalizeDailyFeatureSnapshot(
@@ -364,32 +149,13 @@ export function applyEventToFeatureSnapshot(
     textParts.push(event.contentText);
   }
 
-  const metadata = event.metadata || {};
-  if (event.eventType === EventLogEventType.PRODUCT) {
-    textParts.push(
-      ...collectValuesByKeys(metadata, [
-        'productName',
-        'variantName',
-        'brand',
-        'category',
-        'gender',
-        'scentNotes',
-        'olfactoryFamilies'
-      ])
-    );
-  } else if (event.eventType === EventLogEventType.SEARCH) {
-    textParts.push(
-      ...collectValuesByKeys(metadata, ['keyword', 'query', 'searchText'])
-    );
-  } else if (event.eventType === EventLogEventType.SURVEY) {
-    textParts.push(
-      ...collectValuesByKeys(metadata, ['question', 'answer', 'answers'])
-    );
-  } else {
-    textParts.push(...extractTextFromMetadata(event.metadata));
-  }
+  textParts.push(...extractTextFromMetadata(event.metadata));
 
   const normalizedText = textParts.join(' ').toLowerCase();
+  const keywords = tokenizeText(normalizedText);
+  for (const keyword of keywords) {
+    increaseCounter(featureSnapshot.keywordCounts, keyword);
+  }
 
   if (/recommend|goi y|gợi ý|suggest/.test(normalizedText)) {
     increaseCounter(featureSnapshot.intentCounts, 'recommendation');
@@ -415,14 +181,6 @@ export function applyEventToFeatureSnapshot(
   }
   if (/unisex/.test(normalizedText)) {
     increaseCounter(featureSnapshot.audienceCounts, 'unisex');
-  }
-
-  const preferenceSignal = collectPreferenceSignals(event);
-  mergePreferenceCounters(featureSnapshot.merged, preferenceSignal);
-
-  const byEventBucket = resolveByEventBucket(featureSnapshot, event.eventType);
-  if (byEventBucket) {
-    mergePreferenceCounters(byEventBucket, preferenceSignal);
   }
 }
 
@@ -471,20 +229,18 @@ export function buildRollingSummaryText(
       .map(([key, value]) => `${key} (${value})`)
       .join(', ');
 
+  const topKeywords = topEntries(featureSnapshot.keywordCounts);
   const intents = topEntries(featureSnapshot.intentCounts, 3);
   const audiences = topEntries(featureSnapshot.audienceCounts, 3);
   const activeHours = topEntries(featureSnapshot.hourCounts, 3);
   const eventTypes = topEntries(featureSnapshot.eventTypeCounts, 3);
-  const topBrands = topEntries(featureSnapshot.merged.brand, 3);
-  const topScents = topEntries(featureSnapshot.merged.scent, 3);
 
   return [
     `Total events: ${totalEvents}.`,
     `Top event types: ${eventTypes || 'n/a'}.`,
+    `Top keywords: ${topKeywords || 'n/a'}.`,
     `Detected intents: ${intents || 'n/a'}.`,
     `Detected audiences: ${audiences || 'n/a'}.`,
-    `Top brands: ${topBrands || 'n/a'}.`,
-    `Top scents: ${topScents || 'n/a'}.`,
     `Active hours: ${activeHours || 'n/a'}.`
   ].join(' ');
 }
@@ -511,9 +267,6 @@ export function buildContentSectionsFromEvents(eventLogs: EventLog[]): {
       .map(
         (log) =>
           log.contentText ||
-          (typeof log.metadata?.keyword === 'string'
-            ? (log.metadata.keyword as string)
-            : '') ||
           (typeof log.metadata?.query === 'string'
             ? (log.metadata.query as string)
             : '')
@@ -530,26 +283,6 @@ export function buildContentSectionsFromEvents(eventLogs: EventLog[]): {
 
   const surveyContents = surveyLogs
     .map((log) => {
-      const answerItems = Array.isArray(log.metadata?.answers)
-        ? (log.metadata?.answers as Array<Record<string, unknown>>)
-        : [];
-
-      if (answerItems.length) {
-        const lines = answerItems
-          .map((item) => {
-            const question =
-              typeof item.question === 'string' ? item.question : '';
-            const answer = typeof item.answer === 'string' ? item.answer : '';
-            return `Question: ${question}\n Answer: ${answer}`.trim();
-          })
-          .filter(Boolean)
-          .join('; ');
-
-        if (lines) {
-          return lines;
-        }
-      }
-
       const question =
         typeof log.metadata?.question === 'string'
           ? (log.metadata.question as string)
@@ -581,6 +314,9 @@ export function mergeFeatureSnapshots(
     for (const [key, value] of Object.entries(snapshot.eventTypeCounts)) {
       increaseCounter(merged.eventTypeCounts, key, value);
     }
+    for (const [key, value] of Object.entries(snapshot.keywordCounts)) {
+      increaseCounter(merged.keywordCounts, key, value);
+    }
     for (const [key, value] of Object.entries(snapshot.intentCounts)) {
       increaseCounter(merged.intentCounts, key, value);
     }
@@ -590,11 +326,6 @@ export function mergeFeatureSnapshots(
     for (const [key, value] of Object.entries(snapshot.hourCounts)) {
       increaseCounter(merged.hourCounts, key, value);
     }
-
-    mergePreferenceCounters(merged.merged, snapshot.merged);
-    mergePreferenceCounters(merged.byEvent.click, snapshot.byEvent.click);
-    mergePreferenceCounters(merged.byEvent.search, snapshot.byEvent.search);
-    mergePreferenceCounters(merged.byEvent.survey, snapshot.byEvent.survey);
   }
 
   return merged;
@@ -674,19 +405,19 @@ export function buildSummaryResponseFromEvents(
 
   const totalEvents = eventLogs.length;
   const dailyLogSummary = buildDailyLogSummaryMap(dailyFeatureSnapshot);
-  
+
   const now = new Date();
   const createdAt =
     eventLogs.length > 0
       ? new Date(
-          Math.min(...eventLogs.map((event) => event.createdAt.getTime()))
-        )
+        Math.min(...eventLogs.map((event) => event.createdAt.getTime()))
+      )
       : now;
   const updatedAt =
     eventLogs.length > 0
       ? new Date(
-          Math.max(...eventLogs.map((event) => event.createdAt.getTime()))
-        )
+        Math.max(...eventLogs.map((event) => event.createdAt.getTime()))
+      )
       : now;
 
   return new UserLogSummaryResponse({

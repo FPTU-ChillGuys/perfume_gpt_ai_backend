@@ -13,8 +13,8 @@ export const productCardOutputItemSchema = z.object({
     brandName: z.string(),
     primaryImage: z.string().nullable(),
     variants: z.array(productCardVariantOutputSchema),
-    reasoning: z.string().optional().describe('Giải thích lý do lựa chọn sản phẩm này cho người dùng dựa trên nhu cầu của họ.'),
-    source: z.string().optional().describe('Nguồn gợi ý sản phẩm (ví dụ: RECOMMENDATION_RESULTS, SEARCH_RESULTS, vv.)')
+    reasoning: z.string().nullable().describe('Giải thích lý do lựa chọn sản phẩm này cho người dùng dựa trên nhu cầu của họ.'),
+    source: z.string().nullable().describe('Nguồn gợi ý sản phẩm (ví dụ: RECOMMENDATION_RESULTS, SEARCH_RESULTS, vv.)')
 });
 
 export const productTempItemSchema = z.object({

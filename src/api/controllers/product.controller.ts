@@ -13,6 +13,8 @@ import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.serv
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
+import { HybridSearchService } from 'src/infrastructure/domain/hybrid-search/hybrid-search.service';
+import { HybridSearchResponse } from 'src/infrastructure/domain/hybrid-search/hybrid-search.service';
 import { Request } from 'express';
 import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { SearchRequest } from 'src/application/dtos/request/search.request';
@@ -26,7 +28,8 @@ export class ProductController {
   constructor(
     private productService: ProductService,
     private userLog: UserLogService,
-    private aiAnalysisService: AiAnalysisService
+    private aiAnalysisService: AiAnalysisService,
+    private hybridSearchService: HybridSearchService
   ) { }
 
   /** Lấy danh sách tất cả sản phẩm */
@@ -137,6 +140,23 @@ export class ProductController {
     @Query() request: SearchRequest
   ): Promise<BaseResponseAPI<any>> {
     const result = await this.productService.getProductsUsingParsedSearch(request.searchText, request);
+
+    const logUserId = resolveLogUserIdFromRequest(req);
+    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
+
+    return result;
+  }
+
+  /** Hybrid Search v4 - Query Layer + Vector Layer */
+  @Public()
+  @Get('search/v4')
+  @ApiOperation({ summary: 'Hybrid Search v4 - Kết hợp Query Layer (hard filters) và Vector Layer (similarity)' })
+  @ExtendApiBaseResponse(PagedResult<HybridSearchResponse>)
+  async getProductsByHybridSearch(
+    @Req() req: Request,
+    @Query() request: SearchRequest
+  ): Promise<BaseResponseAPI<HybridSearchResponse>> {
+    const result = await this.hybridSearchService.search(request.searchText, request);
 
     const logUserId = resolveLogUserIdFromRequest(req);
     await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);

@@ -22,5 +22,4 @@ RUN chown -R node /usr/src/app
 USER node
 
 # Use the production start script
-CMD ["pnpm", "run", "start"]
-
+CMD ["node", "dist/main.js"]

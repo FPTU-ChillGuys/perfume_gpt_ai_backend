@@ -22,13 +22,19 @@ export function mergeSurveyQueryResults(
 ): any[] {
   const scoreMap = new Map<string, { product: any; score: number; sources: string[] }>();
 
+  // CRITICAL: Filter out queries with 0 products BEFORE merging
+  const validResults = results.filter(r => r.products && r.products.length > 0);
+  
+  if (validResults.length === 0) {
+    console.log(`[SurveyMerge] No queries with products found. Returning empty array.`);
+    return [];
+  }
+
+  console.log(`[SurveyMerge] Filtering: ${results.length} total queries -> ${validResults.length} queries with products`);
+
   // Score each product based on how many queries it appears in
-  for (const result of results) {
+  for (const result of validResults) {
     const { questionId, products } = result;
-    
-    if (!products || products.length === 0) {
-      continue;
-    }
 
     for (const product of products) {
       const existing = scoreMap.get(product.id);
@@ -53,7 +59,7 @@ export function mergeSurveyQueryResults(
   const topProducts = sorted.slice(0, topN).map(item => item.product);
 
   // Log merge statistics
-  console.log(`[SurveyMerge] Merged ${topProducts.length} unique products from ${results.filter(r => r.products?.length).length} queries with results`);
+  console.log(`[SurveyMerge] Merged ${topProducts.length} unique products from ${validResults.length} queries with results`);
   
   if (topProducts.length > 0) {
     const topProductNames = topProducts.slice(0, 3).map(p => p.name).join(', ');

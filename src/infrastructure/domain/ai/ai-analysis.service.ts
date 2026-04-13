@@ -3,8 +3,10 @@ import { Output } from 'ai';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
 import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT, SURVEY_ANALYSIS_SYSTEM_PROMPT, TREND_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
+import { SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts/survey-question.analysis.system';
 import { Tools } from 'src/chatbot/tools';
 import { analysisOutput, AnalysisObject, intentOnlyOutput, IntentOnlyObject } from 'src/chatbot/output/analysis.output';
+import { surveyAnswerAnalysis, SurveyAnswerAnalysisObject } from 'src/chatbot/output/survey-question.analysis.output';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 
 type AnalysisRuntimeContext = {
@@ -178,6 +180,58 @@ export class AiAnalysisService {
             return analysis;
         } catch (error) {
             this.logger.error('[AiAnalysis] Trend analysis failed', error);
+            return null;
+        }
+    }
+
+    /**
+     * Analyze a SINGLE survey answer to extract search criteria.
+     * Uses searchMasterData tool to normalize keywords before building logic.
+     * 
+     * @param qa Single question-answer pair
+     * @returns AnalysisObject or null if failed
+     */
+    async analyzeSurveyAnswer(
+        qa: { question: string; answer: string }
+    ): Promise<AnalysisObject | null> {
+        try {
+            this.logger.log(`[AiAnalysis] Analyzing survey answer: ${qa.answer.substring(0, 50)}...`);
+            if (!qa || !qa.answer) {
+                this.logger.warn('[AiAnalysis] Survey answer is empty');
+                return null;
+            }
+
+            const input = JSON.stringify({
+                question: qa.question,
+                answer: qa.answer
+            });
+
+            const result = await textGenerationFromPromptToResultWithErrorHandler(
+                aiModelForOptimizePrompt,
+                input,
+                SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT,
+                this.tools.getToolsForAnalysis,
+                'Failed to analyze survey answer',
+                10,
+                Output.object(surveyAnswerAnalysis),
+                0.2
+            );
+
+            if (!result) {
+                this.logger.warn('[AiAnalysis] Survey answer analysis returned null');
+                return null;
+            }
+
+            const analysis = JSON.parse(result) as AnalysisObject;
+            this.logger.log(
+                `[AiAnalysis] Survey answer analysis completed. ` +
+                `Answer: "${qa.answer.substring(0, 30)}...", ` +
+                `Intent: ${analysis.intent}, ` +
+                `Logic groups: ${analysis.logic?.length ?? 0}`
+            );
+            return analysis;
+        } catch (error) {
+            this.logger.error('[AiAnalysis] Survey answer analysis failed', error);
             return null;
         }
     }

@@ -145,7 +145,7 @@ export class SurveyController {
   /** Trả lời survey và nhận gợi ý nước hoa từ AI */
   @Public()
   @Post('user/v2')
-  @ApiOperation({ summary: 'Trả lời survey và nhận gợi ý AI' })
+  @ApiOperation({ summary: 'Trả lời survey và nhận gợi ý AI (v2 - monolithic query)' })
   @ApiQuery({ name: 'userId', type: String, required: false, description: 'ID của người dùng (optional, fallback from request fingerprint)' })
   @ApiBaseResponse(String)
   @ApiBody({ type: [SurveyQuesAnsDetailRequest] })
@@ -156,6 +156,22 @@ export class SurveyController {
   ): Promise<BaseResponse<string>> {
     const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
     return this.surveyService.processSurveyV2AndGetAIResponse(resolvedUserId, surveyAnswers);
+  }
+
+  /** Trả lời survey và nhận gợi ý nước hoa từ AI (v3 - per-question query decomposition) */
+  @Public()
+  @Post('user/v3')
+  @ApiOperation({ summary: 'Trả lời survey và nhận gợi ý AI (v3 - per-question query, skip 0 products)' })
+  @ApiQuery({ name: 'userId', type: String, required: false, description: 'ID của người dùng (optional, fallback from request fingerprint)' })
+  @ApiBaseResponse(String)
+  @ApiBody({ type: [SurveyQuesAnsDetailRequest] })
+  async chatSurveyV3(
+    @Req() req: Request,
+    @Query('userId') userId: string,
+    @Body() surveyAnswers: { questionId: string; answerId: string }[]
+  ): Promise<BaseResponse<string>> {
+    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    return this.surveyService.processSurveyWithPerQuestionQueries(resolvedUserId, surveyAnswers);
   }
 
   /** Lấy tất cả câu hỏi và câu trả lời survey của người dùng */

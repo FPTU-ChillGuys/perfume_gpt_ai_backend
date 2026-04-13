@@ -32,7 +32,7 @@ export class VocabularySnapshotService {
     return em.transactional(async em => {
       const latestDictionary = await em.findOne(
         VocabDictionary,
-        {},
+        { isActive: { $in: [true, false] } },
         { orderBy: { builtAt: 'DESC', createdAt: 'DESC' } },
       );
       const baseParserRules = latestDictionary

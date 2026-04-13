@@ -127,7 +127,7 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
       return [];
     }
 
-    await this.getEntityManager().upsert(eventLogs);
+    await this.getEntityManager().persistAndFlush(eventLogs);
     return eventLogs.map((item) => item.id);
   }
 

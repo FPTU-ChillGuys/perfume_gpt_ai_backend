@@ -10,6 +10,10 @@ export class BaseResponse<T = undefined> {
   @ApiProperty({ description: 'Thông báo lỗi', nullable: true, required: false })
   error?: string | null;
 
+  /** Chi tiết lỗi (nếu có) */
+  @ApiProperty({ description: 'Chi tiết lỗi', nullable: true, required: false })
+  details?: string | null;
+
   /** Dữ liệu trả về */
   @ApiProperty({ description: 'Dữ liệu trả về', required: false })
   data?: T;

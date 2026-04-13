@@ -33,10 +33,14 @@ import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
     MikroOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async () => {
+      useFactory: async (configService: ConfigService) => {
         const config = await defineConfig();
         return {
-          ...config
+          ...config,
+          host: config.host ?? configService.get<string>("POSTGRES_HOST"),
+          port: config.port ?? configService.get<number>("POSTGRES_PORT"),
+          user: config.user ?? configService.get<string>("POSTGRES_USER"),
+          password: config.password ?? configService.get<string>("POSTGRES_PASSWORD")
         };
       }
     }),

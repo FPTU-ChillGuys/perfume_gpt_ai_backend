@@ -77,7 +77,7 @@ export class AIAcceptanceService {
   async createPendingResponseAcceptance(
     input: CreatePendingAIAcceptanceInput
   ): Promise<BaseResponse<AIAcceptance>> {
-    return await funcHandlerAsync(async () => {
+    try {
       const normalizedProductIds = this.normalizeProductIds(input.productIds);
       const record = new AIAcceptance({
         userId: input.userId ?? null,
@@ -92,9 +92,15 @@ export class AIAcceptanceService {
         clickedAt: null
       });
 
+      this.logger.log(`[AIAcceptance] Creating pending record for context=${input.contextType}, productIds=${normalizedProductIds.length}, sourceRefId=${input.sourceRefId}`);
       await this.unitOfWork.AIAcceptanceRepo.insert(record);
+      this.logger.log(`[AIAcceptance] Successfully created pending record with id=${record.id}`);
       return { success: true, data: record };
-    }, 'Failed to create pending AI acceptance record');
+    } catch (error) {
+      this.logger.error('[AIAcceptance] createPendingResponseAcceptance failed', error);
+      this.logger.error(`[AIAcceptance] Input details: context=${input.contextType}, productIds=${input.productIds?.length ?? 0}, sourceRefId=${input.sourceRefId}`);
+      return { success: false, error: 'Failed to create pending AI acceptance record', details: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   async markAcceptedByAcceptanceId(
@@ -171,10 +177,13 @@ export class AIAcceptanceService {
   ): Promise<AttachAIAcceptanceToProductsResult<T>> {
     try {
       if (!Array.isArray(input.products) || input.products.length === 0) {
+        this.logger.warn(`[AIAcceptance] No products to attach acceptance for context=${input.contextType}`);
         return { aiAcceptanceId: null, products: input.products ?? [] };
       }
 
       const productIds = this.extractProductIdsFromPayload(input.products as any[]);
+      this.logger.log(`[AIAcceptance] Attaching acceptance for context=${input.contextType}, productCount=${productIds.length}, sourceRefId=${input.sourceRefId}`);
+      
       const createResult = await this.createPendingResponseAcceptance({
         userId: input.userId,
         contextType: input.contextType,
@@ -186,12 +195,14 @@ export class AIAcceptanceService {
 
       if (!createResult.success || !createResult.data?.id) {
         this.logger.warn(
-          `[AIAcceptance] create pending failed for context=${input.contextType}; products kept without aiAcceptanceId`
+          `[AIAcceptance] create pending failed for context=${input.contextType}; products kept without aiAcceptanceId. Error: ${createResult.error || 'Unknown error'}`
         );
         return { aiAcceptanceId: null, products: input.products };
       }
 
       const aiAcceptanceId = createResult.data.id;
+      this.logger.log(`[AIAcceptance] Successfully created acceptance id=${aiAcceptanceId} for context=${input.contextType}`);
+      
       const enrichedProducts = input.products.map((product) => ({
         ...product,
         aiAcceptanceId

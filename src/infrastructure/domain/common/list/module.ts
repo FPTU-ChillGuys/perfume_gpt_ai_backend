@@ -20,6 +20,8 @@ import { RecommendationModule } from 'src/infrastructure/domain/recommendation/r
 import { ConversationModule } from "../../conversation/conversation.module";
 import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
 import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.module';
+import { HybridSearchModule } from 'src/infrastructure/domain/hybrid-search/hybrid-search.module';
+import { RebuildEmbeddingsModule } from 'src/api/controllers/modules/rebuild-embeddings.module';
 
 export const modules = [
   ConversationModule,
@@ -44,4 +46,6 @@ export const modules = [
   RecommendationModule,
   RestockModule,
   CartModule,
+  HybridSearchModule,
+  RebuildEmbeddingsModule,
 ];

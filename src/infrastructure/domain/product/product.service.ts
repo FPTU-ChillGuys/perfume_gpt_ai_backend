@@ -31,7 +31,10 @@ import { escapeUnicode, isNotAscii } from 'escape-unicode';
 const productInclude = {
   Brands: true,
   Categories: true,
-  Media: { where: { IsPrimary: true } },
+  Media: {
+    orderBy: { IsPrimary: 'desc' },
+    take: 1
+  },
   ProductAttributes: {
     include: { Attributes: true, AttributeValues: true }
   }
@@ -45,7 +48,10 @@ type ProductWithRelations = Prisma.ProductsGetPayload<{
 const productWithVariantsInclude = {
   Brands: true,
   Categories: true,
-  Media: { where: { IsPrimary: true } },
+  Media: {
+    orderBy: { IsPrimary: 'desc' },
+    take: 1
+  },
   ProductAttributes: {
     include: { Attributes: true, AttributeValues: true }
   },
@@ -1423,9 +1429,15 @@ export class ProductService {
         },
         include: {
           Brands: true,
-          Media: { where: { IsPrimary: true } },
+          Media: {
+            orderBy: { IsPrimary: 'desc' },
+            take: 1
+          },
           ProductVariants: {
-            where: { IsDeleted: false }
+            where: { IsDeleted: false },
+            include: {
+              Media: { take: 1 }
+            }
           }
         }
       });
@@ -1436,20 +1448,34 @@ export class ProductService {
       const mappedProducts: ProductCardOutputItem[] = ids
         .map(id => productMap.get(id))
         .filter((p): p is NonNullable<typeof p> => !!p)
-        .map(p => ({
-          id: p.Id,
-          name: p.Name,
-          brandName: p.Brands.Name,
-          primaryImage: p.Media[0]?.Url || null,
-          reasoning: null,
-          source: null,
-          variants: (p.ProductVariants || []).map(v => ({
-            id: v.Id,
-            sku: v.Sku,
-            volumeMl: v.VolumeMl,
-            basePrice: Number(v.BasePrice) // Convert Decimal to number
-          }))
-        }));
+        .map(p => {
+          // Fallback logic for primary image
+          let primaryImage = p.Media[0]?.Url || null;
+          if (!primaryImage && p.ProductVariants && p.ProductVariants.length > 0) {
+            // Try to find any variant that has an image
+            for (const v of p.ProductVariants) {
+              if (v.Media && v.Media.length > 0) {
+                primaryImage = v.Media[0].Url;
+                break;
+              }
+            }
+          }
+
+          return {
+            id: p.Id,
+            name: p.Name,
+            brandName: p.Brands.Name,
+            primaryImage,
+            reasoning: null,
+            source: null,
+            variants: (p.ProductVariants || []).map(v => ({
+              id: v.Id,
+              sku: v.Sku,
+              volumeMl: v.VolumeMl,
+              basePrice: Number(v.BasePrice)
+            }))
+          };
+        });
 
       return {
         success: true,

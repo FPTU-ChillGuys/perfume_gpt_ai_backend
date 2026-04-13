@@ -29,9 +29,9 @@ export const trendOutput = {
 export const surveyOutput = {
   schema: z.object({
     message: z.string().describe('Thông điệp tư vấn cá nhân hóa gửi cho người dùng dựa trên kết quả khảo sát (Tiếng Việt)'),
-    products: z.array(productCardOutputItemSchema).nullable(),
-    productTemp: z.array(productTempItemSchema).nullable()
-  }).describe('Kết quả tư vấn khảo sát dựa trên phân tích sở thích người dùng')
+    products: z.array(productCardOutputItemSchema).nullable().describe('BẮT BUỘC ĐỂ TRỐNG [].'),
+    productTemp: z.array(productTempItemSchema).nullable().describe('BẮT BUỘC ĐIỀN: Danh sách sản phẩm (id, name) và các biến thể (id, price) đi kèm để hệ thống tự động hydrate')
+  }).describe('Kết quả tư vấn khảo sát dựa trên phân tích sở thích người dùng. AI PHẢI dùng productTemp và để products là []')
 };
 
 export const searchOutputSchema = searchOutput.schema;

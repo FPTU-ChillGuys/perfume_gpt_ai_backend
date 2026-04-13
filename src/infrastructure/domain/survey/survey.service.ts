@@ -5,7 +5,7 @@ import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler'
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { SurveyAnswerRequest } from 'src/application/dtos/request/survey-answer.request';
 import { SurveyQuestionRequest } from 'src/application/dtos/request/survey-question.request';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { SurveyQuestionResponse } from 'src/application/dtos/response/survey-question.response';
 import {
   SurveyQuestionAnswerMapper,
@@ -33,8 +33,12 @@ import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { v4 as uuidv4 } from 'uuid';
 
+
 @Injectable()
 export class SurveyService {
+
+  private readonly logger = new Logger(SurveyService.name);
+
   constructor(
     private unitOfWork: UnitOfWork,
     @Inject(AI_SURVEY_HELPER) private readonly aiHelper: AIHelper,
@@ -460,24 +464,27 @@ export class SurveyService {
 
     // Phase 5: Hydrate sản phẩm (Nếu AI trả về productTemp)
     if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
-      const ids = aiResponse.productTemp.map((item: any) => item.id).filter((id: string) => !!id).slice(0, 5);
+      const productTemp: any[] = aiResponse.productTemp;
+      const ids = productTemp.map((item: any) => item.id).filter((id: string) => !!id).slice(0, 5);
+
       if (ids.length > 0) {
         const productResponse = await this.productService.getProductsByIdsForOutput(ids);
         if (productResponse.success && productResponse.data) {
           const hydratedProducts = productResponse.data;
-          const recommendationsMap = new Map<string, string[]>();
-          aiResponse.productTemp.forEach((item: any) => {
-            if (item.id && item.variants && Array.isArray(item.variants)) {
-              recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
-            }
-          });
+
+          // Map to store AI recommendations by ID for fast lookup
+          const aiRecMap = new Map<string, any>(
+            productTemp.map(item => [item.id, item])
+          );
 
           aiResponse.products = hydratedProducts.map(product => {
-            const recommendedVariantIds = recommendationsMap.get(product.id);
-            if (recommendedVariantIds && recommendedVariantIds.length > 0) {
-              const variantIdsSet = new Set(recommendedVariantIds);
+            const aiItem = aiRecMap.get(product.id);
+            if (aiItem && aiItem.variants && Array.isArray(aiItem.variants)) {
+              const variantIdsSet = new Set(aiItem.variants.map((v: any) => v.id));
               return {
                 ...product,
+                reasoning: aiItem.reasoning || product.reasoning,
+                source: aiItem.source || 'SURVEY_RESULT',
                 variants: (product.variants || []).filter(v => variantIdsSet.has(v.id))
               };
             }
@@ -486,6 +493,7 @@ export class SurveyService {
         }
       }
     }
+
 
     if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
       const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({

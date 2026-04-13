@@ -1,6 +1,5 @@
 services:
   perfumegptaibackend:
-    image: perfumegptaibackend
     build:
       context: .
       dockerfile: ./Dockerfile

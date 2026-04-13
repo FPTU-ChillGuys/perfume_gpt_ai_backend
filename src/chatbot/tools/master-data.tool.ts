@@ -79,6 +79,13 @@ export class MasterDataTool {
                             const originalInfo = searchInfos.find(i => i.keyword === mapping.original);
 
                             for (const term of correctedTerms) {
+                                // CRITICAL: Validate that normalized term actually exists in context
+                                // Skip if term is too generic or doesn't match any real data
+                                if (this.shouldSkipNormalizedTerm(term, mapping.original)) {
+                                    this.logger.log(`[searchMasterData] SKIP normalized term (too generic/no match): ${mapping.original} -> ${term}`);
+                                    continue;
+                                }
+
                                 this.logger.log(`[searchMasterData] Re-searching normalized: ${mapping.original} -> ${term}`);
                                 reSearchTasks.push(performSearch(term, originalInfo?.types || ['all']));
                             }
@@ -150,6 +157,42 @@ export class MasterDataTool {
 
     private async getNormalizationContext() {
         return this.masterDataService.getNormalizationContextData();
+    }
+
+    /**
+     * CRITICAL: Skip normalized terms that are too generic or don't match real data.
+     * This prevents AI from hallucinating irrelevant keywords like "and", "Sweet", "Woody", "Fruity"
+     * when they don't actually exist in the context.
+     */
+    private shouldSkipNormalizedTerm(term: string, original: string): boolean {
+        // Skip English words that don't make sense in Vietnamese context
+        const englishOnlyPattern = /^[a-zA-Z\s]+$/;
+        if (englishOnlyPattern.test(term) && !['Floral', 'Woody', 'Fresh', 'Oriental', 'Fruity', 'Sweet'].includes(term)) {
+            // Skip generic English words unless they're known perfume categories
+            this.logger.log(`[searchMasterData] SKIP: English term "${term}" not in known categories`);
+            return true;
+        }
+
+        // Skip very generic terms that would match too many products
+        const genericTerms = ['and', 'the', 'a', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'also', 'now', 'yes', 'ok', 'okay'];
+        if (genericTerms.includes(term.toLowerCase())) {
+            this.logger.log(`[searchMasterData] SKIP: Generic term "${term}"`);
+            return true;
+        }
+
+        // Skip terms that are too short (likely AI hallucination)
+        if (term.length <= 2 && !['US', 'UK', 'EU'].includes(term)) {
+            this.logger.log(`[searchMasterData] SKIP: Too short term "${term}"`);
+            return true;
+        }
+
+        // Skip if the normalized term is the same as original (AI didn't actually normalize)
+        if (term.toLowerCase() === original.toLowerCase()) {
+            this.logger.log(`[searchMasterData] SKIP: No normalization occurred "${original}" -> "${term}"`);
+            return true;
+        }
+
+        return false;
     }
 
     getAvailableAttributes: Tool = tool({

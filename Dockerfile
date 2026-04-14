@@ -14,11 +14,8 @@ COPY . .
 RUN npx prisma generate
 
 # Build app
-RUN pnpm build
-
-# Sau đó chỉ giữ prod deps
-RUN pnpm prune --prod
+RUN pnpm run build
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["npm", "run", "start"]

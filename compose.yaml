@@ -10,4 +10,6 @@ services:
     env_file:
       - .env
     restart: unless-stopped
-    
+    volumes:
+      - /home/vqn/project/perfume_gpt_ai_backend/mikro-orm.config.ts:/usr/src/app/mikro-orm.config.ts:ro
+      - /home/vqn/project/perfume_gpt_ai_backend/public_key.pem:/usr/src/app/public_key.pem:ro

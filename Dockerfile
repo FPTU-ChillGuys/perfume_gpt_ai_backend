@@ -6,6 +6,8 @@ WORKDIR /usr/src/app
 
 COPY ["package.json", "pnpm-lock.yaml", "./"]
 
+RUN touch host-config.mjs
+
 # Cài full deps để build
 RUN pnpm install --frozen-lockfile
 

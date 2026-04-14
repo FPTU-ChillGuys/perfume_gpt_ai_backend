@@ -42,8 +42,17 @@ BEGIN
   END IF;
 END $$;`);
 
-    this.addSql('CREATE UNIQUE INDEX IF NOT EXISTS "UQ_product_embeddings_product_id" ON "product_embeddings" ("product_id");');
-    this.addSql('CREATE INDEX IF NOT EXISTS "IDX_product_embeddings_product_id" ON "product_embeddings" ("product_id");');
+    this.addSql(`DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_name = 'product_embeddings'
+  ) THEN
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS "UQ_product_embeddings_product_id" ON "product_embeddings" ("product_id")';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS "IDX_product_embeddings_product_id" ON "product_embeddings" ("product_id")';
+  END IF;
+END $$;`);
   }
 
   async down(): Promise<void> {
@@ -51,34 +60,40 @@ END $$;`);
 BEGIN
   IF EXISTS (
     SELECT 1
-    FROM information_schema.columns
-    WHERE table_name = 'product_embeddings' AND column_name = 'product_id'
+    FROM information_schema.tables
+    WHERE table_name = 'product_embeddings'
   ) THEN
-    EXECUTE 'ALTER TABLE "product_embeddings" RENAME COLUMN "product_id" TO "productId"';
-  END IF;
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'product_embeddings' AND column_name = 'product_id'
+    ) THEN
+      EXECUTE 'ALTER TABLE "product_embeddings" RENAME COLUMN "product_id" TO "productId"';
+    END IF;
 
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_name = 'product_embeddings' AND column_name = 'created_at'
-  ) THEN
-    EXECUTE 'ALTER TABLE "product_embeddings" RENAME COLUMN "created_at" TO "createdAt"';
-  END IF;
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'product_embeddings' AND column_name = 'created_at'
+    ) THEN
+      EXECUTE 'ALTER TABLE "product_embeddings" RENAME COLUMN "created_at" TO "createdAt"';
+    END IF;
 
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_name = 'product_embeddings' AND column_name = 'updated_at'
-  ) THEN
-    EXECUTE 'ALTER TABLE "product_embeddings" RENAME COLUMN "updated_at" TO "updatedAt"';
-  END IF;
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'product_embeddings' AND column_name = 'updated_at'
+    ) THEN
+      EXECUTE 'ALTER TABLE "product_embeddings" RENAME COLUMN "updated_at" TO "updatedAt"';
+    END IF;
 
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_name = 'product_embeddings' AND column_name = 'is_active'
-  ) THEN
-    EXECUTE 'ALTER TABLE "product_embeddings" RENAME COLUMN "is_active" TO "isActive"';
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'product_embeddings' AND column_name = 'is_active'
+    ) THEN
+      EXECUTE 'ALTER TABLE "product_embeddings" RENAME COLUMN "is_active" TO "isActive"';
+    END IF;
   END IF;
 END $$;`);
   }

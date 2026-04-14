@@ -15,8 +15,6 @@ COPY . .
 
 RUN npx prisma generate
 
-RUN npx mikro-orm migration:up
-
 # Build app
 RUN pnpm run build
 

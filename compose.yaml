@@ -11,7 +11,7 @@ services:
       - .env
     restart: unless-stopped
     volumes:
-      - /home/vqn/project/perfume_gpt_ai_backend/host-config.mjs:/usr/src/app/host-config.mjs:ro
-      - /home/vqn/project/perfume_gpt_ai_backend/public_key.pem:/usr/src/app/public_key.pem:ro
-      - /home/vqn/project/perfume_gpt_ai_backend/.env:/usr/src/app/.env:ro
+      - ${PWD}/host-config.mjs:/usr/src/app/host-config.mjs:ro
+      - ${PWD}/public_key.pem:/usr/src/app/public_key.pem:ro
+      - ${PWD}/.env:/usr/src/app/.env:ro
 

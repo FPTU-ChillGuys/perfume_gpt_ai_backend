@@ -1,4 +1,4 @@
-import { Logger, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AppController } from './api/controllers/app.controller';
 import { AppService } from './app.service';
 import { AutomapperModule } from '@automapper/nestjs';
@@ -35,14 +35,12 @@ import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
         const config = await defineConfig();
-        const logger = new Logger();
-        logger.debug(`MikroORM Config: ${JSON.stringify(config)}`);
         return {
           ...config,
           host: configService.get<string>("POSTGRES_HOST") ?? config.host,
           port:  configService.get<number>("POSTGRES_PORT") ?? config.port,
           user: configService.get<string>("POSTGRES_USER") ?? config.user,
-          password: configService.get<string>("POSTGRES_PASSWORD") ?? config.password
+          password: configService.get<string>("POSTGRES_PASSWORD")
         };
       }
     }),

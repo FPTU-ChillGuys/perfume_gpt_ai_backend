@@ -1,7 +1,6 @@
 import { EntityGenerator } from '@mikro-orm/entity-generator';
 import { Migrator } from '@mikro-orm/migrations';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
-import { PostgreSqlOptions } from '@mikro-orm/postgresql/PostgreSqlMikroORM.js';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { entities } from 'src/infrastructure/domain/utils/entities';
 
@@ -15,7 +14,7 @@ const hostConfig = async () => {
   }
 };
 
-export default async function mikroConfig(): Promise<PostgreSqlOptions> {
+export default async function mikroConfig(): Promise<any> {
   const host_config = await hostConfig();
   const host = host_config.host;
   const port = host_config.port;

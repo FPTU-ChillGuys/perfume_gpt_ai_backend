@@ -6,7 +6,9 @@ services:
     environment:
       NODE_ENV: production
     ports:
-      - 3001:3000
+      - 3000:3000
+    env_file:
+      - .env
     restart: unless-stopped
     volumes:
       - /home/vqn/project/perfume_gpt_ai_backend/host-config.mjs:/usr/src/app/host-config.mjs:ro

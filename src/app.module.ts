@@ -37,10 +37,10 @@ import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
         const config = await defineConfig();
         return {
           ...config,
-          host: configService.get<string>("POSTGRES_HOST") ?? config.host,
-          port:  configService.get<number>("POSTGRES_PORT") ?? config.port,
-          user: configService.get<string>("POSTGRES_USER") ?? config.user,
-          password: configService.get<string>("POSTGRES_PASSWORD")
+          host: config.host ?? configService.get<string>("POSTGRES_HOST"),
+          port:   config.port ?? configService.get<number>("POSTGRES_PORT"),
+          user: config.user ?? configService.get<string>("POSTGRES_USER"),
+          password: config.password ?? configService.get<string>("POSTGRES_PASSWORD")
         };
       }
     }),

@@ -23,11 +23,18 @@ export const SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT =
   "5. **Cấu trúc JSON**: Trả về đúng schema SurveyAnswerAnalysisObject để ProductService có thể query database.\n\n" +
   "## NGUYÊN TẮC QUAN TRỌNG:\n" +
   "- **Tập trung vào \"Intent\" duy nhất của answer này**: Mỗi answer có một mục đích riêng.\n" +
-  "- **Bắt buộc dùng searchMasterData**: \n" +
+  "- **BẮT BUỘC dùng searchMasterData**: \n" +
   "  - Trích xuất tất cả keyword tiềm năng từ answer.\n" +
   "  - Gọi tool `searchMasterData` với searchInfos = [{keyword, types}].\n" +
-  "  - Chỉ dùng kết quả từ searchMasterData để build logic.\n" +
+  "  - **CHỈ dùng giá trị chuẩn từ searchMasterData để build logic**.\n" +
+  "  - **TUYỆT ĐỐI KHÔNG** tự bịa format như `attribute:Phong cách=Nam tính` hay `occasion = \"Hàng ngày\"`.\n" +
   "  - Log quá trình normalization vào normalizationMetadata.\n" +
+  "- **CẤU TRÚC logic (CNF - Conjunctive Normal Form)**: \n" +
+  "  - Mảng ngoài = AND. Mảng trong = OR.\n" +
+  "  - **QUY TẮC VÀNG (BẮT BUỘC)**: Các từ khóa đồng nghĩa, các lựa chọn thay thế (ví dụ từ cùng 1 answer hoặc cùng 1 mapping từ `keywordMappings`) **PHẢI** được gộp vào mảng con để tạo phép toán **OR**.\n" +
+  "  - Ví dụ đúng (OR): `logic = [[\"Hàng ngày\", \"Thường ngày\"]]` (Nghĩa là Hàng ngày HOẶC Thường ngày)\n" +
+  "  - Ví dụ đúng (AND): `logic = [\"Dior\", [\"Hoa nhài\", \"Hoa hồng\"]]` (Nghĩa là Dior VÀ (Hoa nhài HOẶC Hoa hồng))\n" +
+  "  - **KHÔNG** bao giờ bao gồm field name (attribute, occasion, brand...) trong logic.\n" +
   "- **Giải thích (Explanation)**: Mô tả ngắn gọn tại sao bạn chọn các tiêu chí này.\n" +
   "- **Không tự bịa đặt**: Chỉ suy luận dựa trên answer thực tế.\n" +
   "- **Nếu answer quá chung chung** (ví dụ: \"Có\", \"Thích\", \"Không biết\")): Trả về logic = null hoặc [] - đừng cố suy diễn.\n" +
@@ -46,6 +53,19 @@ export const SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT =
   "  ```\n" +
   "- **Kết quả**: Trả về danh sách các giá trị chuẩn từ database.\n" +
   "- **Build logic**: Chỉ dùng các giá trị chuẩn từ searchMasterData để xây dựng logic.\n\n" +
+  "## VÍ DỤ MINH HỌA (CRITICAL):\n" +
+  "### Ví dụ 1: Answer \"Thích mùi hoa nhài\"\n" +
+  "  - **Sai**: `logic = [\"note:Jasmine\", \"scent:hoa nhài\"]`\n" +
+  "  - **Đúng**: `logic = [\"Jasmine\", \"Hoa nhài\"]` (chỉ dùng giá trị từ searchMasterData)\n\n" +
+  "### Ví dụ 2: Answer \"Dùng đi tiệc tối\"\n" +
+  "  - **Sai**: `logic = [\"occasion = Tiệc tối\", \"event:Evening\"]`\n" +
+  "  - **Đúng**: `logic = [\"Tiệc tối\", \"Formal\", \"Evening\"]` (chỉ giá trị chuẩn)\n\n" +
+  "### Ví dụ 3: Answer \"Nam tính\"\n" +
+  "  - **Sai**: `logic = [\"attribute:Phong cách=Nam tính\"]`\n" +
+  "  - **Đúng**: `logic = [\"Nam tính\"]` (chỉ giá trị chuẩn, KHÔNG bao gồm field name)\n\n" +
+  "### Ví dụ 4: Answer \"Hàng ngày / Thường ngày\"\n" +
+  "  - **Sai (AND)**: `logic = [\"Hàng ngày\", \"Thường ngày\"]` (Sẽ tìm sản phẩm khớp cả 2 - thường gây ra 0 kết quả)\n" +
+  "  - **Đúng (OR)**: `logic = [[\"Hàng ngày\", \"Thường ngày\"]]` (Tách và gộp vào mảng con để tạo logic OR)\n\n" +
   "## ĐẦU VÀO (INPUT):\n" +
   "Một đối tượng JSON chứa:\n" +
   "- answer: câu trả lời của người dùng\n\n" +

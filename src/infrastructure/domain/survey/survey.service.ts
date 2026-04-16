@@ -246,6 +246,25 @@ export class SurveyService {
       , 'Failed to get survey question answer by user id');
   }
 
+  async getSurveyHistoryListByUserId(
+    userId: string
+  ): Promise<BaseResponse<SurveyQuestionAnswerResponse[]>> {
+    return await funcHandlerAsync(async () => {
+      const surveyQuestionAnswers =
+        await this.unitOfWork.AISurveyQuestionAnswerRepo.find(
+          { userId },
+          {
+            populate: ['details', 'details.question', 'details.answer'],
+            orderBy: { updatedAt: 'DESC' }
+            // No limit applied to fetch full history
+          }
+        );
+
+      const responses = SurveyQuestionAnswerMapper.toResponseList(surveyQuestionAnswers, true);
+      return { success: true, data: responses };
+    }, 'Failed to get survey history list by user id');
+  }
+
   async getLatestSurveyQuesAnwsByUserId(
     userId: string
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {

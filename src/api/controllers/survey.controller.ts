@@ -43,7 +43,7 @@ export class SurveyController {
     private surveyService: SurveyService,
     private surveyAttributeService: SurveyAttributeService,
     private surveyQueryValidator: SurveyQueryValidatorService
-  ) {}
+  ) { }
 
   /** Lấy tất cả câu hỏi survey */
   @Public()
@@ -314,6 +314,20 @@ export class SurveyController {
     @Param('userId') userId: string
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
     return this.surveyService.getSurveyQuesAnwsByUserId(userId);
+  }
+
+  /** Lấy danh sách lịch sử tất cả các lần trả lời survey của người dùng */
+  @Public()
+  @Get('user/:userId/history')
+  @ApiOperation({
+    summary: 'Lấy danh sách lịch sử tất cả các lần trả lời survey của người dùng'
+  })
+  @ApiParam({ name: 'userId', description: 'ID của người dùng' })
+  @ApiBaseResponse(SurveyQuestionAnswerResponse, true)
+  async getSurveyHistoryListByUserId(
+    @Param('userId') userId: string
+  ): Promise<BaseResponse<SurveyQuestionAnswerResponse[]>> {
+    return this.surveyService.getSurveyHistoryListByUserId(userId);
   }
 
   /** Xóa mềm câu hỏi survey (isActive = false) */

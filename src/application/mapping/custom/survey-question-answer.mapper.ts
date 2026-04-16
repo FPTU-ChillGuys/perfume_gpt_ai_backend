@@ -17,9 +17,28 @@ export class SurveyQuestionAnswerMapper {
     });
 
     if (includeDetails && entity.details.isInitialized()) {
-      response.details = SurveyQuestionAnswerDetailMapper.toResponseList(
+      const flatDetails = SurveyQuestionAnswerDetailMapper.toResponseList(
         entity.details.getItems()
       );
+
+      // Group by question string (or questionId)
+      const groupedMap = new Map<string, any>();
+      for (const d of flatDetails) {
+        if (!groupedMap.has(d.questionId)) {
+          groupedMap.set(d.questionId, {
+            questionId: d.questionId,
+            question: d.question,
+            answers: []
+          });
+        }
+        groupedMap.get(d.questionId).answers.push({
+          detailId: d.id,
+          answerId: d.answerId,
+          answer: d.answer
+        });
+      }
+
+      response.details = Array.from(groupedMap.values()) as any;
     } else {
       response.details = [];
     }

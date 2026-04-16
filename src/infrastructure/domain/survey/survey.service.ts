@@ -33,6 +33,8 @@ import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { v4 as uuidv4 } from 'uuid';
 import { mergeSurveyQueryResults, SurveyQueryResult } from 'src/infrastructure/domain/survey/survey-merge.util';
+import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/survey-query-validator.service';
+import { QueryFragment, QueryAnswerPayload } from 'src/infrastructure/domain/survey/survey-query.types';
 
 
 @Injectable()
@@ -48,8 +50,10 @@ export class SurveyService {
     @InjectQueue(QueueName.SURVEY_QUEUE) private readonly surveyQueue: Queue,
     private readonly productService: ProductService,
     private readonly analysisService: AiAnalysisService,
-    private readonly aiAcceptanceService: AIAcceptanceService
+    private readonly aiAcceptanceService: AIAcceptanceService,
+    private readonly queryValidator: SurveyQueryValidatorService
   ) { }
+
 
   async addSurveyQues(
     question: SurveyQuestionRequest
@@ -240,6 +244,25 @@ export class SurveyService {
       };
     }
       , 'Failed to get survey question answer by user id');
+  }
+
+  async getSurveyHistoryListByUserId(
+    userId: string
+  ): Promise<BaseResponse<SurveyQuestionAnswerResponse[]>> {
+    return await funcHandlerAsync(async () => {
+      const surveyQuestionAnswers =
+        await this.unitOfWork.AISurveyQuestionAnswerRepo.find(
+          { userId },
+          {
+            populate: ['details', 'details.question', 'details.answer'],
+            orderBy: { updatedAt: 'DESC' }
+            // No limit applied to fetch full history
+          }
+        );
+
+      const responses = SurveyQuestionAnswerMapper.toResponseList(surveyQuestionAnswers, true);
+      return { success: true, data: responses };
+    }, 'Failed to get survey history list by user id');
   }
 
   async getLatestSurveyQuesAnwsByUserId(
@@ -568,9 +591,9 @@ export class SurveyService {
 
     // Step 3: Analyze EACH answer independently and execute queries
     this.logger.log(`[SurveyPerQuestion] Analyzing ${quesAnses.length} answers individually...`);
-    
+
     const queryResults: SurveyQueryResult[] = [];
-    
+
     for (const qa of quesAnses) {
       try {
         const analysis = await this.analysisService.analyzeSurveyAnswer({
@@ -585,7 +608,7 @@ export class SurveyService {
         }
 
         const searchResponse = await this.productService.getProductsByStructuredQuery(analysis);
-        
+
         if (searchResponse.success && searchResponse.data && searchResponse.data.items.length > 0) {
           const products = searchResponse.data.items.slice(0, 15).map(p => ({
             id: p.id,
@@ -615,13 +638,13 @@ export class SurveyService {
     // Step 4: Merge results (queries with 0 products are automatically filtered)
     const queriesWithProducts = queryResults.filter(r => r.products.length > 0);
     const queriesWithoutProducts = queryResults.filter(r => r.products.length === 0);
-    
+
     this.logger.log(
       `[SurveyPerQuestion] Merge stats: ` +
       `${queriesWithProducts.length} queries with products, ` +
       `${queriesWithoutProducts.length} queries skipped (0 products)`
     );
-    
+
     const mergedProducts = mergeSurveyQueryResults(queryResults, 20);
 
     // Step 5: Fallback if no products found
@@ -653,8 +676,8 @@ export class SurveyService {
     const quesAnsesSimple = quesAnses.map(q => ({ question: q.question, answer: q.answer }));
     const surveyCtx = surveyContextPrompt(JSON.stringify(quesAnsesSimple));
     const productCtx = surveyProductContextPrompt(
-      mergedProducts.length > 0 
-        ? JSON.stringify(mergedProducts) 
+      mergedProducts.length > 0
+        ? JSON.stringify(mergedProducts)
         : 'Không tìm thấy sản phẩm phù hợp từ các câu hỏi khảo sát.'
     );
 
@@ -728,5 +751,308 @@ export class SurveyService {
     );
 
     return Ok(JSON.stringify(aiResponse));
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ═══  SURVEY V4 — Query-based processing (no AI analysis)  ═══
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Process survey using pre-built query fragments stored in answers.
+   * Câu trả lời chứa sẵn JSON query → trực tiếp query sản phẩm → AI chọn top 5.
+   * Không cần bước AI phân tích keyword.
+   */
+  async processSurveyV4QueryBased(
+    userId: string,
+    surveyAnswers: { questionId: string; answerId: string }[]
+  ): Promise<BaseResponse<string>> {
+    this.logger.log(`[SurveyV4] Starting query-based processing for userId=${userId}, ${surveyAnswers.length} answers`);
+
+    // Step 1: Load all Q&A from database
+    const questionIds = [...new Set(surveyAnswers.map(qa => qa.questionId))];
+    const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
+    if (!surveyQueses.success || !surveyQueses.data) {
+      throw new InternalServerErrorWithDetailsException('Failed to get survey questions', { questionIds });
+    }
+
+    // Step 2: Group answers by question & parse query fragments
+    const questionQueryMap = new Map<string, { question: string; fragments: QueryFragment[]; displayAnswers: string[] }>();
+
+    for (const surveyAnswer of surveyAnswers) {
+      const surveyQues = surveyQueses.data.find(q => q.id === surveyAnswer.questionId);
+      if (!surveyQues?.answers || !surveyQues.question) continue;
+
+      const answer = surveyQues.answers.find(ans => ans.id === surveyAnswer.answerId);
+      if (!answer?.answer) continue;
+
+      // Try to parse answer as query payload
+      const parsed = this.queryValidator.tryParseAnswerAsQuery(answer.answer);
+
+      if (!questionQueryMap.has(surveyAnswer.questionId)) {
+        questionQueryMap.set(surveyAnswer.questionId, {
+          question: surveyQues.question,
+          fragments: [],
+          displayAnswers: [],
+        });
+      }
+
+      const entry = questionQueryMap.get(surveyAnswer.questionId)!;
+
+      if (parsed) {
+        entry.fragments.push(parsed.queryFragment);
+        entry.displayAnswers.push(parsed.displayText);
+      } else {
+        // Fallback: treat as plain text answer (backward compatibility)
+        entry.displayAnswers.push(answer.answer);
+      }
+    }
+
+    // Step 3: Save survey record
+    const savedSurveyQuesAnsResponse = await this.addSurveyQuesAnws(
+      new SurveyQuesAnwsRequest({ userId, details: surveyAnswers })
+    );
+    if (!savedSurveyQuesAnsResponse.success || !savedSurveyQuesAnsResponse.data?.id) {
+      throw new InternalServerErrorWithDetailsException('Failed to save survey question answers', { userId });
+    }
+    await this.userLogService.addSurveyQuesAnsDetailToUserLog(userId, savedSurveyQuesAnsResponse.data.id);
+
+    // Step 4: Query products for each question using query fragments
+    this.logger.log(`[SurveyV4] Processing ${questionQueryMap.size} questions with query fragments...`);
+
+    const queryResults: SurveyQueryResult[] = [];
+    const quesAnsesForContext: Array<{ question: string; answer: string }> = [];
+
+    for (const [questionId, entry] of questionQueryMap) {
+      quesAnsesForContext.push({
+        question: entry.question,
+        answer: entry.displayAnswers.join(', '),
+      });
+
+      if (entry.fragments.length === 0) {
+        this.logger.warn(`[SurveyV4] Question "${entry.question.substring(0, 30)}..." has no query fragments, skipping`);
+        queryResults.push({ questionId, products: [] });
+        continue;
+      }
+
+      try {
+        // Convert query fragments to structured analysis object
+        const analysis = this.queryFragmentsToAnalysis(entry.fragments);
+        const searchResponse = await this.productService.getProductsByStructuredQuery(analysis);
+
+        if (searchResponse.success && searchResponse.data && searchResponse.data.items.length > 0) {
+          const products = searchResponse.data.items.slice(0, 15).map(p => ({
+            id: p.id,
+            name: p.name,
+            brand: p.brandName,
+            image: p.primaryImage,
+            category: p.categoryName,
+            description: p.description,
+            attributes: p.attributes.map(a => `${a.attribute}: ${a.value}`),
+            scentNotes: p.scentNotes,
+            olfactoryFamilies: p.olfactoryFamilies,
+            variants: p.variants.map(v => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
+          }));
+
+          queryResults.push({ questionId, products });
+          this.logger.log(`[SurveyV4] Question "${entry.question.substring(0, 30)}..." -> ${products.length} products`);
+        } else {
+          this.logger.log(`[SurveyV4] Question "${entry.question.substring(0, 30)}..." -> 0 products`);
+          queryResults.push({ questionId, products: [] });
+        }
+      } catch (error) {
+        this.logger.error(`[SurveyV4] Error processing question "${entry.question.substring(0, 30)}...":`, error);
+        queryResults.push({ questionId, products: [] });
+      }
+    }
+
+    // Step 5: Merge results
+    const queriesWithProducts = queryResults.filter(r => r.products.length > 0);
+    const queriesWithoutProducts = queryResults.filter(r => r.products.length === 0);
+
+    this.logger.log(
+      `[SurveyV4] Merge: ${queriesWithProducts.length} queries with products, ${queriesWithoutProducts.length} skipped`
+    );
+
+    const mergedProducts = mergeSurveyQueryResults(queryResults, 20);
+
+    // Step 6: Fallback
+    if (mergedProducts.length === 0) {
+      this.logger.warn(`[SurveyV4] No products found, falling back to bestsellers`);
+      const fallbackResponse = await this.productService.getBestSellingProducts({
+        PageNumber: 1, PageSize: 5, SortOrder: 'desc', IsDescending: true
+      });
+      if (fallbackResponse.success && fallbackResponse.data) {
+        const fallbackProducts = fallbackResponse.data.items.map((item: any) => ({
+          id: item.product.id,
+          name: item.product.name,
+          brand: item.product.brandName,
+          image: item.product.primaryImage,
+          category: item.product.categoryName,
+          description: item.product.description,
+          attributes: item.product.attributes.map((a: any) => `${a.attribute}: ${a.value}`),
+          scentNotes: item.product.scentNotes,
+          olfactoryFamilies: item.product.olfactoryFamilies,
+          variants: item.product.variants.map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
+          source: 'BEST_SELLER_FALLBACK',
+        }));
+        mergedProducts.push(...fallbackProducts);
+      }
+    }
+
+    // Step 7: AI Recommendation
+    // Lấy top 5 trước khi gọi AI — sẽ dùng trực tiếp làm output products
+    const top5Products = mergedProducts.slice(0, 5);
+    this.logger.log(`[SurveyV4] Top 5 products for output: [${top5Products.map(p => p.name).join(', ')}]`);
+
+    const surveyCtx = surveyContextPrompt(JSON.stringify(quesAnsesForContext));
+    const productCtx = surveyProductContextPrompt(
+      top5Products.length > 0
+        ? JSON.stringify(top5Products)
+        : 'Không tìm thấy sản phẩm phù hợp từ các câu hỏi khảo sát.'
+    );
+
+    const adminInstruction = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
+    const combinedSystemPrompt = surveyRecommendationSystemPrompt(adminInstruction || '', surveyCtx, productCtx);
+
+    const aiResponsePayload = await this.aiHelper.textGenerateFromPrompt(
+      'Bạn là một chuyên gia tư vấn nước hoa, hãy đưa ra tư vấn cá nhân hóa và chọn ra các sản phẩm từ danh sách sản phẩm được nhập vào và phân tích và chọn lựa phù hợp nhất. Với mỗi sản phẩm, hãy giải thích rõ lý do tại sao nó phù hợp với người dùng này.',
+      combinedSystemPrompt,
+      Output.object(surveyOutput)
+    );
+
+    if (!aiResponsePayload.success || !aiResponsePayload.data) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response for survey v4', { userId });
+    }
+
+    const aiResponse = typeof aiResponsePayload.data === 'string'
+      ? JSON.parse(aiResponsePayload.data)
+      : aiResponsePayload.data;
+
+    // Step 8: Gán trực tiếp data từ merged results
+    // Extract budget constraint từ câu trả lời (nếu có) để filter variants
+    let budgetMin: number | undefined;
+    let budgetMax: number | undefined;
+    for (const [, entry] of questionQueryMap.entries()) {
+      for (const frag of entry.fragments) {
+        if (frag.type === 'budget') {
+          budgetMin = (frag as any).min;
+          budgetMax = (frag as any).max;
+          this.logger.log(`[SurveyV4] Budget constraint detected: min=${budgetMin}, max=${budgetMax}`);
+        }
+      }
+    }
+
+    const aiRecMap = new Map<string, any>((aiResponse.productTemp || []).map((item: any) => [item.id, item]));
+
+    aiResponse.products = top5Products.map(p => {
+      const aiItem = aiRecMap.get(p.id);
+      let variants = (p.variants || []).map((v: any) => ({
+        id: v.id,
+        sku: v.sku || `SKU-${v.id.substring(0, 8)}`,
+        volumeMl: v.volume || v.volumeMl || 0,
+        basePrice: v.price || v.basePrice || 0
+      }));
+
+      // Filter variants theo ngân sách nếu có
+      if (budgetMin !== undefined || budgetMax !== undefined) {
+        const before = variants.length;
+        variants = variants.filter((v: any) => {
+          if (budgetMin !== undefined && v.basePrice < budgetMin) return false;
+          if (budgetMax !== undefined && v.basePrice > budgetMax) return false;
+          return true;
+        });
+        this.logger.log(`[SurveyV4] Product ${p.name}: variants ${before} -> ${variants.length} after budget filter [${budgetMin}-${budgetMax}]`);
+      }
+
+      return {
+        id: p.id,
+        name: p.name,
+        brandName: p.brand || p.brandName,
+        primaryImage: p.image || p.primaryImage,
+        reasoning: aiItem?.reasoning || 'Sản phẩm phù hợp nhất với nhu cầu của bạn.',
+        source: p.source || aiItem?.source || 'SURVEY_V4_QUERY',
+        variants
+      };
+    }).filter(p => p.variants.length > 0); // Loại sản phẩm không còn variant nào khớp ngân sách
+
+    this.logger.log(`[SurveyV4] Assigned ${aiResponse.products.length} products (after budget variant filtering).`);
+
+    // Step 9: Attach AI acceptance
+    if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
+      const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        userId,
+        contextType: 'survey',
+        sourceRefId: `survey-v4-${userId}-${Date.now()}`,
+        products: aiResponse.products,
+        metadata: {
+          flow: 'survey-v4-query',
+          questionCount: surveyAnswers.length,
+          productCount: aiResponse.products.length,
+          queryCount: queriesWithProducts.length,
+        },
+      });
+      aiResponse.products = attachResult.products;
+      if (attachResult.aiAcceptanceId) {
+        aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+      }
+    }
+
+    this.logger.log(
+      `[SurveyV4] Completed. Questions: ${questionQueryMap.size}, ` +
+      `Queries with results: ${queriesWithProducts.length}, ` +
+      `Final products: ${aiResponse.products?.length || 0}`
+    );
+
+    return Ok(JSON.stringify(aiResponse));
+  }
+
+  /**
+   * Convert query fragments thành AnalysisObject cho getProductsByStructuredQuery().
+   * Mỗi fragment map tới 1 field tương ứng trong analysis.
+   */
+  private queryFragmentsToAnalysis(fragments: QueryFragment[]): any {
+    const logic: string[][] = [];
+    const genderValues: string[] = [];
+    const originValues: string[] = [];
+    const concentrationValues: string[] = [];
+    let budget: { min?: number; max?: number } | undefined;
+
+    for (const frag of fragments) {
+      switch (frag.type) {
+        case 'gender':
+          genderValues.push(frag.match);
+          break;
+        case 'origin':
+          originValues.push(frag.match);
+          break;
+        case 'concentration':
+          concentrationValues.push(frag.match);
+          break;
+        case 'brand':
+        case 'category':
+        case 'note':
+        case 'family':
+          // These go into logic groups → mỗi group là 1 OR condition
+          logic.push([frag.match]);
+          break;
+        case 'attribute':
+          // Attribute values also go into logic groups
+          logic.push([frag.match]);
+          break;
+        case 'budget':
+          budget = { min: frag.min, max: frag.max };
+          break;
+      }
+    }
+
+    return {
+      logic,
+      genderValues,
+      originValues,
+      concentrationValues,
+      budget,
+      pagination: { pageNumber: 1, pageSize: 15 },
+      sorting: { field: 'Newest', isDescending: true },
+    };
   }
 }

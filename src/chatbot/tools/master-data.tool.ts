@@ -29,21 +29,37 @@ export class MasterDataTool {
             };
 
             const foundKeywords = new Set<string>();
+            const keywordToLabelsMap = new Map<string, Set<string>>();
+
+            const getLabelsForRes = (res: any[]) => res.map(item => item.Name || item.Value || item.id || item.Id);
 
             // --- PHASE 1: DIRECT SEARCH ---
-            const performSearch = async (kw: string, targetTypes: string[]) => {
+            const performSearch = async (kw: string, targetTypes: string[], originalKeyword?: string) => {
                 const types = targetTypes.includes('all') ? ['brand', 'category', 'note', 'family', 'attribute', 'product'] : targetTypes;
                 const pList: Promise<void>[] = [];
-                if (types.includes('brand')) pList.push(this.masterDataService.searchBrands(kw).then(res => { if (res.length > 0) { finalResults.brands.push(...res); foundKeywords.add(kw); } }));
-                if (types.includes('category')) pList.push(this.masterDataService.searchCategories(kw).then(res => { if (res.length > 0) { finalResults.categories.push(...res); foundKeywords.add(kw); } }));
-                if (types.includes('note')) pList.push(this.masterDataService.searchScentNotes(kw).then(res => { if (res.length > 0) { finalResults.notes.push(...res); foundKeywords.add(kw); } }));
-                if (types.includes('family')) pList.push(this.masterDataService.searchOlfactoryFamilies(kw).then(res => { if (res.length > 0) { finalResults.families.push(...res); foundKeywords.add(kw); } }));
-                if (types.includes('attribute')) pList.push(this.masterDataService.searchAttributeValues(kw).then(res => { if (res.length > 0) { finalResults.attributes.push(...res); foundKeywords.add(kw); } }));
-                if (types.includes('product')) pList.push(this.masterDataService.searchProducts(kw).then(res => { if (res.length > 0) { finalResults.products.push(...res); foundKeywords.add(kw); } }));
+
+                const trackResult = (res: any[], kwUsed: string) => {
+                    if (res.length > 0) {
+                        foundKeywords.add(kwUsed);
+                        if (originalKeyword) {
+                            if (!keywordToLabelsMap.has(originalKeyword)) {
+                                keywordToLabelsMap.set(originalKeyword, new Set());
+                            }
+                            getLabelsForRes(res).forEach(l => keywordToLabelsMap.get(originalKeyword)!.add(l));
+                        }
+                    }
+                };
+
+                if (types.includes('brand')) pList.push(this.masterDataService.searchBrands(kw).then(res => { if (res.length > 0) { finalResults.brands.push(...res); trackResult(res, kw); } }));
+                if (types.includes('category')) pList.push(this.masterDataService.searchCategories(kw).then(res => { if (res.length > 0) { finalResults.categories.push(...res); trackResult(res, kw); } }));
+                if (types.includes('note')) pList.push(this.masterDataService.searchScentNotes(kw).then(res => { if (res.length > 0) { finalResults.notes.push(...res); trackResult(res, kw); } }));
+                if (types.includes('family')) pList.push(this.masterDataService.searchOlfactoryFamilies(kw).then(res => { if (res.length > 0) { finalResults.families.push(...res); trackResult(res, kw); } }));
+                if (types.includes('attribute')) pList.push(this.masterDataService.searchAttributeValues(kw).then(res => { if (res.length > 0) { finalResults.attributes.push(...res); trackResult(res, kw); } }));
+                if (types.includes('product')) pList.push(this.masterDataService.searchProducts(kw).then(res => { if (res.length > 0) { finalResults.products.push(...res); trackResult(res, kw); } }));
                 await Promise.all(pList);
             };
 
-            await Promise.all(searchInfos.map(info => performSearch(info.keyword, info.types)));
+            await Promise.all(searchInfos.map(info => performSearch(info.keyword, info.types, info.keyword)));
 
             // --- PHASE 2: STRUCTURED SEMANTIC NORMALIZATION ---
             const missingInfos = searchInfos.filter(info => !foundKeywords.has(info.keyword));
@@ -87,7 +103,7 @@ export class MasterDataTool {
                                 }
 
                                 this.logger.log(`[searchMasterData] Re-searching normalized: ${mapping.original} -> ${term}`);
-                                reSearchTasks.push(performSearch(term, originalInfo?.types || ['all']));
+                                reSearchTasks.push(performSearch(term, originalInfo?.types || ['all'], mapping.original));
                             }
                         }
                     }
@@ -108,6 +124,11 @@ export class MasterDataTool {
 
             const getLabels = (arr: any[]) => arr.map(item => item.Name || item.Value || item.id || item.Id);
 
+            const keywordMappings = Array.from(keywordToLabelsMap.entries()).map(([kw, labels]) => ({
+                original: kw,
+                corrected: Array.from(labels)
+            }));
+
             return {
                 ...encodeToolOutput({
                     brands: deduplicate(finalResults.brands),
@@ -117,7 +138,9 @@ export class MasterDataTool {
                     attributes: deduplicate(finalResults.attributes),
                     products: deduplicate(finalResults.products)
                 }),
-                // Thêm summary text để AI (như GPT-Nano) dễ đọc được các Nhãn chuẩn mà không cần giải mã TOON
+                // keywordMappings giúp AI biết nhãn nào thuộc về cùng 1 intent để gộp vào mảng OR
+                keywordMappings,
+                // summaryFoundLabels duy trì cho backward compatibility
                 summaryFoundLabels: {
                     brands: Array.from(new Set(getLabels(finalResults.brands))),
                     categories: Array.from(new Set(getLabels(finalResults.categories))),

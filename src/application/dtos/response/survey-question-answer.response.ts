@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CommonResponse } from './common/common.response';
-import { SurveyQuestionAnswerDetailResponse } from './survey-question-answer-detail.response';
+import { GroupedSurveyQuestionAnswerDetailResponse } from './grouped-survey-question-answer-detail.response';
 
 /** Response bài survey của người dùng */
 export class SurveyQuestionAnswerResponse extends CommonResponse {
@@ -9,8 +9,8 @@ export class SurveyQuestionAnswerResponse extends CommonResponse {
   userId!: string;
 
   /** Danh sách chi tiết câu hỏi - câu trả lời */
-  @ApiProperty({ description: 'Danh sách chi tiết câu hỏi - câu trả lời', type: [SurveyQuestionAnswerDetailResponse] })
-  details!: SurveyQuestionAnswerDetailResponse[];
+  @ApiProperty({ description: 'Danh sách chi tiết câu hỏi - câu trả lời', type: [GroupedSurveyQuestionAnswerDetailResponse] })
+  details!: GroupedSurveyQuestionAnswerDetailResponse[];
 
   constructor(init?: Partial<SurveyQuestionAnswerResponse>) {
     super();

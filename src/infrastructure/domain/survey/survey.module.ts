@@ -10,6 +10,8 @@ import { QueueName } from 'src/application/constant/processor';
 
 import { ProductModule } from 'src/infrastructure/domain/product/product.module';
 import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.module';
+import { SurveyAttributeService } from 'src/infrastructure/domain/survey/survey-attribute.service';
+import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/survey-query-validator.service';
 
 @Module({
   imports: [
@@ -21,7 +23,8 @@ import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-a
     AIAcceptanceModule,
     BullModule.registerQueue({ name: QueueName.SURVEY_QUEUE })
   ],
-  providers: [SurveyService, SurveyQuestionRepository],
-  exports: [SurveyService]
+  providers: [SurveyService, SurveyQuestionRepository, SurveyAttributeService, SurveyQueryValidatorService],
+  exports: [SurveyService, SurveyAttributeService, SurveyQueryValidatorService]
 })
 export class SurveyModule {}
+

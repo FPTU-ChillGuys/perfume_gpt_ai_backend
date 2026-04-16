@@ -445,7 +445,7 @@ export class ConversationV10Service {
   /**
    * Execute a profile-type query: fetch user profile/order keywords, then search products.
    */
-  private async executeProfileQuery(userId: string, query: QueryItemObject): Promise<any[]> {
+  private async executeProfileQuery(userId: string, query: QueryItemObject, rootAnalysis: AnalysisObject): Promise<any[]> {
     this.logger.log(`[V10_MULTI_QUERY][PROFILE] Fetching profile context for userId=${userId}`);
     try {
       const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
@@ -472,7 +472,7 @@ export class ConversationV10Service {
         logic: [keywords], // OR between all profile keywords
         productNames: null,
         sorting: query.sorting || null,
-        budget: query.budget || (payload.budgetHint ? { min: payload.budgetHint.min, max: payload.budgetHint.max } : null),
+        budget: query.budget || rootAnalysis.budget || (payload.budgetHint ? { min: payload.budgetHint.min, max: payload.budgetHint.max } : null),
         pagination: { pageNumber: 1, pageSize: 20 }
       };
 
@@ -668,7 +668,7 @@ export class ConversationV10Service {
 
         case 'profile': {
           if (isGuestUser) break;
-          const items = await this.executeProfileQuery(userId, query);
+          const items = await this.executeProfileQuery(userId, query, rootAnalysis);
           for (const p of items) {
             const pid = p.id;
             if (pid && !seenProductIds.has(pid)) {
@@ -695,11 +695,28 @@ export class ConversationV10Service {
 
     // Merge strategy: function products come first, then search/profile products
     const functionMinimal = functionProducts.map(p => this.mapToMinimalProduct(p, 'FUNCTION_RESULTS'));
-    const mergedProducts = [...functionMinimal, ...allProducts].slice(0, pageSize);
+    let combined = [...functionMinimal, ...allProducts];
+
+    // Apply strict budget filter if budget is provided in rootAnalysis
+    if (rootAnalysis.budget && (rootAnalysis.budget.min !== null || rootAnalysis.budget.max !== null)) {
+      const { min, max } = rootAnalysis.budget;
+      const beforeCount = combined.length;
+      combined = combined.filter(p => {
+        return (p.variants || []).some((v: any) => {
+          const price = v.price;
+          const fitsMin = min === null || price >= (min as number);
+          const fitsMax = max === null || price <= (max as number);
+          return fitsMin && fitsMax;
+        });
+      });
+      this.logger.log(`[V10_MULTI_QUERY] Strict budget filter applied (${min}-${max}): ${beforeCount} -> ${combined.length} items`);
+    }
+
+    const mergedProducts = combined.slice(0, pageSize);
 
     const mergedNames = mergedProducts.slice(0, 5).map(p => p.name).join(', ') + (mergedProducts.length > 5 ? '...' : '');
     this.logger.log(
-      `[V10_MULTI_QUERY] Merge complete: function=${functionMinimal.length} search/profile=${allProducts.length} final=${mergedProducts.length}. Result: [${mergedNames}]`
+      `[V10_MULTI_QUERY] Merge complete: function=${functionMinimal.length} search/profile=${allProducts.length} filtered_final=${mergedProducts.length}. Result: [${mergedNames}]`
     );
 
     return { mergedProducts, taskResults };

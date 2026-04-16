@@ -881,10 +881,14 @@ export class SurveyService {
     }
 
     // Step 7: AI Recommendation
+    // Lấy top 5 trước khi gọi AI — sẽ dùng trực tiếp làm output products
+    const top5Products = mergedProducts.slice(0, 5);
+    this.logger.log(`[SurveyV4] Top 5 products for output: [${top5Products.map(p => p.name).join(', ')}]`);
+
     const surveyCtx = surveyContextPrompt(JSON.stringify(quesAnsesForContext));
     const productCtx = surveyProductContextPrompt(
-      mergedProducts.length > 0
-        ? JSON.stringify(mergedProducts)
+      top5Products.length > 0
+        ? JSON.stringify(top5Products)
         : 'Không tìm thấy sản phẩm phù hợp từ các câu hỏi khảo sát.'
     );
 
@@ -905,52 +909,54 @@ export class SurveyService {
       ? JSON.parse(aiResponsePayload.data)
       : aiResponsePayload.data;
 
-    // Step 8: Hydrate products
-    if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
-      const productTemp: any[] = aiResponse.productTemp;
-      const ids = productTemp.map((item: any) => item.id).filter((id: string) => !!id).slice(0, 5);
-
-      this.logger.log(`[SurveyV4] AI returned ${productTemp.length} products in productTemp. Extracting IDs: ${ids.join(', ')}`);
-
-      if (ids.length > 0) {
-        const productResponse = await this.productService.getProductsByIdsForOutput(ids);
-
-        if (productResponse.success && productResponse.data) {
-          this.logger.log(`[SurveyV4] DB hydration found ${productResponse.data.length} products out of ${ids.length} requested IDs.`);
-
-          const aiRecMap = new Map<string, any>(productTemp.map(item => [item.id, item]));
-
-          aiResponse.products = productResponse.data.map(product => {
-            const aiItem = aiRecMap.get(product.id);
-
-            if (aiItem?.variants && Array.isArray(aiItem.variants)) {
-              const variantIdsSet = new Set(aiItem.variants.map((v: any) => v.id));
-              const filteredVariants = (product.variants || []).filter(v => variantIdsSet.has(v.id));
-
-              this.logger.log(`[SurveyV4] Product ${product.id} (${product.name}): AI requested variants [${Array.from(variantIdsSet).join(', ')}]. DB has [${(product.variants || []).map(v => v.id).join(', ')}]. After filter: ${filteredVariants.length} variants left.`);
-
-              return {
-                ...product,
-                reasoning: aiItem.reasoning || product.reasoning,
-                source: aiItem.source || 'SURVEY_V4_QUERY',
-                variants: filteredVariants,
-              };
-            }
-
-            this.logger.log(`[SurveyV4] Product ${product.id} (${product.name}): AI did not provide variants array. Using all DB variants (${product.variants?.length || 0}).`);
-            return product;
-          }).filter(product => {
-            const hasVariants = product.variants && product.variants.length > 0;
-            if (!hasVariants) {
-              this.logger.warn(`[SurveyV4] Dropping product ${product.id} (${product.name}) because it has 0 variants left after filtering.`);
-            }
-            return hasVariants;
-          });
-        } else {
-          this.logger.warn(`[SurveyV4] getProductsByIdsForOutput failed or returned no data for IDs: ${ids.join(', ')}`);
+    // Step 8: Gán trực tiếp data từ merged results
+    // Extract budget constraint từ câu trả lời (nếu có) để filter variants
+    let budgetMin: number | undefined;
+    let budgetMax: number | undefined;
+    for (const [, entry] of questionQueryMap.entries()) {
+      for (const frag of entry.fragments) {
+        if (frag.type === 'budget') {
+          budgetMin = (frag as any).min;
+          budgetMax = (frag as any).max;
+          this.logger.log(`[SurveyV4] Budget constraint detected: min=${budgetMin}, max=${budgetMax}`);
         }
       }
     }
+
+    const aiRecMap = new Map<string, any>((aiResponse.productTemp || []).map((item: any) => [item.id, item]));
+
+    aiResponse.products = top5Products.map(p => {
+      const aiItem = aiRecMap.get(p.id);
+      let variants = (p.variants || []).map((v: any) => ({
+        id: v.id,
+        sku: v.sku || `SKU-${v.id.substring(0, 8)}`,
+        volumeMl: v.volume || v.volumeMl || 0,
+        basePrice: v.price || v.basePrice || 0
+      }));
+
+      // Filter variants theo ngân sách nếu có
+      if (budgetMin !== undefined || budgetMax !== undefined) {
+        const before = variants.length;
+        variants = variants.filter((v: any) => {
+          if (budgetMin !== undefined && v.basePrice < budgetMin) return false;
+          if (budgetMax !== undefined && v.basePrice > budgetMax) return false;
+          return true;
+        });
+        this.logger.log(`[SurveyV4] Product ${p.name}: variants ${before} -> ${variants.length} after budget filter [${budgetMin}-${budgetMax}]`);
+      }
+
+      return {
+        id: p.id,
+        name: p.name,
+        brandName: p.brand || p.brandName,
+        primaryImage: p.image || p.primaryImage,
+        reasoning: aiItem?.reasoning || 'Sản phẩm phù hợp nhất với nhu cầu của bạn.',
+        source: p.source || aiItem?.source || 'SURVEY_V4_QUERY',
+        variants
+      };
+    }).filter(p => p.variants.length > 0); // Loại sản phẩm không còn variant nào khớp ngân sách
+
+    this.logger.log(`[SurveyV4] Assigned ${aiResponse.products.length} products (after budget variant filtering).`);
 
     // Step 9: Attach AI acceptance
     if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {

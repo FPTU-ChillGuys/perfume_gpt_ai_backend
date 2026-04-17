@@ -5,8 +5,9 @@ import { modules } from "./list/module";
 import { SurveyProcessor } from 'src/infrastructure/domain/processor/survey.processor';
 import { UserLogHelper } from 'src/infrastructure/domain/processor/helper/user-log.helper';
 import { UserLogSummaryProcessor } from 'src/infrastructure/domain/processor/user-log-summary.processor';
+import { ReviewProcessor } from 'src/infrastructure/domain/processor/review.processor';
 
-const processors = [ConversationProcessor, SurveyProcessor, UserLogSummaryProcessor];
+const processors = [ConversationProcessor, SurveyProcessor, UserLogSummaryProcessor, ReviewProcessor];
 const helper = [UserLogHelper];
 
 @Module({

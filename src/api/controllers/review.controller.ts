@@ -138,6 +138,16 @@ export class ReviewController {
         return await this.reviewService.getReviewLogsByVariantId(variantId);
     }
 
+    /** Lấy review log mới nhất theo variant ID */
+    @Public()
+    @Get('logs/latest/variant/:variantId')
+    @ApiBaseResponse(ReviewLog)
+    @ApiOperation({ summary: 'Lấy review log mới nhất theo variant ID' })
+    @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
+    async getLatestReviewLogByVariantId(@Param('variantId') variantId: string): Promise<BaseResponseAPI<ReviewLog>> {
+        return await this.reviewService.getLatestReviewLogByVariantId(variantId);
+    }
+
     /** Lấy review log theo ID */
     @Get('logs/:id')
     @ApiBaseResponse(ReviewLog)

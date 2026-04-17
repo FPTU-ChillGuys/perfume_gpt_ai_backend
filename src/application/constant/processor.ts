@@ -22,3 +22,7 @@ export enum SurveyJobName {
 export enum UserLogSummaryJobName {
   UPDATE_ROLLING_SUMMARY = 'update_rolling_summary',
 }
+
+export enum ReviewJobName {
+  PROCESS_REVIEW_SUMMARY = 'process_review_summary',
+}

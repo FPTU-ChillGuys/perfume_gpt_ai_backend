@@ -16,6 +16,12 @@ import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work'
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
 const reviewInclude = {
   AspNetUsers_Reviews_UserIdToAspNetUsers: {
     include: { Media: true }
@@ -148,10 +154,10 @@ export class ReviewService {
         const take = request.PageSize;
 
         const where: Prisma.ReviewsWhereInput = {
-          ...(request.VariantId
+          ...(request.VariantId && isUUID(request.VariantId)
             ? { OrderDetails: { VariantId: request.VariantId } }
             : {}),
-          ...(request.UserId ? { UserId: request.UserId } : {}),
+          ...(request.UserId && isUUID(request.UserId) ? { UserId: request.UserId } : {}),
           ...buildReviewStatusWhere(request.Status),
           ...(request.MinRating || request.MaxRating
             ? {
@@ -193,6 +199,9 @@ export class ReviewService {
   ): Promise<BaseResponseAPI<ReviewResponse[]>> {
     return await funcHandlerAsync(
       async () => {
+        if (!isUUID(variantId)) {
+          return { success: true, payload: [] };
+        }
         const reviews = await this.prisma.reviews.findMany({
           where: { OrderDetails: { VariantId: variantId } },
           include: reviewInclude
@@ -209,6 +218,21 @@ export class ReviewService {
   ): Promise<BaseResponseAPI<ReviewStatisticsResponse>> {
     return await funcHandlerAsync(
       async () => {
+        if (!isUUID(variantId)) {
+          return {
+            success: true,
+            payload: {
+              variantId,
+              totalReviews: 0,
+              averageRating: 0,
+              fiveStarCount: 0,
+              fourStarCount: 0,
+              threeStarCount: 0,
+              twoStarCount: 0,
+              oneStarCount: 0
+            }
+          };
+        }
         const reviews = await this.prisma.reviews.findMany({
           where: { OrderDetails: { VariantId: variantId } },
           select: { Rating: true }
@@ -274,6 +298,25 @@ export class ReviewService {
         return { success: true, payload: logs };
       },
       'Failed to fetch review logs',
+      true
+    );
+  }
+
+  async getLatestReviewLogByVariantId(
+    variantId: string
+  ): Promise<BaseResponseAPI<ReviewLog>> {
+    return await funcHandlerAsync(
+      async () => {
+        const log = await this.unitOfWork.ReviewLogRepo.findOne(
+          { variantId },
+          { orderBy: { createdAt: 'DESC' } }
+        );
+        if (!log) {
+          return { success: false, error: 'Latest review log not found' };
+        }
+        return { success: true, payload: log };
+      },
+      'Failed to fetch latest review log',
       true
     );
   }

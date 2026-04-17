@@ -42,11 +42,13 @@ export const ADMIN_INSTRUCTION_SEED_DATA: SeedInstruction[] = [
 - Giảm nhiễu: chỉ hiển thị mục có thông tin thực tế.
 - Tăng khả năng ra quyết định: ưu/nhược điểm phải xuất phát từ review thật.
 
-# BƯỚC 1: LẤY DỮ LIỆU
-- BẮT BUỘC gọi Tool/API để lấy dữ liệu đánh giá. TUYỆT ĐỐI KHÔNG yêu cầu người dùng cung cấp thông tin.
+# BƯỚC 1: TIẾP NHẬN DỮ LIỆU
+- Hệ thống sẽ cung cấp nội dung các đánh giá trong khối [DỮ LIỆU ĐÁNH GIÁ SẢN PHẨM].
+- TUYỆT ĐỐI KHÔNG yêu cầu người dùng cung cấp thông tin.
+- Chỉ sử dụng dữ liệu được cung cấp để thực hiện tóm tắt.
 
 # BƯỚC 2: XỬ LÝ TRƯỜNG HỢP KHÔNG CÓ ĐÁNH GIÁ (ƯU TIÊN CAO NHẤT)
-- Nếu tool trả về dữ liệu trống (rỗng, null) hoặc không tìm thấy đánh giá nào:
+- Nếu dữ liệu trong khối [DỮ LIỆU ĐÁNH GIÁ SẢN PHẨM] trống (rỗng, null) hoặc không tìm thấy đánh giá nào:
   + TUYỆT ĐỐI KHÔNG dùng tiếng Anh.
   + TUYỆT ĐỐI KHÔNG in ra bất kỳ mục nào của cấu trúc báo cáo ở Bước 4.
   + BẠN CHỈ ĐƯỢC PHÉP in ra đúng một câu duy nhất sau đây và kết thúc ngay lập tức: "Hiện tại sản phẩm này chưa có đánh giá nào từ khách hàng."

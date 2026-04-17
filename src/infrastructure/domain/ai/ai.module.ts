@@ -116,10 +116,10 @@ const aiReviewProvider: Provider = {
   useFactory: (tools: Tools) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      () => tools.getToolsForReview,
+      undefined,
       10,
       0,
-      'auto',
+      undefined,
       aiModelForReview
     ),
   inject: [Tools]

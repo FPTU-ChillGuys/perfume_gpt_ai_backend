@@ -35,6 +35,7 @@ import {
   AIResponseMetadata
 } from 'src/application/dtos/response/ai-structured.response';
 import { restockOutput } from 'src/chatbot/output/restock.output';
+import { SourcingCatalogService } from 'src/infrastructure/domain/sourcing/sourcing-catalog.service';
 
 type RestockVariantResult = {
   id: string;
@@ -49,6 +50,10 @@ type RestockVariantResult = {
   reservedQuantity: number;
   averageDailySales: number;
   suggestedRestockQuantity: number;
+  supplierId?: number;
+  supplierName?: string;
+  negotiatedPrice?: number;
+  estimatedLeadTimeDays?: number;
 };
 
 type RestockLogPayload = {
@@ -62,7 +67,8 @@ export class InventoryService {
     private readonly unitOfWork: UnitOfWork,
     @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
-    private readonly adminInstructionService: AdminInstructionService
+    private readonly adminInstructionService: AdminInstructionService,
+    private readonly sourcingCatalogService: SourcingCatalogService
   ) { }
 
   private async ensureCriticalLowStockIncluded(
@@ -602,6 +608,33 @@ export class InventoryService {
     return Ok(aiResponse.data);
   }
 
+  private async enrichVariantWithSourcingInfo(
+    variant: RestockVariantResult
+  ): Promise<RestockVariantResult> {
+    try {
+      const sourcingResponse = await this.sourcingCatalogService.getCatalogsAsync(variant.id);
+      if (sourcingResponse.success && Array.isArray(sourcingResponse.payload)) {
+        // Find the primary catalog with the lowest negotiated price
+        const primarySourcing = sourcingResponse.payload
+          .filter(c => c.isPrimary)
+          .sort((a, b) => Number(a.negotiatedPrice) - Number(b.negotiatedPrice))[0];
+        if (primarySourcing) {
+          return {
+            ...variant,
+            supplierId: primarySourcing.supplierId,
+            supplierName: primarySourcing.supplierName,
+            negotiatedPrice: Number(primarySourcing.negotiatedPrice),
+            estimatedLeadTimeDays: primarySourcing.estimatedLeadTimeDays
+          };
+        }
+      }
+    } catch (err) {
+      // Silent fail - return original variant if sourcing fetch fails
+      console.error(`[InventoryService] Failed to enrich sourcing for variant ${variant.id}:`, err);
+    }
+    return variant;
+  }
+
   async generateStructuredAIInventoryReport(): Promise<
     BaseResponse<AIInventoryReportStructuredResponse>
   > {
@@ -667,6 +700,14 @@ export class InventoryService {
     const normalizedResult = await this.ensureCriticalLowStockIncluded(
       aiResponse.data
     );
+
+    // Enrich all variants with sourcing info in parallel
+    if (normalizedResult.variants && normalizedResult.variants.length > 0) {
+      normalizedResult.variants = await Promise.all(
+        normalizedResult.variants.map(v => this.enrichVariantWithSourcingInfo(v))
+      );
+    }
+
     const restockDataStr = JSON.stringify(normalizedResult);
     this.createInventoryLog(restockDataStr, InventoryLogType.RESTOCK).catch(
       (err) => console.error('Failed to save restock log:', err)

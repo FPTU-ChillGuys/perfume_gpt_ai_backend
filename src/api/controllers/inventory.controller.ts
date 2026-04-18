@@ -271,8 +271,6 @@ export class InventoryController {
     description: 'True để bỏ qua job đang cache và tạo job mới ngay lập tức'
   })
   @ApiBaseResponse(String)
-  @CacheTTL(CACHE_TTL_1HOUR)
-  @UseInterceptors(CacheInterceptor)
   async createRestockReportJob(
     @Req() request: Request,
     @Query('forceRefresh') forceRefresh?: boolean | string
@@ -309,7 +307,7 @@ export class InventoryController {
     );
   }
 
-   /** Lấy dữ liệu phân tích bán hàng tất cả variant (2 tháng gần nhất) cho tái cấp hàng */
+  /** Lấy dữ liệu phân tích bán hàng tất cả variant (2 tháng gần nhất) cho tái cấp hàng */
   @Public()
   @Get('restock/sales-analytics')
   @ApiOperation({

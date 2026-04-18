@@ -13,12 +13,43 @@ export class RedisRequestResponseService implements OnApplicationShutdown {
     const host = this.configService.get<string>('REDIS_HOST', 'localhost');
     const port = this.configService.get<number>('REDIS_PORT', 6379);
 
-    this.publisher = new Redis({ host, port });
-    this.subscriber = new Redis({ host, port });
+    const redisOptions = {
+      host,
+      port,
+      retryStrategy: (times: number) => {
+        // Exponential backoff with a cap of 2 seconds
+        const delay = Math.min(times * 100, 2000);
+        return delay;
+      },
+      reconnectOnError: (err: Error) => {
+        const targetError = 'READONLY';
+        if (err.message.includes(targetError)) {
+          return true;
+        }
+        return false;
+      },
+      keepAlive: 10000, // 10 seconds heartbeat
+    };
 
+    this.publisher = new Redis(redisOptions);
+    this.subscriber = new Redis(redisOptions);
+
+    // Logging for subscriber
+    this.subscriber.on('connect', () => this.logger.log('[RedisSub] Connecting to Redis...'));
+    this.subscriber.on('ready', () => this.logger.log('[RedisSub] Connected and ready'));
+    this.subscriber.on('reconnecting', (delay) =>
+      this.logger.warn(`[RedisSub] Lost connection. Reconnecting in ${delay}ms`),
+    );
     this.subscriber.on('error', (err) => {
       this.logger.error(`[RedisSub] Connection error: ${err.message}`);
     });
+
+    // Logging for publisher
+    this.publisher.on('connect', () => this.logger.log('[RedisPub] Connecting to Redis...'));
+    this.publisher.on('ready', () => this.logger.log('[RedisPub] Connected and ready'));
+    this.publisher.on('reconnecting', (delay) =>
+      this.logger.warn(`[RedisPub] Lost connection. Reconnecting in ${delay}ms`),
+    );
     this.publisher.on('error', (err) => {
       this.logger.error(`[RedisPub] Connection error: ${err.message}`);
     });

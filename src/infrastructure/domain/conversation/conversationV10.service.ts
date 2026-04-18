@@ -701,15 +701,20 @@ export class ConversationV10Service {
     if (rootAnalysis.budget && (rootAnalysis.budget.min !== null || rootAnalysis.budget.max !== null)) {
       const { min, max } = rootAnalysis.budget;
       const beforeCount = combined.length;
-      combined = combined.filter(p => {
-        return (p.variants || []).some((v: any) => {
-          const price = v.price;
-          const fitsMin = min === null || price >= (min as number);
-          const fitsMax = max === null || price <= (max as number);
-          return fitsMin && fitsMax;
-        });
-      });
-      this.logger.log(`[V10_MULTI_QUERY] Strict budget filter applied (${min}-${max}): ${beforeCount} -> ${combined.length} items`);
+      
+      combined = combined
+        .map(p => ({
+          ...p,
+          variants: (p.variants || []).filter((v: any) => {
+            const price = v.price;
+            const fitsMin = min === null || price >= (min as number);
+            const fitsMax = max === null || price <= (max as number);
+            return fitsMin && fitsMax;
+          })
+        }))
+        .filter(p => p.variants.length > 0);
+
+      this.logger.log(`[V10_MULTI_QUERY] Strict budget filter applied (${min}-${max}): ${beforeCount} -> ${combined.length} items (variants filtered)`);
     }
 
     const mergedProducts = combined.slice(0, pageSize);
@@ -861,20 +866,41 @@ export class ConversationV10Service {
         }
 
         if (products.length > 0) {
-          const minimalProducts = products.map((product) => ({
-            id: product.id,
-            name: product.name,
-            brand: product.brandName,
-            category: product.categoryName,
-            image: product.primaryImage,
-            attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
-            scentNotes: product.scentNotes,
-            olfactoryFamilies: product.olfactoryFamilies,
-            variants: (product.variants || []).map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
-            source: 'FUNCTION_RESULTS'
-          }));
-          finalMessages.push(this.createSystemMessage(`FUNCTION_RESULTS: ${encodeToolOutput(minimalProducts).encoded}`));
-          hasSearchProducts = true;
+          const minimalProducts = products.map((product) => {
+            let variants = (product.variants || []).map((v: any) => ({
+              id: v.id,
+              volume: v.volumeMl,
+              price: v.basePrice
+            }));
+
+            // Apply budget filter in legacy path
+            if (finalAnalysis.budget && (finalAnalysis.budget.min !== null || finalAnalysis.budget.max !== null)) {
+              const { min, max } = finalAnalysis.budget;
+              variants = variants.filter((v: any) => {
+                const fitsMin = min === null || v.price >= (min as number);
+                const fitsMax = max === null || v.price <= (max as number);
+                return fitsMin && fitsMax;
+              });
+            }
+
+            return {
+              id: product.id,
+              name: product.name,
+              brand: product.brandName,
+              category: product.categoryName,
+              image: product.primaryImage,
+              attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
+              scentNotes: product.scentNotes,
+              olfactoryFamilies: product.olfactoryFamilies,
+              variants,
+              source: 'FUNCTION_RESULTS'
+            };
+          }).filter(p => p.variants.length > 0);
+
+          if (minimalProducts.length > 0) {
+            finalMessages.push(this.createSystemMessage(`FUNCTION_RESULTS: ${encodeToolOutput(minimalProducts).encoded}`));
+            hasSearchProducts = true;
+          }
         }
       } 
       else if (['addToCart', 'getCart', 'clearCart'].includes(funcName)) {
@@ -1036,9 +1062,20 @@ export class ConversationV10Service {
                 const variantIdsSet = new Set(recommendedVariantIds);
                 return {
                   ...product,
-                  variants: (product.variants || []).filter((variant) =>
-                    variantIdsSet.has(variant.id)
-                  )
+                  variants: (product.variants || []).filter((variant) => {
+                    const matchesAiSelection = variantIdsSet.has(variant.id);
+                    
+                    // Final safety check: enforce budget again during hydration
+                    if (finalAnalysis.budget && (finalAnalysis.budget.min !== null || finalAnalysis.budget.max !== null)) {
+                      const { min, max } = finalAnalysis.budget;
+                      const price = variant.basePrice;
+                      const fitsMin = min === null || price >= (min as number);
+                      const fitsMax = max === null || price <= (max as number);
+                      return matchesAiSelection && fitsMin && fitsMax;
+                    }
+                    
+                    return matchesAiSelection;
+                  })
                 };
               }
               return product;

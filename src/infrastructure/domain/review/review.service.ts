@@ -304,7 +304,7 @@ export class ReviewService {
 
   async getLatestReviewLogByVariantId(
     variantId: string
-  ): Promise<BaseResponseAPI<ReviewLog>> {
+  ): Promise<BaseResponseAPI<ReviewLog | null>> {
     return await funcHandlerAsync(
       async () => {
         const log = await this.unitOfWork.ReviewLogRepo.findOne(
@@ -312,7 +312,7 @@ export class ReviewService {
           { orderBy: { createdAt: 'DESC' } }
         );
         if (!log) {
-          return { success: false, error: 'Latest review log not found' };
+          return { success: true, payload: null };
         }
         return { success: true, payload: log };
       },

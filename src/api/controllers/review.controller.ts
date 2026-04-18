@@ -144,7 +144,7 @@ export class ReviewController {
     @ApiBaseResponse(ReviewLog)
     @ApiOperation({ summary: 'Lấy review log mới nhất theo variant ID' })
     @ApiParam({ name: 'variantId', description: 'ID của variant sản phẩm' })
-    async getLatestReviewLogByVariantId(@Param('variantId') variantId: string): Promise<BaseResponseAPI<ReviewLog>> {
+    async getLatestReviewLogByVariantId(@Param('variantId') variantId: string): Promise<BaseResponseAPI<ReviewLog | null>> {
         return await this.reviewService.getLatestReviewLogByVariantId(variantId);
     }
 

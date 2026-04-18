@@ -22,6 +22,7 @@ import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
 import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.module';
 import { HybridSearchModule } from 'src/infrastructure/domain/hybrid-search/hybrid-search.module';
 import { RebuildEmbeddingsModule } from 'src/api/controllers/modules/rebuild-embeddings.module';
+import { SourcingModule } from 'src/infrastructure/domain/sourcing/sourcing.module';
 
 export const modules = [
   ConversationModule,
@@ -48,4 +49,5 @@ export const modules = [
   CartModule,
   HybridSearchModule,
   RebuildEmbeddingsModule,
+  SourcingModule,
 ];

@@ -1405,10 +1405,33 @@ export class ProductService {
         }
       }
 
+      const mappedItems = products.map(mapProductWithVariants).map(item => {
+        let filteredVariants = item.variants || [];
+        
+        // Filter variants based on budget if present
+        if (budget && (budget.min !== undefined || budget.max !== undefined)) {
+          const min = budget.min ? Number(budget.min) : 0;
+          const max = budget.max ? Number(budget.max) : Infinity;
+          
+          filteredVariants = filteredVariants.filter(v => {
+            const price = v.basePrice;
+            return price >= min && price <= max;
+          });
+        }
+
+        // Sort by price ascending as per user request to show cheapest first
+        filteredVariants.sort((a, b) => a.basePrice - b.basePrice);
+
+        return {
+          ...item,
+          variants: filteredVariants
+        };
+      }).filter(item => item.variants.length > 0); // Only return products that still have variants after filtering
+
       return {
         success: true,
         data: new PagedResult<ProductWithVariantsResponse>({
-          items: products.map(mapProductWithVariants),
+          items: mappedItems,
           pageNumber: (pagination?.pageNumber || 1),
           pageSize: take,
           totalCount,

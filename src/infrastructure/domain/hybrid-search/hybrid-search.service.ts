@@ -105,7 +105,7 @@ export class HybridSearchService {
       const paginatedResults = mergedResults.slice(startIndex, endIndex);
 
       // ====== Bước 5: Format response ======
-      const items = paginatedResults.map(product => this.mapToProductResponse(product));
+      const items = paginatedResults.map(product => this.mapToProductResponse(product, queryFilters || undefined));
       
       const response: HybridSearchResponse = {
         items,
@@ -224,7 +224,28 @@ export class HybridSearchService {
   /**
    * Map product từ Prisma sang ProductWithVariantsResponse
    */
-  private mapToProductResponse(product: any): ProductWithVariantsResponse {
+  private mapToProductResponse(product: any, filters?: NormalizedQueryFilters): ProductWithVariantsResponse {
+    let variants = product.ProductVariants || [];
+
+    // Filter variants based on price filters if present
+    if (filters?.price) {
+      const { min, max, operator } = filters.price;
+      variants = variants.filter((v: any) => {
+        const price = Number(v.BasePrice);
+        if (operator === 'lte' || operator === 'lt') {
+          return operator === 'lte' ? price <= (max as number) : price < (max as number);
+        } else if (operator === 'gte' || operator === 'gt') {
+          return operator === 'gte' ? price >= (min as number) : price > (min as number);
+        } else if (operator === 'between') {
+          return price >= (min as number) && price <= (max as number);
+        }
+        return true;
+      });
+    }
+
+    // Sort variants by price ascending so the first one is the cheapest
+    variants.sort((a: any, b: any) => Number(a.BasePrice) - Number(b.BasePrice));
+
     return {
       id: product.Id,
       name: product.Name,
@@ -234,7 +255,7 @@ export class HybridSearchService {
       categoryName: product.Categories.Name,
       description: product.Description,
       primaryImage: product.Media.find(m => m.IsPrimary)?.MediaUrl || null,
-      variants: product.ProductVariants.map(v => ({
+      variants: variants.map(v => ({
         id: v.Id,
         productId: v.ProductId,
         sku: v.Sku,

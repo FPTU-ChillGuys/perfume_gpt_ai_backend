@@ -42,7 +42,7 @@ export class UserService {
       async () => {
         const user = await this.prisma.aspNetUsers.findUnique({
           where: { Id: userId },
-          select: { Email: true, UserName: true }
+          select: { Email: true, UserName: true, FullName: true }
         });
 
         if (!user) {
@@ -53,7 +53,7 @@ export class UserService {
           success: true,
           payload: {
             email: user.Email ?? '',
-            userName: user.UserName ?? 'Khách hàng'
+            userName: this.formatDisplayName(user.FullName, user.UserName)
           }
         };
       },
@@ -95,7 +95,8 @@ export class UserService {
           select: {
             Id: true,
             Email: true,
-            UserName: true
+            UserName: true,
+            FullName: true
           }
         });
 
@@ -103,7 +104,7 @@ export class UserService {
           .map((user) => ({
             id: user.Id,
             email: user.Email?.trim() ?? '',
-            userName: user.UserName?.trim() || 'Khách hàng'
+            userName: this.formatDisplayName(user.FullName, user.UserName)
           }))
           .filter((user) => user.email.length > 0);
 
@@ -136,6 +137,7 @@ export class UserService {
             Id: true,
             Email: true,
             UserName: true,
+            FullName: true,
             PhoneNumber: true
           }
         });
@@ -149,7 +151,7 @@ export class UserService {
           payload: {
             id: user.Id,
             email: user.Email ?? '',
-            userName: user.UserName ?? 'Người dùng',
+            userName: this.formatDisplayName(user.FullName, user.UserName),
             phoneNumber: user.PhoneNumber ?? undefined
           }
         };
@@ -173,5 +175,25 @@ export class UserService {
       'Failed to check user existence by ID',
       true
     );
+  }
+
+  /**
+   * Helper để định dạng tên hiển thị thân thiện
+   */
+  private formatDisplayName(fullName?: string | null, userName?: string | null): string {
+    if (fullName && fullName.trim().length > 0) {
+      return fullName.trim();
+    }
+
+    if (userName && userName.trim().length > 0) {
+      const name = userName.trim();
+      // Nếu username là một địa chỉ email, chỉ lấy phần trước @ để trông thân thiện hơn
+      if (name.includes('@')) {
+        return name.split('@')[0];
+      }
+      return name;
+    }
+
+    return 'Khách hàng';
   }
 }

@@ -379,7 +379,6 @@ export class SurveyService {
 
       if (Array.isArray(parsedResponse?.products) && parsedResponse.products.length > 0) {
         const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-          userId,
           contextType: 'survey',
           sourceRefId: savedSurveyQuesAnsResponse.data.id,
           products: parsedResponse.products,
@@ -521,7 +520,6 @@ export class SurveyService {
 
     if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
       const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-        userId,
         contextType: 'survey',
         sourceRefId: `survey-v2-${userId}-${Date.now()}`,
         products: aiResponse.products,
@@ -725,7 +723,6 @@ export class SurveyService {
     // Step 8: Attach AI acceptance
     if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
       const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-        userId,
         contextType: 'survey',
         sourceRefId: `survey-per-question-${userId}-${Date.now()}`,
         products: aiResponse.products,
@@ -980,7 +977,6 @@ export class SurveyService {
     // Step 9: Attach AI acceptance
     if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
       const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-        userId,
         contextType: 'survey',
         sourceRefId: `survey-v4-${userId}-${Date.now()}`,
         products: aiResponse.products,

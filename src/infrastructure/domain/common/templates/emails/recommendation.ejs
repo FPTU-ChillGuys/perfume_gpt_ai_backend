@@ -111,7 +111,7 @@
 
                                                         <td align="right" valign="middle">
 
-                                                            <a href="<%= frontendUrl %>/products/<%= product.id %>"
+                                                            <a href="<%= frontendUrl %>/products/<%= product.id %><%= product.aiAcceptanceId ? '?aiAcceptanceId=' + product.aiAcceptanceId : '' %>"
                                                                 style="background:#e91e63;color:#ffffff;padding:10px 18px;text-decoration:none;border-radius:4px;font-size:14px;font-weight:600;display:inline-block;">
                                                                 Mua ngay →
                                                             </a>

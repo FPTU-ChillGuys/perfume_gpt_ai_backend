@@ -6,15 +6,6 @@ import { Common } from './common/common.entities';
 /** Entity lưu trạng thái chấp nhận đề xuất AI của người dùng */
 @Entity({ repository: () => AIAcceptanceRepository })
 export class AIAcceptance extends Common {
-  /** ID người dùng */
-  @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
-  @Property({ nullable: true })
-  userId?: string | null;
-
-  @ApiProperty({ description: "Id của cart item nếu có liên quan", format: 'string', nullable: true })
-  @Property({ nullable: true })
-  cartItemId?: string | null;
-
   @ApiProperty({ description: 'ID acceptance cho một response (dùng để nhóm theo lần phản hồi)', nullable: true })
   @Property({ nullable: true })
   responseId?: string | null;

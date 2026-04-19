@@ -7,17 +7,14 @@ import { v4 as uuid } from 'uuid';
 import { AIAcceptanceContextType, AI_ACCEPTANCE_DEFAULT_VISIBLE_HOURS } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.constants';
 
 export interface CreatePendingAIAcceptanceInput {
-  userId?: string | null;
   contextType: AIAcceptanceContextType;
   sourceRefId?: string | null;
   productIds?: string[];
   metadata?: Record<string, unknown> | null;
   visibleInHours?: number;
-  cartItemId?: string | null;
 }
 
 export interface AttachAIAcceptanceToProductsInput<T = any> {
-  userId?: string | null;
   contextType: AIAcceptanceContextType;
   sourceRefId?: string | null;
   products: T[];
@@ -80,9 +77,7 @@ export class AIAcceptanceService {
     try {
       const normalizedProductIds = this.normalizeProductIds(input.productIds);
       const record = new AIAcceptance({
-        userId: input.userId ?? null,
         isAccepted: false,
-        cartItemId: input.cartItemId ?? null,
         contextType: input.contextType,
         responseId: uuid(),
         sourceRefId: input.sourceRefId ?? null,
@@ -104,53 +99,50 @@ export class AIAcceptanceService {
   }
 
   async markAcceptedByAcceptanceId(
-    aiAcceptanceId: string,
-    userId?: string | null
+    aiAcceptanceId: string
   ): Promise<BaseResponse<AIAcceptance>> {
     return await funcHandlerAsync(async () => {
       const where: any = { id: aiAcceptanceId };
-      if (userId) where.userId = userId;
 
       const record = await this.unitOfWork.AIAcceptanceRepo.findOne(where);
       if (!record) {
         return { success: false, error: 'AIAcceptance record not found' };
       }
 
+      this.logger.log(`[AIAcceptance] Marking record id=${aiAcceptanceId} as accepted`);
       await this.unitOfWork.AIAcceptanceRepo.assign(record, {
         isAccepted: true,
         clickedAt: new Date()
       });
       await this.unitOfWork.AIAcceptanceRepo.getEntityManager().flush();
+      this.logger.log(`[AIAcceptance] Successfully marked record id=${aiAcceptanceId} as accepted`);
 
       return { success: true, data: record };
     }, 'Failed to mark AI acceptance as accepted');
   }
 
-  async getVisibleAIAcceptanceByUserId(
-    userId: string,
-    contextType?: AIAcceptanceContextType
-  ): Promise<BaseResponse<AIAcceptance[]>> {
-    return await funcHandlerAsync(async () => {
-      const where: any = { userId };
-      if (contextType) where.contextType = contextType;
-
-      const records = await this.unitOfWork.AIAcceptanceRepo.find(where, {
-        orderBy: { updatedAt: 'DESC' }
-      });
-
-      const visible = records.filter((record) => this.isVisibleRecord(record));
-      return { success: true, data: visible };
-    }, 'Failed to get visible AI acceptance records');
+  async getAllAIAcceptanceStatus(): Promise<BaseResponse<AIAcceptance[] | null>> {
+    return await funcHandlerAsync(
+      async () => {
+        const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll({
+          orderBy: { updatedAt: 'DESC' }
+        });
+        if (!aiAcceptance) {
+          return { success: false, error: 'AIAcceptance record not found' };
+        }
+        return { success: true, data: aiAcceptance };
+      },
+      'Failed to retrieve AI acceptance records',
+      true
+    );
   }
 
   async getAIAcceptanceMetrics(
-    contextType?: AIAcceptanceContextType,
-    userId?: string
+    contextType?: AIAcceptanceContextType
   ): Promise<BaseResponse<AIAcceptanceMetrics>> {
     return await funcHandlerAsync(async () => {
       const where: any = {};
       if (contextType) where.contextType = contextType;
-      if (userId) where.userId = userId;
 
       const now = new Date();
       const records = await this.unitOfWork.AIAcceptanceRepo.find(where);
@@ -185,7 +177,6 @@ export class AIAcceptanceService {
       this.logger.log(`[AIAcceptance] Attaching acceptance for context=${input.contextType}, productCount=${productIds.length}, sourceRefId=${input.sourceRefId}`);
       
       const createResult = await this.createPendingResponseAcceptance({
-        userId: input.userId,
         contextType: input.contextType,
         sourceRefId: input.sourceRefId,
         productIds,
@@ -217,7 +208,6 @@ export class AIAcceptanceService {
 
   async updateAIAcceptanceStatusById(
     id: string,
-    cartItemId?: string | null,
     isAccepted: boolean = false,
   ): Promise<BaseResponse<AIAcceptance>> {
     const userAIAcceptance = await this.unitOfWork.AIAcceptanceRepo.findOne({
@@ -229,17 +219,16 @@ export class AIAcceptanceService {
         isAccepted,
         clickedAt: isAccepted ? new Date() : null
       };
-      if (cartItemId !== undefined) {
-        updateData.cartItemId = cartItemId;
-      }
       if (!isAccepted && !userAIAcceptance.visibleAfterAt) {
         updateData.visibleAfterAt = this.resolveVisibleAfterAt();
       }
+      this.logger.log(`[AIAcceptance] Updating record id=${id} to isAccepted=${isAccepted}`);
       await this.unitOfWork.AIAcceptanceRepo.assign(
         userAIAcceptance,
         updateData
       );
       await this.unitOfWork.AIAcceptanceRepo.getEntityManager().flush();
+      this.logger.log(`[AIAcceptance] Successfully updated record id=${id}`);
     } else {
       return { success: false, error: 'AIAcceptance record not found' };
     }
@@ -248,90 +237,6 @@ export class AIAcceptanceService {
       success: true,
       data: userAIAcceptance
     };
-  }
-
-  async updateAIAcceptanceByUserIdAndCartId(
-    userId: string,
-    cartItemId?: string | null,
-    isAccepted: boolean = false
-  ): Promise<BaseResponse<AIAcceptance>> {
-    const userAIAcceptance = await this.unitOfWork.AIAcceptanceRepo.findOne({
-      userId,
-      cartItemId
-    });
-
-    if (userAIAcceptance) {
-      const updateData: any = {
-        isAccepted,
-        clickedAt: isAccepted ? new Date() : null
-      };
-      if (cartItemId !== undefined) {
-        updateData.cartItemId = cartItemId;
-      }
-      if (!isAccepted && !userAIAcceptance.visibleAfterAt) {
-        updateData.visibleAfterAt = this.resolveVisibleAfterAt();
-      }
-      await this.unitOfWork.AIAcceptanceRepo.assign(
-        userAIAcceptance,
-        updateData
-      );
-      await this.unitOfWork.AIAcceptanceRepo.getEntityManager().flush();
-    } else {
-      return { success: false, error: 'AIAcceptance record not found' };
-    }
-
-    return {
-      success: true,
-      data: userAIAcceptance
-    };
-  }
-
-  async createAIAcceptanceRecord(
-    userId: string,
-    isAccepted: boolean,
-    cartItemId?: string | null
-  ): Promise<BaseResponse<AIAcceptance>> {
-    const newAIAcceptance = new AIAcceptance({
-      userId,
-      isAccepted,
-      cartItemId,
-      contextType: 'cart_legacy',
-      responseId: uuid(),
-      sourceRefId: cartItemId ?? null,
-      productIdsJson: cartItemId ? JSON.stringify([cartItemId]) : null,
-      visibleAfterAt: isAccepted ? new Date() : this.resolveVisibleAfterAt(),
-      clickedAt: isAccepted ? new Date() : null
-    });
-    await this.unitOfWork.AIAcceptanceRepo.insert(newAIAcceptance);
-    return { success: true, data: newAIAcceptance };
-  }
-
-  async getAIAcceptanceByUserId(
-    userId: string
-  ): Promise<BaseResponse<AIAcceptance[] | null>> {
-    const visibleResult = await this.getVisibleAIAcceptanceByUserId(userId);
-    if (!visibleResult.success) {
-      return { success: false, error: visibleResult.error ?? 'AIAcceptance record not found' };
-    }
-    return { success: true, data: visibleResult.data ?? [] };
-  }
-
-  async getAllAIAcceptanceStatus(): Promise<
-    BaseResponse<AIAcceptance[] | null>
-  > {
-    return await funcHandlerAsync(
-      async () => {
-        const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll({
-          orderBy: { updatedAt: 'DESC' }
-        });
-        if (!aiAcceptance) {
-          return { success: false, error: 'AIAcceptance record not found' };
-        }
-        return { success: true, data: aiAcceptance };
-      },
-      'Failed to retrieve AI acceptance records',
-      true
-    );
   }
 
   async getAIAcceptanceRateByAcceptanceStatus(
@@ -350,26 +255,6 @@ export class AIAcceptanceService {
 
     const matchingCount = visibleRecords.filter((record) => record.isAccepted === isAccepted).length;
     const acceptanceRate = (matchingCount / totalCount) * 100;
-    return { success: true, data: acceptanceRate };
-  }
-
-  async getAIAcceptanceRateByAcceptanceStatusWithUserId(
-    userId: string,
-    contextType?: AIAcceptanceContextType
-  ): Promise<BaseResponse<number>> {
-    const where: any = { userId };
-    if (contextType) where.contextType = contextType;
-
-    const records = await this.unitOfWork.AIAcceptanceRepo.find(where);
-    const now = new Date();
-    const visibleRecords = records.filter((record) => record.isAccepted || this.isVisibleRecord(record, now));
-    if (visibleRecords.length === 0) {
-      return { success: true, data: 0 };
-    }
-
-    const acceptedCount = visibleRecords.filter((a) => a.isAccepted === true).length;
-    const acceptanceRate = (acceptedCount / visibleRecords.length) * 100;
-
     return { success: true, data: acceptanceRate };
   }
 }

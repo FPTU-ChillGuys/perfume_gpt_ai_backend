@@ -4,21 +4,12 @@ import { AI_ACCEPTANCE_CONTEXTS, AIAcceptanceContextType } from 'src/infrastruct
 
 /** Request tạo hoặc cập nhật trạng thái chấp nhận AI */
 export class AIAcceptanceRequest {
-  /** ID người dùng */
-  @ApiProperty({ description: 'ID người dùng' })
-  @IsString()
-  userId: string;
 
   /** Trạng thái chấp nhận AI */
   @ApiProperty({ description: 'Người dùng có chấp nhận đề xuất AI hay không' })
   @IsBoolean()
   isAccepted: boolean;
 
-  /** ID cart item liên quan (tùy chọn) */
-  @ApiProperty({ description: 'ID cart item nếu có liên quan', required: false, nullable: true })
-  @IsOptional()
-  @IsString()
-  cartItemId?: string | null;
 
   constructor(init?: Partial<AIAcceptanceRequest>) {
     Object.assign(this, init);
@@ -26,10 +17,6 @@ export class AIAcceptanceRequest {
 }
 
 export class CreateResponseAIAcceptanceRequest {
-  @ApiProperty({ description: 'ID người dùng (optional trong trường hợp nguồn không có user cụ thể)', required: false })
-  @IsOptional()
-  @IsString()
-  userId?: string;
 
   @ApiProperty({ description: 'Ngữ cảnh phát sinh AI acceptance', enum: AI_ACCEPTANCE_CONTEXTS })
   @IsString()

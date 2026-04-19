@@ -126,7 +126,6 @@ export class RecommendationController {
 
     if (result.success && result.data?.recommendations?.length) {
       const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-        userId,
         contextType: 'recommendation',
         sourceRefId: `recommendation-v3-simple-${userId}-${Date.now()}`,
         products: result.data.recommendations,

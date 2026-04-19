@@ -382,7 +382,6 @@ export class RecommendationService {
     }
 
     const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-      userId,
       contextType,
       sourceRefId,
       products,

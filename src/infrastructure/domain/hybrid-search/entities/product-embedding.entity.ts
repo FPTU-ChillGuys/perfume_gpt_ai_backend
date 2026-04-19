@@ -14,9 +14,9 @@ export class ProductEmbedding extends Common {
   @Property({ type: 'text' })
   productId!: string;
 
-  /** Vector embedding (1536 dimensions cho text-embedding-3-small) */
-  @ApiProperty({ description: 'Vector embedding (1536 dimensions)' })
-  @Property({ type: 'floatvector', columnType: 'vector(1536)' })
+  /** Vector embedding (1024 dimensions cho FPT Vietnamese_Embedding) */
+  @ApiProperty({ description: 'Vector embedding (1024 dimensions)' })
+  @Property({ type: 'floatvector', columnType: 'vector(1024)' })
   vector!: number[];
 
   /** Text mô tả đã được dùng để generate embedding (để debug/rebuild) */

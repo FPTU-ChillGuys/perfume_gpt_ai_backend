@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, Query } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import {
@@ -191,8 +192,10 @@ export class ProductService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly nlpEngineService: NlpEngineService,
-    private readonly dictionaryBuilderService: DictionaryBuilderService,
+    private readonly httpService: HttpService,
+    private readonly nlpEngine: NlpEngineService,
+    private readonly dictionaryBuilder: DictionaryBuilderService,
+    private readonly configService: ConfigService,
   ) { }
 
   /**
@@ -284,7 +287,7 @@ export class ProductService {
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
-    const parsedResult = this.nlpEngineService.parseAndNormalize(searchText);
+    const parsedResult = this.nlpEngine.parseAndNormalize(searchText);
     const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
     const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
 
@@ -382,7 +385,7 @@ export class ProductService {
   ): Promise<BaseResponseAPI<any>> {
     return await funcHandlerAsync(
       async () => {
-        const parsedResult = this.nlpEngineService.parseAndNormalize(searchText);
+        const parsedResult = this.nlpEngine.parseAndNormalize(searchText);
         const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
 
         const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
@@ -406,7 +409,7 @@ export class ProductService {
   private mapParsedToStructuredAnalysis(parsed: Record<string, any>, request: PagedAndSortedRequest): any {
     const byType = parsed?.byType && typeof parsed.byType === 'object' ? parsed.byType : {};
     const signals = parsed?.signals && typeof parsed.signals === 'object' ? parsed.signals : {};
-    const entityDictionary = this.dictionaryBuilderService.getSnapshot()?.entityDictionary;
+    const entityDictionary = this.dictionaryBuilder.getSnapshot()?.entityDictionary;
     const searchText = [parsed?.input, parsed?.normalizedInput].find((value): value is string => typeof value === 'string' && value.trim().length > 0) ?? '';
 
     const productNames = this.expandTermsForStructuredQuery(this.asStringArray(byType.product_name), entityDictionary);
@@ -1157,6 +1160,18 @@ export class ProductService {
       });
 
       const andConditionsForWhere: Prisma.ProductsWhereInput[] = [];
+      const isSemanticOnly = this.configService.get<string>('SEARCH_SEMANTIC_ONLY') === 'true';
+
+      if (isSemanticOnly) {
+        this.logger.log(`[ProductService] Semantic Only mode enabled. Bypassing structured filters (except gender).`);
+        // Only add Gender if present
+        if (genderValues.length > 0) {
+          andConditionsForWhere.push({
+            Gender: { in: genderValues }
+          });
+        }
+      } else {
+        // Original logic for structured filters
 
       if (nameConditions.length > 0) {
         andConditionsForWhere.push({ OR: nameConditions });
@@ -1279,6 +1294,7 @@ export class ProductService {
           }
         });
       }
+    }
 
       const where: Prisma.ProductsWhereInput = {
         IsDeleted: false,

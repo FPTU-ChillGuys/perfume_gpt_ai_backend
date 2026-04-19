@@ -113,6 +113,14 @@ export class ProductController {
     @Req() req: Request,
     @Query() request: SearchRequest
   ): Promise<BaseResponseAPI<any>> {
+    const isSemanticOnly = process.env.SEARCH_SEMANTIC_ONLY === 'true';
+    
+    if (isSemanticOnly) {
+      this.logger.log(`[SEARCH][V2] Semantic Only mode enabled. Redirecting to Hybrid Search v4 for text: "${request.searchText}"`);
+      const result = await this.hybridSearchService.search(request.searchText, request);
+      return result;
+    }
+
     const analysis = await this.aiAnalysisService.analyze(request.searchText);
 
     this.logger.log(`Analysis: ${JSON.stringify(analysis)}`);

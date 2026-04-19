@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/core';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { generateEmbedding } from './ai-models';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { FptEmbeddingService } from './fpt-embedding.service';
 import { ProductEmbedding } from './entities/product-embedding.entity';
 
 /**
@@ -11,6 +11,7 @@ import { ProductEmbedding } from './entities/product-embedding.entity';
 export class EmbeddingService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly fptEmbeddingService: FptEmbeddingService,
     public readonly em: EntityManager
   ) {}
 
@@ -51,7 +52,7 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
    * Generate embedding cho text
    */
   async generateEmbedding(text: string): Promise<number[]> {
-    return await generateEmbedding(text);
+    return await this.fptEmbeddingService.generateEmbedding(text);
   }
 
   /**
@@ -69,7 +70,7 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
     // Use raw SQL with MikroORM's parameter binding (? placeholders)
     await this.em.getConnection().execute(
       `INSERT INTO product_embeddings (product_id, vector, description, created_at, updated_at, is_active)
-       VALUES (?, ?::vector(1536), ?, NOW(), NOW(), true)
+       VALUES (?, ?::vector(1024), ?, NOW(), NOW(), true)
        ON CONFLICT (product_id) 
        DO UPDATE SET 
          vector = EXCLUDED.vector,
@@ -198,10 +199,10 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
         .getConnection()
         .execute(
           `
-          SELECT product_id, 1 - (vector <=> ?::vector(1536)) AS similarity 
+          SELECT product_id, 1 - (vector <=> ?::vector(1024)) AS similarity 
           FROM "product_embeddings" 
           WHERE is_active = true
-          ORDER BY vector <=> ?::vector(1536) 
+          ORDER BY vector <=> ?::vector(1024) 
           LIMIT ?
         `,
           [JSON.stringify(queryEmbedding), JSON.stringify(queryEmbedding), limit]
@@ -250,7 +251,14 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
               Concentrations: true,
               Stocks: true,
               Media: {
-                where: { IsPrimary: true }
+                where: { IsPrimary: true },
+                select: {
+                  Id: true,
+                  Url: true,
+                  AltText: true,
+                  IsPrimary: true,
+                  DisplayOrder: true
+                }
               },
               ProductAttributes: {
                 include: {

@@ -7,14 +7,14 @@ const openrouter = createOpenRouter({
 
 /**
  * Embedding model cho vector search trong Hybrid Search v4
- * Sử dụng OpenAI text-embedding-3-small (1536 dimensions)
+ * Sử dụng FPT Cloud Embedding (1024 dimensions)
  */
 export const embeddingModel: any = openrouter.textEmbeddingModel('openai/text-embedding-3-small');
 
 /**
  * Generate embedding cho text input
  * @param text - Text cần embed
- * @returns Promise<number[]> - Vector embedding (1536 dimensions)
+ * @returns Promise<number[]> - Vector embedding (1024 dimensions)
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   const result = await embed({

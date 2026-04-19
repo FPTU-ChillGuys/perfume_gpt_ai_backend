@@ -14,7 +14,7 @@ export class MigrationPgVectorSetup extends Migration {
       CREATE TABLE IF NOT EXISTS product_embeddings (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         product_id TEXT NOT NULL,
-        vector vector(1536),
+        vector vector(1024),
         description TEXT NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),

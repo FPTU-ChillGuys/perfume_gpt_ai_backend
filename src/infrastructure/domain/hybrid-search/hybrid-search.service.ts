@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import { QueryNormalizerOrchestrator, NormalizedQueryFilters } from './normalizers/orchestrator';
 import { EmbeddingService } from './embedding.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
@@ -23,6 +24,7 @@ export type HybridSearchResponse = PagedResult<ProductWithVariantsResponse> & {
 export class HybridSearchService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly embeddingService: EmbeddingService,
     private readonly queryNormalizer: QueryNormalizerOrchestrator
   ) {}
@@ -47,7 +49,21 @@ export class HybridSearchService {
 
       // ====== Bước 1: Query Layer ======
       // Phân tích và chuẩn hóa filters
-      const queryFilters = await this.queryNormalizer.normalize(searchText);
+      let queryFilters = await this.queryNormalizer.normalize(searchText);
+      
+      const isSemanticOnly = this.configService.get<string>('SEARCH_SEMANTIC_ONLY') === 'true';
+      
+      if (isSemanticOnly && queryFilters) {
+        console.log('[HybridSearch] Semantic Only mode enabled. Disabling all filters except Gender.');
+        // Chỉ giữ lại giới tính trong queryFilters
+        queryFilters = {
+          gender: queryFilters.gender,
+          // Xóa các cái khác
+          price: undefined,
+          year: undefined,
+          origin: undefined
+        };
+      }
       
       let queryResultIds: Set<string> | null = null;
       
@@ -64,7 +80,7 @@ export class HybridSearchService {
 
         queryResultIds = new Set(queryProducts.map(p => p.Id));
         
-        console.log(`[HybridSearch] Query layer found ${queryResultIds.size} products with filters`);
+        console.log(`[HybridSearch] Query layer found ${queryResultIds.size} products with filters ${isSemanticOnly ? '(Gender only)' : ''}`);
       }
 
       // ====== Bước 2: Vector Layer ======
@@ -105,7 +121,7 @@ export class HybridSearchService {
       const paginatedResults = mergedResults.slice(startIndex, endIndex);
 
       // ====== Bước 5: Format response ======
-      const items = paginatedResults.map(product => this.mapToProductResponse(product));
+      const items = paginatedResults.map(product => this.mapToProductResponse(product, queryFilters || undefined));
       
       const response: HybridSearchResponse = {
         items,
@@ -224,7 +240,28 @@ export class HybridSearchService {
   /**
    * Map product từ Prisma sang ProductWithVariantsResponse
    */
-  private mapToProductResponse(product: any): ProductWithVariantsResponse {
+  private mapToProductResponse(product: any, filters?: NormalizedQueryFilters): ProductWithVariantsResponse {
+    let variants = product.ProductVariants || [];
+
+    // Filter variants based on price filters if present
+    if (filters?.price) {
+      const { min, max, operator } = filters.price;
+      variants = variants.filter((v: any) => {
+        const price = Number(v.BasePrice);
+        if (operator === 'lte' || operator === 'lt') {
+          return operator === 'lte' ? price <= (max as number) : price < (max as number);
+        } else if (operator === 'gte' || operator === 'gt') {
+          return operator === 'gte' ? price >= (min as number) : price > (min as number);
+        } else if (operator === 'between') {
+          return price >= (min as number) && price <= (max as number);
+        }
+        return true;
+      });
+    }
+
+    // Sort variants by price ascending so the first one is the cheapest
+    variants.sort((a: any, b: any) => Number(a.BasePrice) - Number(b.BasePrice));
+
     return {
       id: product.Id,
       name: product.Name,
@@ -233,8 +270,8 @@ export class HybridSearchService {
       categoryId: product.CategoryId,
       categoryName: product.Categories.Name,
       description: product.Description,
-      primaryImage: product.Media.find(m => m.IsPrimary)?.MediaUrl || null,
-      variants: product.ProductVariants.map(v => ({
+      primaryImage: product.Media[0]?.Url || null,
+      variants: variants.map(v => ({
         id: v.Id,
         productId: v.ProductId,
         sku: v.Sku,

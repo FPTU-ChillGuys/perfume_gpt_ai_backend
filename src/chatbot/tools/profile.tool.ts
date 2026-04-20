@@ -527,6 +527,40 @@ export class ProfileTool {
     }
   });
 
+  /**
+   * Tìm kiếm hồ sơ khách hàng theo họ tên, số điện thoại, email hoặc username.
+   */
+  searchProfile: Tool = tool({
+    description:
+      'Search for a customer profile by phone number, full name, email, or username. ' +
+      'Returns a list of matching users with their UserId (UUID). ' +
+      'Staff should use this to find the correct customer ID before using other profile-related tools.',
+    inputSchema: z.object({
+      query: z
+        .string()
+        .describe('The search query (phone, name, email, or username)')
+    }),
+    execute: async (input) => {
+      this.logger.log(`[searchProfile] called with query: ${input.query}`);
+      return await funcHandlerAsync(
+        async () => {
+          const response = await this.getProfileService().searchProfile(
+            input.query
+          );
+          if (!response.success) {
+            return {
+              success: false,
+              error: 'Failed to search for customer profiles.'
+            };
+          }
+          return { success: true, data: response.payload || [] };
+        },
+        'Error occurred while searching profiles.',
+        true
+      );
+    }
+  });
+
   //   createProfileReport: Tool = tool({
   //     description:
   //       'Generate a formatted text report of user profile information including preferences, favorite notes, budget range, and dates.',

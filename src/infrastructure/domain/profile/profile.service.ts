@@ -103,5 +103,39 @@ export class ProfileService {
     const systemPrompt = `Here is the user's profile information:\n\n${profileReport}\n\nUse this information to provide personalized perfume recommendations and advice.`;
     return systemPrompt;
   }
+
+  async searchProfile(query: string): Promise<BaseResponseAPI<any[]>> {
+    return await funcHandlerAsync(async () => {
+      const users = await this.prisma.aspNetUsers.findMany({
+        where: {
+          OR: [
+            { FullName: { contains: query } },
+            { PhoneNumber: { contains: query } },
+            { Email: { contains: query } },
+            { UserName: { contains: query } }
+          ],
+          IsDeleted: false
+        },
+        select: {
+          Id: true,
+          FullName: true,
+          PhoneNumber: true,
+          Email: true,
+          UserName: true
+        },
+        take: 5
+      });
+
+      const results = users.map((user) => ({
+        userId: user.Id,
+        fullName: user.FullName,
+        phoneNumber: user.PhoneNumber,
+        email: user.Email,
+        userName: user.UserName
+      }));
+
+      return { success: true, payload: results };
+    }, 'Failed to search profiles');
+  }
 }
 

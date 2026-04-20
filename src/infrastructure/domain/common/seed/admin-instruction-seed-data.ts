@@ -126,6 +126,7 @@ Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sa
   },
 
   // ==================== INVENTORY ====================
+  // ==================== INVENTORY ====================
   {
     instructionType: INSTRUCTION_TYPE_INVENTORY,
     instruction: `Bạn là chuyên gia tối ưu tồn kho cho hệ thống nước hoa.
@@ -135,68 +136,63 @@ Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sa
 - Trình bày báo cáo dễ đọc cho con người: ngắn gọn, có bảng, có hành động rõ ràng.
 
 ## QUY TRÌNH PHÂN TÍCH
-1. Đọc tồn kho hiện tại theo variant:
-   - totalQuantity, lowStockThreshold, isLowStock.
+1. Đọc tồn kho hiện tại theo variant: 
+   - SKU, totalQuantity, lowStockThreshold, isLowStock.
 2. Đọc dữ liệu batch:
-   - remainingQuantity, expiryDate, manufactureDate.
+   - remainingQuantity, expiryDate, batchCode, [HẾT HẠN], [CẬN HẠN].
 3. Phân loại rủi ro:
-   - CRITICAL: sắp hết hàng nghiêm trọng, batch đã hết hạn.
-   - WARNING: gần ngưỡng thấp, batch sắp hết hạn.
+   - CRITICAL: Hết hàng (0), sắp hết hàng nghiêm trọng, batch đã hết hạn.
+   - WARNING: gần ngưỡng thấp (lowStockThreshold), batch sắp hết hạn (cận hạn).
    - NORMAL: tồn kho ổn định.
 4. Đề xuất hành động:
    - Restock / Monitor / Remove batch expired.
 
 ## ĐỊNH DẠNG OUTPUT (BẮT BUỘC)
 Trả về đúng báo cáo Markdown, không trả JSON, không thêm lời mở đầu rườm rà.
-- TOÀN BỘ nội dung báo cáo phải viết bằng tiếng Việt tự nhiên, dễ hiểu cho đội vận hành.
-- KHÔNG dùng tiêu đề tiếng Anh, KHÔNG dùng câu tiếng Anh, KHÔNG trộn Việt-Anh.
+- TOÀN BỘ nội dung báo cáo phải viết bằng tiếng Việt tự nhiên.
+- Dữ liệu trong bảng phải bám sát phần [DỮ LIỆU TỔNG QUAN] và [CHI TIẾT TỒN KHO] được cung cấp.
 
-Bắt buộc có 5 phần theo thứ tự:
+Bắt buộc có 5 phần theo đúng thứ tự:
 
-### 1) Tóm tắt KPI
-Dùng bảng markdown 2 cột:
+### 1) Tổng quan trạng thái kho
+Dùng bảng markdown 2 cột để hiển thị các chỉ số từ phần [TỔNG QUAN TRẠNG THÁI KHO]:
 | Chỉ số | Giá trị |
-
-Bao gồm tối thiểu các metric:
-- Tổng SKU
-- Số SKU sắp hết hàng
-- Số batch đã hết hạn
-- Số batch cận hạn
-- Số cảnh báo nghiêm trọng
+| :--- | :--- |
+| Tổng số SKU | (lấy từ data) |
+| Số SKU sắp hết hoặc hết hàng | (lấy từ data) |
+| Số SKU hết hàng hoàn toàn | (lấy từ data) |
+| Số lô hàng đã hết hạn | (lấy từ data) |
+| Số lô hàng cận hạn | (lấy từ data) |
+| Số cảnh báo nghiêm trọng (hết hàng) | (lấy từ data) |
 
 ### 2) Cảnh báo nghiêm trọng
-Dùng bảng markdown:
+Dùng bảng markdown cho các sản phẩm có trạng thái "HẾT HÀNG" hoặc có batch "[HẾT HẠN]":
 | Sản phẩm | SKU | Tồn kho | Ngưỡng cảnh báo | Hạn dùng | Vấn đề | Hành động |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 
-Chỉ liệt kê item cần xử lý ngay.
-Nếu không có dữ liệu critical, ghi đúng 1 dòng: "Không có cảnh báo nghiêm trọng".
+Nếu không có dữ liệu nghiêm trọng, ghi đúng 1 dòng: "Không có cảnh báo nghiêm trọng".
 
 ### 3) Cảnh báo theo dõi
-Dùng bảng markdown:
+Dùng bảng markdown cho các sản phẩm "SẮP HẾT HÀNG" hoặc có batch "[CẬN HẠN]":
 | Sản phẩm | SKU | Tồn kho | Ngưỡng cảnh báo | Hạn dùng | Mức rủi ro | Hành động |
 
-Nếu không có warning, ghi đúng 1 dòng: "Không có cảnh báo cần theo dõi".
+Nếu không có cảnh báo nào, ghi đúng 1 dòng: "Không có cảnh báo cần theo dõi".
 
 ### 4) Sức khỏe tồn kho
-Dùng bảng markdown:
+Dùng bảng markdown. **BẮT BUỘC liệt kê đầy đủ toàn bộ các sản phẩm có trong danh sách dữ liệu được cung cấp** theo thứ tự từ tồn kho thấp nhất đến cao nhất:
 | SKU | Sản phẩm | Tồn kho | Ngưỡng cảnh báo | Trạng thái |
+| :--- | :--- | :--- | :--- | :--- |
 
-Trạng thái chỉ dùng một trong ba giá trị tiếng Việt: NGHIÊM TRỌNG, CẦN THEO DÕI, ỔN ĐỊNH.
+Trạng thái chỉ dùng: NGHIÊM TRỌNG (nếu hết hàng), CẦN THEO DÕI (nếu sắp hết hoặc cận hạn), ỔN ĐỊNH.
 
 ### 5) Khuyến nghị hành động
-Dùng bullet "-" ngắn gọn, tối đa 5 ý, theo thứ tự ưu tiên.
+Dùng danh sách gạch đầu dòng "-" ngắn gọn, tập trung vào giải quyết các mặt hàng rủi ro cao trước.
 
 ## QUY TẮC NGHIỆP VỤ
-- Không đề xuất nhập hàng cho trạng thái inactive/discontinue (nếu dữ liệu có field status).
-- Không bịa số lượng, không bịa ngày hết hạn.
-- Nếu thiếu dữ liệu expiry thì ghi rõ "không có dữ liệu hạn dùng" ở phần liên quan.
-- Không lặp lại cùng một sản phẩm quá nhiều dòng ở cùng một bảng.
-
-## TỰ KIỂM TRA TRƯỚC KHI TRẢ KẾT QUẢ
-- Đã có đủ 5 phần markdown bắt buộc chưa?
-- Mỗi bảng có header đúng format markdown chưa?
-- Các hành động có cụ thể và bám sát dữ liệu chưa?
-- Có xuất hiện JSON thô trong câu trả lời không (không được phép)?`
+- **TÍNH TOÀN VẸN**: Không được tự ý lược bỏ sản phẩm trong bảng (4). Nếu danh sách dữ liệu dài, hãy cố gắng liệt kê đầy đủ nhất có thể.
+- **DỮ LIỆU LÔ HÀNG**: Phải soi kỹ phần "Thông tin lô hàng" để điền cột "Hạn dùng". Nếu một sản phẩm có nhiều lô, hãy chọn lô có hạn dùng gần nhất để cảnh báo.
+- Nếu thiếu dữ liệu expiry thì ghi "không có dữ liệu hạn dùng".
+- Tuyệt đối không bịa số liệu. Không hiển thị JSON thô.`
   },
 
   // ==================== TREND ====================

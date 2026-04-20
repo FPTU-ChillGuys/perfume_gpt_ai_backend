@@ -295,7 +295,8 @@ export class InventoryService {
               remainingQuantity: b.RemainingQuantity,
               manufactureDate: b.ManufactureDate.toISOString(),
               expiryDate: b.ExpiryDate.toISOString(),
-              createdAt: b.CreatedAt.toISOString()
+              createdAt: b.CreatedAt.toISOString(),
+              variantSku: b.ProductVariants.Sku
             })
         );
 
@@ -313,48 +314,172 @@ export class InventoryService {
     );
   }
 
+  /** Tính toán các thông số tổng quan về tồn kho (Source of Truth) */
+  async getInventoryOverallStats() {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+    const [
+      totalSku,
+      lowStockSku,
+      outOfStockSku,
+      expiredBatches,
+      nearExpiryBatches
+    ] = await Promise.all([
+      this.prisma.productVariants.count({
+        where: { IsDeleted: false, Products: { IsDeleted: false } }
+      }),
+      this.prisma.stocks.count({
+        where: {
+          TotalQuantity: { gt: 0, lte: this.prisma.stocks.fields.LowStockThreshold },
+          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
+        }
+      }),
+      this.prisma.stocks.count({
+        where: {
+          TotalQuantity: 0,
+          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
+        }
+      }),
+      this.prisma.batches.count({
+        where: {
+          ExpiryDate: { lt: now },
+          RemainingQuantity: { gt: 0 },
+          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
+        }
+      }),
+      this.prisma.batches.count({
+        where: {
+          ExpiryDate: { gte: now, lt: thirtyDaysFromNow },
+          RemainingQuantity: { gt: 0 },
+          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
+        }
+      })
+    ]);
+
+    return {
+      totalSku,
+      lowStockSku: lowStockSku + outOfStockSku, // Tổng số SKU cần chú ý tồn kho
+      outOfStockSku,
+      expiredBatches,
+      nearExpiryBatches,
+      criticalAlerts: outOfStockSku // Giả định: Hết hàng hoàn toàn là cảnh báo nghiêm trọng
+    };
+  }
+
   async createReportFromBatchAndStock(): Promise<String> {
-    const stockResponse = await this.getInventoryStock(
-      new InventoryStockRequest({ PageNumber: 1, PageSize: 1000 })
-    );
+    const stats = await this.getInventoryOverallStats();
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
 
-    const batchResponse = await this.getBatch(
-      new BatchRequest({ PageNumber: 1, PageSize: 1000 })
-    );
-
-    const report = this.createBatchAndStockReport(
-      stockResponse.payload?.items ?? [],
-      batchResponse.payload?.items ?? []
-    );
-
-    return report;
-  }
-
-  createBatchReport(batchResponse: BatchResponse[]): String {
-    const batchReport = batchResponse.map((batch) => {
-      return `Batch ID: ${batch.id}, Batch Code: ${batch.batchCode}, Import Quantity: ${batch.importQuantity}, Remaining Quantity: ${batch.remainingQuantity}, Manufacture Date: ${batch.manufactureDate}, Expiry Date: ${batch.expiryDate}, Created At: ${batch.createdAt}`;
+    // 1. Fetch all problematic variants first to ensure they are in the report
+    const problematicStocks = await this.prisma.stocks.findMany({
+      where: {
+        OR: [
+          { TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold } },
+          {
+            ProductVariants: {
+              Batches: {
+                some: {
+                  ExpiryDate: { lt: thirtyDaysFromNow },
+                  RemainingQuantity: { gt: 0 }
+                }
+              }
+            }
+          }
+        ],
+        ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
+      },
+      include: {
+        ProductVariants: {
+          include: { Products: true, Concentrations: true }
+        }
+      }
     });
-    return batchReport.join('\n');
-  }
 
-  createStockReport(stockResponse: InventoryStockResponse[]): String {
-    const stockReport = stockResponse.map((stock) => {
-      return `Variant ID: ${stock.variantId}, Variant SKU: ${stock.variantSku}, Product Name: ${stock.productName}, Concentration: ${stock.concentrationName}, Volume: ${stock.volumeMl}ml, Stock Quantity: ${stock.totalQuantity}, Low Stock Threshold: ${stock.lowStockThreshold}, Is Low Stock: ${stock.isLowStock}`;
+    // 2. Fetch standard list (top 1000) sorted by quantity ASC
+    const standardStocks = await this.prisma.stocks.findMany({
+      where: { ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } } },
+      orderBy: { TotalQuantity: 'asc' }, // Sắp xếp theo số lượng tồn tăng dần
+      take: 1000,
+      include: {
+        ProductVariants: {
+          include: { Products: true, Concentrations: true }
+        }
+      }
     });
-    return stockReport.join('\n');
-  }
 
-  createBatchAndStockReport(
-    stockResponse: InventoryStockResponse[],
-    batchResponse: BatchResponse[]
-  ) {
-    const batchAndStockReport = [
-      '--- Inventory Stock Report ---',
-      this.createStockReport(stockResponse),
-      '--- Batch Report ---',
-      this.createBatchReport(batchResponse)
-    ].join('\n\n');
-    return batchAndStockReport;
+    // Merge and remove duplicates
+    const mergedStocks = [...problematicStocks];
+    const existingVariantIds = new Set(mergedStocks.map(s => s.VariantId));
+
+    for (const s of standardStocks) {
+      if (!existingVariantIds.has(s.VariantId)) {
+        mergedStocks.push(s);
+        existingVariantIds.add(s.VariantId);
+      }
+    }
+
+    // 3. Fetch ALL batches for the variants in our list to ensure linking
+    const batches = await this.prisma.batches.findMany({
+      where: {
+        VariantId: { in: Array.from(existingVariantIds) },
+        RemainingQuantity: { gt: 0 }
+      },
+      orderBy: { ExpiryDate: 'asc' }
+    });
+
+    const batchesByVariantId = new Map<string, any[]>();
+    batches.forEach(b => {
+      const existing = batchesByVariantId.get(b.VariantId) || [];
+      existing.push(b);
+      batchesByVariantId.set(b.VariantId, existing);
+    });
+
+    const reportLines = [
+      '# TỔNG QUAN TRẠNG THÁI KHO (Dữ liệu hệ thống chính xác)',
+      `- Tổng số SKU: ${stats.totalSku}`,
+      `- Số SKU sắp hết hoặc hết hàng: ${stats.lowStockSku}`,
+      `- Số SKU hết hàng hoàn toàn: ${stats.outOfStockSku}`,
+      `- Số lô hàng (batch) đã hết hạn: ${stats.expiredBatches}`,
+      `- Số lô hàng (batch) cận hạn (dưới 30 ngày): ${stats.nearExpiryBatches}`,
+      `- Số cảnh báo nghiêm trọng (hết hàng): ${stats.criticalAlerts}`,
+      '',
+      '--- CHI TIẾT TỒN KHO VÀ ĐIỀU KIỆN LÔ HÀNG ---',
+      'Lưu ý: Danh sách dưới đây liệt kê ưu tiên các mặt hàng đang có vấn đề về tồn kho hoặc hạn dùng.'
+    ];
+
+    mergedStocks.forEach(s => {
+      const variantBatches = batchesByVariantId.get(s.VariantId) || [];
+      let batchInfo = '- (Không có dữ liệu lô hàng còn tồn)';
+
+      if (variantBatches.length > 0) {
+        batchInfo = variantBatches.map(b => {
+          const isExpired = new Date(b.ExpiryDate) < now;
+          const isNearExpiry = !isExpired && new Date(b.ExpiryDate) < thirtyDaysFromNow;
+          let statusLabel = '';
+          if (isExpired) statusLabel = ' [HẾT HẠN]';
+          else if (isNearExpiry) statusLabel = ' [CẬN HẠN]';
+
+          return `- Lô ${b.BatchCode}: Hạn dùng ${b.ExpiryDate.toISOString().split('T')[0]}, Còn lại ${b.RemainingQuantity}${statusLabel}`;
+        }).join('\n  ');
+      }
+
+      reportLines.push(
+        `Sản phẩm: ${s.ProductVariants.Products.Name} (${s.ProductVariants.Concentrations.Name}, ${s.ProductVariants.VolumeMl}ml)`,
+        `SKU: ${s.ProductVariants.Sku}`,
+        `Tồn kho hiện tại: ${s.TotalQuantity}`,
+        `Ngưỡng báo động: ${s.LowStockThreshold}`,
+        `Trạng thái: ${s.TotalQuantity === 0 ? 'HẾT HÀNG' : (s.TotalQuantity <= s.LowStockThreshold ? 'SẮP HẾT HÀNG' : 'ỔN ĐỊNH')}`,
+        `Thông tin lô hàng:`,
+        `  ${batchInfo}`,
+        '-----------------------------------'
+      );
+    });
+
+    return reportLines.join('\n');
   }
 
   async createInventoryLog(

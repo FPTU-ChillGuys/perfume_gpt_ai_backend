@@ -128,8 +128,6 @@ export class InventoryController {
     description: 'True để bỏ qua job đang cache và tạo job mới ngay lập tức'
   })
   @ApiBaseResponse(String)
-  @CacheTTL(CACHE_TTL_1HOUR)
-  @UseInterceptors(CacheInterceptor)
   async createInventoryReportJob(
     @Req() request: Request,
     @Query('forceRefresh') forceRefresh?: boolean | string

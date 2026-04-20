@@ -35,6 +35,7 @@ export class InventoryTool {
       return await funcHandlerAsync(
         async () => {
           const stocks = await this.prisma.stocks.findMany({
+            orderBy: { TotalQuantity: 'asc' },
             include: {
               ProductVariants: {
                 include: { Products: true, Concentrations: true }

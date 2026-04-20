@@ -59,6 +59,13 @@ export class BatchResponse {
   })
   remainingQuantity: number;
 
+  @ApiProperty({
+    type: String,
+    description: 'Variant SKU',
+    example: 'SKU-001'
+  })
+  variantSku?: string;
+
   constructor(init?: Partial<BatchResponse>) {
     Object.assign(this, init);
   }

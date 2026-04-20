@@ -96,4 +96,20 @@ export class ConversationController {
     }
     return this.conversationV10Service.chat(conversation);
   }
+
+  @Public()
+  @Post('chat/v10-staff')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat V10 Staff (Quick Counter Consultation Mode)' })
+  @ApiBaseResponse(ConversationRequestDto)
+  async conversationV10Staff(
+    @Req() request: Request,
+    @Body() conversation: ConversationRequestDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    if (!conversation.userId) {
+      conversation.userId = getTokenPayloadFromRequest(request)?.id;
+    }
+    conversation.isStaff = true;
+    return this.conversationV10Service.chat(conversation);
+  }
 }

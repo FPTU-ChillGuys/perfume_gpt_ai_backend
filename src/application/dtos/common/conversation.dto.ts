@@ -40,6 +40,11 @@ export class ConversationRequestDto {
   @Type(() => MessageRequestDto)
   messages!: MessageRequestDto[];
 
+  /** Chế độ nhân viên tư vấn tại quầy */
+  @ApiProperty({ description: 'Chế độ nhân viên tư vấn tại quầy', required: false })
+  @IsOptional()
+  isStaff?: boolean;
+
   constructor(init?: Partial<ConversationRequestDto>) {
     Object.assign(this, init);
   }

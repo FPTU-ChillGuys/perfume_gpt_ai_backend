@@ -109,7 +109,19 @@ export class Tools implements OnModuleInit {
     return {
       getReviewStatisticsByVariantId:
         this.reviewTool.getReviewStatisticsByVariantId,
-      getReviewsByVariantId: this.reviewTool.getReviewsByVariantId
+      getReviewsByVariantId: this.reviewTool.getReviewsByVariantId,
+      getLatestReviewSummaryByVariantId: this.reviewTool.getLatestReviewSummaryByVariantId
+    };
+  }
+
+  get getToolsForStaffChatbot(): ToolSet {
+    if (!this.inventoryTool || !this.reviewTool || !this.profileTool) return {};
+    return {
+      getInventoryStock: this.inventoryTool.getInventoryStock,
+      getReviewsByVariantId: this.reviewTool.getReviewsByVariantId,
+      getReviewStatisticsByVariantId: this.reviewTool.getReviewStatisticsByVariantId,
+      getLatestReviewSummaryByVariantId: this.reviewTool.getLatestReviewSummaryByVariantId,
+      getProfileRecommendationContext: this.profileTool.getProfileRecommendationContext
     };
   }
 

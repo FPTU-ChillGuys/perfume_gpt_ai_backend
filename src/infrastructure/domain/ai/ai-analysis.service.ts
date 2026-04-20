@@ -12,6 +12,7 @@ import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 type AnalysisRuntimeContext = {
     userId?: string;
     isGuestUser?: boolean;
+    isStaff?: boolean;
 };
 
 @Injectable()
@@ -37,7 +38,8 @@ export class AiAnalysisService {
                 currentMessage: currentMessage,
                 analysisContext: {
                     userId: context?.userId ?? null,
-                    isGuestUser: context?.isGuestUser ?? false
+                    isGuestUser: context?.isGuestUser ?? false,
+                    isStaff: context?.isStaff ?? false
                 }
             });
 

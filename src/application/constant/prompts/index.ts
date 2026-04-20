@@ -11,6 +11,7 @@ export {
   INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT,
   SURVEY_ANALYSIS_SYSTEM_PROMPT,
   TREND_ANALYSIS_SYSTEM_PROMPT,
+  STAFF_CONSULTATION_SYSTEM_PROMPT,
 } from './system.prompt';
 
 // Controller prompts
@@ -50,6 +51,7 @@ export {
   INSTRUCTION_TYPE_LOG,
   INSTRUCTION_TYPE_CONVERSATION,
   INSTRUCTION_TYPE_RESTOCK,
+  INSTRUCTION_TYPE_STAFF_CONSULTATION,
   ALL_INSTRUCTION_TYPES
 } from './admin-instruction-types';
 export type { InstructionDomainType } from './admin-instruction-types';

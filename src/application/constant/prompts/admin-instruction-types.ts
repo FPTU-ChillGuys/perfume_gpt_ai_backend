@@ -41,6 +41,9 @@ export const INSTRUCTION_TYPE_RESTOCK = 'restock';
 /** Loại instruction cho trích xuất thông tin tìm kiếm nước hoa (search extraction) */
 export const INSTRUCTION_TYPE_SEARCH_EXTRACTION = 'search_extraction';
 
+/** Loại instruction cho tư vấn nội bộ cửa hàng (Staff Consultation) */
+export const INSTRUCTION_TYPE_STAFF_CONSULTATION = 'staff_consultation';
+
 /** Danh sách tất cả các loại instruction hợp lệ */
 export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_REVIEW,
@@ -53,7 +56,8 @@ export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_CONVERSATION,
   INSTRUCTION_TYPE_SURVEY,
   INSTRUCTION_TYPE_RESTOCK,
-  INSTRUCTION_TYPE_SEARCH_EXTRACTION
+  INSTRUCTION_TYPE_SEARCH_EXTRACTION,
+  INSTRUCTION_TYPE_STAFF_CONSULTATION
 ] as const;
 
 export type InstructionDomainType = (typeof ALL_INSTRUCTION_TYPES)[number];

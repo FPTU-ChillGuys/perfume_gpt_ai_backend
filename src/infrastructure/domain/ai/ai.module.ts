@@ -20,6 +20,7 @@ export const AI_RESTOCK_HELPER = 'AI_RESTOCK_HELPER';
 export const AI_SURVEY_HELPER = 'AI_SURVEY_HELPER';
 export const AI_INVENTORY_REPORT_HELPER = 'AI_INVENTORY_REPORT_HELPER';
 export const AI_REVIEW_HELPER = 'AI_REVIEW_HELPER';
+export const AI_STAFF_CONVERSATION_HELPER = 'AI_STAFF_CONVERSATION_HELPER';
 
 // Backward-compat aliases (old token name → same string value as new)
 export const AI_SERVICE = AI_HELPER;
@@ -50,6 +51,25 @@ const aiConversationProvider: Provider = {
         enablePromptOptimization: true,
         optimizationPrompt:
           'Use case: conversation tu van nuoc hoa. Giu nguyen intent cua nguoi dung, khong doi sang domain khac. Neu user dang yeu cau tim/goi y san pham thi giu cau truc de model chinh co the goi tool va tra ve dung format.'
+      }
+    ),
+  inject: [Tools]
+};
+
+const aiStaffConversationProvider: Provider = {
+  provide: AI_STAFF_CONVERSATION_HELPER,
+  useFactory: (tools: Tools) =>
+    new AIHelper(
+      SYSTEM_PROMPT,
+      () => tools.getToolsForStaffChatbot,
+      10,
+      undefined,
+      undefined,
+      undefined,
+      {
+        enablePromptOptimization: true,
+        optimizationPrompt:
+          'Use case: STAFF ASSISTANT conversation. Helping staff with quick counter consultations. Precise, fact-based, bullet points.'
       }
     ),
   inject: [Tools]
@@ -143,13 +163,13 @@ const aiInventoryReportProvider: Provider = {
     AiAnalysisService,
     aiProvider,
     aiConversationProvider,
-    // ...
     aiTrendProvider,
     aiRecommendationProvider,
     aiRestockProvider,
     aiSurveyProvider,
     aiInventoryReportProvider,
-    aiReviewProvider
+    aiReviewProvider,
+    aiStaffConversationProvider
   ],
   exports: [
     AiAnalysisService,
@@ -160,7 +180,8 @@ const aiInventoryReportProvider: Provider = {
     aiRestockProvider,
     aiSurveyProvider,
     aiInventoryReportProvider,
-    aiReviewProvider
+    aiReviewProvider,
+    aiStaffConversationProvider
   ]
 })
 export class AIModule { }

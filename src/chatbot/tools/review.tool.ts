@@ -143,4 +143,35 @@ export class ReviewTool {
             );
         }
     });
+
+    /**
+     * Lấy tóm tắt đánh giá mới nhất của một variant sản phẩm.
+     * AI dùng tool này để có cái nhìn tổng quan nhanh về phản hồi của khách hàng.
+     */
+    getLatestReviewSummaryByVariantId: Tool = tool({
+        description:
+            'Get the most recent AI-generated summary (ReviewLog) for a specific product variant. ' +
+            'Returns a concise aggregation of customer sentiment, pros, and cons. ' +
+            'Use this when the user (Staff) needs a quick overview of product feedback without reading individual reviews.',
+        inputSchema: z.object({
+            variantId: z.string().describe('The ID of the product variant to fetch the summary for')
+        }),
+        execute: async (input) => {
+            this.logger.log(`[getLatestReviewSummaryByVariantId] called for variantId: ${input.variantId}`);
+            return await funcHandlerAsync(
+                async () => {
+                    const response = await this.reviewService.getLatestReviewLogByVariantId(input.variantId);
+                    if (!response.success) {
+                        return { success: false, error: 'Failed to fetch the latest review summary.' };
+                    }
+                    if (!response.payload) {
+                        return { success: true, data: 'No summary available for this product yet.' };
+                    }
+                    return { success: true, data: response.payload.reviewLog };
+                },
+                'Error occurred while fetching latest review summary.',
+                true
+            );
+        }
+    });
 }

@@ -13,7 +13,7 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { conversationOutput } from 'src/chatbot/output/search.output';
 import { AnalysisObject, QueryItemObject } from 'src/chatbot/output/analysis.output';
-import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
+import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION, STAFF_CONSULTATION_SYSTEM_PROMPT, INSTRUCTION_TYPE_STAFF_CONSULTATION } from 'src/application/constant/prompts';
 import {
   addMessageToMessages,
   convertToMessages,
@@ -22,7 +22,7 @@ import {
 import { buildCombinedPromptV5 } from 'src/infrastructure/domain/utils/prompt-builder';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
-import { AI_CONVERSATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
+import { AI_CONVERSATION_HELPER, AI_STAFF_CONVERSATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
 import { ConversationJobName, QueueName } from 'src/application/constant/processor';
@@ -57,7 +57,8 @@ export class ConversationV10Service {
     private readonly cartService: CartService,
     private readonly orderService: OrderService,
     private readonly analysisService: AiAnalysisService,
-    private readonly profileTool: ProfileTool
+    private readonly profileTool: ProfileTool,
+    @Inject(AI_STAFF_CONVERSATION_HELPER) private readonly staffAiHelper: AIHelper
   ) {}
 
   async addConversation(
@@ -735,7 +736,8 @@ export class ConversationV10Service {
     adminInstruction: string | undefined,
     combinedPrompt: string,
     endpoint: string,
-    isGuestUser: boolean
+    isGuestUser: boolean,
+    isStaff: boolean
   ): Promise<ConversationDto> {
     const lastUserMessage = [...convertedMessages]
       .reverse()
@@ -758,7 +760,8 @@ export class ConversationV10Service {
     const rawAnalysis =
       (await this.analysisService.analyze(messageText, previousContext, {
         userId,
-        isGuestUser
+        isGuestUser,
+        isStaff
       })) ||
       this.createFallbackAnalysis(messageText);
 
@@ -1011,19 +1014,19 @@ export class ConversationV10Service {
       );
     }
 
-    const systemPrompt = conversationSystemPrompt(
-      adminInstruction || '',
-      combinedPrompt
-    );
+    const systemPrompt = conversationSystemPrompt(adminInstruction || '', combinedPrompt);
 
     this.logger.log(
       '[processAiChatResponseV10] Generating final structured response using main AI'
     );
 
-    const message = await this.aiHelper.textGenerateFromMessages(
+    const activeAiHelper = isStaff ? this.staffAiHelper : this.aiHelper;
+
+    const message = await activeAiHelper.textGenerateFromMessages(
       finalMessages,
       systemPrompt,
-      Output.object(conversationOutput)
+      Output.object(conversationOutput),
+      undefined
     );
 
     if (!message.success || !message.data) {
@@ -1108,8 +1111,12 @@ export class ConversationV10Service {
     const userId = conversation.userId ?? uuid();
     const convertedMessages: UIMessage[] = convertToMessages(conversation.messages || []);
 
+    const instructionType = conversation.isStaff
+      ? INSTRUCTION_TYPE_STAFF_CONSULTATION
+      : INSTRUCTION_TYPE_CONVERSATION;
+
     const promptResult = await buildCombinedPromptV5(
-      INSTRUCTION_TYPE_CONVERSATION,
+      instructionType,
       this.adminInstructionService,
       userId
     );
@@ -1134,7 +1141,8 @@ export class ConversationV10Service {
       promptResult.data.adminInstruction,
       promptResult.data.combinedPrompt,
       'chat/v10',
-      isGuestUser
+      isGuestUser,
+      conversation.isStaff || false
     );
 
     return Ok(responseConversation);

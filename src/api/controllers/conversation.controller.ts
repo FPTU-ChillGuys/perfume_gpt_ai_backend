@@ -23,7 +23,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
 import { ConversationV10Service } from 'src/infrastructure/domain/conversation/conversationV10.service';
-import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
+import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 
 @ApiTags('Conversation')
@@ -58,7 +58,7 @@ export class ConversationController {
   @Role(['admin'])
   @Get('list/paged')
   @ApiOperation({ summary: 'Lấy danh sách cuộc hội thoại có phân trang' })
-  @ApiBaseResponse(PagedResult<ConversationDto>)
+  @ExtendApiBaseResponse(PagedResult, ConversationDto)
   async getAllConversationsPaginated(
     @Query() request: PagedConversationRequest
   ): Promise<BaseResponse<PagedResult<ConversationDto>>> {

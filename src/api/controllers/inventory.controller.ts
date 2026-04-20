@@ -66,7 +66,7 @@ export class InventoryController {
   /** Lấy thông tin tồn kho */
   @Get('stock')
   @ApiOperation({ summary: 'Lấy thông tin tồn kho' })
-  @ApiBaseResponse(PagedResult<InventoryStockResponse>)
+  @ExtendApiBaseResponse(PagedResult, InventoryStockResponse)
   async getInventoryStock(
     @Query() inventoryStockRequest: InventoryStockRequest
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
@@ -76,7 +76,7 @@ export class InventoryController {
   /** Lấy danh sách batch */
   @Get('batches')
   @ApiOperation({ summary: 'Lấy danh sách batch' })
-  @ApiBaseResponse(PagedResult<BatchResponse>)
+  @ExtendApiBaseResponse(PagedResult, BatchResponse)
   async getBatch(
     @Query() batchRequest: BatchRequest
   ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
@@ -171,7 +171,7 @@ export class InventoryController {
 
   @Get('report/logs')
   @ApiOperation({ summary: 'Lấy lịch sử báo cáo tồn kho tổng quan' })
-  @ApiBaseResponse(PagedResult<String>)
+  @ExtendApiBaseResponse(PagedResult, String)
   async getInventoryReportLogs(): Promise<
     BaseResponseAPI<PagedResult<String>>
   > {
@@ -186,7 +186,7 @@ export class InventoryController {
 
   @Get('restock/logs')
   @ApiOperation({ summary: 'Lấy lịch sử phân tích nhu cầu nhập hàng (restock)' })
-  @ApiBaseResponse(PagedResult<String>)
+  @ExtendApiBaseResponse(PagedResult, String)
   async getInventoryRestockLogs(): Promise<
     BaseResponseAPI<PagedResult<String>>
   > {
@@ -314,7 +314,7 @@ export class InventoryController {
     summary: 'Lấy dữ liệu phân tích bán hàng tất cả variant',
     description: 'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất, sử dụng cho tool dự đoán tái cấp hàng'
   })
-  @ExtendApiBaseResponse(VariantSalesAnalyticsResponse, true)
+  @ExtendApiBaseResponse(VariantSalesAnalyticsResponse, undefined, true)
   async getProductSalesAnalyticsForRestock(): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse[]>> {
     return this.restockService.getProductSalesAnalyticsForRestock();
   }

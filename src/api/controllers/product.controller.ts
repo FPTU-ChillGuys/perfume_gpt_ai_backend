@@ -36,7 +36,7 @@ export class ProductController {
   @Public()
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả sản phẩm' })
-  @ExtendApiBaseResponse(PagedResult<ProductResponse>)
+  @ExtendApiBaseResponse(PagedResult, ProductResponse)
   async getAllProducts(@Query() request: PagedAndSortedRequest): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
     return this.productService.getAllProducts(request);
   }
@@ -45,7 +45,7 @@ export class ProductController {
   @Public()
   @Get('search')
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search' })
-  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
   async getProductsBySemanticSearch(@Req() req: Request, @Query() request: SearchRequest): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     const result = await this.productService.getProductsUsingSemanticSearch(request.searchText, request);
     const logUserId = resolveLogUserIdFromRequest(req);
@@ -57,7 +57,7 @@ export class ProductController {
   @Public()
   @Get('all/with-variants')
   @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm kèm toàn bộ variants' })
-  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
   async getAllProductsWithVariants(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
@@ -68,7 +68,7 @@ export class ProductController {
   @Public()
   @Get('all/newest')
   @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm mới nhất' })
-  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
   async getNewestProductsWithVariants(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
@@ -79,7 +79,7 @@ export class ProductController {
   @Public()
   @Get('all/best-sellers')
   @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm bán chạy' })
-  @ExtendApiBaseResponse(PagedResult<BestSellingProductResponse>)
+  @ExtendApiBaseResponse(PagedResult, BestSellingProductResponse)
   async getBestSellingProducts(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
@@ -90,7 +90,7 @@ export class ProductController {
   @Public()
   @Get('search/with-variants')
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search, kết quả kèm toàn bộ variants' })
-  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
   async getProductsBySemanticSearchWithVariants(
     @Req() req: Request,
     @Query() request: SearchRequest
@@ -108,7 +108,7 @@ export class ProductController {
   @Public()
   @Get('search/v2')
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search v2 (AI extraction)' })
-  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
   async getProductsByAiSearch(
     @Req() req: Request,
     @Query() request: SearchRequest
@@ -142,7 +142,7 @@ export class ProductController {
   @Public()
   @Get('search/v3')
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng parser path (parse -> query)' })
-  @ExtendApiBaseResponse(PagedResult<ProductWithVariantsResponse>)
+  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
   async getProductsByParsedSearch(
     @Req() req: Request,
     @Query() request: SearchRequest
@@ -159,7 +159,7 @@ export class ProductController {
   @Public()
   @Get('search/v4')
   @ApiOperation({ summary: 'Hybrid Search v4 - Kết hợp Query Layer (hard filters) và Vector Layer (similarity)' })
-  @ExtendApiBaseResponse(PagedResult<HybridSearchResponse>)
+  @ExtendApiBaseResponse(HybridSearchResponse)
   async getProductsByHybridSearch(
     @Req() req: Request,
     @Query() request: SearchRequest

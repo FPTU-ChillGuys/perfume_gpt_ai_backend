@@ -30,7 +30,7 @@ import { AI_SERVICE } from 'src/infrastructure/domain/ai/ai.module';
 import { AIService } from 'src/infrastructure/domain/ai/ai.service';
 import { OrderService } from 'src/infrastructure/domain/order/order.service';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
-import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
+import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 
 import {
   AIOrderSummaryStructuredResponse,
@@ -61,7 +61,7 @@ export class OrderController {
   /** Lấy danh sách tất cả đơn hàng */
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả đơn hàng' })
-  @ApiBaseResponse(PagedResult<OrderResponse>)
+  @ExtendApiBaseResponse(PagedResult, OrderListItemResponse)
   async getAllOrders(
     @Query() orderRequest: OrderRequest
   ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
@@ -72,7 +72,7 @@ export class OrderController {
   @Get('user/:userId')
   @ApiOperation({ summary: 'Lấy đơn hàng theo user ID' })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
-  @ApiBaseResponse(PagedResult<OrderResponse>)
+  @ExtendApiBaseResponse(PagedResult, OrderListItemResponse)
   async getOrdersByUserId(
     @Param('userId') userId: string,
     @Query() orderRequest: OrderRequest

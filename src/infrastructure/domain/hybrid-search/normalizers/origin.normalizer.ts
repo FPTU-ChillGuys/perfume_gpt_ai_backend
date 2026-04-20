@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
 
 /**
@@ -9,7 +10,11 @@ export const OriginNormalizerSchema = z.object({
   origins: z.array(z.string()).optional().describe('Danh sách nguồn gốc'),
 });
 
-export type OriginNormalizerOutput = z.infer<typeof OriginNormalizerSchema>;
+export class OriginNormalizerOutput {
+  @ApiPropertyOptional({ description: 'Danh sách nguồn gốc', type: [String] })
+  origins?: string[];
+}
+
 
 /**
  * OriginNormalizer - Chuẩn hóa nguồn gốc từ search text

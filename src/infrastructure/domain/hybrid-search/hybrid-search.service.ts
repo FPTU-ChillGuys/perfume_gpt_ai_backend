@@ -8,13 +8,25 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
 /**
  * Response cho Hybrid Search v4
  */
-export type HybridSearchResponse = PagedResult<ProductWithVariantsResponse> & {
+export class HybridSearchResponse extends PagedResult<ProductWithVariantsResponse> {
+  /** Danh sách bản ghi */
+  @ApiProperty({ description: 'Danh sách bản ghi', type: () => [ProductWithVariantsResponse] })
+  declare items: ProductWithVariantsResponse[];
+
+  /** Bộ lọc query đã extract */
+  @ApiPropertyOptional({ description: 'Filters found in query', type: () => NormalizedQueryFilters, nullable: true })
   queryFilters?: NormalizedQueryFilters | null;
+
+  /** Có sử dụng vector similarity không */
+  @ApiProperty({ description: 'Whether vector similarity was used' })
   vectorSimilarity?: boolean;
-};
+}
+
 
 /**
  * HybridSearchService - Orchestrator cho Hybrid Search v4
@@ -27,7 +39,7 @@ export class HybridSearchService {
     private readonly configService: ConfigService,
     private readonly embeddingService: EmbeddingService,
     private readonly queryNormalizer: QueryNormalizerOrchestrator
-  ) {}
+  ) { }
 
   /**
    * Search products bằng Hybrid Search v4
@@ -50,9 +62,9 @@ export class HybridSearchService {
       // ====== Bước 1: Query Layer ======
       // Phân tích và chuẩn hóa filters
       let queryFilters = await this.queryNormalizer.normalize(searchText);
-      
+
       const isSemanticOnly = this.configService.get<string>('SEARCH_SEMANTIC_ONLY') === 'true';
-      
+
       if (isSemanticOnly && queryFilters) {
         console.log('[HybridSearch] Semantic Only mode enabled. Disabling all filters except Gender.');
         // Chỉ giữ lại giới tính trong queryFilters
@@ -64,13 +76,13 @@ export class HybridSearchService {
           origin: undefined
         };
       }
-      
+
       let queryResultIds: Set<string> | null = null;
-      
+
       if (queryFilters) {
         // Build Prisma WHERE clause từ filters
         const whereClause = this.buildWhereClause(queryFilters);
-        
+
         // Execute query để lấy product IDs
         const queryProducts = await this.prisma.products.findMany({
           where: whereClause,
@@ -79,7 +91,7 @@ export class HybridSearchService {
         });
 
         queryResultIds = new Set(queryProducts.map(p => p.Id));
-        
+
         console.log(`[HybridSearch] Query layer found ${queryResultIds.size} products with filters ${isSemanticOnly ? '(Gender only)' : ''}`);
       }
 
@@ -87,19 +99,19 @@ export class HybridSearchService {
       // Generate embedding và vector search
       const vectorLimit = pageSize * 3; // Lấy dư để filter
       const vectorResults = await this.embeddingService.searchProductsByVector(searchText, vectorLimit);
-      
+
       console.log(`[HybridSearch] Vector layer found ${vectorResults.length} products by similarity`);
 
       // ====== Bước 3: Merge ======
       // Nếu có query filters, filter vector results (intersection)
       let mergedResults: any[] = [];
-      
+
       if (queryResultIds && queryResultIds.size > 0) {
         // Intersection: chỉ giữ products có productId trong queryResultIds
         mergedResults = vectorResults.filter(v => queryResultIds.has(v.Id));
-        
+
         console.log(`[HybridSearch] After intersection: ${mergedResults.length} products`);
-        
+
         // Nếu intersection rỗng -> trả về empty (theo decision)
         if (mergedResults.length === 0) {
           return {
@@ -122,7 +134,7 @@ export class HybridSearchService {
 
       // ====== Bước 5: Format response ======
       const items = paginatedResults.map(product => this.mapToProductResponse(product, queryFilters || undefined));
-      
+
       const response: HybridSearchResponse = {
         items,
         pageNumber,
@@ -157,7 +169,7 @@ export class HybridSearchService {
     // Price filter
     if (filters.price) {
       const { min, max, operator } = filters.price;
-      
+
       if (operator === 'lte' || operator === 'lt') {
         conditions.push({
           ProductVariants: {
@@ -201,7 +213,7 @@ export class HybridSearchService {
     // Year filter
     if (filters.year) {
       const { year, operator } = filters.year;
-      
+
       if (operator === 'eq') {
         conditions.push({ ReleaseYear: year });
       } else if (operator === 'gte') {

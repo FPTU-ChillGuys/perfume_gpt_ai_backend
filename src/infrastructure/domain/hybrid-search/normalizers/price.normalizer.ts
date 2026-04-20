@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
 
 /**
@@ -11,7 +12,20 @@ export const PriceNormalizerSchema = z.object({
   operator: z.enum(['lt', 'lte', 'gt', 'gte', 'between']).optional().describe('Toán tử so sánh'),
 });
 
-export type PriceNormalizerOutput = z.infer<typeof PriceNormalizerSchema>;
+export class PriceNormalizerOutput {
+  @ApiPropertyOptional({ description: 'Giá tối thiểu (VND)' })
+  min?: number;
+
+  @ApiPropertyOptional({ description: 'Giá tối đa (VND)' })
+  max?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Toán tử so sánh', 
+    enum: ['lt', 'lte', 'gt', 'gte', 'between'] 
+  })
+  operator?: 'lt' | 'lte' | 'gt' | 'gte' | 'between';
+}
+
 
 /**
  * PriceNormalizer - Chuẩn hóa thông tin giá cả từ search text

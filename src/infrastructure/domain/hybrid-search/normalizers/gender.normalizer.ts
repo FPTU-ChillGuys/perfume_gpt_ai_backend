@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
 import { PrismaService } from 'src/prisma/prisma.service';
 
@@ -10,7 +11,11 @@ export const GenderNormalizerSchema = z.object({
   value: z.enum(['Nam', 'Nữ', 'Unisex']).optional().describe('Giới tính nước hoa'),
 });
 
-export type GenderNormalizerOutput = z.infer<typeof GenderNormalizerSchema>;
+export class GenderNormalizerOutput {
+  @ApiPropertyOptional({ description: 'Giới tính nước hoa', enum: ['Nam', 'Nữ', 'Unisex'] })
+  value?: 'Nam' | 'Nữ' | 'Unisex';
+}
+
 
 /**
  * GenderNormalizer - Chuẩn hóa giới tính từ search text

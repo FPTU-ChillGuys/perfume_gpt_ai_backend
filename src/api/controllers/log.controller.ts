@@ -16,7 +16,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { UserLogAIService } from 'src/infrastructure/domain/user-log/user-log-ai.service';
-import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
+import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
@@ -40,7 +40,7 @@ export class LogController {
   constructor(
     protected userLogService: UserLogService,
     protected userLogAIService: UserLogAIService
-  ) {}
+  ) { }
 
   /** Lấy báo cáo tất cả log hoạt động người dùng */
   @CacheTTL(1)
@@ -120,7 +120,7 @@ export class LogController {
   @CacheTTL(0)
   @Get('events/paged')
   @ApiOperation({ summary: 'Lấy event log dạng mới có phân trang' })
-  @ApiBaseResponse(PagedResult<EventLog>)
+  @ExtendApiBaseResponse(PagedResult, EventLog)
   async getPagedEventLogs(
     @Query() request: EventLogPagedQueryRequest
   ): Promise<BaseResponse<PagedResult<EventLog>>> {
@@ -343,7 +343,7 @@ export class LogController {
   async rebuildAllUsersSummary(): Promise<BaseResponse<string>> {
     try {
       const userIds = await this.userLogService.getAllUserIdsFromLogs();
-      
+
       if (!userIds || userIds.length === 0) {
         return Ok('No users found in logs');
       }
@@ -362,7 +362,7 @@ export class LogController {
       }
 
       const summary = `Rebuilt summaries for ${successCount}/${userIds.length} users`;
-      const message = failedUserIds.length > 0 
+      const message = failedUserIds.length > 0
         ? `${summary}. Failed users: ${failedUserIds.join(', ')}`
         : summary;
 

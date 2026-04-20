@@ -5,15 +5,25 @@ import { YearNormalizer, YearNormalizerOutput } from './year.normalizer';
 import { OriginNormalizer, OriginNormalizerOutput } from './origin.normalizer';
 import { PrismaService } from 'src/prisma/prisma.service';
 
+import { ApiPropertyOptional } from '@nestjs/swagger';
+
 /**
  * Combined normalized query filters
  */
-export interface NormalizedQueryFilters {
+export class NormalizedQueryFilters {
+  @ApiPropertyOptional({ type: () => PriceNormalizerOutput })
   price?: PriceNormalizerOutput;
+
+  @ApiPropertyOptional({ type: () => GenderNormalizerOutput })
   gender?: GenderNormalizerOutput;
+
+  @ApiPropertyOptional({ type: () => YearNormalizerOutput })
   year?: YearNormalizerOutput;
+
+  @ApiPropertyOptional({ type: () => OriginNormalizerOutput })
   origin?: OriginNormalizerOutput;
 }
+
 
 /**
  * QueryNormalizerOrchestrator - Chạy tất cả normalizers và merge kết quả

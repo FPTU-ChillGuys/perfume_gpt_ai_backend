@@ -51,17 +51,43 @@ export const ApiBaseResponse = <T extends Function>(
  * ExtendApiBaseResponse
  * =====================================================
  */
-export const ExtendApiBaseResponse = <T extends Function>(
+export const ExtendApiBaseResponse = <T extends Function, I extends Function>(
   data: T,
-  isArray: boolean = false,
+  itemTypeOrIsArray?: I | boolean,
+  oldIsArray: boolean = false,
   properties?: Record<string, any>
 ) => {
+  const isSecondArgBoolean = typeof itemTypeOrIsArray === 'boolean';
+  const isArray = isSecondArgBoolean ? (itemTypeOrIsArray as boolean) : oldIsArray;
+  const itemType = isSecondArgBoolean ? undefined : (itemTypeOrIsArray as I);
+
   const schemaData = isPrimitive(data)
     ? primitiveMap[data.name]
     : { $ref: getSchemaPath(data) };
 
+  const itemSchema = itemType ? (isPrimitive(itemType) ? primitiveMap[itemType.name] : { $ref: getSchemaPath(itemType) }) : null;
+
+  let payloadSchema: any = isArray ? { type: 'array', items: schemaData } : schemaData;
+
+  // Nếu là PagedResult và có itemType, override items property
+  if (itemType && data.name === 'PagedResult') {
+    payloadSchema = {
+      allOf: [
+        { $ref: getSchemaPath(data) },
+        {
+          properties: {
+            items: {
+              type: 'array',
+              items: itemSchema
+            }
+          }
+        }
+      ]
+    };
+  }
+
   return applyDecorators(
-    ApiExtraModels(BaseResponseAPI, ...(isPrimitive(data) ? [] : [data])),
+    ApiExtraModels(BaseResponseAPI, ...(isPrimitive(data) ? [] : [data]), ...(itemType && !isPrimitive(itemType) ? [itemType] : [])),
     ApiOkResponse({
       description: `The base response of ${data.name}`,
       schema: {
@@ -69,7 +95,7 @@ export const ExtendApiBaseResponse = <T extends Function>(
           { $ref: getSchemaPath(BaseResponseAPI) },
           {
             properties: properties ?? {
-              data: isArray ? { type: 'array', items: schemaData } : schemaData
+              payload: payloadSchema
             }
           }
         ]
@@ -77,3 +103,5 @@ export const ExtendApiBaseResponse = <T extends Function>(
     })
   );
 };
+
+

@@ -12,7 +12,7 @@ import { ReviewAIService } from 'src/infrastructure/domain/review/review-ai.serv
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
-import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
+import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { AIReviewSummaryStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
@@ -45,7 +45,7 @@ export class ReviewController {
     /** Lấy danh sách đánh giá */
     @Get()
     @ApiOperation({ summary: 'Lấy danh sách đánh giá (phân trang)' })
-    @ApiBaseResponse(PagedResult<ReviewListItemResponse>)
+    @ExtendApiBaseResponse(PagedResult, ReviewListItemResponse)
     async getReviews(@Query() request: GetPagedReviewRequest): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
         return await this.reviewService.getAllReviews(request);
     }

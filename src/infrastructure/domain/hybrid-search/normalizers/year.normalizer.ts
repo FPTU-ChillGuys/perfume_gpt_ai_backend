@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { z } from 'zod';
 
 /**
@@ -10,7 +11,17 @@ export const YearNormalizerSchema = z.object({
   operator: z.enum(['eq', 'gte', 'lte', 'newer', 'older']).optional().describe('Toán tử so sánh'),
 });
 
-export type YearNormalizerOutput = z.infer<typeof YearNormalizerSchema>;
+export class YearNormalizerOutput {
+  @ApiPropertyOptional({ description: 'Năm ra mắt' })
+  year?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Toán tử so sánh', 
+    enum: ['eq', 'gte', 'lte', 'newer', 'older'] 
+  })
+  operator?: 'eq' | 'gte' | 'lte' | 'newer' | 'older';
+}
+
 
 /**
  * YearNormalizer - Chuẩn hóa năm ra mắt từ search text

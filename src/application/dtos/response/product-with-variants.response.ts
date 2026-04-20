@@ -123,7 +123,13 @@ export class ProductVariantResponse {
     /** Ngày cập nhật */
     @ApiPropertyOptional({ description: 'Ngày cập nhật', nullable: true })
     updatedAt!: string | null;
+
+
+    /** URL hình ảnh chính của variant (dùng cho SEO và hiển thị nhanh) */
+    @ApiPropertyOptional({ description: 'URL hình ảnh chính của variant', nullable: true })
+    url!: string | null;
 }
+
 
 /** Response thông tin sản phẩm kèm danh sách biến thể */
 export class ProductWithVariantsResponse {

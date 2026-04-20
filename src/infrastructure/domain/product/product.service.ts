@@ -152,7 +152,8 @@ function mapProductWithVariants(
         longevity: v.Longevity,
         sillage: v.Sillage,
         createdAt: v.CreatedAt.toISOString(),
-        updatedAt: v.UpdatedAt?.toISOString() ?? null
+        updatedAt: v.UpdatedAt?.toISOString() ?? null,
+        url: v.Media?.find((m: any) => m.IsPrimary)?.Url || v.Media?.[0]?.Url || null
       })
     )
   };

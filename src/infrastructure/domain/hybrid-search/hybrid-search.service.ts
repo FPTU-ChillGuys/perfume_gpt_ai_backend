@@ -311,11 +311,11 @@ export class HybridSearchService {
           value: pa.AttributeValues?.Value ?? '',
           valueName: pa.AttributeValues?.Value
         })),
-        media: v.Media.map(m => ({
+        url: v.Media?.find((m: any) => m.IsPrimary)?.Url || v.Media?.[0]?.Url || null,
+        media: (v.Media ?? []).map((m: any) => ({
           id: m.Id,
-          mediaUrl: m.MediaUrl,
-          url: m.MediaUrl,
-          altText: null,
+          url: m.Url,
+          altText: m.AltText ?? null,
           isPrimary: m.IsPrimary,
           displayOrder: m.DisplayOrder ?? 0
         })),

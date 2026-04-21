@@ -12,7 +12,7 @@ export const aiModelForTrend = gpt5_4nano;
 
 export const aiModelForRestock = gpt5_4nano;
 
-export const aiModelForReview = llama_3_1_8b_instruct;
+export const aiModelForReview = gpt5_4nano;
 
 export const aiModelForOptimizePrompt = gpt5_4nano;
 

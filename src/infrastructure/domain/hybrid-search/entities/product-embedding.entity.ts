@@ -23,4 +23,9 @@ export class ProductEmbedding extends Common {
   @ApiProperty({ description: 'Text mô tả đã được dùng để generate embedding' })
   @Property({ type: 'text' })
   description!: string;
+
+  /** Text dùng cho BM25 keyword search */
+  @ApiProperty({ description: 'Text dùng cho BM25 keyword search' })
+  @Property({ type: 'text', nullable: true })
+  searchText?: string;
 }

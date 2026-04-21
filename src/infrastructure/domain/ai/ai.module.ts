@@ -1,5 +1,7 @@
+import { HttpModule } from '@nestjs/axios';
 import { forwardRef, Module, Provider } from '@nestjs/common';
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
+import { RerankService } from 'src/infrastructure/domain/ai/rerank.service';
 import { SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { Tools } from 'src/chatbot/tools';
@@ -158,9 +160,10 @@ const aiInventoryReportProvider: Provider = {
 };
 
 @Module({
-  imports: [UnitOfWorkModule, ToolModule],
+  imports: [UnitOfWorkModule, ToolModule, HttpModule],
   providers: [
     AiAnalysisService,
+    RerankService,
     aiProvider,
     aiConversationProvider,
     aiTrendProvider,
@@ -173,6 +176,7 @@ const aiInventoryReportProvider: Provider = {
   ],
   exports: [
     AiAnalysisService,
+    RerankService,
     aiProvider,
     aiConversationProvider,
     aiTrendProvider,

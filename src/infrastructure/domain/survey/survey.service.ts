@@ -32,7 +32,7 @@ import { ProductService } from 'src/infrastructure/domain/product/product.servic
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { v4 as uuidv4 } from 'uuid';
-import { mergeSurveyQueryResults, SurveyQueryResult } from 'src/infrastructure/domain/survey/survey-merge.util';
+import { mergeSurveyQueryResults, SurveyQueryResult, buildSurveyContextForAI } from 'src/infrastructure/domain/survey/survey-merge.util';
 import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/survey-query-validator.service';
 import { QueryFragment, QueryAnswerPayload } from 'src/infrastructure/domain/survey/survey-query.types';
 
@@ -998,6 +998,265 @@ export class SurveyService {
       `Queries with results: ${queriesWithProducts.length}, ` +
       `Final products: ${aiResponse.products?.length || 0}`
     );
+
+    return Ok(JSON.stringify(aiResponse));
+  }
+
+  /**
+   * SURVEY V5 — Hybrid processing (AI + Query fragments) with Matching Score
+   * - Hybrid: Chấp nhận cả answer JSON (Query-based) và Text (AI 분석).
+   * - Soft Constraints: Tất cả tiêu chí (Brand, Category, Notes, Age...) đều dùng để tính RANK.
+   * - Hard Constraints: KHÔNG CÓ (theo yêu cầu user, Age cũng là soft).
+   * - Post-Merge Filter: Chỉ có Budget là lọc sau cùng sau khi merge.
+   */
+  async processSurveyV5Hybrid(
+    userId: string,
+    surveyAnswers: { questionId: string; answerId: string }[]
+  ): Promise<BaseResponse<string>> {
+    this.logger.log(`[SurveyV5] Starting hybrid processing for userId=${userId}, ${surveyAnswers.length} answers`);
+
+    // Step 1: Load all Q&A from database
+    const questionIds = [...new Set(surveyAnswers.map(qa => qa.questionId))];
+    const surveyQuesesResponse = await this.getSurveyQuesByIdList(questionIds);
+    if (!surveyQuesesResponse.success || !surveyQuesesResponse.data) {
+      throw new InternalServerErrorWithDetailsException('Failed to get survey questions', { questionIds });
+    }
+    const surveyQueses = surveyQuesesResponse.data;
+
+    // Step 2: Hybrid Answer Analysis (Parse JSON or Call AI)
+    const perQuestionAnalysis: Array<{ questionId: string; question: string; answer: string; analysis: any }> = [];
+    const quesAnsesForContext: Array<{ question: string; answer: string }> = [];
+
+    for (const surveyAnswer of surveyAnswers) {
+      const surveyQues = surveyQueses.find(q => q.id === surveyAnswer.questionId);
+      if (!surveyQues?.answers || !surveyQues.question) continue;
+
+      const answer = surveyQues.answers.find(ans => ans.id === surveyAnswer.answerId);
+      if (!answer?.answer) continue;
+
+      let analysis: any = null;
+      let displayAnswer = answer.answer;
+
+      // Try to parse as JSON (Structured V4)
+      const parsed = this.queryValidator.tryParseAnswerAsQuery(answer.answer);
+      if (parsed) {
+        analysis = this.queryFragmentsToAnalysis([parsed.queryFragment]);
+        displayAnswer = parsed.displayText;
+      } else {
+        // Plain text -> Call AI Analysis (V3 pattern)
+        this.logger.log(`[SurveyV5] Manual text detected for question "${surveyQues.question.substring(0, 30)}...", analyzing with AI...`);
+        analysis = await this.analysisService.analyzeSurveyAnswer({
+          question: surveyQues.question,
+          answer: answer.answer
+        });
+      }
+
+      if (analysis) {
+        perQuestionAnalysis.push({
+          questionId: surveyAnswer.questionId,
+          question: surveyQues.question,
+          answer: displayAnswer,
+          analysis
+        });
+        quesAnsesForContext.push({ question: surveyQues.question, answer: displayAnswer });
+      }
+    }
+
+    // Step 3: Save survey record
+    const savedSurveyQuesAnsResponse = await this.addSurveyQuesAnws(
+      new SurveyQuesAnwsRequest({ userId, details: surveyAnswers })
+    );
+    if (!savedSurveyQuesAnsResponse.success || !savedSurveyQuesAnsResponse.data?.id) {
+      throw new InternalServerErrorWithDetailsException('Failed to save survey question answers', { userId });
+    }
+    await this.userLogService.addSurveyQuesAnsDetailToUserLog(userId, savedSurveyQuesAnsResponse.data.id);
+
+    // Step 4: Extract Global Budget & Concentration for final filtering
+    let globalMinPrice: number | undefined;
+    let globalMaxPrice: number | undefined;
+    const globalConcentrations = new Set<string>();
+
+    for (const item of perQuestionAnalysis) {
+      // Budget
+      const b = item.analysis.budget;
+      if (b) {
+        if (b.min !== undefined) globalMinPrice = globalMinPrice !== undefined ? Math.max(globalMinPrice, b.min) : b.min;
+        if (b.max !== undefined) globalMaxPrice = globalMaxPrice !== undefined ? Math.min(globalMaxPrice, b.max) : b.max;
+      }
+      // Concentration
+      if (item.analysis.concentrationValues && Array.isArray(item.analysis.concentrationValues)) {
+        item.analysis.concentrationValues.forEach((c: string) => globalConcentrations.add(c.toLowerCase()));
+      }
+    }
+    this.logger.log(`[SurveyV5] Global Constraints: Budget[${globalMinPrice}-${globalMaxPrice}], Concentrations[${Array.from(globalConcentrations).join(', ')}]`);
+
+    // Step 5: Execute Queries independently (excluding Budget & Concentration)
+    const queryResults: SurveyQueryResult[] = [];
+
+    for (const item of perQuestionAnalysis) {
+      const analysisCopy = { ...item.analysis };
+      // Quan trọng: Xóa budget và concentration khỏi query từng câu hỏi để thực hiện "Ranking" trước, lọc sau
+      delete analysisCopy.budget;
+      delete analysisCopy.concentrationValues;
+      
+      // Đảm bảo lấy đủ ứng viên để merge
+      analysisCopy.pagination = { pageNumber: 1, pageSize: 20 };
+
+      try {
+        const searchResponse = await this.productService.getProductsByStructuredQuery(analysisCopy);
+        if (searchResponse.success && searchResponse.data && searchResponse.data.items.length > 0) {
+          const products = searchResponse.data.items.map(p => ({
+            id: p.id,
+            name: p.name,
+            brand: p.brandName,
+            image: p.primaryImage,
+            category: p.categoryName,
+            description: p.description,
+            attributes: p.attributes.map(a => `${a.attribute}: ${a.value}`),
+            scentNotes: p.scentNotes,
+            olfactoryFamilies: p.olfactoryFamilies,
+            variants: p.variants.map(v => ({ 
+              id: v.id, 
+              volume: v.volumeMl, 
+              price: v.basePrice,
+              concentration: v.concentration?.name 
+            })),
+          }));
+          queryResults.push({ questionId: item.questionId, products });
+        } else {
+          queryResults.push({ questionId: item.questionId, products: [] });
+        }
+      } catch (error) {
+        this.logger.error(`[SurveyV5] Error querying question "${item.questionId}":`, error);
+        queryResults.push({ questionId: item.questionId, products: [] });
+      }
+    }
+
+    // Step 6: Merge & Rank by Matching Score
+    let mergedProducts = mergeSurveyQueryResults(queryResults, 50); // Lấy tập rộng hơn để lọc giá
+
+    // Step 7: Final Filtering by Budget & Concentration
+    if (globalMinPrice !== undefined || globalMaxPrice !== undefined || globalConcentrations.size > 0) {
+      const before = mergedProducts.length;
+      mergedProducts = mergedProducts.filter(p => {
+        // Kiểm tra xem sản phẩm có ít nhất 1 variant nằm trong range không
+        const hasValidVariant = p.variants.some((v: any) => {
+          // Budget Check
+          const price = v.price || v.basePrice;
+          if (globalMinPrice !== undefined && price < globalMinPrice) return false;
+          if (globalMaxPrice !== undefined && price > globalMaxPrice) return false;
+          
+          // Concentration Check (nếu user yêu cầu cụ thể)
+          if (globalConcentrations.size > 0 && v.concentration) {
+            const variantC = v.concentration.toLowerCase();
+            // Match nếu variant concentration name chứa một trong các keyword user yêu cầu
+            let matchedC = false;
+            for (const requestedC of globalConcentrations) {
+              if (variantC.includes(requestedC) || requestedC.includes(variantC)) {
+                matchedC = true;
+                break;
+              }
+            }
+            if (!matchedC) return false;
+          }
+
+          return true;
+        });
+        return hasValidVariant;
+      });
+      this.logger.log(`[SurveyV5] Hard filter removed ${before - mergedProducts.length} products. Remaining: ${mergedProducts.length}`);
+    }
+
+    // Step 8: Final AI Recommendation
+    const topProducts = mergedProducts.slice(0, 10); // Gửi top 10 cho AI chọn 5
+    
+    const surveyCtx = buildSurveyContextForAI(quesAnsesForContext, topProducts);
+    const adminInstruction = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
+    const combinedSystemPrompt = surveyRecommendationSystemPrompt(adminInstruction || '', surveyCtx, '');
+
+    const aiResponsePayload = await this.aiHelper.textGenerateFromPrompt(
+      'Dựa trên kết quả khảo sát và danh sách sản phẩm tiềm năng đã được xếp hạng theo độ phù hợp, hãy đưa ra tư vấn cá nhân hóa và chọn ra 5 sản phẩm tốt nhất. Giải thích rõ tại sao các sản phẩm này lại đứng đầu bảng xếp hạng cho người dùng này.',
+      combinedSystemPrompt,
+      Output.object(surveyOutput)
+    );
+
+    if (!aiResponsePayload.success || !aiResponsePayload.data) {
+      throw new InternalServerErrorWithDetailsException('Failed to get AI response for survey v5', { userId });
+    }
+
+    const aiResponse = typeof aiResponsePayload.data === 'string'
+      ? JSON.parse(aiResponsePayload.data)
+      : aiResponsePayload.data;
+
+    // Step 9: Hydrate & Format Final Products
+    const aiRecMap = new Map<string, any>((aiResponse.productTemp || []).map((item: any) => [item.id, item]));
+    
+    // Tìm các sản phẩm được AI chọn trong danh sách đã merge
+    aiResponse.products = topProducts
+      .filter(p => aiRecMap.has(p.id))
+      .map(p => {
+        const aiItem = aiRecMap.get(p.id);
+        let variants = (p.variants || []).map((v: any) => ({
+          id: v.id,
+          sku: v.sku || `SKU-${v.id.substring(0, 8)}`,
+          volumeMl: v.volume || v.volumeMl || 0,
+          basePrice: v.price || v.basePrice || 0
+        }));
+
+        // Filter variants theo budget & concentration lần cuối
+        if (globalMinPrice !== undefined || globalMaxPrice !== undefined || globalConcentrations.size > 0) {
+          variants = variants.filter((v: any) => {
+            const price = v.basePrice || v.price;
+            if (globalMinPrice !== undefined && price < globalMinPrice) return false;
+            if (globalMaxPrice !== undefined && price > globalMaxPrice) return false;
+            
+            if (globalConcentrations.size > 0 && v.concentration) {
+              const variantC = v.concentration.toLowerCase();
+              let matchedC = false;
+              for (const requestedC of globalConcentrations) {
+                if (variantC.includes(requestedC) || requestedC.includes(variantC)) {
+                  matchedC = true;
+                  break;
+                }
+              }
+              if (!matchedC) return false;
+            }
+            return true;
+          });
+        }
+
+        return {
+          id: p.id,
+          name: p.name,
+          brandName: p.brand || p.brandName,
+          primaryImage: p.image || p.primaryImage,
+          reasoning: aiItem?.reasoning || 'Sản phẩm đạt điểm tương xứng cao nhất với sở thích của bạn.',
+          source: p.source || aiItem?.source || 'SURVEY_V5_HYBRID',
+          variants
+        };
+      })
+      .filter(p => p.variants.length > 0)
+      .slice(0, 5);
+
+    // Step 10: Attach AI Acceptance
+    if (aiResponse.products.length > 0) {
+      const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        contextType: 'survey',
+        sourceRefId: `survey-v5-${userId}-${Date.now()}`,
+        products: aiResponse.products,
+        metadata: {
+          flow: 'survey-v5-hybrid',
+          questionCount: surveyAnswers.length,
+          productCount: aiResponse.products.length,
+          minPrice: globalMinPrice,
+          maxPrice: globalMaxPrice
+        },
+      });
+      aiResponse.products = attachResult.products;
+      if (attachResult.aiAcceptanceId) {
+        aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+      }
+    }
 
     return Ok(JSON.stringify(aiResponse));
   }

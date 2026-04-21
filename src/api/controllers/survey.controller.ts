@@ -196,6 +196,22 @@ export class SurveyController {
     const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
     return this.surveyService.processSurveyV4QueryBased(resolvedUserId, surveyAnswers);
   }
+  
+  /** Trả lời survey và nhận gợi ý nước hoa từ AI (v5 - Hybrid AI + Query fragments + Ranking score) */
+  @Public()
+  @Post('user/v5')
+  @ApiOperation({ summary: 'Trả lời survey V5 — Hybrid (AI phân tích + Query-based + Ranking score)' })
+  @ApiQuery({ name: 'userId', type: String, required: false, description: 'ID của người dùng' })
+  @ApiBaseResponse(String)
+  @ApiBody({ type: [SurveyQuesAnsDetailRequest] })
+  async chatSurveyV5(
+    @Req() req: Request,
+    @Query('userId') userId: string,
+    @Body() surveyAnswers: { questionId: string; answerId: string }[]
+  ): Promise<BaseResponse<string>> {
+    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    return this.surveyService.processSurveyV5Hybrid(resolvedUserId, surveyAnswers);
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // ═══  ATTRIBUTE ENDPOINTS (cho admin tạo survey query-based) ═══

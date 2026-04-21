@@ -176,7 +176,7 @@ export class HybridSearchService {
       const rerankedResults = await this.rerankService.rerank(searchText, rerankCandidates, retrievalLimit);
 
       // ====== Bước 5: Filtering by Rerank Score (Thanh lọc kết quả) ======
-      const threshold = 0.3;
+      const threshold = 0.2;
       const filteredResults = rerankedResults.filter(r => r.rerankScore >= threshold);
       console.log(`[HybridSearch] Reranked ${rerankedResults.length} items, ${filteredResults.length} passed threshold ${threshold}`);
 

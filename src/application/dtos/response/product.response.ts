@@ -19,8 +19,8 @@ export class ProductAttributeResponse {
   attribute!: string;
 
   /** Mô tả thuộc tính */
-  @ApiProperty({ description: 'Mô tả thuộc tính', example: 'Suitable weather or season for the product' })
-  description!: string;
+  @ApiProperty({ description: 'Mô tả thuộc tính', example: 'Suitable weather or season for the product', required: false, nullable: true })
+  description?: string;
 
   /** Giá trị thuộc tính (vd: Winter, Confident, Unisex, Sandalwood...) */
   @ApiProperty({ description: 'Giá trị thuộc tính', example: 'Winter' })
@@ -54,8 +54,8 @@ export class ProductResponse {
   categoryName!: string;
 
   /** Mô tả sản phẩm */
-  @ApiProperty({ description: 'Mô tả sản phẩm' })
-  description!: string;
+  @ApiProperty({ description: 'Mô tả sản phẩm', required: false, nullable: true })
+  description?: string;
 
   /** URL hình ảnh chính */
   @ApiProperty({ description: 'URL hình ảnh chính', nullable: true })

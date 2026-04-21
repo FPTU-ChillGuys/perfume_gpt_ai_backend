@@ -20,9 +20,9 @@ export class ProductEmbedding extends Common {
   vector!: number[];
 
   /** Text mô tả đã được dùng để generate embedding (để debug/rebuild) */
-  @ApiProperty({ description: 'Text mô tả đã được dùng để generate embedding' })
+  @ApiProperty({ description: 'Text mô tả đã được dùng để generate embedding', required: false, nullable: true })
   @Property({ type: 'text' })
-  description!: string;
+  description?: string;
 
   /** Text dùng cho BM25 keyword search */
   @ApiProperty({ description: 'Text dùng cho BM25 keyword search' })

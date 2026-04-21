@@ -158,8 +158,8 @@ export class ProductWithVariantsResponse {
     categoryName!: string;
 
     /** Mô tả sản phẩm */
-    @ApiProperty({ description: 'Mô tả sản phẩm' })
-    description!: string;
+    @ApiPropertyOptional({ description: 'Mô tả sản phẩm', required: false, nullable: true })
+    description?: string;
 
     /** URL hình ảnh chính */
     @ApiPropertyOptional({ description: 'URL hình ảnh chính', nullable: true })

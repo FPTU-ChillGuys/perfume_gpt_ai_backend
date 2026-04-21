@@ -138,7 +138,7 @@ export class SearchObjectDto {
     @IsOptional()
     season?: string;
 
-    @ApiProperty({ description: 'Mô tả thêm hoặc ngữ cảnh', required: false })
+    @ApiProperty({ description: 'Mô tả thêm hoặc ngữ cảnh', required: false, nullable: true })
     @IsString()
     @IsOptional()
     description?: string;

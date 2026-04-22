@@ -63,23 +63,24 @@ export class RedisRequestResponseService implements OnApplicationShutdown {
   /**
    * Sends a request to a Redis channel and waits for a response on a unique reply channel.
    * @param channel The channel to send the request to.
-   * @param payload The payload to send.
+   * @param action The specific action within the domain.
+   * @param payload The relevant data for the action.
    * @param timeoutMs Maximum time to wait for the response.
    */
-  async sendRequest<T>(channel: string, payload: any, timeoutMs: number = 10000): Promise<T> {
+  async sendRequest<T>(channel: string, action: string, payload: any, timeoutMs: number = 10000): Promise<T> {
     const correlationId = uuidv4();
     const replyChannel = `reply:${correlationId}`;
 
     return new Promise<T>(async (resolve, reject) => {
       const timeout = setTimeout(() => {
-        this.subscriber.unsubscribe(replyChannel).catch(() => {});
-        reject(new Error(`Redis request timed out after ${timeoutMs}ms on channel ${channel}`));
+        this.subscriber.unsubscribe(replyChannel).catch(() => { });
+        reject(new Error(`Redis request timed out after ${timeoutMs}ms on channel ${channel}:${action}`));
       }, timeoutMs);
 
       const handleMessage = (chan: string, message: string) => {
         if (chan === replyChannel) {
           clearTimeout(timeout);
-          this.subscriber.unsubscribe(replyChannel).catch(() => {});
+          this.subscriber.unsubscribe(replyChannel).catch(() => { });
           this.subscriber.off('message', handleMessage);
 
           try {
@@ -96,15 +97,16 @@ export class RedisRequestResponseService implements OnApplicationShutdown {
         this.subscriber.on('message', handleMessage);
 
         const requestPayload = JSON.stringify({
-          ...payload,
+          action,
+          payload,
           replyChannel,
         });
 
         await this.publisher.publish(channel, requestPayload);
-        this.logger.log(`[RedisReq] Published request to ${channel}, waiting on ${replyChannel}`);
+        this.logger.log(`[RedisReq] Published ${action} to ${channel}, waiting on ${replyChannel}`);
       } catch (err) {
         clearTimeout(timeout);
-        this.subscriber.unsubscribe(replyChannel).catch(() => {});
+        this.subscriber.unsubscribe(replyChannel).catch(() => { });
         reject(err);
       }
     });

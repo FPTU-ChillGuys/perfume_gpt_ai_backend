@@ -45,6 +45,10 @@ export class ReviewListItemResponse {
     /** Tên variant sản phẩm */
     @ApiProperty({ description: 'Tên variant sản phẩm' })
     variantName: string;
+
+    constructor(init?: Partial<ReviewListItemResponse>) {
+        Object.assign(this, init);
+    }
 }
 
 /** Response chi tiết đánh giá sản phẩm */
@@ -100,6 +104,10 @@ export class ReviewResponse {
 	/** Ngày cập nhật gần nhất */
 	@ApiProperty({ description: 'Ngày cập nhật', format: 'date-time', nullable: true })
 	updatedAt: string | null;
+
+	constructor(init?: Partial<ReviewResponse>) {
+		Object.assign(this, init);
+	}
 }
 
 /** Response media (hình ảnh) đính kèm đánh giá */
@@ -131,6 +139,10 @@ export class MediaResponse {
 	/** Loại MIME */
 	@ApiProperty({ description: 'Loại MIME (image/jpeg, ...)', nullable: true })
 	mimeType: string | null;
+
+	constructor(init?: Partial<MediaResponse>) {
+		Object.assign(this, init);
+	}
 }
 
 /** Response thống kê đánh giá theo variant */

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from 'generated/prisma/client';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { ReviewRedisRepository } from '../repositories/redis/review-redis.repository';
 import {
   ReviewListItemResponse,
   ReviewResponse,
@@ -8,140 +7,24 @@ import {
   MediaResponse
 } from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
-import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUUID(id: string): boolean {
   return UUID_REGEX.test(id);
 }
 
-const reviewInclude = {
-  AspNetUsers_Reviews_UserIdToAspNetUsers: {
-    include: { Media: true }
-  },
-  AspNetUsers_Reviews_StaffFeedbackByStaffIdToAspNetUsers: true,
-  OrderDetails: {
-    include: {
-      ProductVariants: {
-        include: {
-          Products: true,
-          Concentrations: true
-        }
-      }
-    }
-  },
-  Media: true
-} satisfies Prisma.ReviewsInclude;
-
-type ReviewWithRelations = Prisma.ReviewsGetPayload<{
-  include: typeof reviewInclude;
-}>;
-
-type ReviewStatus = 'Pending' | 'Approved' | 'Rejected';
-
-function deriveReviewStatus(review: Pick<ReviewWithRelations, 'StaffFeedbackAt' | 'StaffFeedbackComment'>): ReviewStatus {
-  if (!review.StaffFeedbackAt) {
-    return 'Pending';
-  }
-  if (review.StaffFeedbackComment && review.StaffFeedbackComment.trim().length > 0) {
-    return 'Rejected';
-  }
-  return 'Approved';
-}
-
-function buildReviewStatusWhere(status?: string): Prisma.ReviewsWhereInput {
-  switch (status) {
-    case 'Pending':
-      return { StaffFeedbackAt: null };
-    case 'Approved':
-      return {
-        AND: [
-          { StaffFeedbackAt: { not: null } },
-          {
-            OR: [
-              { StaffFeedbackComment: null },
-              { StaffFeedbackComment: '' },
-            ],
-          },
-        ],
-      };
-    case 'Rejected':
-      return {
-        AND: [
-          { StaffFeedbackAt: { not: null } },
-          { StaffFeedbackComment: { not: null } },
-          { NOT: { StaffFeedbackComment: '' } },
-        ],
-      };
-    default:
-      return {};
-  }
-}
-
-function buildVariantName(review: ReviewWithRelations): string {
-  const v = review.OrderDetails.ProductVariants;
-  return `${v.Products.Name} ${v.VolumeMl}ml ${v.Concentrations.Name}`;
-}
-
-function mapToReviewResponse(review: ReviewWithRelations): ReviewResponse {
-  return {
-    id: review.Id,
-    userId: review.UserId,
-    userFullName: review.AspNetUsers_Reviews_UserIdToAspNetUsers.FullName,
-    userProfilePictureUrl:
-      review.AspNetUsers_Reviews_UserIdToAspNetUsers.Media?.Url ?? null,
-    orderDetailId: review.OrderDetailId,
-    variantId: review.OrderDetails.VariantId,
-    variantName: buildVariantName(review),
-    rating: review.Rating,
-    comment: review.Comment ?? '',
-    status: deriveReviewStatus(review),
-    images: review.Media.map(
-      (m): MediaResponse => ({
-        id: m.Id,
-        url: m.Url,
-        altText: m.AltText ?? null,
-        displayOrder: m.DisplayOrder,
-        isPrimary: m.IsPrimary,
-        fileSize: m.FileSize != null ? Number(m.FileSize) : null,
-        mimeType: m.MimeType ?? null
-      })
-    ),
-    createdAt: review.CreatedAt.toISOString(),
-    updatedAt: review.UpdatedAt?.toISOString() ?? null
-  };
-}
-
-function mapToReviewListItemResponse(
-  review: ReviewWithRelations
-): ReviewListItemResponse {
-  return {
-    id: review.Id,
-    userId: review.UserId,
-    userFullName: review.AspNetUsers_Reviews_UserIdToAspNetUsers.FullName,
-    userProfilePictureUrl:
-      review.AspNetUsers_Reviews_UserIdToAspNetUsers.Media?.Url ?? null,
-    variantId: review.OrderDetails.VariantId,
-    variantName: buildVariantName(review),
-    rating: review.Rating,
-    status: deriveReviewStatus(review),
-    commentPreview: (review.Comment ?? '').substring(0, 100),
-    imageCount: review.Media.length,
-    createdAt: review.CreatedAt.toISOString()
-  };
-}
-
 @Injectable()
 export class ReviewService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly reviewRedisRepo: ReviewRedisRepository,
     private readonly unitOfWork: UnitOfWork
   ) {}
   
@@ -150,46 +33,28 @@ export class ReviewService {
   ): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
-
-        const where: Prisma.ReviewsWhereInput = {
-          ...(request.VariantId && isUUID(request.VariantId)
-            ? { OrderDetails: { VariantId: request.VariantId } }
-            : {}),
-          ...(request.UserId && isUUID(request.UserId) ? { UserId: request.UserId } : {}),
-          ...buildReviewStatusWhere(request.Status),
-          ...(request.MinRating || request.MaxRating
-            ? {
-              Rating: {
-                ...(request.MinRating ? { gte: request.MinRating } : {}),
-                ...(request.MaxRating ? { lte: request.MaxRating } : {})
-              }
-            }
-            : {}),
-          ...(request.HasImages ? { Media: { some: {} } } : {})
-        };
-
-        const [reviews, totalCount] = await Promise.all([
-          this.prisma.reviews.findMany({
-            where,
-            skip,
-            take,
-            include: reviewInclude
-          }),
-          this.prisma.reviews.count({ where })
-        ]);
-
-        const result = new PagedResult<ReviewListItemResponse>({
-          items: reviews.map(mapToReviewListItemResponse),
+        const payload = await this.reviewRedisRepo.getPagedReviews({
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
+          variantId: request.VariantId,
+          userId: request.UserId,
+          status: request.Status,
+          minRating: request.MinRating,
+          maxRating: request.MaxRating,
+          hasImages: request.HasImages
         });
+
+        const result = new PagedResult<ReviewListItemResponse>({
+          items: (payload?.items || []).map(r => new ReviewListItemResponse(r)),
+          pageNumber: payload?.pageNumber || request.PageNumber,
+          pageSize: payload?.pageSize || request.PageSize,
+          totalCount: payload?.totalCount || 0,
+          totalPages: payload?.totalPages || 0
+        });
+
         return { success: true, payload: result };
       },
-      'Failed to fetch reviews',
+      'Failed to fetch reviews from Redis',
       true
     );
   }
@@ -199,16 +64,13 @@ export class ReviewService {
   ): Promise<BaseResponseAPI<ReviewResponse[]>> {
     return await funcHandlerAsync(
       async () => {
-        if (!isUUID(variantId)) {
-          return { success: true, payload: [] };
-        }
-        const reviews = await this.prisma.reviews.findMany({
-          where: { OrderDetails: { VariantId: variantId } },
-          include: reviewInclude
-        });
-        return { success: true, payload: reviews.map(mapToReviewResponse) };
+        if (!isUUID(variantId)) return { success: true, payload: [] };
+        
+        const reviews = await this.reviewRedisRepo.getVariantReviews(variantId);
+
+        return { success: true, payload: (reviews || []).map(r => new ReviewResponse(r)) };
       },
-      'Failed to fetch reviews',
+      'Failed to fetch variant reviews from Redis via Repository',
       true
     );
   }
@@ -233,38 +95,23 @@ export class ReviewService {
             }
           };
         }
-        const reviews = await this.prisma.reviews.findMany({
-          where: { OrderDetails: { VariantId: variantId } },
-          select: { Rating: true }
-        });
 
-        const totalReviews = reviews.length;
-        const averageRating =
-          totalReviews > 0
-            ? reviews.reduce((sum, r) => sum + r.Rating, 0) / totalReviews
-            : 0;
+        const stats = await this.reviewRedisRepo.getVariantStats(variantId);
 
-        const countByRating = reviews.reduce(
-          (acc, r) => {
-            acc[r.Rating] = (acc[r.Rating] ?? 0) + 1;
-            return acc;
-          },
-          {} as Record<number, number>
-        );
-
-        const stats: ReviewStatisticsResponse = {
+        const response: ReviewStatisticsResponse = {
           variantId,
-          totalReviews,
-          averageRating: Math.round(averageRating * 100) / 100,
-          fiveStarCount: countByRating[5] ?? 0,
-          fourStarCount: countByRating[4] ?? 0,
-          threeStarCount: countByRating[3] ?? 0,
-          twoStarCount: countByRating[2] ?? 0,
-          oneStarCount: countByRating[1] ?? 0
+          totalReviews: stats?.totalReviews || 0,
+          averageRating: stats?.averageRating || 0,
+          fiveStarCount: stats?.fiveStarCount || 0,
+          fourStarCount: stats?.fourStarCount || 0,
+          threeStarCount: stats?.threeStarCount || 0,
+          twoStarCount: stats?.twoStarCount || 0,
+          oneStarCount: stats?.oneStarCount || 0
         };
-        return { success: true, payload: stats };
+
+        return { success: true, payload: response };
       },
-      'Failed to fetch review statistics',
+      'Failed to fetch review statistics from Redis',
       true
     );
   }
@@ -346,12 +193,9 @@ export class ReviewService {
     );
   }
 
-  /** Lấy toàn bộ review không phân trang – dùng cho AI summary */
+  /** Lấy toàn bộ review không phân trang qua Redis Repository – dùng cho AI summary */
   async getReviewsUnpaged(variantId?: string): Promise<ReviewResponse[]> {
-    const reviews = await this.prisma.reviews.findMany({
-      where: variantId ? { OrderDetails: { VariantId: variantId } } : undefined,
-      include: reviewInclude
-    });
-    return reviews.map(mapToReviewResponse);
+    const reviews = await this.reviewRedisRepo.getVariantReviews(variantId!);
+    return (reviews || []).map(r => new ReviewResponse(r));
   }
 }

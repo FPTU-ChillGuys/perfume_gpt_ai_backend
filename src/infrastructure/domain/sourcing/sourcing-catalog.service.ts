@@ -23,7 +23,7 @@ export class SourcingCatalogService {
         variantId: string;
         catalogs: any[];
         error?: string;
-      }>(CATALOG_REQUEST_CHANNEL, { variantId });
+      }>(CATALOG_REQUEST_CHANNEL, 'getCatalogs', { variantId });
 
       if (response.error) {
         return {

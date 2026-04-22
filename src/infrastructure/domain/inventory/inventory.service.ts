@@ -1,8 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { Prisma } from 'generated/prisma/client';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -17,7 +15,7 @@ import { TrendLog } from 'src/domain/entities/trend-log.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Output } from 'ai';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
-import { AI_HELPER, AI_INVENTORY_REPORT_HELPER, AI_RESTOCK_HELPER } from 'src/infrastructure/domain/ai/ai.module';
+import { AI_INVENTORY_REPORT_HELPER, AI_RESTOCK_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import {
   inventoryReportPrompt,
@@ -36,6 +34,7 @@ import {
 } from 'src/application/dtos/response/ai-structured.response';
 import { restockOutput } from 'src/chatbot/output/restock.output';
 import { SourcingCatalogService } from 'src/infrastructure/domain/sourcing/sourcing-catalog.service';
+import { InventoryRedisRepository } from '../repositories/redis/inventory-redis.repository';
 
 type RestockVariantResult = {
   id: string;
@@ -62,8 +61,11 @@ type RestockLogPayload = {
 
 @Injectable()
 export class InventoryService {
+  //Them logger 
+  private readonly logger = new Logger(InventoryService.name);
+
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly inventoryRedisRepo: InventoryRedisRepository,
     private readonly unitOfWork: UnitOfWork,
     @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
@@ -82,62 +84,45 @@ export class InventoryService {
       ? [...safeData.variants]
       : [];
 
-    const criticalStocks = await this.prisma.stocks.findMany({
-      where: {
-        ProductVariants: {
-          IsDeleted: false,
-          Products: { IsDeleted: false }
-        },
-        TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold }
-      },
-      include: {
-        ProductVariants: {
-          include: {
-            Products: true,
-            Concentrations: true
-          }
-        }
-      }
+    // Only fetch genuinely critical items — LowStock or OutOfStock
+    // Using pageSize: 100 to provide enough candidates while staying safe
+    const response = await this.inventoryRedisRepo.getPagedStock({
+      isLowStock: true,
+      pageSize: 100
     });
 
-    if (criticalStocks.length === 0) {
+    const criticalItems = response?.items || [];
+    if (criticalItems.length === 0) {
       return { variants: currentVariants };
     }
 
     const existingIds = new Set(currentVariants.map((item) => item.id));
-    for (const stock of criticalStocks) {
-      if (existingIds.has(stock.VariantId)) {
-        continue;
-      }
 
-      const status = stock.ProductVariants.Status;
-      const isInactive = status === 'Inactive' || status === 'Discontinue';
+    for (const item of criticalItems) {
+      if (existingIds.has(item.variantId)) continue;
+
+      // Restore original: Inactive/Discontinued variants should not be restocked
+      const status = item.variantStatus as string;
+      const isInactive = status === 'Inactive' || status === 'Discontinued';
       const suggestedRestockQuantity = isInactive
         ? 0
-        : Math.max(stock.LowStockThreshold * 2 - stock.TotalQuantity, stock.LowStockThreshold * 2);
+        : Math.max(item.lowStockThreshold * 2 - item.totalQuantity, item.lowStockThreshold * 2);
 
       currentVariants.push({
-        id: stock.VariantId,
-        sku: stock.ProductVariants.Sku,
-        productName: stock.ProductVariants.Products.Name,
-        volumeMl: stock.ProductVariants.VolumeMl,
-        type: stock.ProductVariants.Type,
-        basePrice: Number(stock.ProductVariants.BasePrice),
-        status,
-        concentrationName: stock.ProductVariants.Concentrations.Name,
-        totalQuantity: stock.TotalQuantity,
-        reservedQuantity: stock.ReservedQuantity,
+        id: item.variantId,
+        sku: item.variantSku,
+        productName: item.productName,
+        volumeMl: item.volumeMl,
+        type: item.type || 'Standard',
+        basePrice: item.basePrice || 0,
+        status: item.variantStatus || 'Active',
+        concentrationName: item.concentrationName,
+        totalQuantity: item.totalQuantity,
+        reservedQuantity: item.reservedQuantity || 0,
         averageDailySales: 0,
         suggestedRestockQuantity
       });
     }
-
-    currentVariants.sort((left, right) => {
-      if (right.suggestedRestockQuantity !== left.suggestedRestockQuantity) {
-        return right.suggestedRestockQuantity - left.suggestedRestockQuantity;
-      }
-      return left.totalQuantity - right.totalQuantity;
-    });
 
     return { variants: currentVariants };
   }
@@ -147,69 +132,24 @@ export class InventoryService {
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
-
-        const where: Prisma.StocksWhereInput = {
-          ...(request.VariantId ? { VariantId: request.VariantId } : {}),
-          ...(request.SearchTerm
-            ? {
-              ProductVariants: {
-                Products: { Name: { contains: request.SearchTerm } }
-              }
-            }
-            : {}),
-          ...(request.IsLowStock != null
-            ? {
-              ProductVariants: {
-                Stocks: request.IsLowStock ? { isNot: null } : undefined
-              }
-            }
-            : {})
-        };
-
-        const [stocks, totalCount] = await Promise.all([
-          this.prisma.stocks.findMany({
-            where,
-            skip,
-            take,
-            include: {
-              ProductVariants: {
-                include: {
-                  Products: true,
-                  Concentrations: true
-                }
-              }
-            }
-          }),
-          this.prisma.stocks.count({ where })
-        ]);
-
-        const items: InventoryStockResponse[] = stocks.map((s) => {
-          const isLowStock = s.TotalQuantity <= s.LowStockThreshold;
-          return new InventoryStockResponse({
-            id: s.Id,
-            variantId: s.VariantId,
-            variantSku: s.ProductVariants.Sku,
-            productName: s.ProductVariants.Products.Name,
-            concentrationName: s.ProductVariants.Concentrations.Name,
-            volumeMl: s.ProductVariants.VolumeMl,
-            totalQuantity: s.TotalQuantity,
-            lowStockThreshold: s.LowStockThreshold,
-            isLowStock
-          });
+        const payload = await this.inventoryRedisRepo.getPagedStock({
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          searchTerm: request.SearchTerm,
+          isLowStock: request.IsLowStock
         });
 
         const result = new PagedResult<InventoryStockResponse>({
-          items,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
+          items: (payload?.items || []).map(s => new InventoryStockResponse(s)),
+          pageNumber: payload?.pageNumber || request.PageNumber,
+          pageSize: payload?.pageSize || request.PageSize,
+          totalCount: payload?.totalCount || 0,
+          totalPages: payload?.totalPages || 0
         });
+
         return { success: true, payload: result };
       },
-      'Failed to fetch inventory stock',
+      'Failed to fetch inventory stock from Redis',
       true
     );
   }
@@ -219,227 +159,78 @@ export class InventoryService {
   ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
-
-        const where: Prisma.BatchesWhereInput = {
-          ...(request.id ? { Id: request.id } : {}),
-          ...(request.variantId ? { VariantId: request.variantId } : {}),
-          ...(request.batchCode
-            ? { BatchCode: { contains: request.batchCode } }
-            : {}),
-          ...(request.manufactureDate
-            ? { ManufactureDate: { gte: new Date(request.manufactureDate) } }
-            : {}),
-          ...(request.expiryDate
-            ? { ExpiryDate: { lte: new Date(request.expiryDate) } }
-            : {}),
-          ...(request.importQuantity
-            ? { ImportQuantity: { gte: request.importQuantity } }
-            : {}),
-          ...(request.remainingQuantity
-            ? { RemainingQuantity: { gte: request.remainingQuantity } }
-            : {}),
-          ...(request.isExpired != null
-            ? {
-              ExpiryDate: request.isExpired
-                ? { lt: new Date() }
-                : { gte: new Date() }
-            }
-            : {}),
-          ...(request.variantSku ||
-            request.productName ||
-            request.volumeMl ||
-            request.concentrationName
-            ? {
-              ProductVariants: {
-                ...(request.variantSku
-                  ? { Sku: { contains: request.variantSku } }
-                  : {}),
-                ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
-                ...(request.productName
-                  ? { Products: { Name: { contains: request.productName } } }
-                  : {}),
-                ...(request.concentrationName
-                  ? {
-                    Concentrations: {
-                      Name: { contains: request.concentrationName }
-                    }
-                  }
-                  : {})
-              }
-            }
-            : {})
-        };
-
-        const [batches, totalCount] = await Promise.all([
-          this.prisma.batches.findMany({
-            where,
-            skip,
-            take,
-            include: {
-              ProductVariants: {
-                include: { Products: true, Concentrations: true }
-              }
-            }
-          }),
-          this.prisma.batches.count({ where })
-        ]);
-
-        const items: BatchResponse[] = batches.map(
-          (b) =>
-            new BatchResponse({
-              id: b.Id,
-              batchCode: b.BatchCode,
-              importQuantity: b.ImportQuantity,
-              remainingQuantity: b.RemainingQuantity,
-              manufactureDate: b.ManufactureDate.toISOString(),
-              expiryDate: b.ExpiryDate.toISOString(),
-              createdAt: b.CreatedAt.toISOString(),
-              variantSku: b.ProductVariants.Sku
-            })
-        );
-
-        const result = new PagedResult<BatchResponse>({
-          items,
+        const payload = await this.inventoryRedisRepo.getPagedBatches({
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
+          batchCode: request.batchCode,
+          isExpired: request.isExpired
         });
+
+        const result = new PagedResult<BatchResponse>({
+          items: (payload?.items || []).map(b => new BatchResponse(b)),
+          pageNumber: payload?.pageNumber || request.PageNumber,
+          pageSize: payload?.pageSize || request.PageSize,
+          totalCount: payload?.totalCount || 0,
+          totalPages: payload?.totalPages || 0
+        });
+
         return { success: true, payload: result };
       },
-      'Failed to fetch batches',
+      'Failed to fetch batches from Redis',
       true
     );
   }
 
-  /** Tính toán các thông số tổng quan về tồn kho (Source of Truth) */
+  /** Tính toán các thông số tổng quan về tồn kho qua Redis Repository */
   async getInventoryOverallStats() {
-    const now = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(now.getDate() + 30);
-
-    const [
-      totalSku,
-      lowStockSku,
-      outOfStockSku,
-      expiredBatches,
-      nearExpiryBatches
-    ] = await Promise.all([
-      this.prisma.productVariants.count({
-        where: { IsDeleted: false, Products: { IsDeleted: false } }
-      }),
-      this.prisma.stocks.count({
-        where: {
-          TotalQuantity: { gt: 0, lte: this.prisma.stocks.fields.LowStockThreshold },
-          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-        }
-      }),
-      this.prisma.stocks.count({
-        where: {
-          TotalQuantity: 0,
-          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-        }
-      }),
-      this.prisma.batches.count({
-        where: {
-          ExpiryDate: { lt: now },
-          RemainingQuantity: { gt: 0 },
-          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-        }
-      }),
-      this.prisma.batches.count({
-        where: {
-          ExpiryDate: { gte: now, lt: thirtyDaysFromNow },
-          RemainingQuantity: { gt: 0 },
-          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-        }
-      })
-    ]);
+    const stats = await this.inventoryRedisRepo.getOverallStats();
 
     return {
-      totalSku,
-      lowStockSku: lowStockSku + outOfStockSku, // Tổng số SKU cần chú ý tồn kho
-      outOfStockSku,
-      expiredBatches,
-      nearExpiryBatches,
-      criticalAlerts: outOfStockSku // Giả định: Hết hàng hoàn toàn là cảnh báo nghiêm trọng
+      totalSku: stats?.totalVariants || 0,
+      lowStockSku: stats?.lowStockVariantsCount || 0,
+      outOfStockSku: stats?.outOfStockVariantsCount || 0,
+      expiredBatches: stats?.expiredBatchesCount || 0,
+      nearExpiryBatches: stats?.expiringSoonCount || 0,
+      criticalAlerts: (stats?.lowStockVariantsCount || 0) + (stats?.outOfStockVariantsCount || 0)
     };
   }
 
   async createReportFromBatchAndStock(): Promise<String> {
     const stats = await this.getInventoryOverallStats();
+
+    // Fetch problematic stocks via Redis Repository
+    // pageSize reduced to 200 to prevent OOM while still providing significant data
+    const stockResponse = await this.inventoryRedisRepo.getPagedStock({
+      isLowStock: true,
+      pageSize: 200
+    });
+
+    const stocks = stockResponse?.items || [];
+
+    // Fetch batches for these variants to provide detailed info
+    const batchesByVariantId = new Map<string, any[]>();
     const now = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(now.getDate() + 30);
+    const thirtyDaysFromNow = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
 
-    // 1. Fetch all problematic variants first to ensure they are in the report
-    const problematicStocks = await this.prisma.stocks.findMany({
-      where: {
-        OR: [
-          { TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold } },
-          {
-            ProductVariants: {
-              Batches: {
-                some: {
-                  ExpiryDate: { lt: thirtyDaysFromNow },
-                  RemainingQuantity: { gt: 0 }
-                }
-              }
-            }
-          }
-        ],
-        ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-      },
-      include: {
-        ProductVariants: {
-          include: { Products: true, Concentrations: true }
+    // Parallel fetch batches with a concurrency control or just sequential for simplicity/safety
+    // sequential here to avoid hitting Redis too hard at once
+    for (const s of stocks) {
+      if (!s.variantId) continue;
+      try {
+        const bResponse = await this.inventoryRedisRepo.getPagedBatches({
+          variantId: s.variantId,
+          pageSize: 20 // Only need latest batches for report
+        });
+        if (bResponse?.items) {
+          batchesByVariantId.set(s.variantId, bResponse.items);
         }
-      }
-    });
-
-    // 2. Fetch standard list (top 1000) sorted by quantity ASC
-    const standardStocks = await this.prisma.stocks.findMany({
-      where: { ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } } },
-      orderBy: { TotalQuantity: 'asc' }, // Sắp xếp theo số lượng tồn tăng dần
-      take: 1000,
-      include: {
-        ProductVariants: {
-          include: { Products: true, Concentrations: true }
-        }
-      }
-    });
-
-    // Merge and remove duplicates
-    const mergedStocks = [...problematicStocks];
-    const existingVariantIds = new Set(mergedStocks.map(s => s.VariantId));
-
-    for (const s of standardStocks) {
-      if (!existingVariantIds.has(s.VariantId)) {
-        mergedStocks.push(s);
-        existingVariantIds.add(s.VariantId);
+      } catch (err) {
+        this.logger.error(`Failed to fetch batches for variant ${s.variantId}: ${err.message}`);
       }
     }
 
-    // 3. Fetch ALL batches for the variants in our list to ensure linking
-    const batches = await this.prisma.batches.findMany({
-      where: {
-        VariantId: { in: Array.from(existingVariantIds) },
-        RemainingQuantity: { gt: 0 }
-      },
-      orderBy: { ExpiryDate: 'asc' }
-    });
-
-    const batchesByVariantId = new Map<string, any[]>();
-    batches.forEach(b => {
-      const existing = batchesByVariantId.get(b.VariantId) || [];
-      existing.push(b);
-      batchesByVariantId.set(b.VariantId, existing);
-    });
-
     const reportLines = [
-      '# TỔNG QUAN TRẠNG THÁI KHO (Dữ liệu hệ thống chính xác)',
+      '# TỔNG QUAN TRẠNG THÁI KHO (Dữ liệu chính xác từ Redis)',
       `- Tổng số SKU: ${stats.totalSku}`,
       `- Số SKU sắp hết hoặc hết hàng: ${stats.lowStockSku}`,
       `- Số SKU hết hàng hoàn toàn: ${stats.outOfStockSku}`,
@@ -451,28 +242,29 @@ export class InventoryService {
       'Lưu ý: Danh sách dưới đây liệt kê ưu tiên các mặt hàng đang có vấn đề về tồn kho hoặc hạn dùng.'
     ];
 
-    mergedStocks.forEach(s => {
-      const variantBatches = batchesByVariantId.get(s.VariantId) || [];
+    stocks.forEach((s: any) => {
+      const variantBatches = batchesByVariantId.get(s.variantId) || [];
       let batchInfo = '- (Không có dữ liệu lô hàng còn tồn)';
 
       if (variantBatches.length > 0) {
         batchInfo = variantBatches.map(b => {
-          const isExpired = new Date(b.ExpiryDate) < now;
-          const isNearExpiry = !isExpired && new Date(b.ExpiryDate) < thirtyDaysFromNow;
+          const expiryDate = new Date(b.expiryDate);
+          const isExpired = expiryDate < now;
+          const isNearExpiry = !isExpired && expiryDate < thirtyDaysFromNow;
           let statusLabel = '';
           if (isExpired) statusLabel = ' [HẾT HẠN]';
           else if (isNearExpiry) statusLabel = ' [CẬN HẠN]';
 
-          return `- Lô ${b.BatchCode}: Hạn dùng ${b.ExpiryDate.toISOString().split('T')[0]}, Còn lại ${b.RemainingQuantity}${statusLabel}`;
+          return `- Lô ${b.batchCode}: Hạn dùng ${b.expiryDate.split('T')[0]}, Còn lại ${b.remainingQuantity}${statusLabel}`;
         }).join('\n  ');
       }
 
       reportLines.push(
-        `Sản phẩm: ${s.ProductVariants.Products.Name} (${s.ProductVariants.Concentrations.Name}, ${s.ProductVariants.VolumeMl}ml)`,
-        `SKU: ${s.ProductVariants.Sku}`,
-        `Tồn kho hiện tại: ${s.TotalQuantity}`,
-        `Ngưỡng báo động: ${s.LowStockThreshold}`,
-        `Trạng thái: ${s.TotalQuantity === 0 ? 'HẾT HÀNG' : (s.TotalQuantity <= s.LowStockThreshold ? 'SẮP HẾT HÀNG' : 'ỔN ĐỊNH')}`,
+        `Sản phẩm: ${s.productName} (${s.concentrationName}, ${s.volumeMl}ml)`,
+        `SKU: ${s.variantSku}`,
+        `Tồn kho hiện tại: ${s.totalQuantity}`,
+        `Ngưỡng báo động: ${s.lowStockThreshold}`,
+        `Trạng thái: ${s.totalQuantity === 0 ? 'HẾT HÀNG' : (s.totalQuantity <= s.lowStockThreshold ? 'SẮP HẾT HÀNG' : 'ỔN ĐỊNH')}`,
         `Thông tin lô hàng:`,
         `  ${batchInfo}`,
         '-----------------------------------'

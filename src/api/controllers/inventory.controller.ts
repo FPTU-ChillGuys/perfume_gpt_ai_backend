@@ -63,16 +63,6 @@ export class InventoryController {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) { }
 
-  /** Lấy thông tin tồn kho */
-  @Get('stock')
-  @ApiOperation({ summary: 'Lấy thông tin tồn kho' })
-  @ExtendApiBaseResponse(PagedResult, InventoryStockResponse)
-  async getInventoryStock(
-    @Query() inventoryStockRequest: InventoryStockRequest
-  ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
-    return this.inventoryService.getInventoryStock(inventoryStockRequest);
-  }
-
   /** Lấy danh sách batch */
   @Get('batches')
   @ApiOperation({ summary: 'Lấy danh sách batch' })
@@ -100,19 +90,6 @@ export class InventoryController {
   @ApiBaseResponse(String)
   async getAIInventoryReport(): Promise<BaseResponse<string>> {
     return this.inventoryService.generateAIInventoryReport();
-  }
-
-  /**
-   * Tạo báo cáo tồn kho bằng AI - Phiên bản có cấu trúc.
-   * Trả về response kèm metadata (thời gian xử lý).
-   */
-  @Get('report/ai/structured')
-  @ApiOperation({ summary: 'Tạo báo cáo tồn kho AI có cấu trúc' })
-  @ApiBaseResponse(AIInventoryReportStructuredResponse)
-  async getStructuredAIInventoryReport(): Promise<
-    BaseResponse<AIInventoryReportStructuredResponse>
-  > {
-    return this.inventoryService.generateStructuredAIInventoryReport();
   }
 
   /**

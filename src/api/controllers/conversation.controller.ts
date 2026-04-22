@@ -54,34 +54,6 @@ export class ConversationController {
     return await this.conversationService.getConversationById(id);
   }
 
-  /** Lấy danh sách cuộc hội thoại có phân trang */
-  @Role(['admin'])
-  @Get('list/paged')
-  @ApiOperation({ summary: 'Lấy danh sách cuộc hội thoại có phân trang' })
-  @ExtendApiBaseResponse(PagedResult, ConversationDto)
-  async getAllConversationsPaginated(
-    @Query() request: PagedConversationRequest
-  ): Promise<BaseResponse<PagedResult<ConversationDto>>> {
-    return await this.conversationService.getAllConversationsPaginated(request);
-  }
-
-  /** Chat V8 - sử dụng buildCombinedPromptV5 + queue_with_userid */
-  @Public()
-  @Post('chat/v8')
-  @ApiBearerAuth('jwt')
-  @ApiOperation({ summary: 'Chat V8' })
-  @ApiBaseResponse(ConversationRequestDto)
-  async conversationV8(
-    @Req() request: Request,
-    @Body() conversation: ConversationRequestDto
-  ): Promise<BaseResponse<ConversationDto>> {
-    if (!conversation.userId) {
-      conversation.userId = getTokenPayloadFromRequest(request)?.id;
-    }
-    return this.conversationService.chat(conversation);
-  }
-
-
   @Public()
   @Post('chat/v10')
   @ApiBearerAuth('jwt')

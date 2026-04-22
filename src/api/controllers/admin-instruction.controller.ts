@@ -37,7 +37,7 @@ export class AdminInstructionController {
 
   /** Lấy tất cả chỉ thị admin */
   @Get()
-  @Role(['admin', 'user'])
+  @Role(['admin'])
   @ApiOperation({ summary: 'Lấy tất cả chỉ thị admin' })
   @ApiBaseResponse(AdminInstructionResponse, true)
   async getAllInstructions(): Promise<BaseResponse<AdminInstructionResponse[]>> {
@@ -68,30 +68,6 @@ export class AdminInstructionController {
     return await this.adminInstructionService.getInstructionsByType(type);
   }
 
-  /** Gộp chỉ thị theo loại thành chuỗi prompt cho AI */
-  @Get('combined/:type')
-  @Role(['admin'])
-  @ApiOperation({ summary: 'Gộp chỉ thị theo loại thành prompt cho AI' })
-  @ApiParam({ name: 'type', description: 'Loại chỉ thị cần gộp' })
-  @ApiBaseResponse(String)
-  async getCombinedPromptByType(
-    @Param('type') type: string
-  ): Promise<BaseResponse<string>> {
-    return await this.adminInstructionService.getCombinedPromptByType(type);
-  }
-
-  /** Tạo chỉ thị mới */
-  @Post()
-  @Role(['admin'])
-  @ApiOperation({ summary: 'Tạo chỉ thị admin mới' })
-  @ApiBody({ type: CreateAdminInstructionRequest })
-  @ApiBaseResponse(AdminInstructionResponse)
-  async createInstruction(
-    @Body() request: CreateAdminInstructionRequest
-  ): Promise<BaseResponse<AdminInstructionResponse>> {
-    return await this.adminInstructionService.createInstruction(request);
-  }
-
   /** Cập nhật chỉ thị */
   @Put(':id')
   @Role(['admin'])
@@ -104,17 +80,5 @@ export class AdminInstructionController {
     @Body() request: UpdateAdminInstructionRequest
   ): Promise<BaseResponse<AdminInstructionResponse>> {
     return await this.adminInstructionService.updateInstruction(id, request);
-  }
-
-  /** Xóa chỉ thị */
-  @Delete(':id')
-  @Role(['admin'])
-  @ApiOperation({ summary: 'Xóa chỉ thị admin' })
-  @ApiParam({ name: 'id', description: 'ID của chỉ thị cần xóa' })
-  @ApiBaseResponse(Boolean)
-  async deleteInstruction(
-    @Param('id') id: string
-  ): Promise<BaseResponse<boolean>> {
-    return await this.adminInstructionService.deleteInstruction(id);
   }
 }

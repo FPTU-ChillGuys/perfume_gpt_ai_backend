@@ -43,7 +43,6 @@ export class LogController {
   ) { }
 
   /** Lấy báo cáo tất cả log hoạt động người dùng */
-  @CacheTTL(1)
   @Public()
   @Get('report/activity/all')
   @ApiOperation({ summary: 'Lấy báo cáo tất cả log hoạt động người dùng' })
@@ -87,110 +86,11 @@ export class LogController {
   }
 
   /** Lấy tất cả log hoạt động người dùng */
-  @CacheTTL(0)
   @Get('all')
   @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng' })
   @ApiBaseResponse(Array<EventLog>)
   async getAllUserLogs(): Promise<BaseResponse<EventLog[]>> {
     const response = await this.userLogService.getAllEventLogs();
-
-    return {
-      success: response.success,
-      data: response.data
-    };
-  }
-
-  /** Lấy event log dạng mới (message/search/survey) */
-  @CacheTTL(0)
-  @Get('events')
-  @ApiOperation({ summary: 'Lấy event log dạng mới' })
-  @ApiBaseResponse(Array<EventLog>)
-  async getEventLogs(
-    @Query() request: EventLogQueryRequest
-  ): Promise<BaseResponse<EventLog[]>> {
-    const response = await this.userLogService.getEventLogs(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
-  }
-
-  /** Lấy event log dạng mới có phân trang */
-  @CacheTTL(0)
-  @Get('events/paged')
-  @ApiOperation({ summary: 'Lấy event log dạng mới có phân trang' })
-  @ExtendApiBaseResponse(PagedResult, EventLog)
-  async getPagedEventLogs(
-    @Query() request: EventLogPagedQueryRequest
-  ): Promise<BaseResponse<PagedResult<EventLog>>> {
-    const response = await this.userLogService.getEventLogsPaged(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
-  }
-
-  /** Tạo event log theo contract mới */
-  @Post('events')
-  @ApiOperation({ summary: 'Tạo event log theo contract mới' })
-  @ApiBody({ type: EventLogCreateRequest })
-  @ApiBaseResponse(String)
-  async createEventLog(
-    @Body() request: EventLogCreateRequest
-  ): Promise<BaseResponse<{ id: string }>> {
-    const response = await this.userLogService.createEventLog(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
-  }
-
-  /** Thống kê nhanh event log cho dashboard */
-  @Get('events/summary')
-  @ApiOperation({ summary: 'Thống kê nhanh event log cho dashboard' })
-  @ApiBaseResponse(EventLogSummaryResponse)
-  async getEventLogsSummary(
-    @Query() request: EventLogSummaryQueryRequest
-  ): Promise<BaseResponse<EventLogSummaryResponse>> {
-    const response = await this.userLogService.getEventLogsSummary(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
-  }
-
-  /** Thống kê time-series event log cho dashboard chart */
-  @Get('events/summary/timeseries')
-  @ApiOperation({
-    summary: 'Thống kê time-series event log cho dashboard chart'
-  })
-  @ApiBaseResponse(EventLogTimeSeriesResponse)
-  async getEventLogsTimeSeries(
-    @Query() request: EventLogSummaryQueryRequest
-  ): Promise<BaseResponse<EventLogTimeSeriesResponse>> {
-    const response = await this.userLogService.getEventLogsTimeSeries(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
-  }
-
-  /** Lấy tất cả log hoạt động người dùng theo khoảng thời gian */
-  @Get('all/period')
-  @ApiOperation({
-    summary: 'Lấy tất cả log hoạt động người dùng theo khoảng thời gian'
-  })
-  @ApiBaseResponse(Array<EventLog>)
-  async getUserLogsWithPeriod(
-    @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<EventLog[]>> {
-    const response =
-      await this.userLogService.getEventLogsWithPeriod(allUserLogRequest);
 
     return {
       success: response.success,
@@ -221,34 +121,6 @@ export class LogController {
     return { success: response.success, data: response.data ?? [] };
   }
 
-
-  /** Xem chi tiết các bản tóm tắt log người dùng */
-  @Get('summaries/:userId')
-  @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
-  @ApiQuery({ name: 'period', required: false, enum: PeriodEnum })
-  @ApiQuery({ name: 'startDate', required: false, type: Date })
-  @ApiQuery({ name: 'endDate', required: false, type: Date, example: new Date() })
-  @ApiBaseResponse(UserLogSummaryResponse, true)
-  async getUserLogsSummariesById(
-    @Param('userId') userId: string,
-    @Query('period') period?: PeriodEnum,
-    @Query('endDate') endDate?: Date,
-    @Query('startDate') startDate?: Date
-  ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
-    const singleResponse = await this.userLogService.getUserLogSummaryByUserId(
-      userId,
-      period,
-      startDate,
-      endDate
-    );
-
-    return {
-      success: singleResponse.success,
-      error: singleResponse.error,
-      data: singleResponse.data ? [singleResponse.data] : []
-    };
-  }
-
   /** Xem báo cáo tóm tắt log người dùng theo ID */
   @Get('report/summary')
   @ApiOperation({ summary: 'Xem báo cáo tóm tắt log người dùng theo ID' })
@@ -269,109 +141,4 @@ export class LogController {
     return response;
   }
 
-  /** Xem báo cáo tổng hợp summary của nhiều người dùng (không lưu DB) */
-  @Get('report/summary/aggregate')
-  @ApiOperation({
-    summary: 'Tổng hợp summary của nhiều người dùng (runtime only), gồm overall và daily breakdown'
-  })
-  @ApiQuery({ name: 'period', required: false })
-  @ApiQuery({ name: 'startDate', required: false, type: Date })
-  @ApiQuery({ name: 'endDate', required: false, type: Date })
-  @ApiBaseResponse(UserLogSummaryResponse)
-  async getAggregatedUserSummaryReport(
-    @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<
-    BaseResponse<UserLogSummaryResponse>
-  > {
-    const hasTimeFilter =
-      Boolean(allUserLogRequest.startDate) ||
-      Boolean(allUserLogRequest.endDate) ||
-      Boolean(allUserLogRequest.period);
-
-    return await this.userLogService.getUserLogSummary(
-      hasTimeFilter ? allUserLogRequest : undefined
-    );
-  }
-
-  /** Tạo bản tóm tắt log người dùng thủ công */
-  @Post()
-  @ApiOperation({ summary: 'Tạo bản tóm tắt log người dùng thủ công' })
-  @ApiBody({ type: UserLogSummaryRequest })
-  @ApiBaseResponse(String)
-  async createUserLogSummary(
-    @Body() userLogRequest: UserLogSummaryRequest
-  ): Promise<BaseResponse<string>> {
-    const response = await this.userLogService.saveUserLogSummary(
-      userLogRequest.userId,
-      userLogRequest.logSummary,
-      userLogRequest.featureSnapshot,
-      userLogRequest.dailyLogSummary,
-      userLogRequest.dailyFeatureSnapshot
-    );
-
-    if (!response.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to save user log summary',
-        { userId: userLogRequest.userId }
-      );
-    }
-    return Ok('User log summary saved successfully');
-  }
-
-  /** Rebuild rolling summary cho user cụ thể từ logs */
-  @Post('rebuild-summary/:userId')
-  @ApiOperation({ summary: 'Rebuild rolling summary cho user cụ thể từ logs' })
-  @ApiBaseResponse(String)
-  async rebuildUserSummary(
-    @Param('userId') userId: string
-  ): Promise<BaseResponse<string>> {
-    try {
-      await this.userLogService.rebuildRollingSummaryForUser(userId);
-      return Ok(`Rolling summary rebuilt successfully for user: ${userId}`);
-    } catch (error) {
-      throw new InternalServerErrorWithDetailsException(
-        `Failed to rebuild summary for user: ${userId}`,
-        { userId, error: String(error) }
-      );
-    }
-  }
-
-  /** Rebuild rolling summary cho tất cả users có logs */
-  @Post('rebuild-summary-all')
-  @ApiOperation({ summary: 'Rebuild rolling summary cho tất cả users có logs' })
-  @ApiBaseResponse(String)
-  async rebuildAllUsersSummary(): Promise<BaseResponse<string>> {
-    try {
-      const userIds = await this.userLogService.getAllUserIdsFromLogs();
-
-      if (!userIds || userIds.length === 0) {
-        return Ok('No users found in logs');
-      }
-
-      let successCount = 0;
-      const failedUserIds: string[] = [];
-
-      for (const userId of userIds) {
-        try {
-          await this.userLogService.rebuildRollingSummaryForUser(userId);
-          successCount++;
-        } catch (error) {
-          failedUserIds.push(userId);
-          console.error(`Failed to rebuild summary for user ${userId}:`, error);
-        }
-      }
-
-      const summary = `Rebuilt summaries for ${successCount}/${userIds.length} users`;
-      const message = failedUserIds.length > 0
-        ? `${summary}. Failed users: ${failedUserIds.join(', ')}`
-        : summary;
-
-      return Ok(message);
-    } catch (error) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to rebuild summaries for all users',
-        { error: String(error) }
-      );
-    }
-  }
 }

@@ -5,13 +5,12 @@ import { NaturalNlpService } from './natural-nlp.service';
 import { NlpEngineService } from './nlp-engine.service';
 import { MasterDataService } from './master-data.service';
 import { PrismaModule } from 'src/prisma/prisma.module';
-import { DictionaryController } from 'src/api/controllers/dictionary.controller';
 import { VocabularySnapshotService } from './vocabulary-snapshot.service';
 
 @Module({
   imports: [PrismaModule],
   providers: [DictionaryBuilderService, WinkNlpService, NaturalNlpService, NlpEngineService, MasterDataService, VocabularySnapshotService],
-  controllers: [DictionaryController],
+  controllers: [],
   exports: [DictionaryBuilderService, WinkNlpService, NaturalNlpService, NlpEngineService],
 })
 export class DictionaryModule implements OnModuleInit {
@@ -19,7 +18,7 @@ export class DictionaryModule implements OnModuleInit {
     private readonly dictionaryBuilderService: DictionaryBuilderService,
     private readonly nlpEngineService: NlpEngineService,
     private readonly vocabularySnapshotService: VocabularySnapshotService,
-  ) {}
+  ) { }
 
   /**
    * Hook vào app startup để build dictionary + initialize winkNLP
@@ -42,7 +41,7 @@ export class DictionaryModule implements OnModuleInit {
       }
 
       console.log(`[DictionaryModule] Dictionary ready: ${snapshot.stats.totalCanonicals} canonicals, ${snapshot.stats.totalSynonyms} synonyms`);
-      
+
       // Step 2: Initialize selected NLP engine with dictionary
       await this.nlpEngineService.initializeWithDictionary();
       console.log(`[DictionaryModule] NLP engine initialized and ready (${this.nlpEngineService.getActiveEngine()})`);

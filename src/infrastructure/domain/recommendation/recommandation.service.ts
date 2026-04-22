@@ -19,7 +19,6 @@ import {
 } from 'src/infrastructure/domain/user/user.service';
 import { OrderService } from 'src/infrastructure/domain/order/order.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
-import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -143,40 +142,61 @@ export class RecommendationService {
     const limit = options.limit || 3;
     const contextType = options.contextType || 'recommendation';
 
-    // Step 1: Fetch products from Simple Recommendation (always has results)
-    let simpleResult: BaseResponse<any> | null = null;
-    if (contextType === 'repurchase' && options.orderId) {
-      simpleResult = await this.getRepurchaseRecommendationsSimple(userId, options.orderId as string, limit);
-    } else {
-      simpleResult = await this.getRecommendationsSimple(userId, limit);
-    }
-    
-    const simpleRecs: any[] = (simpleResult && simpleResult.success) ? (simpleResult.data?.recommendations ?? []) : [];
+    // 1. Fetch Candidates (Order -> Best Seller fallback)
+    const candidates = await this.fetchRecommendationCandidates(userId, { ...options, limit });
 
-    // Map to the minimal format the AI understands (same as conversationV10)
-    const minimalProducts = simpleRecs.map((rec: any) => ({
-      id: rec.productId,
-      name: rec.productName,
-      brand: rec.brand,
-      image: rec.primaryImage,
-      variants: (rec.variants || []).map((v: any) => ({
-        id: v.id,
-        volume: v.volumeMl,
-        price: v.basePrice
-      })),
-      source: rec.source ?? 'RECOMMENDATION'
-    }));
+    this.logger.log(`[${contextType.toUpperCase()}][CONTEXT_LOADED] userId=${userId} candidates=${candidates.length}`);
 
-    const tag = contextType === 'repurchase' ? '[REPURCHASE]' : '[RECOMMENDATION]';
-
-    this.logger.log(
-      `${tag}[TOON_INJECT] userId=${userId} injecting ${minimalProducts.length} products into AI context`
+    // 2. Call AI to get message and suggested products
+    const { message, productTemp } = await this.executeRecommendationAI(
+      userId,
+      systemPrompt,
+      combinedPrompt,
+      candidates,
+      options
     );
 
-    // Step 2: Build messages array with PERSONALIZATION contexts and RECOMMENDATION_CONTEXT
+    // 3. Hydrate product details
+    const emailProducts = await this.hydrateRecommendedProducts(userId, productTemp, candidates, limit);
+
+    this.logger.log(`[${contextType.toUpperCase()}][HYDRATION_DONE] userId=${userId} count=${emailProducts.length}`);
+
+    return { message, emailProducts };
+  }
+
+  /**
+   * Bước 1: Lấy danh sách ứng viên từ Multi-Query Retrieval
+   */
+  private async fetchRecommendationCandidates(
+    userId: string,
+    options: { contextType?: string; orderId?: string; limit?: number }
+  ): Promise<any[]> {
+    const limit = options.limit || 3;
+    const contextType = options.contextType || 'recommendation';
+
+    let result: BaseResponse<any> | null = null;
+    if (contextType === 'repurchase' && options.orderId) {
+      result = await this.getRepurchaseRecommendationsSimple(userId, options.orderId, limit);
+    } else {
+      result = await this.getRecommendationsSimple(userId, limit);
+    }
+
+    return (result && result.success) ? (result.data?.recommendations ?? []) : [];
+  }
+
+  /**
+   * Bước 2: Chuẩn bị context (TOON) và gọi AI
+   */
+  private async executeRecommendationAI(
+    userId: string,
+    systemPrompt: string,
+    combinedPrompt: string,
+    candidates: any[],
+    options: { personalizationPayload?: any }
+  ): Promise<{ message: string; productTemp: any[] }> {
     const messages: UIMessage[] = [];
 
-    // Inject Persona Context if available (Point 2: Pattern Conversation V10)
+    // Inject Personalization context (Profile & Order history summary)
     if (options.personalizationPayload) {
       const p = options.personalizationPayload;
       const sourcePriority = Array.isArray(p.sourcePriority) ? p.sourcePriority.join(' > ') : 'INPUT > ORDER > PROFILE';
@@ -190,58 +210,60 @@ export class RecommendationService {
       if (profileToon) messages.push({ id: uuid(), role: 'system', parts: [{ type: 'text', text: `PROFILE_CONTEXT_TOON: ${profileToon}` }] });
     }
 
-    const encodedContext = encodeToolOutput(minimalProducts);
-    const encoded = encodedContext.encoded;
-    
-    this.logger.log(
-      `${tag}[TOON_ENCODED] size=${encoded.length}/${encodedContext.originalSize} ratio=${encodedContext.compressionRatio}%`
-    );
+    // Prepare RECOMMENDATION_CONTEXT (The specific items we want the AI to consider)
+    const minimalProducts = candidates.map((rec: any) => ({
+      id: rec.productId,
+      name: rec.productName,
+      brand: rec.brand,
+      image: rec.primaryImage,
+      variants: (rec.variants || []).map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
+      source: rec.source ?? 'RECOMMENDATION'
+    }));
 
+    const encodedContext = encodeToolOutput(minimalProducts);
     messages.push({
       id: uuid(),
-      role: 'system' as const,
-      parts: [{ type: 'text', text: `RECOMMENDATION_CONTEXT: ${encoded}` }]
+      role: 'system',
+      parts: [{ type: 'text', text: `RECOMMENDATION_CONTEXT: ${encodedContext.encoded}` }]
     });
 
     messages.push({
       id: uuid(),
-      role: 'user' as const,
+      role: 'user',
       parts: [{ type: 'text', text: combinedPrompt }]
     });
 
-    // Step 3: Call AI main with textGenerateFromMessages
-    const aiResponse = await this.aiHelper.textGenerateFromMessages(
-      messages,
-      systemPrompt,
-      Output.object(searchOutput)
-    );
+    const aiRes = await this.aiHelper.textGenerateFromMessages(messages, systemPrompt, Output.object(searchOutput));
+    const raw = aiRes.success ? aiRes.data ?? '' : '';
 
-    const rawMessage = aiResponse.success ? aiResponse.data ?? '' : '';
-    this.logger.log(`${tag}[AI_RAW] length=${rawMessage.length} preview=${String(rawMessage).slice(0, 120)}`);
-
-    let parsedAI: { message?: string; productTemp?: any[]; products?: any[] } = {};
+    let parsed: any = {};
     try {
-      parsedAI = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
+      parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     } catch {
-      parsedAI = { message: rawMessage };
+      parsed = { message: raw };
     }
 
-    const aiMessage = parsedAI.message ?? '';
+    const productTemp = Array.isArray(parsed.productTemp) && parsed.productTemp.length > 0
+      ? parsed.productTemp
+      : (Array.isArray(parsed.products) ? parsed.products : []);
 
-    // Step 4: Hydrate productTemp exactly like conversationV10, but fallback to "products" 
-    // because the instruction prompts often tell the AI to use the "products" array.
-    let emailProducts: EmailProduct[] = [];
-    let productTemp = Array.isArray(parsedAI.productTemp) && parsedAI.productTemp.length > 0
-      ? parsedAI.productTemp
-      : (Array.isArray(parsedAI.products) ? parsedAI.products : []);
+    return { message: parsed.message ?? '', productTemp };
+  }
 
-    this.logger.log(`${tag}[PRODUCT_TEMP] productTempCount=${productTemp.length} ids=[${productTemp.map((p:any) => p.id).join(',')}]`);
-
+  /**
+   * Bước 3: Lấy thông tin chi tiết sản phẩm và map sang EmailProduct
+   */
+  private async hydrateRecommendedProducts(
+    userId: string,
+    productTemp: any[],
+    candidates: any[],
+    limit: number
+  ): Promise<EmailProduct[]> {
     if (productTemp.length > 0) {
-      const ids = productTemp.map((item: any) => item.id).filter((id: any) => !!id);
+      const ids = productTemp.map((p: any) => p.id).filter(Boolean);
       if (ids.length > 0) {
-        const productResponse = await this.productService.getProductsByIdsForOutput(ids);
-        if (productResponse.success && Array.isArray(productResponse.data)) {
+        const res = await this.productService.getProductsByIdsForOutput(ids);
+        if (res.success && Array.isArray(res.data)) {
           const recommendationsMap = new Map<string, Set<string>>();
           productTemp.forEach((item: any) => {
             if (item.id && Array.isArray(item.variants)) {
@@ -249,14 +271,11 @@ export class RecommendationService {
             }
           });
 
-          emailProducts = productResponse.data
+          return res.data
             .map((product) => {
               const allowedVariantIds = recommendationsMap.get(product.id);
-              const variants = (product.variants || []).filter(v =>
-                !allowedVariantIds || allowedVariantIds.has(v.id)
-              );
-              if (variants.length === 0) return null;
-              return this.mapProductCardOutputToEmailProduct(product, variants);
+              const variants = (product.variants || []).filter(v => !allowedVariantIds || allowedVariantIds.has(v.id));
+              return variants.length > 0 ? this.mapToEmailProduct(product, variants) : null;
             })
             .filter((p): p is EmailProduct => p !== null)
             .slice(0, limit);
@@ -264,50 +283,47 @@ export class RecommendationService {
       }
     }
 
-    // If AI didn't produce productTemp or hydration failed, fall back to the Simple products directly
-    if (emailProducts.length === 0 && simpleRecs.length > 0) {
-      this.logger.warn(
-        `[RecommendationService][V10_PATTERN] userId=${userId} productTemp hydration failed, falling back to Simple products directly`
-      );
-      const ids = simpleRecs.map((r: any) => r.productId).filter(Boolean);
-      const productResponse = await this.productService.getProductsByIdsForOutput(ids);
-      if (productResponse.success && Array.isArray(productResponse.data)) {
-        emailProducts = productResponse.data
-          .map((product) => this.mapProductCardOutputToEmailProduct(product, product.variants || []))
-          .slice(0, limit);
-      }
+    // Fallback: Dùng candidates trực tiếp nếu AI không đưa ra gợi ý hợp lệ
+    this.logger.warn(`[RecommendationService] userId=${userId} hydration fallback to candidates`);
+    const fallbackIds = candidates.map((r: any) => r.productId).filter(Boolean);
+    const fallbackRes = await this.productService.getProductsByIdsForOutput(fallbackIds);
+    
+    if (fallbackRes.success && Array.isArray(fallbackRes.data)) {
+      return fallbackRes.data
+        .map((p) => this.mapToEmailProduct(p, p.variants || []))
+        .slice(0, limit);
     }
 
-    this.logger.log(`${tag}[HYDRATION_DONE] emailProductsCount=${emailProducts.length} ids=[${emailProducts.map(p => p.id).join(',')}]`);
-
-    return { message: aiMessage, emailProducts };
+    return [];
   }
 
   /**
-   * Maps a ProductCardOutputItem to a EmailProduct for use in email templates.
+   * Unified mapping logic for EmailProduct
    */
-  private mapProductCardOutputToEmailProduct(
-    product: import('src/chatbot/output/product.output').ProductCardOutputItem,
-    variants: any[]
+  private mapToEmailProduct(
+    product: any,
+    variants: any[],
+    fallbackDescription?: string
   ): EmailProduct {
     return {
-      id: product.id,
-      name: product.name,
-      description: 'Hương nước hoa được gợi ý theo hồ sơ của bạn.',
-      brandName: product.brandName ?? 'Unknown',
-      categoryName: 'Perfume',
-      primaryImage: product.primaryImage ?? undefined,
+      id: product.id || product.Id,
+      name: product.name || product.Name,
+      description: product.description || product.Description || fallbackDescription || 'Hương nước hoa được gợi ý theo hồ sơ của bạn.',
+      brandName: product.brandName || (product.Brands?.Name) || 'Unknown',
+      categoryName: product.categoryName || (product.Categories?.Name) || 'Perfume',
+      primaryImage: product.primaryImage || (product.Media?.[0]?.Url) || undefined,
       variants: variants.slice(0, 3).map((v: any) => ({
-        id: v.id,
-        sku: v.sku ?? 'N/A',
-        volumeMl: Number(v.volumeMl),
-        type: 'Standard',
-        basePrice: Number(v.basePrice),
-        status: 'Active',
-        concentrationName: 'N/A'
+        id: v.id || v.Id,
+        sku: v.sku || v.Sku || 'N/A',
+        volumeMl: Number(v.volumeMl || v.VolumeMl),
+        type: v.type || v.Type || 'Standard',
+        basePrice: Number(v.basePrice || v.BasePrice),
+        status: v.status || v.Status || 'Active',
+        concentrationName: v.concentration?.name || v.Concentrations?.Name || 'N/A'
       }))
     };
   }
+
 
   async generateRecommendationText(userId: string): Promise<BaseResponse<string>> {
     const promptResult = await buildCombinedPromptV5(
@@ -394,48 +410,7 @@ export class RecommendationService {
     return attachResult.products as EmailProduct[];
   }
 
-  private mapProductToEmailProduct(
-    product: ProductWithVariantsResponse,
-    fallbackVariant?: { variantId?: string; basePrice?: number }
-  ): EmailProduct {
-    const activeVariants = (product.variants ?? []).filter(
-      (variant) => variant.status?.toLowerCase() === 'active'
-    );
-    const sourceVariants =
-      activeVariants.length > 0 ? activeVariants : product.variants ?? [];
 
-    const variants = sourceVariants.slice(0, 3).map((variant) => ({
-      id: variant.id,
-      sku: variant.sku,
-      volumeMl: variant.volumeMl,
-      type: variant.type,
-      basePrice: Number(variant.basePrice),
-      status: variant.status,
-      concentrationName: variant.concentration?.name ?? 'N/A'
-    }));
-
-    if (variants.length === 0 && fallbackVariant?.basePrice !== undefined) {
-      variants.push({
-        id: fallbackVariant.variantId ?? 'fallback-variant',
-        sku: 'N/A',
-        volumeMl: 50,
-        type: 'Standard',
-        basePrice: Number(fallbackVariant.basePrice),
-        status: 'Active',
-        concentrationName: 'N/A'
-      });
-    }
-
-    return {
-      id: product.id,
-      name: product.name,
-      description: product.description || 'Hương nước hoa được gợi ý theo hồ sơ của bạn.',
-      brandName: product.brandName,
-      categoryName: product.categoryName || 'Perfume',
-      primaryImage: product.primaryImage ?? undefined,
-      variants
-    };
-  }
 
   private async buildDailyEmailProductsFromV3(
     userId: string

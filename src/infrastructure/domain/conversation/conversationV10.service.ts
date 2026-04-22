@@ -61,6 +61,54 @@ export class ConversationV10Service {
     @Inject(AI_STAFF_CONVERSATION_HELPER) private readonly staffAiHelper: AIHelper
   ) {}
 
+  // -------------------------------------------------------------------------
+  // PUBLIC API
+  // -------------------------------------------------------------------------
+
+  async chat(
+    conversation: ConversationRequestDto
+  ): Promise<BaseResponse<ConversationDto>> {
+    const isGuestUser = !conversation.userId;
+    const userId = conversation.userId ?? uuid();
+    const convertedMessages: UIMessage[] = convertToMessages(conversation.messages || []);
+
+    const instructionType = conversation.isStaff
+      ? INSTRUCTION_TYPE_STAFF_CONSULTATION
+      : INSTRUCTION_TYPE_CONVERSATION;
+
+    const promptResult = await buildCombinedPromptV5(
+      instructionType,
+      this.adminInstructionService,
+      userId
+    );
+
+    if (!promptResult.success || !promptResult.data) {
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          conversationId: conversation.id,
+          service: 'PromptBuilder',
+          endpoint: 'chat/v10'
+        }
+      );
+    }
+
+    const responseConversation = await this.processAiChatResponse(
+      convertedMessages,
+      conversation.messages || [],
+      conversation.id || '',
+      userId,
+      promptResult.data.adminInstruction,
+      promptResult.data.combinedPrompt,
+      'chat/v10',
+      isGuestUser,
+      conversation.isStaff || false
+    );
+
+    return Ok(responseConversation);
+  }
+
   async addConversation(
     conversationRequest: ConversationDto
   ): Promise<BaseResponse<ConversationDto>> {
@@ -164,18 +212,6 @@ export class ConversationV10Service {
     }, 'Failed to get conversation by id');
   }
 
-  private getLastMessage(messages: Message[]): Message | undefined {
-    if (!messages.length) {
-      return undefined;
-    }
-    return messages[messages.length - 1];
-  }
-
-  async isExistConversation(id: string): Promise<boolean> {
-    const conversation = await this.unitOfWork.AIConversationRepo.findOne({ id });
-    return conversation !== null && conversation !== undefined;
-  }
-
   async getAllConversations(): Promise<BaseResponse<ConversationDto[]>> {
     return await funcHandlerAsync(
       async () => {
@@ -242,12 +278,407 @@ export class ConversationV10Service {
     }
   }
 
+  async isExistConversation(id: string): Promise<boolean> {
+    const conversation = await this.unitOfWork.AIConversationRepo.findOne({ id });
+    return conversation !== null && conversation !== undefined;
+  }
+
+  // -------------------------------------------------------------------------
+  // MAIN ORCHESTRATION
+  // -------------------------------------------------------------------------
+
+  private async processAiChatResponse(
+    convertedMessages: UIMessage[],
+    conversationMessages: any[],
+    conversationId: string,
+    userId: string,
+    adminInstruction: string | undefined,
+    combinedPrompt: string,
+    endpoint: string,
+    isGuestUser: boolean,
+    isStaff: boolean
+  ): Promise<ConversationDto> {
+    
+    // 1. Phân tích ý định & bối cảnh
+    const { messageText, previousContext } = this.extractMessageContext(convertedMessages);
+    const finalAnalysis = await this.performInitialAnalysis(messageText, previousContext, userId, isGuestUser, isStaff);
+
+    // 2. Chuẩn bị thông điệp bổ trợ
+    let finalMessages = await this.prepareContextMessages(userId, isGuestUser, finalAnalysis, convertedMessages);
+
+    // 3. Thực thi truy xuất dữ liệu & Actions
+    const { products, taskResults, hasResults } = await this.fetchChatContextData(finalAnalysis, userId, isGuestUser);
+    
+    // Thêm log các hành động (giỏ hàng, đơn hàng) vào tin nhắn context
+    finalMessages.push(...taskResults);
+
+    // Thêm kết quả tìm kiếm sản phẩm vào tin nhắn context
+    if (products.length > 0) {
+      finalMessages.push(this.createSystemMessage(`SEARCH_RESULTS: ${encodeToolOutput(products).encoded}`));
+    }
+
+    // 4. Xử lý logic cảnh báo & fallback
+    finalMessages = this.applyFlowWarnings(finalAnalysis, hasResults, isGuestUser, finalMessages);
+
+    // 5. Sinh phản hồi AI
+    const aiResponseRaw = await this.generateAiResponse(finalMessages, adminInstruction, combinedPrompt, isStaff, {
+      userId, conversationId, endpoint
+    });
+
+    // 6. Làm giàu dữ liệu sản phẩm (Hydration)
+    const hydratedAiResponse = await this.hydrateProductDisplayData(aiResponseRaw, finalAnalysis);
+
+    // 7. Lưu trữ tin nhắn & Queue xử lý ngầm
+    return await this.finalizeAndQueueResponse(hydratedAiResponse, conversationId, userId, conversationMessages);
+  }
+
+  // -------------------------------------------------------------------------
+  // PRIVATE HELPERS: STEP 1 - ANALYSIS
+  // -------------------------------------------------------------------------
+
+  private extractMessageContext(messages: UIMessage[]) {
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === 'user');
+    const messageText = lastUserMessage?.parts.find((part) => part.type === 'text')?.text || '';
+
+    const previousContext = messages
+      .filter((message) => message !== lastUserMessage)
+      .map(
+        (message) => `${message.role}: ${message.parts.find((part) => part.type === 'text')?.text || ''}`
+      )
+      .join('\n');
+
+    return { messageText, previousContext };
+  }
+
+  private async performInitialAnalysis(
+    messageText: string,
+    previousContext: string,
+    userId: string,
+    isGuestUser: boolean,
+    isStaff: boolean
+  ): Promise<AnalysisObject> {
+    this.logger.log(`[processAiChatResponseV10] Analyzing user intent: "${messageText.substring(0, 80)}..."`);
+
+    const rawAnalysis = await this.analysisService.analyze(messageText, previousContext, {
+      userId,
+      isGuestUser,
+      isStaff
+    }) || this.createFallbackAnalysis(messageText);
+
+    const finalAnalysis = this.normalizeAnalysisForQuery(rawAnalysis);
+
+    this.logger.log(
+      `[processAiChatResponseV10] Analysis -> Intent: ${finalAnalysis.intent}, queries: ${finalAnalysis.queries?.length ?? 0}, legacyFunc: ${finalAnalysis.functionCall?.name || 'None'}`
+    );
+
+    return finalAnalysis;
+  }
+
+  // -------------------------------------------------------------------------
+  // PRIVATE HELPERS: STEP 2 - CONTEXT PREPARATION
+  // -------------------------------------------------------------------------
+
+  private async prepareContextMessages(
+    userId: string,
+    isGuestUser: boolean,
+    finalAnalysis: AnalysisObject,
+    baseMessages: UIMessage[]
+  ): Promise<UIMessage[]> {
+    const messages = [...baseMessages];
+
+    const personalizationToonMessages = await this.buildPersonalizationToonMessages(
+      userId,
+      isGuestUser,
+      finalAnalysis
+    );
+
+    if (personalizationToonMessages.length > 0) {
+      messages.push(...personalizationToonMessages);
+    }
+
+    messages.push(this.createSystemMessage(`NORMALIZED_QUERY_ANALYSIS: ${JSON.stringify(finalAnalysis)}`));
+
+    return messages;
+  }
+
+  // -------------------------------------------------------------------------
+  // PRIVATE HELPERS: STEP 3 - DATA FETCHING & TOOL EXECUTION
+  // -------------------------------------------------------------------------
+
+  private async fetchChatContextData(
+    analysis: AnalysisObject,
+    userId: string,
+    isGuestUser: boolean
+  ): Promise<{ products: any[], taskResults: UIMessage[], hasResults: boolean }> {
+    
+    let products: any[] = [];
+    const taskResults: UIMessage[] = [];
+    const pageSize = analysis.pagination?.pageSize || 5;
+
+    // A. Xử lý Multi-Query Decomposition (Ưu tiên path mới)
+    if (Array.isArray(analysis.queries) && analysis.queries.length > 0) {
+      this.logger.log(`[processAiChatResponseV10] Executing MULTI-QUERY path (${analysis.queries.length} items)`);
+      const res = await this.executeMultiQueries(analysis.queries, analysis, userId, isGuestUser, pageSize);
+      products = res.mergedProducts;
+      taskResults.push(...res.taskResults);
+    } 
+    // B. Xử lý Legacy Function Call
+    else if (analysis.functionCall) {
+      this.logger.log(`[processAiChatResponseV10] Executing LEGACY path: ${analysis.functionCall.name}`);
+      const res = await this.executeLegacyFunctionCall(analysis.functionCall, analysis, userId, isGuestUser);
+      products = res.products;
+      if (res.actionResult) taskResults.push(res.actionResult);
+    } 
+    // C. Xử lý Search thuần túy (Nếu không có tool/multi-query đặc biệt)
+    else if (['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)) {
+      this.logger.log(`[processAiChatResponseV10] Executing base structured search`);
+      const searchRes = await this.productService.getProductsByStructuredQuery(analysis);
+      if (searchRes.success && searchRes.data) {
+        products = searchRes.data.items.map(p => this.mapToMinimalProduct(p, 'SEARCH_RESULTS'));
+      }
+    }
+
+    // D. Xử lý Fallback Best Seller (Nếu các bước trên không có kết quả)
+    const hasResults = products.length > 0;
+    const isObjective = this.isObjectiveOrGiftFlow(analysis);
+    const shouldFallback = (this.hasAnalysisFlag(analysis, 'PURE_TREND_QUERY') || isGuestUser) && !hasResults;
+
+    if (shouldFallback) {
+      const fallbackMsg = await this.buildBestSellerFallbackMessage(5);
+      if (fallbackMsg) taskResults.push(fallbackMsg);
+    }
+
+    return { products, taskResults, hasResults: hasResults || taskResults.some(m => m.parts.some(p => p.type === 'text' && p.text.includes('FALLBACK'))) };
+  }
+
+  private async executeLegacyFunctionCall(
+    call: any,
+    analysis: AnalysisObject,
+    userId: string,
+    isGuestUser: boolean
+  ): Promise<{ products: any[], actionResult: UIMessage | null }> {
+    const funcName = call.name;
+    const purpose = call.purpose;
+    const args = call.arguments || {};
+
+    // 1. Xử lý Action Tool (Giỏ hàng, Đơn hàng, v.v.)
+    if (['addToCart', 'getCart', 'clearCart', 'getOrdersByUserId', 'getUserLogSummaryByUserId', 'getStaticProductPolicy'].includes(funcName)) {
+      const actionResult = await this.executeActionTool(funcName, args, userId, isGuestUser);
+      return { products: [], actionResult };
+    }
+
+    // 2. Xử lý Product-returning Tool (Best Seller)
+    if (funcName === 'getBestSellingProducts') {
+      let targetItems: any[] = [];
+      const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
+      if (res.success && res.data) targetItems = res.data.items.map(i => i.product);
+
+      let products: any[] = [];
+      if (purpose === 'main') {
+        products = targetItems.slice(0, analysis.pagination?.pageSize || 5);
+      } else if (purpose === 'support') {
+        const searchRes = await this.productService.getProductsByStructuredQuery({ ...analysis, pagination: { pageNumber: 1, pageSize: 50 } });
+        const queryProducts = searchRes.success && searchRes.data ? searchRes.data.items : [];
+        
+        if (targetItems.length > 0 && queryProducts.length > 0) {
+          const queryIds = new Set(queryProducts.map(p => p.id));
+          const intersection = targetItems.filter(p => queryIds.has(p.id));
+          products = intersection.length > 0 ? intersection : queryProducts;
+        } else {
+          products = queryProducts;
+        }
+        products = products.slice(0, analysis.pagination?.pageSize || 5);
+      }
+
+      const minimal = products.map(p => {
+         const mapped = this.mapToMinimalProduct(p, 'FUNCTION_RESULTS');
+         // Apply budget filter
+         if (analysis.budget && (analysis.budget.min !== null || analysis.budget.max !== null)) {
+            const { min, max } = analysis.budget;
+            mapped.variants = mapped.variants.filter(v => (min === null || v.price >= min) && (max === null || v.price <= max));
+         }
+         return mapped;
+      }).filter(p => p.variants.length > 0);
+
+      return { products: minimal, actionResult: null };
+    }
+
+    return { products: [], actionResult: null };
+  }
+
+  private async executeActionTool(
+    funcName: string,
+    args: any,
+    userId: string,
+    isGuestUser: boolean
+  ): Promise<UIMessage> {
+    if (isGuestUser) {
+      return this.createSystemMessage(
+        `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Tính năng ${funcName} yêu cầu đăng nhập. BẮT BUỘC phản hồi: xin lỗi vì chưa đăng nhập nên không thể thực hiện, và hướng dẫn họ đăng nhập.`
+      );
+    }
+
+    let res: any;
+    try {
+      if (funcName === 'addToCart') {
+        const items = Array.isArray(args.items) ? args.items : [];
+        res = await Promise.all(items.map(async (i: any) => {
+          if (!i.variantId) return { success: false, error: 'Missing variantId' };
+          const addRes = await this.cartService.addToCart(userId, { variantId: i.variantId, quantity: i.quantity || 1 });
+          return { variantId: i.variantId, success: addRes.success, error: addRes.error };
+        }));
+      } else if (funcName === 'getCart') {
+        const cartRes = await this.cartService.getCart(userId);
+        res = cartRes.success ? cartRes.data : cartRes.error;
+      } else if (funcName === 'clearCart') {
+        const clearRes = await this.cartService.clearCart(userId);
+        res = clearRes.success ? 'Cart Cleared' : clearRes.error;
+      } else if (funcName === 'getOrdersByUserId') {
+        const orderRes = await this.orderService.getOrdersByUserId(userId, { PageNumber: 1, PageSize: 5, SortOrder: 'desc', IsDescending: true });
+        const items = (orderRes as any).data?.items || (orderRes as any).items || [];
+        res = items.map((i: any) => ({ id: i.id, code: i.code, status: i.status, total: i.totalAmount }));
+      } else {
+        res = 'Function partially supported or informational only.';
+      }
+    } catch (err) {
+      this.logger.error(`[executeActionTool] Error executing ${funcName}`, err);
+      res = `Error: ${err instanceof Error ? err.message : 'Unknown error'}`;
+    }
+
+    return this.createSystemMessage(`FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`);
+  }
+
+  // -------------------------------------------------------------------------
+  // PRIVATE HELPERS: STEP 4 - AI GENERATION
+  // -------------------------------------------------------------------------
+
+  private async generateAiResponse(
+    messages: UIMessage[],
+    adminInstruction: string | undefined,
+    combinedPrompt: string,
+    isStaff: boolean,
+    context: { userId: string, conversationId: string, endpoint: string }
+  ) {
+    const systemPrompt = conversationSystemPrompt(adminInstruction || '', combinedPrompt);
+    const activeAiHelper = isStaff ? this.staffAiHelper : this.aiHelper;
+
+    const message = await activeAiHelper.textGenerateFromMessages(
+      messages,
+      systemPrompt,
+      Output.object(conversationOutput),
+      undefined
+    );
+
+    if (!message.success || !message.data) {
+      throw new InternalServerErrorWithDetailsException('Failed to get structured AI response', { ...context, service: 'AIHelper' });
+    }
+
+    return typeof message.data === 'string' ? JSON.parse(message.data) : message.data;
+  }
+
+  private applyFlowWarnings(analysis: AnalysisObject, hasResults: boolean, isGuestUser: boolean, messages: UIMessage[]): UIMessage[] {
+    const results = [...messages];
+    const isObjective = this.isObjectiveOrGiftFlow(analysis);
+    const shouldQuery = ['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent);
+
+    // 1. Cảnh báo dữ liệu rỗng
+    if (!hasResults && shouldQuery) {
+      results.push(this.createSystemMessage(
+        'EMPTY_RESULTS_WARNING: Dữ liệu (SEARCH_RESULTS) hoàn toàn rỗng! BẮT BUỘC phản hồi là "hiện tại cửa hàng không tìm thấy sản phẩm nào phù hợp". TUYỆT ĐỐI KHÔNG ĐƯỢC tự bịa.'
+      ));
+    }
+
+    // 2. Cảnh báo thiếu Profile
+    if (!isObjective && this.hasAnalysisFlag(analysis, 'PROFILE_ENRICHMENT_SKIPPED')) {
+      const warningText = isGuestUser 
+        ? 'GUEST_USER_PROMPT: Khách chưa đăng nhập. Nhắc khách đăng nhập để cá nhân hóa, nhưng vẫn tư vấn bình thường nếu có kết quả.'
+        : 'PROFILE_UPDATE_REQUIRED: Nhắc người dùng cập nhật profile (sở thích, survey) nhưng vẫn đưa gợi ý nếu có kết quả.';
+      results.push(this.createSystemMessage(warningText));
+    }
+
+    return results;
+  }
+
+  // -------------------------------------------------------------------------
+  // PRIVATE HELPERS: STEP 5 - HYDRATION
+  // -------------------------------------------------------------------------
+
+  private async hydrateProductDisplayData(aiResponse: any, analysis: AnalysisObject) {
+    if (!aiResponse.productTemp || !Array.isArray(aiResponse.productTemp) || aiResponse.productTemp.length === 0) {
+      return aiResponse;
+    }
+
+    const ids = aiResponse.productTemp.map((item: any) => item.id).filter((id: string) => !!id);
+    if (ids.length === 0) return aiResponse;
+
+    const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+    if (!productResponse.success || !productResponse.data) return aiResponse;
+
+    const hydratedProducts = productResponse.data;
+    const recommendationsMap = new Map<string, string[]>();
+    aiResponse.productTemp.forEach((item: any) => {
+      if (item.id && Array.isArray(item.variants)) {
+        recommendationsMap.set(item.id, item.variants.map((v: any) => v.id));
+      }
+    });
+
+    aiResponse.products = hydratedProducts.map((product) => {
+      const selectedVariantIds = new Set(recommendationsMap.get(product.id) || []);
+      if (selectedVariantIds.size === 0) return product;
+
+      return {
+        ...product,
+        variants: (product.variants || []).filter((variant) => {
+          const matchesAi = selectedVariantIds.has(variant.id);
+          if (!matchesAi) return false;
+
+          // Re-enforce budget safety check
+          if (analysis.budget && (analysis.budget.min !== null || analysis.budget.max !== null)) {
+            const { min, max } = analysis.budget;
+            const price = variant.basePrice;
+            return (min === null || price >= (min as number)) && (max === null || price <= (max as number));
+          }
+          return true;
+        })
+      };
+    }).filter((p) => p.variants && p.variants.length > 0);
+
+    return aiResponse;
+  }
+
+  // -------------------------------------------------------------------------
+  // PRIVATE HELPERS: STEP 6 - FINALIZATION
+  // -------------------------------------------------------------------------
+
+  private async finalizeAndQueueResponse(aiResponse: any, conversationId: string, userId: string, conversationMessages: any[]) {
+    const finalMessageData = JSON.stringify(aiResponse);
+
+    const responseConversation = overrideMessagesToConversation(
+      conversationId,
+      userId,
+      addMessageToMessages(finalMessageData, conversationMessages)
+    );
+
+    await this.conversationQueue.add(ConversationJobName.ADD_MESSAGE_AND_LOG, {
+      responseConversation,
+      userId
+    });
+
+    return responseConversation;
+  }
+
+  // -------------------------------------------------------------------------
+  // UTILS & LEGACY WRAPPERS (Preserved logic)
+  // -------------------------------------------------------------------------
+
+  private getLastMessage(messages: Message[]): Message | undefined {
+    return messages.length ? messages[messages.length - 1] : undefined;
+  }
+
   private createSystemMessage(text: string): UIMessage {
-    return {
-      id: uuid(),
-      role: 'system',
-      parts: [{ type: 'text', text }]
-    };
+    return { id: uuid(), role: 'system', parts: [{ type: 'text', text }] };
   }
 
   private createFallbackAnalysis(messageText: string): AnalysisObject {
@@ -267,140 +698,60 @@ export class ConversationV10Service {
   }
 
   private normalizeAnalysisForQuery(analysis: AnalysisObject): AnalysisObject {
-    const normalizedLogic = Array.isArray(analysis.logic) ? analysis.logic : [];
-    const normalizedProductNames = Array.isArray(analysis.productNames)
-      ? Array.from(new Set(analysis.productNames)).slice(0, 8)
-      : [];
-
     return {
       ...analysis,
-      functionCall: analysis.functionCall || null,
-      logic: normalizedLogic,
-      productNames: normalizedProductNames.length > 0 ? normalizedProductNames : null,
+      logic: Array.isArray(analysis.logic) ? analysis.logic : [],
+      productNames: Array.isArray(analysis.productNames) ? Array.from(new Set(analysis.productNames)).slice(0, 8) : null,
       pagination: analysis.pagination || { pageNumber: 1, pageSize: 5 }
     };
   }
 
   private hasAnalysisFlag(analysis: AnalysisObject, flag: string): boolean {
-    const explanation = (analysis.explanation || '').toUpperCase();
-    return explanation.includes(flag.toUpperCase());
+    return (analysis.explanation || '').toUpperCase().includes(flag.toUpperCase());
   }
 
   private isObjectiveOrGiftFlow(analysis: AnalysisObject): boolean {
-    return (
-      this.hasAnalysisFlag(analysis, 'PURE_TREND_QUERY') ||
-      this.hasAnalysisFlag(analysis, 'OBJECTIVE_CATALOG_QUERY') ||
-      this.hasAnalysisFlag(analysis, 'GIFT_INTENT')
-    );
+    return this.hasAnalysisFlag(analysis, 'PURE_TREND_QUERY') ||
+           this.hasAnalysisFlag(analysis, 'OBJECTIVE_CATALOG_QUERY') ||
+           this.hasAnalysisFlag(analysis, 'GIFT_INTENT');
   }
 
   private async buildBestSellerFallbackMessage(limit: number = 5): Promise<UIMessage | null> {
-    const fallback = await this.productService.getBestSellingProducts({
-      PageNumber: 1,
-      PageSize: limit,
-      SortOrder: 'desc',
-      IsDescending: true
-    });
+    const fallback = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: limit, SortOrder: 'desc', IsDescending: true });
+    if (!fallback.success || !fallback.data) return null;
 
-    if (!fallback.success || !fallback.data) {
-      return null;
-    }
+    const minimal = (fallback.data.items || []).map((item: any) => ({
+      ...this.mapToMinimalProduct(item.product, 'BEST_SELLER_FALLBACK'),
+      totalSoldQuantity: item.totalSoldQuantity
+    }));
 
-    const minimalProducts = (fallback.data.items || []).map((item: any) => {
-      const product = item.product;
-      return {
-        id: product.id,
-        name: product.name,
-        brand: product.brandName,
-        category: product.categoryName,
-        image: product.primaryImage,
-        attributes: (product.attributes || []).map(
-          (attr: any) => `${attr.attribute}: ${attr.value}`
-        ),
-        scentNotes: product.scentNotes,
-        olfactoryFamilies: product.olfactoryFamilies,
-        variants: (product.variants || []).map((variant: any) => ({
-          id: variant.id,
-          volume: variant.volumeMl,
-          price: variant.basePrice
-        })),
-        totalSoldQuantity: item.totalSoldQuantity,
-        source: 'BEST_SELLER_FALLBACK'
-      };
-    });
-
-    const encoded = encodeToolOutput(minimalProducts).encoded;
-    return this.createSystemMessage(`BEST_SELLER_FALLBACK_RESULTS: ${encoded}`);
+    return this.createSystemMessage(`BEST_SELLER_FALLBACK_RESULTS: ${encodeToolOutput(minimal).encoded}`);
   }
 
-  private async buildPersonalizationToonMessages(
-    userId: string,
-    isGuestUser: boolean,
-    analysis: AnalysisObject
-  ): Promise<UIMessage[]> {
-    if (isGuestUser || this.isObjectiveOrGiftFlow(analysis)) {
-      return [];
-    }
-
-    if (!['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)) {
-      return [];
-    }
+  private async buildPersonalizationToonMessages(userId: string, isGuestUser: boolean, analysis: AnalysisObject): Promise<UIMessage[]> {
+    if (isGuestUser || this.isObjectiveOrGiftFlow(analysis)) return [];
+    if (!['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)) return [];
 
     try {
       const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
-      if (!payload || payload.source === 'none') {
-        return [];
-      }
+      if (!payload || payload.source === 'none') return [];
 
-      const sourcePriority = Array.isArray(payload.sourcePriority)
-        ? payload.sourcePriority.join(' > ')
-        : 'INPUT > ORDER > SURVEY > PROFILE';
-
-      const messages: UIMessage[] = [
-        this.createSystemMessage(
-          `PERSONALIZATION_SOURCE_PRIORITY: ${sourcePriority}. Khi dữ liệu xung đột, phải ưu tiên từ trái sang phải.`
-        ),
-        this.createSystemMessage(
-          `PERSONALIZATION_CONTEXT_SUMMARY: ${JSON.stringify(payload.contextSummaries || {})}`
-        ),
-        this.createSystemMessage(
-          `PERSONALIZATION_SIGNALS: ${JSON.stringify({
-            source: payload.source,
-            budgetHint: payload.budgetHint,
-            topOrderProducts: payload.topOrderProducts,
-            signals: payload.signals
-          })}`
-        )
+      const messages = [
+        this.createSystemMessage(`PERSONALIZATION_SOURCE_PRIORITY: ${Array.isArray(payload.sourcePriority) ? payload.sourcePriority.join(' > ') : 'INPUT > ORDER > SURVEY > PROFILE'}`),
+        this.createSystemMessage(`PERSONALIZATION_CONTEXT_SUMMARY: ${JSON.stringify(payload.contextSummaries || {})}`),
+        this.createSystemMessage(`PERSONALIZATION_SIGNALS: ${JSON.stringify({ source: payload.source, budgetHint: payload.budgetHint, topOrderProducts: payload.topOrderProducts, signals: payload.signals })}`)
       ];
 
-      const orderToon = payload?.toonContext?.orderDataToon?.encoded;
-      const surveyToon = payload?.toonContext?.surveyDataToon?.encoded;
-      const profileToon = payload?.toonContext?.profileDataToon?.encoded;
-
-      if (orderToon) {
-        messages.push(this.createSystemMessage(`ORDER_CONTEXT_TOON: ${orderToon}`));
-      }
-
-      if (surveyToon) {
-        messages.push(this.createSystemMessage(`SURVEY_CONTEXT_TOON: ${surveyToon}`));
-      }
-
-      if (profileToon) {
-        messages.push(this.createSystemMessage(`PROFILE_CONTEXT_TOON: ${profileToon}`));
-      }
+      if (payload.toonContext?.orderDataToon?.encoded) messages.push(this.createSystemMessage(`ORDER_CONTEXT_TOON: ${payload.toonContext.orderDataToon.encoded}`));
+      if (payload.toonContext?.surveyDataToon?.encoded) messages.push(this.createSystemMessage(`SURVEY_CONTEXT_TOON: ${payload.toonContext.surveyDataToon.encoded}`));
+      if (payload.toonContext?.profileDataToon?.encoded) messages.push(this.createSystemMessage(`PROFILE_CONTEXT_TOON: ${payload.toonContext.profileDataToon.encoded}`));
 
       return messages;
-    } catch (error) {
-      this.logger.warn(
-        `[processAiChatResponseV10] Failed to build personalization TOON context: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
+    } catch (err) {
+      this.logger.warn(`[V10] Personalization fail`, err);
       return [];
     }
   }
-
-  // ====== Multi-Query Decomposition Methods ======
 
   private mapToMinimalProduct(product: any, source: string) {
     return {
@@ -417,734 +768,102 @@ export class ConversationV10Service {
     };
   }
 
-  /**
-   * Execute a function-type query (getBestSellingProducts, getNewestProducts, etc.)
-   * Returns an array of minimal product objects.
-   */
   private async executeFunctionQuery(query: QueryItemObject): Promise<any[]> {
     if (!query.functionCall) return [];
-    const funcName = query.functionCall.name;
-    this.logger.log(`[V10_MULTI_QUERY][FUNCTION] Executing ${funcName}`);
-
-    let targetItems: any[] = [];
-    if (funcName === 'getBestSellingProducts') {
+    const name = query.functionCall.name;
+    let items: any[] = [];
+    if (name === 'getBestSellingProducts') {
       const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
-      if (res.success && res.data) targetItems = res.data.items.map((i: any) => i.product);
-    } else if (funcName === 'getNewestProducts') {
+      if (res.success && res.data) items = res.data.items.map((i: any) => i.product);
+    } else if (name === 'getNewestProducts') {
       const res = await this.productService.getNewestProductsWithVariants({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
-      if (res.success && res.data) targetItems = res.data.items;
-    } else if (funcName === 'getLeastSellingProducts') {
+      if (res.success && res.data) items = res.data.items;
+    } else if (name === 'getLeastSellingProducts') {
       const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'asc', IsDescending: false });
-      if (res.success && res.data) targetItems = res.data.items.map((i: any) => i.product);
+      if (res.success && res.data) items = res.data.items.map((i: any) => i.product);
     }
-
-    const productNames = targetItems.slice(0, 5).map(p => p.name).join(', ') + (targetItems.length > 5 ? '...' : '');
-    this.logger.log(`[V10_MULTI_QUERY][FUNCTION] ${funcName} returned ${targetItems.length} items. Top: [${productNames}]`);
-    return targetItems;
+    return items;
   }
 
-  /**
-   * Execute a profile-type query: fetch user profile/order keywords, then search products.
-   */
-  private async executeProfileQuery(userId: string, query: QueryItemObject, rootAnalysis: AnalysisObject): Promise<any[]> {
-    this.logger.log(`[V10_MULTI_QUERY][PROFILE] Fetching profile context for userId=${userId}`);
+  private async executeProfileQuery(userId: string, query: QueryItemObject, root: AnalysisObject): Promise<any[]> {
     try {
       const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
-      if (!payload || payload.source === 'none') {
-        this.logger.warn(`[V10_MULTI_QUERY][PROFILE] No profile data for userId=${userId}`);
-        return [];
-      }
+      if (!payload || payload.source === 'none') return [];
+      const keywords = [...(payload.profileKeywords || []), ...(payload.topOrderProducts || []).slice(0, 3)].filter(Boolean);
+      if (keywords.length === 0) return [];
 
-      // Extract keywords from profile
-      const keywords: string[] = [
-        ...(payload.profileKeywords || []),
-        ...(payload.topOrderProducts || []).slice(0, 3)
-      ].filter(Boolean);
-
-      if (keywords.length === 0) {
-        this.logger.warn(`[V10_MULTI_QUERY][PROFILE] No keywords extracted from profile`);
-        return [];
-      }
-
-      this.logger.log(`[V10_MULTI_QUERY][PROFILE] Profile keywords: ${keywords.slice(0, 5).join(', ')}`);
-
-      // Build a mini-analysis with profile keywords and run search
-      const miniAnalysis: any = {
-        logic: [keywords], // OR between all profile keywords
+      const searchRes = await this.productService.getProductsByStructuredQuery({
+        logic: [keywords],
         productNames: null,
         sorting: query.sorting || null,
-        budget: query.budget || rootAnalysis.budget || (payload.budgetHint ? { min: payload.budgetHint.min, max: payload.budgetHint.max } : null),
+        budget: query.budget || root.budget || (payload.budgetHint ? { min: payload.budgetHint.min, max: payload.budgetHint.max } : null),
         pagination: { pageNumber: 1, pageSize: 20 }
-      };
-
-      const searchResponse = await this.productService.getProductsByStructuredQuery(miniAnalysis);
-      if (searchResponse.success && searchResponse.data) {
-        const productNames = searchResponse.data.items.slice(0, 5).map(p => p.name).join(', ') + (searchResponse.data.items.length > 5 ? '...' : '');
-        this.logger.log(`[V10_MULTI_QUERY][PROFILE] Found ${searchResponse.data.items.length} products from profile query. Top: [${productNames}]`);
-        return searchResponse.data.items;
-      }
-      return [];
+      });
+      return searchRes.success && searchRes.data ? searchRes.data.items : [];
     } catch (err) {
-      this.logger.warn(`[V10_MULTI_QUERY][PROFILE] Error: ${err instanceof Error ? err.message : String(err)}`);
       return [];
     }
   }
 
-  /**
-   * Execute a search-type query using AND-decomposition.
-   * Each AND group in logic[] runs as a separate sub-query independently.
-   * Results are merged by intersection-score (products matching most sub-queries rank first).
-   * Falls back to union if no intersection found.
-   */
-  private async executeSearchQuery(query: QueryItemObject, rootAnalysis: AnalysisObject): Promise<any[]> {
+  private async executeSearchQuery(query: QueryItemObject, root: AnalysisObject): Promise<any[]> {
     const logicGroups = query.logic || [];
-    const shared = {
-      productNames: query.productNames || null,
-      sorting: query.sorting || rootAnalysis.sorting || null,
-      budget: query.budget || rootAnalysis.budget || null,
-    };
+    const shared = { productNames: query.productNames || null, sorting: query.sorting || root.sorting || null, budget: query.budget || root.budget || null };
 
-    // If only 0-1 group, skip decomposition and just run normally
     if (logicGroups.length <= 1) {
-      const miniAnalysis: any = {
-        logic: logicGroups,
-        ...shared,
-        pagination: { pageNumber: 1, pageSize: 20 }
-      };
-      this.logger.log(`[V10_MULTI_QUERY][SEARCH] Single group, no decomposition. logic=${JSON.stringify(logicGroups)}`);
-      const searchResponse = await this.productService.getProductsByStructuredQuery(miniAnalysis);
-      if (searchResponse.success && searchResponse.data) {
-        const names = searchResponse.data.items.slice(0, 5).map((p: any) => p.name).join(', ') + (searchResponse.data.items.length > 5 ? '...' : '');
-        this.logger.log(`[V10_MULTI_QUERY][SEARCH] Found ${searchResponse.data.items.length} products. Top: [${names}]`);
-        return searchResponse.data.items;
-      }
-      return [];
+      const res = await this.productService.getProductsByStructuredQuery({ logic: logicGroups, ...shared, pagination: { pageNumber: 1, pageSize: 20 } });
+      return res.success && res.data ? res.data.items : [];
     }
 
-    // AND-DECOMPOSITION: run each AND group as its own sub-query
-    this.logger.log(`[V10_MULTI_QUERY][SEARCH] AND-decomposition: splitting ${logicGroups.length} AND groups into sub-queries`);
-
-    const subQueryResults: Array<{ group: any; products: any[] }> = [];
-
+    const subResults: any[][] = [];
     for (let i = 0; i < logicGroups.length; i++) {
-      const group = logicGroups[i];
-      const miniAnalysis: any = {
-        logic: [group], // single AND group = just one condition block
-        ...shared,
-        budget: i === 0 ? shared.budget : null, // only apply budget to first sub-query to avoid over-filtering
-        pagination: { pageNumber: 1, pageSize: 50 }
-      };
-
-      this.logger.log(`[V10_MULTI_QUERY][SEARCH][SUB-${i + 1}/${logicGroups.length}] Running sub-query for group: ${JSON.stringify(group)}`);
-      const subResponse = await this.productService.getProductsByStructuredQuery(miniAnalysis);
-
-      if (subResponse.success && subResponse.data && subResponse.data.items.length > 0) {
-        const names = subResponse.data.items.slice(0, 5).map((p: any) => p.name).join(', ') + (subResponse.data.items.length > 5 ? '...' : '');
-        this.logger.log(`[V10_MULTI_QUERY][SEARCH][SUB-${i + 1}/${logicGroups.length}] Found ${subResponse.data.items.length} products. Top: [${names}]`);
-        subQueryResults.push({ group, products: subResponse.data.items });
-      } else {
-        this.logger.warn(`[V10_MULTI_QUERY][SEARCH][SUB-${i + 1}/${logicGroups.length}] No results for group: ${JSON.stringify(group)}`);
-        subQueryResults.push({ group, products: [] });
-      }
+      const res = await this.productService.getProductsByStructuredQuery({ logic: [logicGroups[i]], ...shared, budget: i === 0 ? shared.budget : null, pagination: { pageNumber: 1, pageSize: 50 } });
+      if (res.success && res.data) subResults.push(res.data.items);
     }
 
-    // INTERSECTION-SCORE MERGE: score each product by how many sub-queries it appears in
-    const scoreMap = new Map<string, { product: any; score: number }>();
-
-    for (const { products } of subQueryResults) {
+    const scoreMap = new Map<string, { p: any; s: number }>();
+    for (const products of subResults) {
       for (const p of products) {
         const existing = scoreMap.get(p.id);
-        if (existing) {
-          existing.score += 1;
-        } else {
-          scoreMap.set(p.id, { product: p, score: 1 });
-        }
+        if (existing) existing.s += 1;
+        else scoreMap.set(p.id, { p, s: 1 });
       }
     }
 
-    // Sort by score descending (most sub-queries matched = highest priority)
-    const sorted = Array.from(scoreMap.values()).sort((a, b) => b.score - a.score);
-
-    // Try intersection first (score === total number of sub-queries with results)
-    const subQueriesWithResults = subQueryResults.filter(r => r.products.length > 0).length;
-    const intersection = sorted.filter(e => e.score === subQueriesWithResults).map(e => e.product);
-    const union = sorted.map(e => e.product);
-
-    if (intersection.length > 0) {
-      const names = intersection.slice(0, 5).map((p: any) => p.name).join(', ') + (intersection.length > 5 ? '...' : '');
-      this.logger.log(
-        `[V10_MULTI_QUERY][SEARCH] Intersection merge: ${intersection.length} products matched ALL ${subQueriesWithResults} sub-queries. Top: [${names}]`
-      );
-      return intersection;
-    }
-
-    // Fallback: union sorted by score
-    const names = union.slice(0, 5).map((p: any) => p.name).join(', ') + (union.length > 5 ? '...' : '');
-    this.logger.warn(
-      `[V10_MULTI_QUERY][SEARCH] No full intersection. Falling back to UNION (${union.length} unique products, ranked by match score). Top: [${names}]`
-    );
-    return union;
+    const sorted = Array.from(scoreMap.values()).sort((a, b) => b.s - a.s);
+    const validSubsCount = subResults.filter(r => r.length > 0).length;
+    const intersection = sorted.filter(e => e.s === validSubsCount).map(e => e.p);
+    return intersection.length > 0 ? intersection : sorted.map(e => e.p);
   }
 
-  /**
-   * Orchestrate execution of all decomposed queries, merge and deduplicate results.
-   */
-  private async executeMultiQueries(
-    queries: QueryItemObject[],
-    rootAnalysis: AnalysisObject,
-    userId: string,
-    isGuestUser: boolean,
-    pageSize: number
-  ): Promise<{ mergedProducts: any[]; taskResults: UIMessage[] }> {
+  private async executeMultiQueries(queries: QueryItemObject[], root: AnalysisObject, userId: string, isGuest: boolean, pageSize: number) {
     const allProducts: any[] = [];
     const functionProducts: any[] = [];
     const taskResults: UIMessage[] = [];
-    const seenProductIds = new Set<string>();
+    const seen = new Set<string>();
 
-    this.logger.log(`[V10_MULTI_QUERY] Executing ${queries.length} decomposed queries`);
-
-    for (const query of queries) {
-      switch (query.purpose) {
-        case 'function': {
-          if (!query.functionCall) break;
-          const funcName = query.functionCall.name;
-          
-          // Handle task-type functions (cart, orders) — these don't produce products
-          if (['addToCart', 'getCart', 'clearCart'].includes(funcName)) {
-            const args: any = query.functionCall.arguments || {};
-            if (!isGuestUser) {
-              let res: any;
-              if (funcName === 'addToCart') {
-                const items: any[] = Array.isArray(args.items) ? args.items : [];
-                const results: any[] = [];
-                for (const item of items) {
-                  if (item.variantId) {
-                    const addRes = await this.cartService.addToCart(userId, { variantId: item.variantId, quantity: item.quantity || 1 });
-                    results.push({ variantId: item.variantId, success: addRes.success, error: addRes.error });
-                  }
-                }
-                res = results;
-              } else if (funcName === 'getCart') {
-                const cartRes = await this.cartService.getCart(userId);
-                res = cartRes.success ? cartRes.data : cartRes.error;
-              } else if (funcName === 'clearCart') {
-                const clearRes = await this.cartService.clearCart(userId);
-                res = clearRes.success ? 'Cart Cleared' : clearRes.error;
-              }
-              taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`));
-            } else {
-              taskResults.push(
-                this.createSystemMessage(
-                  `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Tính năng ${funcName} yêu cầu đăng nhập. BẮT BUỘC phản hồi khách hàng: xin lỗi vì chưa đăng nhập nên không thể lưu giỏ hàng/thao tác, và hướng dẫn họ đăng nhập để hệ thống hỗ trợ tốt hơn.`
-                )
-              );
-            }
-          } else if (funcName === 'getOrdersByUserId') {
-            if (!isGuestUser) {
-              const res = await this.orderService.getOrdersByUserId(userId, { PageNumber: 1, PageSize: 5, SortOrder: 'desc', IsDescending: true });
-              const resAny = res as any;
-              const itemsData: any[] = resAny.data ? resAny.data.items : (resAny.items ? resAny.items : []);
-              const orderItems = itemsData.map((i: any) => ({ id: i.id, code: i.code, status: i.status, total: i.totalAmount }));
-              taskResults.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: getOrdersByUserId executed: ${JSON.stringify(orderItems)}`));
-            } else {
-              taskResults.push(
-                this.createSystemMessage(
-                  `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Xem đơn hàng yêu cầu đăng nhập. BẮT BUỘC phản hồi khách hàng: xin lỗi vì chưa đăng nhập nên không có dữ liệu đơn hàng, và hướng dẫn họ đăng nhập để kiểm tra.`
-                )
-              );
-            }
-          } else {
-            // Product-returning functions (getBestSellingProducts, etc.)
-            const items = await this.executeFunctionQuery(query);
-            for (const p of items) {
-              const pid = p.id;
-              if (pid && !seenProductIds.has(pid)) {
-                seenProductIds.add(pid);
-                functionProducts.push(p);
-              }
-            }
-          }
-          break;
-        }
-
-        case 'profile': {
-          if (isGuestUser) break;
-          const items = await this.executeProfileQuery(userId, query, rootAnalysis);
-          for (const p of items) {
-            const pid = p.id;
-            if (pid && !seenProductIds.has(pid)) {
-              seenProductIds.add(pid);
-              allProducts.push(this.mapToMinimalProduct(p, 'PROFILE_QUERY'));
-            }
-          }
-          break;
-        }
-
-        case 'search': {
-          const items = await this.executeSearchQuery(query, rootAnalysis);
-          for (const p of items) {
-            const pid = p.id;
-            if (pid && !seenProductIds.has(pid)) {
-              seenProductIds.add(pid);
-              allProducts.push(this.mapToMinimalProduct(p, 'SEARCH_QUERY'));
-            }
-          }
-          break;
-        }
-      }
-    }
-
-    // Merge strategy: function products come first, then search/profile products
-    const functionMinimal = functionProducts.map(p => this.mapToMinimalProduct(p, 'FUNCTION_RESULTS'));
-    let combined = [...functionMinimal, ...allProducts];
-
-    // Apply strict budget filter if budget is provided in rootAnalysis
-    if (rootAnalysis.budget && (rootAnalysis.budget.min !== null || rootAnalysis.budget.max !== null)) {
-      const { min, max } = rootAnalysis.budget;
-      const beforeCount = combined.length;
-      
-      combined = combined
-        .map(p => ({
-          ...p,
-          variants: (p.variants || []).filter((v: any) => {
-            const price = v.price;
-            const fitsMin = min === null || price >= (min as number);
-            const fitsMax = max === null || price <= (max as number);
-            return fitsMin && fitsMax;
-          })
-        }))
-        .filter(p => p.variants.length > 0);
-
-      this.logger.log(`[V10_MULTI_QUERY] Strict budget filter applied (${min}-${max}): ${beforeCount} -> ${combined.length} items (variants filtered)`);
-    }
-
-    const mergedProducts = combined.slice(0, pageSize);
-
-    const mergedNames = mergedProducts.slice(0, 5).map(p => p.name).join(', ') + (mergedProducts.length > 5 ? '...' : '');
-    this.logger.log(
-      `[V10_MULTI_QUERY] Merge complete: function=${functionMinimal.length} search/profile=${allProducts.length} filtered_final=${mergedProducts.length}. Result: [${mergedNames}]`
-    );
-
-    return { mergedProducts, taskResults };
-  }
-
-  private async processAiChatResponse(
-    convertedMessages: UIMessage[],
-    conversationMessages: any[],
-    conversationId: string,
-    userId: string,
-    adminInstruction: string | undefined,
-    combinedPrompt: string,
-    endpoint: string,
-    isGuestUser: boolean,
-    isStaff: boolean
-  ): Promise<ConversationDto> {
-    const lastUserMessage = [...convertedMessages]
-      .reverse()
-      .find((message) => message.role === 'user');
-    const messageText =
-      lastUserMessage?.parts.find((part) => part.type === 'text')?.text || '';
-
-    const previousContext = convertedMessages
-      .filter((message) => message !== lastUserMessage)
-      .map(
-        (message) =>
-          `${message.role}: ${message.parts.find((part) => part.type === 'text')?.text || ''}`
-      )
-      .join('\n');
-
-    this.logger.log(
-      `[processAiChatResponseV10] Running intermediate analysis for: "${messageText.substring(0, 80)}..."`
-    );
-
-    const rawAnalysis =
-      (await this.analysisService.analyze(messageText, previousContext, {
-        userId,
-        isGuestUser,
-        isStaff
-      })) ||
-      this.createFallbackAnalysis(messageText);
-
-    const finalAnalysis = this.normalizeAnalysisForQuery(rawAnalysis);
-
-    this.logger.log(
-      `[processAiChatResponseV10] Analysis Result -> Intent: ${finalAnalysis.intent}, queries: ${
-        finalAnalysis.queries?.length ?? 0
-      }, legacyFunctionCall: ${
-        finalAnalysis.functionCall
-          ? `${finalAnalysis.functionCall.name} (purpose: ${finalAnalysis.functionCall.purpose})`
-          : 'None'
-      }`
-    );
-
-    let finalMessages = [...convertedMessages];
-
-    const personalizationToonMessages = await this.buildPersonalizationToonMessages(
-      userId,
-      isGuestUser,
-      finalAnalysis
-    );
-
-    if (personalizationToonMessages.length > 0) {
-      finalMessages.push(...personalizationToonMessages);
-    }
-
-    finalMessages.push(
-      this.createSystemMessage(
-        `NORMALIZED_QUERY_ANALYSIS: ${JSON.stringify(finalAnalysis)}`
-      )
-    );
-
-    const shouldQueryProducts = ['Search', 'Consult', 'Recommend', 'Compare'].includes(
-      finalAnalysis.intent
-    );
-
-    let hasSearchProducts = false;
-    const pageSize = finalAnalysis.pagination?.pageSize || 5;
-
-    // ====== NEW: Multi-Query Decomposition Path ======
-    const hasDecomposedQueries = Array.isArray(finalAnalysis.queries) && finalAnalysis.queries.length > 0;
-
-    if (hasDecomposedQueries) {
-      this.logger.log(`[processAiChatResponseV10] Using MULTI-QUERY path with ${finalAnalysis.queries!.length} queries`);
-
-      const { mergedProducts, taskResults } = await this.executeMultiQueries(
-        finalAnalysis.queries!,
-        finalAnalysis,
-        userId,
-        isGuestUser,
-        pageSize
-      );
-
-      // Inject task results (cart/order actions)
-      for (const taskMsg of taskResults) {
-        finalMessages.push(taskMsg);
-      }
-
-      // Inject merged product results
-      if (mergedProducts.length > 0) {
-        finalMessages.push(
-          this.createSystemMessage(`SEARCH_RESULTS: ${encodeToolOutput(mergedProducts).encoded}`)
-        );
-        hasSearchProducts = true;
-      }
-    }
-    // ====== LEGACY: Single-query path (backward-compatible) ======
-    else if (finalAnalysis.functionCall) {
-      const funcName = finalAnalysis.functionCall.name;
-      const purpose = finalAnalysis.functionCall.purpose;
-      const args: any = finalAnalysis.functionCall.arguments || {};
-      
-      this.logger.log(`[processAiChatResponseV10] LEGACY functionCall: ${funcName} intercepted, purpose=${purpose}`);
-
-      if (['getBestSellingProducts'].includes(funcName)) {
-        let products: any[] = [];
-        let targetItems: any[] = [];
-
-        if (funcName === 'getBestSellingProducts') {
-          const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
-          if (res.success && res.data) targetItems = res.data.items.map(i => i.product);
-        }
-
-        if (purpose === 'main') {
-          products = targetItems.slice(0, finalAnalysis.pagination?.pageSize || 5);
-        } else if (purpose === 'support' && shouldQueryProducts) {
-          const expandedAnalysis = { ...finalAnalysis, pagination: { pageNumber: 1, pageSize: 50 } };
-          const searchResponse = await this.productService.getProductsByStructuredQuery(expandedAnalysis);
-          const queryProducts = searchResponse.success && searchResponse.data ? searchResponse.data.items : [];
-
-          if (targetItems.length > 0 && queryProducts.length > 0) {
-            const queryProductIds = new Set(queryProducts.map((p) => p.id));
-            const intersection = targetItems.filter((p) => queryProductIds.has(p.id));
-            if (intersection.length > 0) {
-              products = intersection.slice(0, finalAnalysis.pagination?.pageSize || 5);
-              this.logger.log(`[processAiChatResponseV10] Support merge: Found matching products, kept top ${products.length} by function rank.`);
-            } else {
-              products = queryProducts.slice(0, finalAnalysis.pagination?.pageSize || 5);
-              this.logger.log(`[processAiChatResponseV10] Support merge: No intersection, fallback to raw query products.`);
-            }
-          } else {
-            products = queryProducts.slice(0, finalAnalysis.pagination?.pageSize || 5);
-          }
-        }
-
-        if (products.length > 0) {
-          const minimalProducts = products.map((product) => {
-            let variants = (product.variants || []).map((v: any) => ({
-              id: v.id,
-              volume: v.volumeMl,
-              price: v.basePrice
-            }));
-
-            // Apply budget filter in legacy path
-            if (finalAnalysis.budget && (finalAnalysis.budget.min !== null || finalAnalysis.budget.max !== null)) {
-              const { min, max } = finalAnalysis.budget;
-              variants = variants.filter((v: any) => {
-                const fitsMin = min === null || v.price >= (min as number);
-                const fitsMax = max === null || v.price <= (max as number);
-                return fitsMin && fitsMax;
-              });
-            }
-
-            return {
-              id: product.id,
-              name: product.name,
-              brand: product.brandName,
-              category: product.categoryName,
-              image: product.primaryImage,
-              attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
-              scentNotes: product.scentNotes,
-              olfactoryFamilies: product.olfactoryFamilies,
-              variants,
-              source: 'FUNCTION_RESULTS'
-            };
-          }).filter(p => p.variants.length > 0);
-
-          if (minimalProducts.length > 0) {
-            finalMessages.push(this.createSystemMessage(`FUNCTION_RESULTS: ${encodeToolOutput(minimalProducts).encoded}`));
-            hasSearchProducts = true;
-          }
-        }
-      } 
-      else if (['addToCart', 'getCart', 'clearCart'].includes(funcName)) {
-        if (!isGuestUser) {
-          let res: any;
-          if (funcName === 'addToCart') {
-            const items: any[] = Array.isArray(args.items) ? args.items : [];
-            const results: any[] = [];
-            for (const item of items) {
-               if (item.variantId) {
-                  const addRes = await this.cartService.addToCart(userId, { variantId: item.variantId, quantity: item.quantity || 1 });
-                  results.push({ variantId: item.variantId, success: addRes.success, error: addRes.error });
-               }
-            }
-            res = results;
-          } else if (funcName === 'getCart') {
-            const cartRes = await this.cartService.getCart(userId);
-            res = cartRes.success ? cartRes.data : cartRes.error;
-          } else if (funcName === 'clearCart') {
-            const clearRes = await this.cartService.clearCart(userId);
-            res = clearRes.success ? 'Cart Cleared' : clearRes.error;
-          }
-          finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`));
+    for (const q of queries) {
+      if (q.purpose === 'function' && q.functionCall) {
+        if (['addToCart', 'getCart', 'clearCart', 'getOrdersByUserId'].includes(q.functionCall.name)) {
+          taskResults.push(await this.executeActionTool(q.functionCall.name, q.functionCall.arguments || {}, userId, isGuest));
         } else {
-          finalMessages.push(
-            this.createSystemMessage(
-              `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Tính năng ${funcName} yêu cầu đăng nhập. BẮT BUỘC phản hồi khách hàng: xin lỗi vì chưa đăng nhập nên không thể lưu giỏ hàng/thao tác, và hướng dẫn họ đăng nhập để hệ thống hỗ trợ tốt hơn.`
-            )
-          );
+          const items = await this.executeFunctionQuery(q);
+          for (const p of items) { if (p.id && !seen.has(p.id)) { seen.add(p.id); functionProducts.push(p); } }
         }
-      } 
-      else if (funcName === 'getOrdersByUserId') {
-        if (!isGuestUser) {
-          const res = await this.orderService.getOrdersByUserId(userId, { PageNumber: 1, PageSize: 5, SortOrder: 'desc', IsDescending: true });
-          const resAny = res as any;
-          const itemsData: any[] = resAny.data ? resAny.data.items : (resAny.items ? resAny.items : []);
-          const orderItems = itemsData.map((i: any) => ({ id: i.id, code: i.code, status: i.status, total: i.totalAmount }));
-          finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: getOrdersByUserId executed: ${JSON.stringify(orderItems)}`));
-        } else {
-          finalMessages.push(
-            this.createSystemMessage(
-              `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Xem đơn hàng yêu cầu đăng nhập. BẮT BUỘC phản hồi khách hàng: xin lỗi vì chưa đăng nhập nên không có dữ liệu đơn hàng, và hướng dẫn họ đăng nhập để kiểm tra.`
-            )
-          );
-        }
-      } 
-      else if (funcName === 'getUserLogSummaryByUserId') {
-        finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: getUserLogSummaryByUserId not fully implemented directly in wrapper, please rely on Profile Tool`));
-      } 
-      else if (funcName === 'getStaticProductPolicy') {
-        finalMessages.push(this.createSystemMessage(`FUNCTION_ACTION_RESULT: Information is available in policies or general instructions.`));
-      }
-    } 
-    else if (shouldQueryProducts) {
-      this.logger.log(`[processAiChatResponseV10] Querying products with structured analysis. intent=${finalAnalysis.intent}`);
-      const searchResponse = await this.productService.getProductsByStructuredQuery(finalAnalysis);
-      if (searchResponse.success && searchResponse.data && searchResponse.data.items.length > 0) {
-        const minimalProducts = searchResponse.data.items.map((product) => ({
-            id: product.id,
-            name: product.name,
-            brand: product.brandName,
-            category: product.categoryName,
-            image: product.primaryImage,
-            attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
-            scentNotes: product.scentNotes,
-            olfactoryFamilies: product.olfactoryFamilies,
-            variants: (product.variants || []).map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
-            source: 'SEARCH_RESULTS'
-        }));
-        finalMessages.push(this.createSystemMessage(`SEARCH_RESULTS: ${encodeToolOutput(minimalProducts).encoded}`));
-        hasSearchProducts = true;
+      } else if (q.purpose === 'profile' && !isGuest) {
+        const items = await this.executeProfileQuery(userId, q, root);
+        for (const p of items) { if (p.id && !seen.has(p.id)) { seen.add(p.id); allProducts.push(this.mapToMinimalProduct(p, 'PROFILE_QUERY')); } }
+      } else if (q.purpose === 'search') {
+        const items = await this.executeSearchQuery(q, root);
+        for (const p of items) { if (p.id && !seen.has(p.id)) { seen.add(p.id); allProducts.push(this.mapToMinimalProduct(p, 'SEARCH_QUERY')); } }
       }
     }
 
-    const shouldUseTrendFallback = this.hasAnalysisFlag(finalAnalysis, 'PURE_TREND_QUERY');
-    const isObjectiveFlow = this.isObjectiveOrGiftFlow(finalAnalysis);
-    const shouldUseBestSellerFallback = shouldUseTrendFallback || isGuestUser;
-
-    if (shouldUseBestSellerFallback && !hasSearchProducts) {
-      const fallbackMessage = await this.buildBestSellerFallbackMessage(5);
-      if (fallbackMessage) {
-        finalMessages.push(fallbackMessage);
-        hasSearchProducts = true; // We now have products to show
-      }
+    let combined = [...functionProducts.map(p => this.mapToMinimalProduct(p, 'FUNCTION_RESULTS')), ...allProducts];
+    if (root.budget && (root.budget.min !== null || root.budget.max !== null)) {
+      const { min, max } = root.budget;
+      combined = combined.map(p => ({ ...p, variants: p.variants.filter((v: any) => (min === null || v.price >= min) && (max === null || v.price <= max)) })).filter(p => p.variants.length > 0);
     }
 
-    if (!isObjectiveFlow && this.hasAnalysisFlag(finalAnalysis, 'PROFILE_ENRICHMENT_SKIPPED')) {
-      if (isGuestUser) {
-        finalMessages.push(
-          this.createSystemMessage(
-            'GUEST_USER_PROMPT: true. Khách chưa đăng nhập. Nhắc khách ĐĂNG NHẬP để hệ thống lưu lại sở thích cá nhân. KHÔNG yêu cầu khách chọn số hay "cập nhật profile" vì họ không có tài khoản. Vẫn tiếp tục tư vấn bình thường nếu có SEARCH_RESULTS.'
-          )
-        );
-      } else {
-        finalMessages.push(
-          this.createSystemMessage(
-            'PROFILE_UPDATE_REQUIRED: true. Bạn phải nhắc người dùng cập nhật profile (sở thích, ngân sách, độ tuổi/survey) nhưng vẫn cần đưa gợi ý sản phẩm từ SEARCH_RESULTS (nếu có).'
-          )
-        );
-      }
-    }
-
-    if (!hasSearchProducts && shouldQueryProducts) {
-      finalMessages.push(
-        this.createSystemMessage(
-          'EMPTY_RESULTS_WARNING: Dữ liệu (SEARCH_RESULTS) hoàn toàn rỗng! BẮT BUỘC phản hồi là "hiện tại cửa hàng không tìm thấy sản phẩm nào phù hợp". TUYỆT ĐỐI KHÔNG ĐƯỢC tự nói "có một vài lựa chọn dưới đây" rồi để trống.'
-        )
-      );
-    }
-
-    const systemPrompt = conversationSystemPrompt(adminInstruction || '', combinedPrompt);
-
-    this.logger.log(
-      '[processAiChatResponseV10] Generating final structured response using main AI'
-    );
-
-    const activeAiHelper = isStaff ? this.staffAiHelper : this.aiHelper;
-
-    const message = await activeAiHelper.textGenerateFromMessages(
-      finalMessages,
-      systemPrompt,
-      Output.object(conversationOutput),
-      undefined
-    );
-
-    if (!message.success || !message.data) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get structured AI response',
-        { userId, conversationId, service: 'AIHelper', endpoint }
-      );
-    }
-
-    const aiResponse =
-      typeof message.data === 'string' ? JSON.parse(message.data) : message.data;
-
-    if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
-      const productTemp = aiResponse.productTemp;
-      const ids = productTemp.map((item: any) => item.id).filter((id: string) => !!id);
-
-      if (ids.length > 0) {
-        const productResponse = await this.productService.getProductsByIdsForOutput(ids);
-        if (productResponse.success && productResponse.data) {
-          const hydratedProducts = productResponse.data;
-          const recommendationsMap = new Map<string, string[]>();
-
-          productTemp.forEach((item: any) => {
-            if (item.id && item.variants && Array.isArray(item.variants)) {
-              recommendationsMap.set(
-                item.id,
-                item.variants.map((variant: any) => variant.id)
-              );
-            }
-          });
-
-          aiResponse.products = hydratedProducts
-            .map((product) => {
-              const recommendedVariantIds = recommendationsMap.get(product.id);
-              if (recommendedVariantIds && recommendedVariantIds.length > 0) {
-                const variantIdsSet = new Set(recommendedVariantIds);
-                return {
-                  ...product,
-                  variants: (product.variants || []).filter((variant) => {
-                    const matchesAiSelection = variantIdsSet.has(variant.id);
-                    
-                    // Final safety check: enforce budget again during hydration
-                    if (finalAnalysis.budget && (finalAnalysis.budget.min !== null || finalAnalysis.budget.max !== null)) {
-                      const { min, max } = finalAnalysis.budget;
-                      const price = variant.basePrice;
-                      const fitsMin = min === null || price >= (min as number);
-                      const fitsMax = max === null || price <= (max as number);
-                      return matchesAiSelection && fitsMin && fitsMax;
-                    }
-                    
-                    return matchesAiSelection;
-                  })
-                };
-              }
-              return product;
-            })
-            .filter((product) => product.variants && product.variants.length > 0);
-        }
-      }
-    }
-
-    const finalMessageData = JSON.stringify(aiResponse);
-
-    const responseConversation = overrideMessagesToConversation(
-      conversationId || '',
-      userId || '',
-      addMessageToMessages(finalMessageData, conversationMessages || [])
-    );
-
-    await this.conversationQueue.add(
-      ConversationJobName.ADD_MESSAGE_AND_LOG,
-      { responseConversation, userId }
-    );
-
-    return responseConversation;
-  }
-
-  async chat(
-    conversation: ConversationRequestDto
-  ): Promise<BaseResponse<ConversationDto>> {
-    const isGuestUser = !conversation.userId;
-    const userId = conversation.userId ?? uuid();
-    const convertedMessages: UIMessage[] = convertToMessages(conversation.messages || []);
-
-    const instructionType = conversation.isStaff
-      ? INSTRUCTION_TYPE_STAFF_CONSULTATION
-      : INSTRUCTION_TYPE_CONVERSATION;
-
-    const promptResult = await buildCombinedPromptV5(
-      instructionType,
-      this.adminInstructionService,
-      userId
-    );
-
-    if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to build combined prompt',
-        {
-          userId,
-          conversationId: conversation.id,
-          service: 'PromptBuilder',
-          endpoint: 'chat/v10'
-        }
-      );
-    }
-
-    const responseConversation = await this.processAiChatResponse(
-      convertedMessages,
-      conversation.messages || [],
-      conversation.id || '',
-      userId,
-      promptResult.data.adminInstruction,
-      promptResult.data.combinedPrompt,
-      'chat/v10',
-      isGuestUser,
-      conversation.isStaff || false
-    );
-
-    return Ok(responseConversation);
+    return { mergedProducts: combined.slice(0, pageSize), taskResults };
   }
 }

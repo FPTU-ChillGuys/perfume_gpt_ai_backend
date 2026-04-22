@@ -60,144 +60,30 @@ export class HybridSearchService {
     try {
       const pageNumber = request.PageNumber || 1;
       const pageSize = request.PageSize || 10;
-      const k = 60; // RRF constant
 
-      // ====== Bước 1: Query Layer (Hard Filters) ======
-      let queryFilters = await this.queryNormalizer.normalize(searchText);
+      // 1. Query Layer (Hard Filters)
+      const queryFilters = await this.queryNormalizer.normalize(searchText);
+      const hardFilterIds = await this.applyHardFilters(queryFilters);
 
-      // Build hard filter IDs if filters exist
-      let hardFilterIds: string[] | null = null;
-      if (queryFilters) {
-        const whereClause = this.buildWhereClause(queryFilters);
-        const filteredProducts = await this.prisma.products.findMany({
-          where: whereClause,
-          select: { Id: true },
-          distinct: ['Id']
-        });
-
-        // Nếu filter ra 0 sản phẩm -> trả về trống luôn, đỡ phải query vector/BM25
-        if (filteredProducts.length === 0) {
-          return { success: true, payload: this.createEmptyResponse(pageNumber, pageSize) };
-        }
-
-        hardFilterIds = filteredProducts.map(p => p.Id);
+      if (hardFilterIds && hardFilterIds.length === 0) {
+        return { success: true, payload: this.createEmptyResponse(pageNumber, pageSize) };
       }
 
-      // ====== Bước 2: Hybrid Retrieval (Vector + BM25) ======
-      const queryEmbedding = await this.embeddingService.generateEmbedding(searchText);
-      const embeddingString = `[${queryEmbedding.join(',')}]`;
-
-      const retrievalLimit = 10;
-
-      // 1. Get BM25 Candidates
-      const bm25Params: any[] = [];
-      if (hardFilterIds) bm25Params.push(hardFilterIds);
-      bm25Params.push(searchText); // query for BM25
-      bm25Params.push(retrievalLimit);
-
-      const bm25Rows = await this.embeddingService.em.getConnection().execute(`
-        SELECT product_id 
-        FROM product_embeddings 
-        WHERE is_active = true 
-        ${hardFilterIds ? 'AND product_id IN (?)' : ''}
-        ORDER BY search_text <@> ?
-        LIMIT ?
-      `, bm25Params);
-
-      // 2. Get Vector Candidates
-      const vectorParams: any[] = [];
-      vectorParams.push(embeddingString); // Parameter 1: For SELECT similarity
-      if (hardFilterIds) vectorParams.push(hardFilterIds); // Parameter 2: For WHERE IN
-      vectorParams.push(embeddingString); // Parameter 3: For ORDER BY
-      vectorParams.push(retrievalLimit); // Parameter 4: For LIMIT
-
-      const vectorRows = await this.embeddingService.em.getConnection().execute(`
-        SELECT product_id, 1 - (vector <=> ?::vector(1024)) as similarity 
-        FROM product_embeddings 
-        WHERE is_active = true 
-        ${hardFilterIds ? 'AND product_id IN (?)' : ''}
-        ORDER BY vector <=> ?::vector(1024)
-        LIMIT ?
-      `, vectorParams);
-
-      const bm25Ids = (Array.isArray(bm25Rows) ? bm25Rows : (bm25Rows as any)?.rows ?? []).map((r: any) => r.product_id);
-      const vectorData = (Array.isArray(vectorRows) ? vectorRows : (vectorRows as any)?.rows ?? []);
-      const vectorIds = vectorData.map((r: any) => r.product_id);
-
-      // 3. Intersection Merge (Giao của 2 mảng)
-      const candidateIds = bm25Ids.filter(id => vectorIds.includes(id));
-
-      console.log(`[HybridSearch] BM25 found ${bm25Ids.length} candidates`);
-      console.log(`[HybridSearch] Vector found ${vectorIds.length} candidates (top score: ${vectorData[0]?.similarity || 0})`);
-      console.log(`[HybridSearch] Intersection candidates (Giao): ${candidateIds.length}`);
+      // 2. Hybrid Retrieval (Vector + BM25)
+      const candidateIds = await this.performHybridRetrieval(searchText, hardFilterIds);
 
       if (candidateIds.length === 0) {
         return { success: true, payload: this.createEmptyResponse(pageNumber, pageSize) };
       }
 
-      // ====== Bước 3: Fetch candidate details ======
-      const products = await this.prisma.products.findMany({
-        where: { Id: { in: candidateIds }, IsDeleted: false },
-        include: {
-          Brands: true,
-          Categories: true,
-          ProductVariants: {
-            where: { IsDeleted: false },
-            include: {
-              Concentrations: true,
-              Media: { where: { IsPrimary: true } },
-              ProductAttributes: { include: { Attributes: true, AttributeValues: true } }
-            },
-            orderBy: { BasePrice: 'asc' }
-          },
-          ProductNoteMaps: { include: { ScentNotes: true } },
-          ProductFamilyMaps: { include: { OlfactoryFamilies: true } },
-          ProductAttributes: { include: { Attributes: true, AttributeValues: true } },
-          Media: { where: { IsPrimary: true } }
-        }
-      });
+      // 3. Fetch candidate details
+      const products = await this.fetchCandidateDetails(candidateIds);
 
-      // Log chi tiết tên cho BM25 và Vector
-      const nameMap = new Map(products.map(p => [p.Id, p.Name]));
-      console.log('[HybridSearch] BM25 Product Names:', bm25Ids.map(id => nameMap.get(id) || 'Unknown'));
-      console.log('[HybridSearch] Vector Product Names:', vectorIds.map(id => nameMap.get(id) || 'Unknown'));
+      // 4. Reranking & Filtering
+      const filteredResults = await this.rerankAndFilter(searchText, products, 10);
 
-      // ====== Bước 4: AI Reranking ======
-      // Map candidates with their texts for reranking
-      const rerankCandidates = products.map(p => {
-        const scentNotes = p.ProductNoteMaps.map(n => n.ScentNotes.Name).join(', ');
-        const families = p.ProductFamilyMaps.map(f => f.OlfactoryFamilies.Name).join(', ');
-        return {
-          ...p,
-          text: `name: ${p.Name} brand: ${p.Brands.Name} category: ${p.Categories.Name} notes: ${scentNotes} families: ${families} description: ${p.Description || ''}`
-        };
-      });
-
-      const rerankedResults = await this.rerankService.rerank(searchText, rerankCandidates, retrievalLimit);
-
-      // ====== Bước 5: Filtering by Rerank Score (Thanh lọc kết quả) ======
-      const threshold = 0.2;
-      const filteredResults = rerankedResults.filter(r => r.rerankScore >= threshold);
-      console.log(`[HybridSearch] Reranked ${rerankedResults.length} items, ${filteredResults.length} passed threshold ${threshold}`);
-
-      // ====== Bước 6: Pagination & Mapping ======
-      const startIndex = (pageNumber - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedResults = filteredResults.slice(startIndex, endIndex);
-
-      const items = paginatedResults.map(product => this.mapToProductResponse(product, queryFilters || undefined));
-
-      const response: HybridSearchResponse = {
-        items,
-        pageNumber,
-        pageSize,
-        totalCount: filteredResults.length,
-        totalPages: Math.ceil(filteredResults.length / pageSize),
-        hasPreviousPage: pageNumber > 1,
-        hasNextPage: endIndex < filteredResults.length,
-        queryFilters,
-        vectorSimilarity: true
-      };
+      // 5. Build Response
+      const response = this.buildPaginatedResponse(filteredResults, pageNumber, pageSize, queryFilters);
 
       return { success: true, payload: response };
     } catch (error) {
@@ -205,6 +91,157 @@ export class HybridSearchService {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
+
+  /**
+   * Bước 1: Query Layer (Hard Filters)
+   * Phân tích query và lấy IDs của các sản phẩm thỏa mãn tiêu chí cứng (giá, giới tính, v.v.)
+   */
+  private async applyHardFilters(queryFilters: NormalizedQueryFilters | null): Promise<string[] | null> {
+    if (!queryFilters) return null;
+
+    const whereClause = this.buildWhereClause(queryFilters);
+    const filteredProducts = await this.prisma.products.findMany({
+      where: whereClause,
+      select: { Id: true },
+      distinct: ['Id']
+    });
+
+    return filteredProducts.map(p => p.Id);
+  }
+
+  /**
+   * Bước 2: Hybrid Retrieval (Vector + BM25)
+   * Tìm kiếm ứng viên bằng cả Vector Similarity và Keyword Matching (BM25-ish)
+   */
+  private async performHybridRetrieval(searchText: string, hardFilterIds: string[] | null): Promise<string[]> {
+    const queryEmbedding = await this.embeddingService.generateEmbedding(searchText);
+    const embeddingString = `[${queryEmbedding.join(',')}]`;
+    const retrievalLimit = 10;
+
+    // 1. Get BM25 Candidates
+    const bm25Params: any[] = [];
+    if (hardFilterIds) bm25Params.push(hardFilterIds);
+    bm25Params.push(searchText);
+    bm25Params.push(retrievalLimit);
+
+    const bm25Rows = await this.embeddingService.em.getConnection().execute(`
+      SELECT product_id 
+      FROM product_embeddings 
+      WHERE is_active = true 
+      ${hardFilterIds ? 'AND product_id IN (?)' : ''}
+      ORDER BY search_text <@> ?
+      LIMIT ?
+    `, bm25Params);
+
+    // 2. Get Vector Candidates
+    const vectorParams: any[] = [];
+    vectorParams.push(embeddingString);
+    if (hardFilterIds) vectorParams.push(hardFilterIds);
+    vectorParams.push(embeddingString);
+    vectorParams.push(retrievalLimit);
+
+    const vectorRows = await this.embeddingService.em.getConnection().execute(`
+      SELECT product_id, 1 - (vector <=> ?::vector(1024)) as similarity 
+      FROM product_embeddings 
+      WHERE is_active = true 
+      ${hardFilterIds ? 'AND product_id IN (?)' : ''}
+      ORDER BY vector <=> ?::vector(1024)
+      LIMIT ?
+    `, vectorParams);
+
+    const bm25Ids = (Array.isArray(bm25Rows) ? bm25Rows : (bm25Rows as any)?.rows ?? []).map((r: any) => r.product_id);
+    const vectorData = (Array.isArray(vectorRows) ? vectorRows : (vectorRows as any)?.rows ?? []);
+    const vectorIds = vectorData.map((r: any) => r.product_id);
+
+    // 3. Intersection Merge (Giao của 2 mảng)
+    const candidateIds = bm25Ids.filter(id => vectorIds.includes(id));
+
+    console.log(`[HybridSearch] BM25 found ${bm25Ids.length} candidates`);
+    console.log(`[HybridSearch] Vector found ${vectorIds.length} candidates (top score: ${vectorData[0]?.similarity || 0})`);
+    console.log(`[HybridSearch] Intersection candidates (Giao): ${candidateIds.length}`);
+
+    return candidateIds;
+  }
+
+  /**
+   * Bước 3: Fetch candidate details
+   * Lấy thông tin chi tiết các sản phẩm từ database
+   */
+  private async fetchCandidateDetails(candidateIds: string[]) {
+    return await this.prisma.products.findMany({
+      where: { Id: { in: candidateIds }, IsDeleted: false },
+      include: {
+        Brands: true,
+        Categories: true,
+        ProductVariants: {
+          where: { IsDeleted: false },
+          include: {
+            Concentrations: true,
+            Media: { where: { IsPrimary: true } },
+            ProductAttributes: { include: { Attributes: true, AttributeValues: true } }
+          },
+          orderBy: { BasePrice: 'asc' }
+        },
+        ProductNoteMaps: { include: { ScentNotes: true } },
+        ProductFamilyMaps: { include: { OlfactoryFamilies: true } },
+        ProductAttributes: { include: { Attributes: true, AttributeValues: true } },
+        Media: { where: { IsPrimary: true } }
+      }
+    });
+  }
+
+  /**
+   * Bước 4: Reranking & Filtering
+   * Sử dụng AI Reranker để đánh giá lại độ liên quan và lọc bỏ kết quả điểm thấp
+   */
+  private async rerankAndFilter(searchText: string, products: any[], retrievalLimit: number) {
+    const rerankCandidates = products.map(p => {
+      const scentNotes = p.ProductNoteMaps.map(n => n.ScentNotes.Name).join(', ');
+      const families = p.ProductFamilyMaps.map(f => f.OlfactoryFamilies.Name).join(', ');
+      return {
+        ...p,
+        text: `name: ${p.Name} brand: ${p.Brands.Name} category: ${p.Categories.Name} notes: ${scentNotes} families: ${families} description: ${p.Description || ''}`
+      };
+    });
+
+    const rerankedResults = await this.rerankService.rerank(searchText, rerankCandidates, retrievalLimit);
+
+    const threshold = 0.2;
+    const filteredResults = rerankedResults.filter(r => r.rerankScore >= threshold);
+    console.log(`[HybridSearch] Reranked ${rerankedResults.length} items, ${filteredResults.length} passed threshold ${threshold}`);
+
+    return filteredResults;
+  }
+
+  /**
+   * Bước 5: Build Response
+   * Phân trang và map sang DTO response
+   */
+  private buildPaginatedResponse(
+    filteredResults: any[],
+    pageNumber: number,
+    pageSize: number,
+    queryFilters: NormalizedQueryFilters | null
+  ): HybridSearchResponse {
+    const startIndex = (pageNumber - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedResults = filteredResults.slice(startIndex, endIndex);
+
+    const items = paginatedResults.map(product => this.mapToProductResponse(product, queryFilters || undefined));
+
+    return {
+      items,
+      pageNumber,
+      pageSize,
+      totalCount: filteredResults.length,
+      totalPages: Math.ceil(filteredResults.length / pageSize),
+      hasPreviousPage: pageNumber > 1,
+      hasNextPage: endIndex < filteredResults.length,
+      queryFilters,
+      vectorSimilarity: true
+    };
+  }
+
 
   /**
    * Build Prisma WHERE clause từ NormalizedQueryFilters

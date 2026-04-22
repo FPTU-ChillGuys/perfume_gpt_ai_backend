@@ -25,18 +25,6 @@ export class TrendController {
   ) { }
 
 
-  /** Dự đoán xu hướng từ tổng hợp log người dùng */
-  @Get('summary')
-  @Public()
-  @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
-  @ApiBaseResponse(String)
-  @ApiBody({ type: AllUserLogRequest })
-  async summarizeLogs(
-    @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<string>> {
-    return this.trendService.generateTrendSummary(allUserLogRequest);
-  }
-
   async getProductFromTrend(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<ProductCardResponse[]>> {
@@ -104,31 +92,4 @@ export class TrendController {
     );
   }
 
-  /** Lấy product từ xu hướng người dùng */
-  @Public()
-  @Get("product")
-  @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
-  @ApiBaseResponse(ProductCardResponse)
-  @ApiBody({ type: AllUserLogRequest })
-  @CacheTTL(1) // 1 ms
-  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
-  async getProductNoCaching(
-    @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<ProductCardResponse[]>> {
-    const trendResult = await this.getProductFromTrend(allUserLogRequest)
-    return trendResult
-  }
-
-  /**
-   * Dự đoán xu hướng có cấu trúc - Trả về metadata bổ sung (thời gian xử lý, khoảng thời gian phân tích).
-   */
-  @Get('summary/structured')
-  @ApiOperation({ summary: 'Dự đoán xu hướng có cấu trúc với metadata' })
-  @ApiBaseResponse(AITrendForecastStructuredResponse)
-  @ApiBody({ type: AllUserLogRequest })
-  async summarizeLogsStructured(
-    @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<AITrendForecastStructuredResponse>> {
-    return this.trendService.generateStructuredTrendForecast(allUserLogRequest);
-  }
 }

@@ -18,7 +18,14 @@
     "get_paginated_failed": "Lỗi khi lấy danh sách cuộc hội thoại có phân trang.",
     "guest_denied": "Rất tiếc, bạn cần đăng nhập để thực hiện chức năng này. Vui lòng đăng nhập để tôi có thể hỗ trợ bạn tốt nhất!",
     "ai_response_failed": "Lỗi khi lấy phản hồi từ AI.",
-    "no_products_found": "Hiện tại cửa hàng không tìm thấy sản phẩm nào phù hợp với yêu cầu của bạn. Bạn có muốn thử tìm kiếm với tiêu chí khác không?"
+    "no_products_found": "Hiện tại cửa hàng không tìm thấy sản phẩm nào phù hợp với yêu cầu của bạn. Bạn có muốn thử tìm kiếm với tiêu chí khác không?",
+    "system_instructions": {
+      "action_denied_guest": "FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Tính năng {funcName} yêu cầu đăng nhập. BẮT BUỘC phản hồi là xin lỗi vì chưa đăng nhập nên không thể thực hiện, và hướng dẫn họ đăng nhập.",
+      "empty_results_warning": "EMPTY_RESULTS_WARNING: Dữ liệu (SEARCH_RESULTS) hoàn toàn rỗng! BẮT BUỘC phản hồi là \"hiện tại cửa hàng không tìm thấy sản phẩm nào phù hợp\". TUYỆT ĐỐI KHÔNG ĐƯỢC tự bịa.",
+      "guest_user_prompt": "GUEST_USER_PROMPT: Khách chưa đăng nhập. Nhắc khách đăng nhập để cá nhân hóa, nhưng vẫn tư vấn bình thường nếu có kết quả.",
+      "profile_update_prompt": "PROFILE_UPDATE_REQUIRED: Nhắc người dùng cập nhật profile (sở thích, survey) nhưng vẫn đưa gợi ý nếu có kết quả.",
+      "fallback_explanation": "Fallback analysis because intermediate analysis failed"
+    }
   },
   "recommendation": {
     "no_history_fallback": "Chúng tôi rất trân trọng sự quan tâm của Quý khách. Hiện tại hệ thống chưa ghi nhận đơn hàng trước đó, nên chúng tôi xin gửi một số gợi ý mở đầu để Quý khách khám phá phong cách hương thơm phù hợp nhất."

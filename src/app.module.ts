@@ -142,7 +142,15 @@ import { HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
     I18nModule.forRoot({
       fallbackLanguage: 'vi',
       loaderOptions: {
-        path: path.join(__dirname, '../i18n/'),
+        path: (() => {
+          const p = [
+            path.join(process.cwd(), 'src', 'i18n'),
+            path.join(process.cwd(), 'dist', 'i18n'),
+            path.join(__dirname, 'i18n'),
+            path.join(__dirname, '..', 'i18n'),
+          ].find((dir) => fs.existsSync(dir));
+          return p || path.join(__dirname, 'i18n');
+        })(),
         watch: true,
       },
       resolvers: [

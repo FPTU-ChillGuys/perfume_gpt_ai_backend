@@ -12,6 +12,12 @@ import { Conversation } from 'src/domain/entities/conversation.entity';
 import { ConversationDto, ConversationRequestDto } from 'src/application/dtos/common/conversation.dto';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import {
+  ProductResponse
+} from 'src/application/dtos/response/product.response';
+import {
+  ProductWithVariantsResponse
+} from 'src/application/dtos/response/product-with-variants.response';
 import { conversationOutput } from 'src/chatbot/output/search.output';
 import { AnalysisObject, QueryItemObject } from 'src/chatbot/output/analysis.output';
 import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION, INSTRUCTION_TYPE_STAFF_CONSULTATION } from 'src/application/constant/prompts';
@@ -39,6 +45,15 @@ import { PagedConversationRequest } from 'src/application/dtos/request/paged-con
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { ProfileTool } from 'src/chatbot/tools/profile.tool';
+
+import {
+  AiChatResponse,
+  AiProductTempItem,
+  MinimalProduct,
+  MinimalProductVariant,
+  MultiQueryExecutionResult,
+  ToolActionResult
+} from 'src/application/dtos/response/ai-chat.response';
 
 import { OrderService } from 'src/infrastructure/domain/order/order.service';
 import { CartService } from 'src/infrastructure/domain/cart/cart.service';
@@ -98,7 +113,7 @@ export class ConversationService {
 
     const responseConversation = await this.processAiChatResponse(
       convertedMessages,
-      conversation.messages || [],
+      conversation.messages ?? [],
       conversation.id || '',
       userId,
       promptResult.data.adminInstruction,
@@ -238,7 +253,7 @@ export class ConversationService {
         const pageNumber = Math.max(Number(request.pageNumber) || 1, 1);
         const pageSize = Math.max(Number(request.pageSize) || 10, 1);
 
-        const where: Record<string, any> = {};
+        const where: Record<string, unknown> = {};
         if (request.userId) {
           where.userId = request.userId;
         }
@@ -291,7 +306,7 @@ export class ConversationService {
 
   private async processAiChatResponse(
     convertedMessages: UIMessage[],
-    conversationMessages: any[],
+    conversationMessages: MessageDto[],
     conversationId: string,
     userId: string,
     adminInstruction: string | undefined,
@@ -413,9 +428,9 @@ export class ConversationService {
     analysis: AnalysisObject,
     userId: string,
     isGuestUser: boolean
-  ): Promise<{ products: any[], taskResults: UIMessage[], hasResults: boolean }> {
+  ): Promise<{ products: MinimalProduct[], taskResults: UIMessage[], hasResults: boolean }> {
     
-    let products: any[] = [];
+    let products: MinimalProduct[] = [];
     const taskResults: UIMessage[] = [];
     const pageSize = analysis.pagination?.pageSize || 5;
 
@@ -485,7 +500,7 @@ export class ConversationService {
         const queryProducts = searchRes.success && searchRes.data ? searchRes.data.items : [];
         
         if (targetItems.length > 0 && queryProducts.length > 0) {
-          const queryIds = new Set(queryProducts.map(p => p.id));
+          const queryIds = new Set(queryProducts.map((p: any) => p.id));
           const intersection = targetItems.filter(p => queryIds.has(p.id));
           products = intersection.length > 0 ? intersection : queryProducts;
         } else {
@@ -494,7 +509,7 @@ export class ConversationService {
         products = products.slice(0, analysis.pagination?.pageSize || 5);
       }
 
-      const minimal = products.map(p => {
+      const minimal: MinimalProduct[] = products.map(p => {
          const mapped = this.mapToMinimalProduct(p, 'FUNCTION_RESULTS');
          // Apply budget filter
          if (analysis.budget && (analysis.budget.min !== null || analysis.budget.max !== null)) {
@@ -517,12 +532,10 @@ export class ConversationService {
     isGuestUser: boolean
   ): Promise<UIMessage> {
     if (isGuestUser) {
-      return this.createSystemMessage(
-        `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Tính năng ${funcName} yêu cầu đăng nhập. BẮT BUỘC phản hồi: xin lỗi vì chưa đăng nhập nên không thể thực hiện, và hướng dẫn họ đăng nhập.`
-      );
+      return this.createSystemMessage(this.i18n.t('common.conversation.system_instructions.action_denied_guest', { args: { funcName } }));
     }
 
-    let res: any;
+    let res: unknown;
     try {
       if (funcName === 'addToCart') {
         const items = Array.isArray(args.items) ? args.items : [];
@@ -577,7 +590,7 @@ export class ConversationService {
       throw new InternalServerErrorWithDetailsException('Failed to get structured AI response', { ...context, service: 'AIHelper' });
     }
 
-    return typeof message.data === 'string' ? JSON.parse(message.data) : message.data;
+    return (typeof message.data === 'string' ? JSON.parse(message.data) : message.data) as AiChatResponse;
   }
 
   private applyFlowWarnings(analysis: AnalysisObject, hasResults: boolean, isGuestUser: boolean, messages: UIMessage[]): UIMessage[] {
@@ -587,16 +600,14 @@ export class ConversationService {
 
     // 1. Cảnh báo dữ liệu rỗng
     if (!hasResults && shouldQuery) {
-      results.push(this.createSystemMessage(
-        'EMPTY_RESULTS_WARNING: Dữ liệu (SEARCH_RESULTS) hoàn toàn rỗng! BẮT BUỘC phản hồi là "hiện tại cửa hàng không tìm thấy sản phẩm nào phù hợp". TUYỆT ĐỐI KHÔNG ĐƯỢC tự bịa.'
-      ));
+      results.push(this.createSystemMessage(this.i18n.t('common.conversation.system_instructions.empty_results_warning')));
     }
 
     // 2. Cảnh báo thiếu Profile
     if (!isObjective && this.hasAnalysisFlag(analysis, 'PROFILE_ENRICHMENT_SKIPPED')) {
       const warningText = isGuestUser 
-        ? 'GUEST_USER_PROMPT: Khách chưa đăng nhập. Nhắc khách đăng nhập để cá nhân hóa, nhưng vẫn tư vấn bình thường nếu có kết quả.'
-        : 'PROFILE_UPDATE_REQUIRED: Nhắc người dùng cập nhật profile (sở thích, survey) nhưng vẫn đưa gợi ý nếu có kết quả.';
+        ? this.i18n.t('common.conversation.system_instructions.guest_user_prompt')
+        : this.i18n.t('common.conversation.system_instructions.profile_update_prompt');
       results.push(this.createSystemMessage(warningText));
     }
 
@@ -607,7 +618,7 @@ export class ConversationService {
   // PRIVATE HELPERS: STEP 5 - HYDRATION
   // -------------------------------------------------------------------------
 
-  private async hydrateProductDisplayData(aiResponse: any, analysis: AnalysisObject) {
+  private async hydrateProductDisplayData(aiResponse: AiChatResponse, analysis: AnalysisObject): Promise<AiChatResponse> {
     if (!aiResponse.productTemp || !Array.isArray(aiResponse.productTemp) || aiResponse.productTemp.length === 0) {
       return aiResponse;
     }
@@ -654,7 +665,7 @@ export class ConversationService {
   // PRIVATE HELPERS: STEP 6 - FINALIZATION
   // -------------------------------------------------------------------------
 
-  private async finalizeAndQueueResponse(aiResponse: any, conversationId: string, userId: string, conversationMessages: any[]) {
+  private async finalizeAndQueueResponse(aiResponse: AiChatResponse, conversationId: string, userId: string, conversationMessages: MessageDto[]): Promise<ConversationDto> {
     const finalMessageData = JSON.stringify(aiResponse);
 
     const responseConversation = overrideMessagesToConversation(
@@ -695,7 +706,7 @@ export class ConversationService {
       pagination: { pageNumber: 1, pageSize: 5 },
       originalRequestVietnamese: messageText,
       normalizationMetadata: null,
-      explanation: 'Fallback analysis because intermediate analysis failed'
+      explanation: this.i18n.t('common.conversation.system_instructions.fallback_explanation') as string
     };
   }
 
@@ -755,39 +766,39 @@ export class ConversationService {
     }
   }
 
-  private mapToMinimalProduct(product: any, source: string) {
+  private mapToMinimalProduct(product: ProductResponse | ProductWithVariantsResponse, source: string): MinimalProduct {
     return {
       id: product.id,
       name: product.name,
       brand: product.brandName,
       category: product.categoryName,
       image: product.primaryImage,
-      attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
-      scentNotes: product.scentNotes,
-      olfactoryFamilies: product.olfactoryFamilies,
-      variants: (product.variants || []).map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
+      attributes: (product.attributes || []).map((attr) => `${attr.attribute}: ${attr.value}`),
+      scentNotes: (product as ProductWithVariantsResponse).scentNotes || [],
+      olfactoryFamilies: (product as ProductWithVariantsResponse).olfactoryFamilies || [],
+      variants: ((product as ProductWithVariantsResponse).variants || []).map((v) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
       source
     };
   }
 
-  private async executeFunctionQuery(query: QueryItemObject): Promise<any[]> {
+  private async executeFunctionQuery(query: QueryItemObject): Promise<Array<ProductResponse | ProductWithVariantsResponse>> {
     if (!query.functionCall) return [];
     const name = query.functionCall.name;
-    let items: any[] = [];
+    let items: Array<ProductResponse | ProductWithVariantsResponse> = [];
     if (name === 'getBestSellingProducts') {
       const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
-      if (res.success && res.data) items = res.data.items.map((i: any) => i.product);
+      if (res.success && res.data) items = res.data.items.map((i) => i.product);
     } else if (name === 'getNewestProducts') {
       const res = await this.productService.getNewestProductsWithVariants({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
       if (res.success && res.data) items = res.data.items;
     } else if (name === 'getLeastSellingProducts') {
       const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'asc', IsDescending: false });
-      if (res.success && res.data) items = res.data.items.map((i: any) => i.product);
+      if (res.success && res.data) items = res.data.items.map((i) => i.product);
     }
     return items;
   }
 
-  private async executeProfileQuery(userId: string, query: QueryItemObject, root: AnalysisObject): Promise<any[]> {
+  private async executeProfileQuery(userId: string, query: QueryItemObject, root: AnalysisObject): Promise<ProductWithVariantsResponse[]> {
     try {
       const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
       if (!payload || payload.source === 'none') return [];
@@ -807,7 +818,7 @@ export class ConversationService {
     }
   }
 
-  private async executeSearchQuery(query: QueryItemObject, root: AnalysisObject): Promise<any[]> {
+  private async executeSearchQuery(query: QueryItemObject, root: AnalysisObject): Promise<ProductWithVariantsResponse[]> {
     const logicGroups = query.logic || [];
     const shared = { productNames: query.productNames || null, sorting: query.sorting || root.sorting || null, budget: query.budget || root.budget || null };
 
@@ -816,13 +827,13 @@ export class ConversationService {
       return res.success && res.data ? res.data.items : [];
     }
 
-    const subResults: any[][] = [];
+    const subResults: ProductWithVariantsResponse[][] = [];
     for (let i = 0; i < logicGroups.length; i++) {
       const res = await this.productService.getProductsByStructuredQuery({ logic: [logicGroups[i]], ...shared, budget: i === 0 ? shared.budget : null, pagination: { pageNumber: 1, pageSize: 50 } });
       if (res.success && res.data) subResults.push(res.data.items);
     }
 
-    const scoreMap = new Map<string, { p: any; s: number }>();
+    const scoreMap = new Map<string, { p: ProductWithVariantsResponse; s: number }>();
     for (const products of subResults) {
       for (const p of products) {
         const existing = scoreMap.get(p.id);
@@ -837,16 +848,17 @@ export class ConversationService {
     return intersection.length > 0 ? intersection : sorted.map(e => e.p);
   }
 
-  private async executeMultiQueries(queries: QueryItemObject[], root: AnalysisObject, userId: string, isGuest: boolean, pageSize: number) {
-    const allProducts: any[] = [];
-    const functionProducts: any[] = [];
+  private async executeMultiQueries(queries: QueryItemObject[], root: AnalysisObject, userId: string, isGuest: boolean, pageSize: number): Promise<MultiQueryExecutionResult> {
+    const allProducts: MinimalProduct[] = [];
+    const functionProducts: Array<ProductResponse | ProductWithVariantsResponse> = [];
     const taskResults: UIMessage[] = [];
     const seen = new Set<string>();
 
     for (const q of queries) {
       if (q.purpose === 'function' && q.functionCall) {
-        if (['addToCart', 'getCart', 'clearCart', 'getOrdersByUserId'].includes(q.functionCall.name)) {
-          taskResults.push(await this.executeActionTool(q.functionCall.name, q.functionCall.arguments || {}, userId, isGuest));
+        const funcName = q.functionCall.name;
+        if (['addToCart', 'getCart', 'clearCart', 'getOrdersByUserId'].includes(funcName)) {
+          taskResults.push(await this.executeActionTool(funcName, q.functionCall.arguments || {}, userId, isGuest));
         } else {
           const items = await this.executeFunctionQuery(q);
           for (const p of items) { if (p.id && !seen.has(p.id)) { seen.add(p.id); functionProducts.push(p); } }
@@ -863,7 +875,7 @@ export class ConversationService {
     let combined = [...functionProducts.map(p => this.mapToMinimalProduct(p, 'FUNCTION_RESULTS')), ...allProducts];
     if (root.budget && (root.budget.min !== null || root.budget.max !== null)) {
       const { min, max } = root.budget;
-      combined = combined.map(p => ({ ...p, variants: p.variants.filter((v: any) => (min === null || v.price >= min) && (max === null || v.price <= max)) })).filter(p => p.variants.length > 0);
+      combined = combined.map(p => ({ ...p, variants: p.variants.filter((v: MinimalProductVariant) => (min === null || v.price >= min) && (max === null || v.price <= max)) })).filter(p => p.variants.length > 0);
     }
 
     return { mergedProducts: combined.slice(0, pageSize), taskResults };

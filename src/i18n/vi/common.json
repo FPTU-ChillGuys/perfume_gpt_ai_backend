@@ -1,0 +1,26 @@
+{
+  "common": {
+    "error": "Lỗi hệ thống, vui lòng thử lại sau.",
+    "success": "Thành công",
+    "not_found": "Không tìm thấy dữ liệu"
+  },
+  "conversation": {
+    "error_fetching_inventory": "Không thể lấy dữ liệu tồn kho từ Redis.",
+    "analysis_failed": "Phân tích ý định người dùng thất bại.",
+    "chat_success": "Phản hồi AI thành công.",
+    "build_prompt_failed": "Lỗi khi xây dựng prompt kết hợp.",
+    "already_exists": "Cuộc hội thoại đã tồn tại.",
+    "add_failed": "Không thể thêm cuộc hội thoại.",
+    "update_messages_failed": "Không thể cập nhật tin nhắn.",
+    "not_found": "Không tìm thấy cuộc hội thoại.",
+    "get_failed": "Lỗi khi lấy thông tin cuộc hội thoại.",
+    "get_all_failed": "Lỗi khi lấy danh sách cuộc hội thoại.",
+    "get_paginated_failed": "Lỗi khi lấy danh sách cuộc hội thoại có phân trang.",
+    "guest_denied": "Rất tiếc, bạn cần đăng nhập để thực hiện chức năng này. Vui lòng đăng nhập để tôi có thể hỗ trợ bạn tốt nhất!",
+    "ai_response_failed": "Lỗi khi lấy phản hồi từ AI.",
+    "no_products_found": "Hiện tại cửa hàng không tìm thấy sản phẩm nào phù hợp với yêu cầu của bạn. Bạn có muốn thử tìm kiếm với tiêu chí khác không?"
+  },
+  "recommendation": {
+    "no_history_fallback": "Chúng tôi rất trân trọng sự quan tâm của Quý khách. Hiện tại hệ thống chưa ghi nhận đơn hàng trước đó, nên chúng tôi xin gửi một số gợi ý mở đầu để Quý khách khám phá phong cách hương thơm phù hợp nhất."
+  }
+}

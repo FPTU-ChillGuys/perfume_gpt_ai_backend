@@ -1,0 +1,33 @@
+{
+  "report": {
+    "title": "TỔNG QUAN TRẠNG THÁI KHO",
+    "totalSku": "Tổng số SKU",
+    "lowStock": "Số SKU sắp hết hoặc hết hàng",
+    "outOfStock": "Số SKU hết hàng hoàn toàn",
+    "expired": "Số lô hàng (batch) đã hết hạn",
+    "nearExpiry": "Số lô hàng (batch) cận hạn (dưới 30 ngày)",
+    "criticalAlerts": "Số cảnh báo nghiêm trọng (hết hàng)",
+    "detailHeader": "CHI TIẾT TỒN KHO VÀ ĐIỀU KIỆN LÔ HÀNG",
+    "detailNote": "Lưu ý: Danh sách dưới đây liệt kê ưu tiên các mặt hàng đang có vấn đề về tồn kho hoặc hạn dùng.",
+    "product": "Sản phẩm",
+    "sku": "SKU",
+    "currentStock": "Tồn kho hiện tại",
+    "threshold": "Ngưỡng báo động",
+    "status": "Trạng thái",
+    "batchInfo": "Thông tin lô hàng",
+    "noBatchData": "(Không có dữ liệu lô hàng còn tồn)",
+    "statusLabels": {
+      "outOfStock": "HẾT HÀNG",
+      "lowStock": "SẮP HẾT HÀNG",
+      "stable": "ỔN ĐỊNH",
+      "expired": "HẾT HẠN",
+      "nearExpiry": "CẬN HẠN"
+    }
+  },
+  "errors": {
+    "fetchStock": "Lỗi khi lấy thông tin tồn kho từ Redis",
+    "fetchBatches": "Lỗi khi lấy thông tin lô hàng từ Redis",
+    "logNotFound": "Không tìm thấy log tồn kho",
+    "pdfConvert": "Lỗi khi chuyển đổi markdown sang PDF"
+  }
+}

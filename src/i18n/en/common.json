@@ -1,0 +1,26 @@
+{
+  "common": {
+    "error": "System error, please try again later.",
+    "success": "Success",
+    "not_found": "Data not found"
+  },
+  "conversation": {
+    "error_fetching_inventory": "Failed to fetch inventory stock from Redis.",
+    "analysis_failed": "Failed to analyze user intent.",
+    "chat_success": "AI response successful.",
+    "build_prompt_failed": "Failed to build combined prompt.",
+    "already_exists": "Conversation already exists.",
+    "add_failed": "Failed to add conversation.",
+    "update_messages_failed": "Failed to update messages.",
+    "not_found": "Conversation not found.",
+    "get_failed": "Failed to get conversation.",
+    "get_all_failed": "Failed to get all conversations.",
+    "get_paginated_failed": "Failed to get paginated conversations.",
+    "guest_denied": "I'm sorry, you need to log in to perform this action. Please log in so I can assist you better!",
+    "ai_response_failed": "Failed to get AI response.",
+    "no_products_found": "Currently, the store could not find any products matching your request. Would you like to try searching with different criteria?"
+  },
+  "recommendation": {
+    "no_history_fallback": "We appreciate your interest. Since we don't have your purchase history yet, we've provided some starting suggestions to help you explore the fragrance style that suits you best."
+  }
+}

@@ -7,6 +7,7 @@ import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { Tools } from 'src/chatbot/tools';
 import { UnitOfWorkModule } from 'src/infrastructure/domain/common/unit-of-work.module';
 import { ToolModule } from 'src/infrastructure/domain/ai/tool.module';
+import { AdminInstructionModule } from 'src/infrastructure/domain/admin-instruction/admin-instruction.module';
 import {
   aiModelForSurvey,
   aiModelForRestock,
@@ -160,7 +161,7 @@ const aiInventoryReportProvider: Provider = {
 };
 
 @Module({
-  imports: [UnitOfWorkModule, ToolModule, HttpModule],
+  imports: [UnitOfWorkModule, ToolModule, HttpModule, forwardRef(() => AdminInstructionModule)],
   providers: [
     AiAnalysisService,
     RerankService,

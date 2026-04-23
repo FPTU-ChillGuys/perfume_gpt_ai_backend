@@ -1,0 +1,33 @@
+{
+  "report": {
+    "title": "INVENTORY STATUS OVERVIEW",
+    "totalSku": "Total SKU",
+    "lowStock": "Low stock or out of stock SKU",
+    "outOfStock": "Completely out of stock SKU",
+    "expired": "Expired batches",
+    "nearExpiry": "Near expiry batches (under 30 days)",
+    "criticalAlerts": "Critical alerts (out of stock)",
+    "detailHeader": "INVENTORY DETAILS AND BATCH CONDITIONS",
+    "detailNote": "Note: The list below prioritizes items with inventory or expiry issues.",
+    "product": "Product",
+    "sku": "SKU",
+    "currentStock": "Current stock",
+    "threshold": "Alarm threshold",
+    "status": "Status",
+    "batchInfo": "Batch info",
+    "noBatchData": "(No stock batch data available)",
+    "statusLabels": {
+      "outOfStock": "OUT OF STOCK",
+      "lowStock": "LOW STOCK",
+      "stable": "STABLE",
+      "expired": "EXPIRED",
+      "nearExpiry": "NEAR EXPIRY"
+    }
+  },
+  "errors": {
+    "fetchStock": "Failed to fetch inventory stock from Redis",
+    "fetchBatches": "Failed to fetch batches from Redis",
+    "logNotFound": "Inventory log not found",
+    "pdfConvert": "Failed to convert markdown to PDF"
+  }
+}

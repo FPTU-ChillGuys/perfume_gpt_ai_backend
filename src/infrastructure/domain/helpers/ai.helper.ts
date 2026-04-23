@@ -342,4 +342,18 @@ export class AIHelper {
       }
     }, 'Failed to generate object from messages');
   }
+
+  async objectGenerateFromPrompt<T>(
+    prompt: string,
+    output: Schema<T> | { schema: Schema<T> },
+    additionalSystemPrompt?: string,
+    errorMessage?: string
+  ): Promise<BaseResponse<T>> {
+    return this.objectGenerateFromMessages<T>(
+      [{ id: '1', role: 'user', parts: [{ type: 'text', text: prompt }] }],
+      output,
+      additionalSystemPrompt,
+      errorMessage
+    );
+  }
 }

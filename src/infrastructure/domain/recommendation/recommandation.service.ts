@@ -12,6 +12,7 @@ import { buildCombinedPromptV5 } from 'src/infrastructure/domain/utils/prompt-bu
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { AI_RECOMMENDATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
+import { I18nService } from 'nestjs-i18n';
 import { EmailService, EmailProduct, EmailTemplate } from 'src/infrastructure/domain/common/mail.service';
 import {
   ActiveDailyRecommendationRecipient,
@@ -61,7 +62,8 @@ export class RecommendationService {
     private readonly productService: ProductService,
     private readonly prisma: PrismaService,
     private readonly aiAcceptanceService: AIAcceptanceService,
-    private readonly profileTool: ProfileTool
+    private readonly profileTool: ProfileTool,
+    private readonly i18n: I18nService
   ) { }
 
   private uniqueKeywords(items: string[]): string[] {
@@ -94,8 +96,7 @@ export class RecommendationService {
       : [];
 
     return JSON.stringify({
-      message:
-        'Chúng tôi rất trân trọng sự quan tâm của Quý khách. Hiện tại hệ thống chưa ghi nhận đơn hàng trước đó, nên chúng tôi xin gửi một số gợi ý mở đầu để Quý khách khám phá phong cách hương thơm phù hợp nhất.',
+      message: this.i18n.t('common.recommendation.no_history_fallback'),
       products
     });
   }

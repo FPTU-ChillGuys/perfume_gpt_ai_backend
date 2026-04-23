@@ -3,6 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Output, UIMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
+import { I18nService } from 'nestjs-i18n';
 
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
@@ -13,7 +14,7 @@ import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { conversationOutput } from 'src/chatbot/output/search.output';
 import { AnalysisObject, QueryItemObject } from 'src/chatbot/output/analysis.output';
-import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION, STAFF_CONSULTATION_SYSTEM_PROMPT, INSTRUCTION_TYPE_STAFF_CONSULTATION } from 'src/application/constant/prompts';
+import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION, INSTRUCTION_TYPE_STAFF_CONSULTATION } from 'src/application/constant/prompts';
 import {
   addMessageToMessages,
   convertToMessages,
@@ -58,7 +59,8 @@ export class ConversationService {
     private readonly orderService: OrderService,
     private readonly analysisService: AiAnalysisService,
     private readonly profileTool: ProfileTool,
-    @Inject(AI_STAFF_CONVERSATION_HELPER) private readonly staffAiHelper: AIHelper
+    @Inject(AI_STAFF_CONVERSATION_HELPER) private readonly staffAiHelper: AIHelper,
+    private readonly i18n: I18nService
   ) {}
 
   // -------------------------------------------------------------------------
@@ -84,7 +86,7 @@ export class ConversationService {
 
     if (!promptResult.success || !promptResult.data) {
       throw new InternalServerErrorWithDetailsException(
-        'Failed to build combined prompt',
+        this.i18n.t('common.conversation.build_prompt_failed'),
         {
           userId,
           conversationId: conversation.id,
@@ -119,7 +121,7 @@ export class ConversationService {
         );
 
         if (existedConversation) {
-          return { success: false, error: 'Conversation already exists' };
+          return { success: false, error: this.i18n.t('common.conversation.already_exists') };
         }
 
         const conversation = new Conversation({
@@ -149,7 +151,7 @@ export class ConversationService {
         const conversationDto = ConversationMapper.toResponse(conversation, true);
         return { success: true, data: conversationDto };
       },
-      'Failed to add conversation',
+      this.i18n.t('common.conversation.add_failed'),
       true
     );
   }
@@ -190,7 +192,7 @@ export class ConversationService {
           data: MessageMapper.toResponseList(conversation.messages.getItems())
         };
       },
-      'Failed to update messages',
+      this.i18n.t('common.conversation.update_failed'),
       true
     );
   }
@@ -204,12 +206,12 @@ export class ConversationService {
         { populate: ['messages'] }
       );
       if (!conversation) {
-        return { success: false, error: 'Conversation not found' };
+        return { success: false, error: this.i18n.t('common.conversation.not_found') };
       }
 
       const conversationDto = ConversationMapper.toResponse(conversation, true);
       return { success: true, data: conversationDto };
-    }, 'Failed to get conversation by id');
+    }, this.i18n.t('common.conversation.get_failed'));
   }
 
   async getAllConversations(): Promise<BaseResponse<ConversationDto[]>> {
@@ -223,7 +225,7 @@ export class ConversationService {
         const response = ConversationMapper.toResponseList(conversations, true);
         return { success: true, data: response };
       },
-      'Failed to get all conversations',
+      this.i18n.t('common.conversation.get_all_failed'),
       true
     );
   }
@@ -262,7 +264,7 @@ export class ConversationService {
 
         return { success: true, data: pagedResult };
       },
-      'Failed to get paginated conversations',
+      this.i18n.t('common.conversation.get_paginated_failed'),
       true
     );
   }

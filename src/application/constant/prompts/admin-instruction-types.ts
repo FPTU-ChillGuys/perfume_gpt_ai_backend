@@ -44,6 +44,21 @@ export const INSTRUCTION_TYPE_SEARCH_EXTRACTION = 'search_extraction';
 /** Loại instruction cho tư vấn nội bộ cửa hàng (Staff Consultation) */
 export const INSTRUCTION_TYPE_STAFF_CONSULTATION = 'staff_consultation';
 
+/** Loại instruction cho phân tích ý định (intent only) */
+export const INSTRUCTION_TYPE_INTENT_ONLY_ANALYSIS = 'intent_only_analysis';
+
+/** Loại instruction cho chuẩn hóa dữ liệu nội bộ (internal normalization) */
+export const INSTRUCTION_TYPE_INTERNAL_NORMALIZATION = 'internal_normalization';
+
+/** Loại instruction cho phân tích survey (tổng thể) */
+export const INSTRUCTION_TYPE_SURVEY_ANALYSIS = 'survey_analysis';
+
+/** Loại instruction cho phân tích trend (từ Google Trends) */
+export const INSTRUCTION_TYPE_TREND_ANALYSIS = 'trend_analysis';
+
+/** Loại instruction cho phân tích từng câu trả lời survey */
+export const INSTRUCTION_TYPE_SURVEY_ANSWER_ANALYSIS = 'survey_answer_analysis';
+
 /** Danh sách tất cả các loại instruction hợp lệ */
 export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_REVIEW,
@@ -57,7 +72,12 @@ export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_SURVEY,
   INSTRUCTION_TYPE_RESTOCK,
   INSTRUCTION_TYPE_SEARCH_EXTRACTION,
-  INSTRUCTION_TYPE_STAFF_CONSULTATION
+  INSTRUCTION_TYPE_STAFF_CONSULTATION,
+  INSTRUCTION_TYPE_INTENT_ONLY_ANALYSIS,
+  INSTRUCTION_TYPE_INTERNAL_NORMALIZATION,
+  INSTRUCTION_TYPE_SURVEY_ANALYSIS,
+  INSTRUCTION_TYPE_TREND_ANALYSIS,
+  INSTRUCTION_TYPE_SURVEY_ANSWER_ANALYSIS
 ] as const;
 
 export type InstructionDomainType = (typeof ALL_INSTRUCTION_TYPES)[number];

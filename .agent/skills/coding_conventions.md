@@ -299,3 +299,5 @@ Khi thêm Redis Repository mới vào domain:
 - [ ] Không có system prompt nghiệp vụ ngoài seed file
 - [ ] Không sửa DTO gốc của người khác ở .NET (chỉ extend)
 - [ ] `eslint.config.mjs` không thay đổi `__dirname`
+- [ ] Chạy `pnpm run build` thành công, không còn lỗi lint/type check.
+- [ ] Cập nhật `walkthrough.md` với bằng chứng hình ảnh (nếu là UI).

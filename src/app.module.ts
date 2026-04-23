@@ -19,6 +19,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import * as path from 'path';
 import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
+import { HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
 
 @Module({
   imports: [
@@ -38,7 +39,7 @@ import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
         return {
           ...config,
           host: config.host ?? configService.get<string>("POSTGRES_HOST"),
-          port:   config.port ?? configService.get<number>("POSTGRES_PORT"),
+          port: config.port ?? configService.get<number>("POSTGRES_PORT"),
           user: config.user ?? configService.get<string>("POSTGRES_USER"),
           password: config.password ?? configService.get<string>("POSTGRES_PASSWORD")
         };
@@ -137,7 +138,18 @@ import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
           port: config.get<number>('REDIS_PORT')
         }
       })
-    })
+    }),
+    I18nModule.forRoot({
+      fallbackLanguage: 'vi',
+      loaderOptions: {
+        path: path.join(__dirname, '../i18n/'),
+        watch: true,
+      },
+      resolvers: [
+        { use: QueryResolver, options: ['lang'] },
+        HeaderResolver,
+      ],
+    }),
   ],
   controllers: [AppController],
   providers: [

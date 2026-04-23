@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -12,6 +12,8 @@ import {
 /** Service quản lý chỉ thị admin cho hệ thống AI */
 @Injectable()
 export class AdminInstructionService {
+  private readonly logger = new Logger(AdminInstructionService.name);
+
   constructor(private unitOfWork: UnitOfWork) {}
 
   /** Lấy tất cả chỉ thị */
@@ -143,12 +145,21 @@ export class AdminInstructionService {
    * Trả về chuỗi rỗng nếu không có instruction nào cho domain đó.
    * Dùng để inject admin instruction vào các AI endpoint.
    */
-  async getSystemPromptForDomain(domain: string): Promise<string> {
+  async getSystemPromptForDomain(domain: string, defaultPrompt: string = ''): Promise<string> {
     try {
       const combined = await this.unitOfWork.AdminInstructionRepo.getCombinedInstructionsByType(domain);
-      return combined || '';
-    } catch {
-      return '';
+      
+      if (!combined) {
+        this.logger.warn(
+          `[AdminInstruction] System prompt for domain "${domain}" is EMPTY. ` +
+          `Database may not be seeded. Please run: pnpm seed`
+        );
+      }
+
+      return combined || defaultPrompt;
+    } catch (error) {
+      this.logger.error(`Failed to fetch prompt for domain: ${domain}`, error);
+      return defaultPrompt;
     }
   }
 

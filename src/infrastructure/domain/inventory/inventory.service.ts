@@ -22,6 +22,7 @@ import {
   INSTRUCTION_TYPE_INVENTORY,
   INSTRUCTION_TYPE_RESTOCK
 } from 'src/application/constant/prompts';
+import { I18nService } from 'nestjs-i18n';
 import {
   isDataEmpty,
   INSUFFICIENT_DATA_MESSAGES
@@ -60,6 +61,12 @@ type RestockLogPayload = {
   variants?: RestockVariantResult[];
 };
 
+type BatchItem = {
+  batchCode: string;
+  expiryDate: string;
+  remainingQuantity: number;
+};
+
 @Injectable()
 export class InventoryService {
   //Them logger 
@@ -71,11 +78,12 @@ export class InventoryService {
     @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
-    private readonly sourcingCatalogService: SourcingCatalogService
+    private readonly sourcingCatalogService: SourcingCatalogService,
+    private readonly i18n: I18nService
   ) { }
 
   private async ensureCriticalLowStockIncluded(
-    restockData: any
+    restockData: RestockLogPayload | null
   ): Promise<{ variants: RestockVariantResult[] }> {
     const safeData = (restockData && typeof restockData === 'object' ? restockData : {}) as RestockLogPayload;
     const currentVariants = Array.isArray(safeData.variants)
@@ -147,7 +155,7 @@ export class InventoryService {
 
         return { success: true, payload: result };
       },
-      'Failed to fetch inventory stock from Redis',
+      this.i18n.t('inventory.errors.fetchStock'),
       true
     );
   }
@@ -174,7 +182,7 @@ export class InventoryService {
 
         return { success: true, payload: result };
       },
-      'Failed to fetch batches from Redis',
+      this.i18n.t('inventory.errors.fetchBatches'),
       true
     );
   }
@@ -199,8 +207,9 @@ export class InventoryService {
     };
   }
 
-  async createReportFromBatchAndStock(): Promise<String> {
+  async createReportFromBatchAndStock(lang?: string): Promise<String> {
     const stats = await this.getInventoryOverallStats();
+    const l = lang || 'vi';
 
     // 1. Fetch problematic stocks via Redis Repository
     const problematicResponse = (await this.inventoryRedisRepo.getPagedStock({
@@ -231,7 +240,7 @@ export class InventoryService {
     const stocks = mergedStocks;
 
     // Fetch batches for these variants to provide detailed info
-    const batchesByVariantId = new Map<string, any[]>();
+    const batchesByVariantId = new Map<string, BatchItem[]>();
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
 
@@ -243,7 +252,7 @@ export class InventoryService {
         const bResponse = (await this.inventoryRedisRepo.getPagedBatches({
           variantId: s.variantId,
           pageSize: 20 // Only need latest batches for report
-        })) as { items: any[] };
+        })) as { items: BatchItem[] };
         if (bResponse?.items) {
           batchesByVariantId.set(s.variantId, bResponse.items);
         }
@@ -253,21 +262,21 @@ export class InventoryService {
     }
 
     const reportLines = [
-      '# TỔNG QUAN TRẠNG THÁI KHO (Dữ liệu chính xác từ Redis)',
-      `- Tổng số SKU: ${stats.totalSku}`,
-      `- Số SKU sắp hết hoặc hết hàng: ${stats.lowStockSku}`,
-      `- Số SKU hết hàng hoàn toàn: ${stats.outOfStockSku}`,
-      `- Số lô hàng (batch) đã hết hạn: ${stats.expiredBatches}`,
-      `- Số lô hàng (batch) cận hạn (dưới 30 ngày): ${stats.nearExpiryBatches}`,
-      `- Số cảnh báo nghiêm trọng (hết hàng): ${stats.criticalAlerts}`,
+      `# ${this.i18n.t('inventory.report.title', { lang: l })}`,
+      `- ${this.i18n.t('inventory.report.totalSku', { lang: l })}: ${stats.totalSku}`,
+      `- ${this.i18n.t('inventory.report.lowStock', { lang: l })}: ${stats.lowStockSku}`,
+      `- ${this.i18n.t('inventory.report.outOfStock', { lang: l })}: ${stats.outOfStockSku}`,
+      `- ${this.i18n.t('inventory.report.expired', { lang: l })}: ${stats.expiredBatches}`,
+      `- ${this.i18n.t('inventory.report.nearExpiry', { lang: l })}: ${stats.nearExpiryBatches}`,
+      `- ${this.i18n.t('inventory.report.criticalAlerts', { lang: l })}: ${stats.criticalAlerts}`,
       '',
-      '--- CHI TIẾT TỒN KHO VÀ ĐIỀU KIỆN LÔ HÀNG ---',
-      'Lưu ý: Danh sách dưới đây liệt kê ưu tiên các mặt hàng đang có vấn đề về tồn kho hoặc hạn dùng.'
+      `--- ${this.i18n.t('inventory.report.detailHeader', { lang: l })} ---`,
+      this.i18n.t('inventory.report.detailNote', { lang: l })
     ];
 
     stocks.forEach((s) => {
       const variantBatches = batchesByVariantId.get(s.variantId) || [];
-      let batchInfo = '- (Không có dữ liệu lô hàng còn tồn)';
+      let batchInfo = `- ${this.i18n.t('inventory.report.noBatchData', { lang: l })}`;
 
       if (variantBatches.length > 0) {
         batchInfo = variantBatches.map(b => {
@@ -275,20 +284,27 @@ export class InventoryService {
           const isExpired = expiryDate < now;
           const isNearExpiry = !isExpired && expiryDate < thirtyDaysFromNow;
           let statusLabel = '';
-          if (isExpired) statusLabel = ' [HẾT HẠN]';
-          else if (isNearExpiry) statusLabel = ' [CẬN HẠN]';
+          if (isExpired) statusLabel = ` [${this.i18n.t('inventory.report.statusLabels.expired', { lang: l })}]`;
+          else if (isNearExpiry) statusLabel = ` [${this.i18n.t('inventory.report.statusLabels.nearExpiry', { lang: l })}]`;
 
           return `- Lô ${b.batchCode}: Hạn dùng ${b.expiryDate.split('T')[0]}, Còn lại ${b.remainingQuantity}${statusLabel}`;
         }).join('\n  ');
       }
 
+      const statusVal = s.totalQuantity === 0 
+        ? this.i18n.t('inventory.report.statusLabels.outOfStock', { lang: l })
+        : (s.totalQuantity <= s.lowStockThreshold 
+            ? this.i18n.t('inventory.report.statusLabels.lowStock', { lang: l })
+            : this.i18n.t('inventory.report.statusLabels.stable', { lang: l })
+          );
+
       reportLines.push(
-        `Sản phẩm: ${s.productName} (${s.concentrationName}, ${s.volumeMl}ml)`,
-        `SKU: ${s.variantSku}`,
-        `Tồn kho hiện tại: ${s.totalQuantity}`,
-        `Ngưỡng báo động: ${s.lowStockThreshold}`,
-        `Trạng thái: ${s.totalQuantity === 0 ? 'HẾT HÀNG' : (s.totalQuantity <= s.lowStockThreshold ? 'SẮP HẾT HÀNG' : 'ỔN ĐỊNH')}`,
-        `Thông tin lô hàng:`,
+        `${this.i18n.t('inventory.report.product', { lang: l })}: ${s.productName} (${s.concentrationName}, ${s.volumeMl}ml)`,
+        `${this.i18n.t('inventory.report.sku', { lang: l })}: ${s.variantSku}`,
+        `${this.i18n.t('inventory.report.currentStock', { lang: l })}: ${s.totalQuantity}`,
+        `${this.i18n.t('inventory.report.threshold', { lang: l })}: ${s.lowStockThreshold}`,
+        `${this.i18n.t('inventory.report.status', { lang: l })}: ${statusVal}`,
+        `${this.i18n.t('inventory.report.batchInfo', { lang: l })}:`,
         `  ${batchInfo}`,
         '-----------------------------------'
       );
@@ -337,7 +353,7 @@ export class InventoryService {
     return funcHandlerAsync(async () => {
       const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
       if (!log) {
-        return { success: false, error: 'Inventory log not found' };
+        return { success: false, error: this.i18n.t('inventory.errors.logNotFound') };
       }
       return { success: true, data: log };
     }, 'Failed to fetch inventory log');
@@ -357,8 +373,9 @@ export class InventoryService {
       async () => {
         const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
         if (!log) {
-          return { success: false, error: 'Inventory log not found' };
+          return { success: false, error: this.i18n.t('inventory.errors.logNotFound') };
         }
+        const l = 'vi'; // Default to Vietnamese for PDFs if not specified
 
         const converterRoot = path.join(process.cwd(), 'md-pdf-converter');
         const outputDir = path.join(converterRoot, 'outputs');
@@ -376,8 +393,8 @@ export class InventoryService {
 
         const title =
           log.type === InventoryLogType.RESTOCK
-            ? 'Báo cáo phân tích nhập hàng'
-            : 'Báo cáo tồn kho';
+            ? this.i18n.t('inventory.report.detailHeader', { lang: l })
+            : this.i18n.t('inventory.report.title', { lang: l });
         const generatedAt = new Date().toISOString();
 
         const reportBody = this.buildMarkdownFromInventoryLog(log);
@@ -412,7 +429,7 @@ export class InventoryService {
         if (!result || !result.filename) {
           return {
             success: false,
-            error: 'Failed to convert markdown to pdf'
+            error: this.i18n.t('inventory.errors.pdfConvert')
           };
         }
 
@@ -481,9 +498,9 @@ export class InventoryService {
     ].join('\n');
   }
 
-  private tryParseJson(input: string): unknown | null {
+  private tryParseJson<T>(input: string): T | null {
     try {
-      return JSON.parse(input);
+      return JSON.parse(input) as T;
     } catch {
       return null;
     }
@@ -618,13 +635,13 @@ export class InventoryService {
     );
   }
 
-  async analyzeRestockNeeds(): Promise<BaseResponse<any>> {
+  async analyzeRestockNeeds(): Promise<BaseResponse<RestockLogPayload>> {
     const adminPrompt =
       await this.adminInstructionService.getSystemPromptForDomain(
         INSTRUCTION_TYPE_RESTOCK
       );
     const aiResponse = await this.aiRestockHelper.textGenerateFromPrompt(
-      adminPrompt, // Empty prompt — all context in adminPrompt
+      adminPrompt,
       '',
       Output.object({ schema: restockOutput.schema })
     );
@@ -637,8 +654,9 @@ export class InventoryService {
       );
     }
 
+    const parsedData = this.tryParseJson(aiResponse.data ?? '') as RestockLogPayload | null;
     const normalizedResult = await this.ensureCriticalLowStockIncluded(
-      aiResponse.data
+      parsedData
     );
 
     // Enrich all variants with sourcing info in parallel

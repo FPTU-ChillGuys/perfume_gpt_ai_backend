@@ -1,12 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { Output } from 'ai';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
-import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT, SURVEY_ANALYSIS_SYSTEM_PROMPT, TREND_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
-import { SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts/survey-question.analysis.system';
+import {
+    INSTRUCTION_TYPE_INTENT_ONLY_ANALYSIS,
+    INSTRUCTION_TYPE_SEARCH_EXTRACTION,
+    INSTRUCTION_TYPE_SURVEY_ANALYSIS,
+    INSTRUCTION_TYPE_SURVEY_ANSWER_ANALYSIS,
+    INSTRUCTION_TYPE_TREND_ANALYSIS
+} from 'src/application/constant/prompts/admin-instruction-types';
+import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { Tools } from 'src/chatbot/tools';
 import { analysisOutput, AnalysisObject, intentOnlyOutput, IntentOnlyObject } from 'src/chatbot/output/analysis.output';
-import { surveyAnswerAnalysis, SurveyAnswerAnalysisObject } from 'src/chatbot/output/survey-question.analysis.output';
+import { surveyAnswerAnalysis } from 'src/chatbot/output/survey-question.analysis.output';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 
 type AnalysisRuntimeContext = {
@@ -19,7 +25,12 @@ type AnalysisRuntimeContext = {
 export class AiAnalysisService {
     private readonly logger = new Logger(AiAnalysisService.name);
 
-    constructor(private readonly tools: Tools) { }
+    constructor(
+        private readonly tools: Tools,
+        @Inject(forwardRef(() => AdminInstructionService))
+        private readonly adminInstructionService: AdminInstructionService
+    ) { }
+
 
     async analyze(
         currentMessage: string,
@@ -43,10 +54,15 @@ export class AiAnalysisService {
                 }
             });
 
+            const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(
+                INSTRUCTION_TYPE_SEARCH_EXTRACTION
+            );
+
+
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
                 input,
-                CONVERSATION_ANALYSIS_SYSTEM_PROMPT,
+                systemPrompt,
                 this.tools.getToolsForAnalysis,
                 'Failed to analyze intent',
                 10,
@@ -81,10 +97,14 @@ export class AiAnalysisService {
                 currentMessage: currentMessage
             });
 
+            const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(
+                INSTRUCTION_TYPE_INTENT_ONLY_ANALYSIS
+            );
+
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
                 input,
-                INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT,
+                systemPrompt,
                 undefined,
                 'Failed to analyze intent only',
                 10,
@@ -116,10 +136,14 @@ export class AiAnalysisService {
 
             const input = encodeToolOutput(quesAnses).encoded;
 
+            const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(
+                INSTRUCTION_TYPE_SURVEY_ANALYSIS
+            );
+
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
                 input,
-                SURVEY_ANALYSIS_SYSTEM_PROMPT,
+                systemPrompt,
                 this.tools.getToolsForAnalysis,
                 'Failed to analyze survey intent',
                 10,
@@ -153,10 +177,14 @@ export class AiAnalysisService {
 
             const input = JSON.stringify({ trendSignals });
 
+            const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(
+                INSTRUCTION_TYPE_TREND_ANALYSIS
+            );
+
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
                 input,
-                TREND_ANALYSIS_SYSTEM_PROMPT,
+                systemPrompt,
                 this.tools.getToolsForAnalysis,
                 'Failed to analyze trend signals',
                 10,
@@ -208,10 +236,14 @@ export class AiAnalysisService {
                 answer: qa.answer
             });
 
+            const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(
+                INSTRUCTION_TYPE_SURVEY_ANSWER_ANALYSIS
+            );
+
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
                 input,
-                SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT,
+                systemPrompt,
                 this.tools.getToolsForAnalysis,
                 'Failed to analyze survey answer',
                 10,

@@ -35,6 +35,7 @@ import {
 import { restockOutput } from 'src/chatbot/output/restock.output';
 import { SourcingCatalogService } from 'src/infrastructure/domain/sourcing/sourcing-catalog.service';
 import { InventoryRedisRepository } from '../repositories/redis/inventory-redis.repository';
+import { RedisInventoryStockResponse } from 'src/application/dtos/response/redis-internal.response';
 
 type RestockVariantResult = {
   id: string;
@@ -74,22 +75,19 @@ export class InventoryService {
   ) { }
 
   private async ensureCriticalLowStockIncluded(
-    restockData: unknown
+    restockData: any
   ): Promise<{ variants: RestockVariantResult[] }> {
-    const safeData =
-      typeof restockData === 'object' && restockData !== null
-        ? (restockData as { variants?: RestockVariantResult[] })
-        : {};
+    const safeData = (restockData && typeof restockData === 'object' ? restockData : {}) as RestockLogPayload;
     const currentVariants = Array.isArray(safeData.variants)
       ? [...safeData.variants]
       : [];
 
     // Only fetch genuinely critical items — LowStock or OutOfStock
     // Using pageSize: 100 to provide enough candidates while staying safe
-    const response = await this.inventoryRedisRepo.getPagedStock({
+    const response = (await this.inventoryRedisRepo.getPagedStock({
       isLowStock: true,
       pageSize: 100
-    });
+    })) as { items: RedisInventoryStockResponse[] };
 
     const criticalItems = response?.items || [];
     if (criticalItems.length === 0) {
@@ -132,12 +130,12 @@ export class InventoryService {
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const payload = await this.inventoryRedisRepo.getPagedStock({
+        const payload = (await this.inventoryRedisRepo.getPagedStock({
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           searchTerm: request.SearchTerm,
           isLowStock: request.IsLowStock
-        });
+        })) as PagedResult<InventoryStockResponse>;
 
         const result = new PagedResult<InventoryStockResponse>({
           items: (payload?.items || []).map(s => new InventoryStockResponse(s)),
@@ -159,12 +157,12 @@ export class InventoryService {
   ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const payload = await this.inventoryRedisRepo.getPagedBatches({
+        const payload = (await this.inventoryRedisRepo.getPagedBatches({
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           batchCode: request.batchCode,
           isExpired: request.isExpired
-        });
+        })) as PagedResult<BatchResponse>;
 
         const result = new PagedResult<BatchResponse>({
           items: (payload?.items || []).map(b => new BatchResponse(b)),
@@ -183,7 +181,13 @@ export class InventoryService {
 
   /** Tính toán các thông số tổng quan về tồn kho qua Redis Repository */
   async getInventoryOverallStats() {
-    const stats = await this.inventoryRedisRepo.getOverallStats();
+    const stats = (await this.inventoryRedisRepo.getOverallStats()) as {
+      totalVariants: number;
+      lowStockVariantsCount: number;
+      outOfStockVariantsCount: number;
+      expiredBatchesCount: number;
+      expiringSoonCount: number;
+    };
 
     return {
       totalSku: stats?.totalVariants || 0,
@@ -200,10 +204,10 @@ export class InventoryService {
 
     // Fetch problematic stocks via Redis Repository
     // pageSize reduced to 200 to prevent OOM while still providing significant data
-    const stockResponse = await this.inventoryRedisRepo.getPagedStock({
+    const stockResponse = (await this.inventoryRedisRepo.getPagedStock({
       isLowStock: true,
       pageSize: 200
-    });
+    })) as { items: RedisInventoryStockResponse[] };
 
     const stocks = stockResponse?.items || [];
 
@@ -217,10 +221,10 @@ export class InventoryService {
     for (const s of stocks) {
       if (!s.variantId) continue;
       try {
-        const bResponse = await this.inventoryRedisRepo.getPagedBatches({
+        const bResponse = (await this.inventoryRedisRepo.getPagedBatches({
           variantId: s.variantId,
           pageSize: 20 // Only need latest batches for report
-        });
+        })) as { items: any[] };
         if (bResponse?.items) {
           batchesByVariantId.set(s.variantId, bResponse.items);
         }
@@ -242,7 +246,7 @@ export class InventoryService {
       'Lưu ý: Danh sách dưới đây liệt kê ưu tiên các mặt hàng đang có vấn đề về tồn kho hoặc hạn dùng.'
     ];
 
-    stocks.forEach((s: any) => {
+    stocks.forEach((s) => {
       const variantBatches = batchesByVariantId.get(s.variantId) || [];
       let batchInfo = '- (Không có dữ liệu lô hàng còn tồn)';
 
@@ -287,7 +291,7 @@ export class InventoryService {
           })
         );
         // No need to await or return anything, just fire and forget
-        return { success: true, data: logEntry as any };
+        return { success: true, data: logEntry };
       },
       'Failed to create inventory log',
       true

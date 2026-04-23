@@ -22,7 +22,7 @@ export class InventoryRedisRepository {
     variantId?: string;
   }) {
     this.logger.log(`Fetching paged stock data: ${JSON.stringify(params)}`);
-    return await this.redisRequestResponse.sendRequest<any>(
+    return await this.redisRequestResponse.sendRequest<unknown>(
       INVENTORY_REQUEST_CHANNEL,
       'getInventory',
       params,
@@ -41,7 +41,7 @@ export class InventoryRedisRepository {
     variantId?: string;
   }) {
     this.logger.log(`Fetching paged batch data: ${JSON.stringify(params)}`);
-    return await this.redisRequestResponse.sendRequest<any>(
+    return await this.redisRequestResponse.sendRequest<unknown>(
       INVENTORY_REQUEST_CHANNEL,
       'getBatches',
       params,
@@ -54,7 +54,7 @@ export class InventoryRedisRepository {
    */
   async getOverallStats() {
     this.logger.log('Fetching overall inventory stats');
-    return await this.redisRequestResponse.sendRequest<any>(
+    return await this.redisRequestResponse.sendRequest<unknown>(
       INVENTORY_REQUEST_CHANNEL,
       'getOverallStats',
       {},

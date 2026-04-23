@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { InventoryRedisRepository } from 'src/infrastructure/domain/repositories/redis/inventory-redis.repository';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
+import { RedisInventoryStockResponse } from 'src/application/dtos/response/redis-internal.response';
 
 @Injectable()
 export class InventoryTool {
@@ -14,7 +15,7 @@ export class InventoryTool {
   private readonly restockAnalyticsProductLimit = 20;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly inventoryRedisRepo: InventoryRedisRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly restockService: RestockService
   ) { }
@@ -34,28 +35,24 @@ export class InventoryTool {
       this.logger.log(`[getInventoryStock] called`);
       return await funcHandlerAsync(
         async () => {
-          const stocks = await this.prisma.stocks.findMany({
-            orderBy: { TotalQuantity: 'asc' },
-            include: {
-              ProductVariants: {
-                include: { Products: true, Concentrations: true }
-              }
-            }
-          });
+          // Fetch from Redis Repository instead of direct Prisma
+          const response = (await this.inventoryRedisRepo.getPagedStock({
+            pageSize: 400 // Limit for AI tool context efficiency
+          })) as { items: RedisInventoryStockResponse[] };
 
-          const items = stocks.map((s) => ({
-            variantId: s.VariantId,
-            sku: s.ProductVariants.Sku,
-            productName: s.ProductVariants.Products.Name,
-            volumeMl: s.ProductVariants.VolumeMl,
-            type: s.ProductVariants.Type,
-            basePrice: Number(s.ProductVariants.BasePrice),
-            status: s.ProductVariants.Status,
-            concentrationName: s.ProductVariants.Concentrations.Name,
-            totalQuantity: s.TotalQuantity,
-            reservedQuantity: s.ReservedQuantity,
-            lowStockThreshold: s.LowStockThreshold,
-            isLowStock: s.TotalQuantity <= s.LowStockThreshold
+          const items = (response?.items || []).map((s) => ({
+            variantId: s.variantId,
+            sku: s.variantSku,
+            productName: s.productName,
+            volumeMl: s.volumeMl,
+            type: s.type,
+            basePrice: Number(s.basePrice),
+            status: s.variantStatus,
+            concentrationName: s.concentrationName,
+            totalQuantity: s.totalQuantity,
+            reservedQuantity: Math.max(0, s.totalQuantity - s.availableQuantity),
+            lowStockThreshold: s.lowStockThreshold,
+            isLowStock: s.totalQuantity <= s.lowStockThreshold
           }));
 
           const encodingResult = encodeToolOutput(items);

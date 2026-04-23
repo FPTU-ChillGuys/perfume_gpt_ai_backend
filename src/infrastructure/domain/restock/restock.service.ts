@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import {
   VariantSalesAnalyticsResponse,
@@ -7,18 +6,12 @@ import {
 } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { calculateSalesMetrics } from 'src/infrastructure/domain/utils/sales-metrics.util';
-import { Prisma } from 'generated/prisma/client';
-
-const variantInclude = {
-  Products: true,
-  Concentrations: true
-} satisfies Prisma.ProductVariantsInclude;
-
-type VariantWithRelations = Prisma.ProductVariantsGetPayload<{
-  include: typeof variantInclude;
-}>;
-
-type CandidateMode = 'trend' | 'restock';
+import { InventoryRedisRepository } from '../repositories/redis/inventory-redis.repository';
+import { SalesRedisRepository } from '../repositories/redis/sales-redis.repository';
+import {
+  RedisInventoryStockResponse,
+  VariantSalesAnalyticsRedisResponse
+} from 'src/application/dtos/response/redis-internal.response';
 
 export interface ProductVariantSalesCandidate {
   variantId: string;
@@ -50,11 +43,13 @@ export interface ProductSalesAnalyticsCandidate {
 
 /**
  * Service xử lý dữ liệu phân tích bán hàng variant để dự đoán tái cấp hàng
- * Lấy dữ liệu bán hàng từ 2 tháng gần nhất
  */
 @Injectable()
 export class RestockService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly inventoryRedisRepo: InventoryRedisRepository,
+    private readonly salesRedisRepo: SalesRedisRepository
+  ) {}
 
   private inferAggregateTrend(last7DaysSales: number, last30DaysSales: number): 'INCREASING' | 'STABLE' | 'DECLINING' {
     if (last30DaysSales <= 0) {
@@ -183,31 +178,20 @@ export class RestockService {
   private async getCriticalLowStockVariants(
     knownVariantIds: Set<string>
   ): Promise<{ variants: VariantSalesAnalyticsResponse[]; ids: Set<string> }> {
-    const stocks = await this.prisma.stocks.findMany({
-      where: {
-        ProductVariants: {
-          IsDeleted: false,
-          Products: { IsDeleted: false }
-        },
-        TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold }
-      },
-      include: {
-        ProductVariants: {
-          include: {
-            Products: true,
-            Concentrations: true
-          }
-        }
-      }
-    });
+    // Fetch from Redis Repository instead of direct Prisma
+    const response = (await this.inventoryRedisRepo.getPagedStock({
+      isLowStock: true,
+      pageSize: 200
+    })) as { items: RedisInventoryStockResponse[] };
 
+    const items = response?.items || [];
     const ids = new Set<string>();
     const variants: VariantSalesAnalyticsResponse[] = [];
     const now = new Date();
     const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
 
-    for (const stock of stocks) {
-      const variantId = stock.VariantId;
+    for (const item of items) {
+      const variantId = item.variantId;
       ids.add(variantId);
       if (knownVariantIds.has(variantId)) {
         continue;
@@ -216,13 +200,13 @@ export class RestockService {
       variants.push(
         new VariantSalesAnalyticsResponse({
           variantId,
-          sku: stock.ProductVariants.Sku,
-          productName: stock.ProductVariants.Products.Name,
-          volumeMl: stock.ProductVariants.VolumeMl,
-          type: stock.ProductVariants.Type,
-          basePrice: Number(stock.ProductVariants.BasePrice),
-          status: stock.ProductVariants.Status,
-          concentrationName: stock.ProductVariants.Concentrations.Name,
+          sku: item.variantSku,
+          productName: item.productName,
+          volumeMl: item.volumeMl,
+          type: item.type,
+          basePrice: Number(item.basePrice),
+          status: item.variantStatus,
+          concentrationName: item.concentrationName,
           dailySalesData: [],
           totalQuantitySold: 0,
           totalRevenue: 0,
@@ -268,7 +252,7 @@ export class RestockService {
     if (!analyticsResult.success || !analyticsResult.payload) {
       return {
         success: false,
-        error: analyticsResult.error ?? 'Failed to fetch restock sales analytics candidates'
+        error: analyticsResult.error ?? 'Failed to fetch restock analytics candidates'
       };
     }
 
@@ -292,116 +276,59 @@ export class RestockService {
   /**
    * Lấy tất cả variant với dữ liệu bán hàng theo ngày (2 tháng gần nhất)
    * Sử dụng cho tool dự đoán tái cấp hàng
+   * Lấy từ Redis Repository thay vì direct Prisma
    */
   async getProductSalesAnalyticsForRestock(): Promise<
     BaseResponseAPI<VariantSalesAnalyticsResponse[]>
   > {
     return await funcHandlerAsync(
       async () => {
-        // Tính toán thời gian 2 tháng gần nhất
+        const months = 2;
         const now = new Date();
-        const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        const startDate = new Date(now.getFullYear(), now.getMonth() - months, now.getDate());
 
-        // Lấy tất cả variant không bị xóa
-        const variants = await this.prisma.productVariants.findMany({
-          where: { IsDeleted: false },
-          include: variantInclude
-        });
+        // Fetch aggregated sales data from Main Backend via Redis
+        const salesData = (await this.salesRedisRepo.getVariantSalesAnalytics(
+          months
+        )) as VariantSalesAnalyticsRedisResponse[];
 
-        // Lấy tất cả order details từ 2 tháng gần nhất
-        const orderDetails = await this.prisma.orderDetails.findMany({
-          where: {
-            Orders: {
-              CreatedAt: {
-                gte: twoMonthsAgo
-              },
-              Status: {
-                notIn: ['Canceled', 'Returned']
-              }
-            }
-          },
-          include: {
-            Orders: true
-          }
-        });
+        if (!Array.isArray(salesData)) {
+          throw new Error('Invalid response from sales analytics repository');
+        }
 
-        // Nhóm dữ liệu bán hàng theo variant
-        const salesDataByVariant = new Map<
-          string,
-          { date: string; quantity: number; unitPrice: number }[]
-        >();
+        // Map the results to VariantSalesAnalyticsResponse
+        const results = salesData.map((item) => {
+          const dailySalesData: DailySalesRecord[] = (item.dailySales || [])
+            .map((ds) => ({
+              date: ds.date,
+              quantitySold: ds.quantitySold,
+              revenue: Number(ds.revenue)
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date));
 
-        orderDetails.forEach((detail) => {
-          const variantId = detail.VariantId;
-          if (!salesDataByVariant.has(variantId)) {
-            salesDataByVariant.set(variantId, []);
-          }
-          const dateStr = detail.Orders.CreatedAt.toISOString().split('T')[0];
-          salesDataByVariant.get(variantId)!.push({
-            date: dateStr,
-            quantity: detail.Quantity,
-            unitPrice: Number(detail.UnitPrice)
-          });
-        });
-
-        // Xây dựng response
-        const results = variants.map((variant) => {
-          const salesData = salesDataByVariant.get(variant.Id) || [];
-
-          // Nhóm bán hàng theo ngày
-          const dailyMap = new Map<
-            string,
-            { quantity: number; revenue: number }
-          >();
-          salesData.forEach((record) => {
-            const existing = dailyMap.get(record.date) || { quantity: 0, revenue: 0 };
-            dailyMap.set(record.date, {
-              quantity: existing.quantity + record.quantity,
-              revenue: existing.revenue + record.quantity * record.unitPrice
-            });
-          });
-
-          // Tạo mảng records theo ngày được sắp xếp
-          const dailySalesData: DailySalesRecord[] = Array.from(
-            dailyMap.entries()
-          )
-            .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-            .map(([date, data]) => ({
-              date,
-              quantitySold: data.quantity,
-              revenue: data.revenue
-            }));
-
-          // Tính tổng thống kê
-          const totalQuantitySold = dailySalesData.reduce(
-            (sum, record) => sum + record.quantitySold,
-            0
-          );
-          const totalRevenue = dailySalesData.reduce(
-            (sum, record) => sum + record.revenue,
-            0
-          );
+          // Calculate summary stats
+          const totalQuantitySold = dailySalesData.reduce((sum, record) => sum + record.quantitySold, 0);
+          const totalRevenue = dailySalesData.reduce((sum, record) => sum + record.revenue, 0);
           const daysWithSalesCount = dailySalesData.length;
-          const averageDailySales =
-            daysWithSalesCount > 0 ? totalQuantitySold / daysWithSalesCount : 0;
+          const averageDailySales = daysWithSalesCount > 0 ? totalQuantitySold / daysWithSalesCount : 0;
 
-          // Tính metrics tối ưu cho LLM
+          // Calculate metrics for LLM
           const salesMetrics = calculateSalesMetrics(dailySalesData);
 
           return new VariantSalesAnalyticsResponse({
-            variantId: variant.Id,
-            sku: variant.Sku,
-            productName: variant.Products.Name,
-            volumeMl: variant.VolumeMl,
-            type: variant.Type,
-            basePrice: Number(variant.BasePrice),
-            status: variant.Status,
-            concentrationName: variant.Concentrations.Name,
+            variantId: item.variantId,
+            sku: item.sku,
+            productName: item.productName,
+            volumeMl: item.volumeMl,
+            type: item.type,
+            basePrice: Number(item.basePrice),
+            status: item.status,
+            concentrationName: item.concentrationName,
             dailySalesData,
             totalQuantitySold,
             totalRevenue,
             averageDailySales: Number(averageDailySales.toFixed(2)),
-            periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
+            periodStartDate: startDate.toISOString().split('T')[0],
             periodEndDate: now.toISOString().split('T')[0],
             daysWithSalesCount,
             salesMetrics
@@ -420,119 +347,19 @@ export class RestockService {
 
   /**
    * Lấy dữ liệu phân tích bán hàng cho một variant cụ thể
-   * @param variantId ID của variant
+   * TODO: Hiện tại trả về lỗi hoặc lọc từ list chung để tối ưu code
    */
   async getVariantSalesAnalyticsById(
     variantId: string
   ): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse>> {
-    return await funcHandlerAsync(
-      async () => {
-        const now = new Date();
-        const twoMonthsAgo = new Date(
-          now.getFullYear(),
-          now.getMonth() - 2,
-          now.getDate()
-        );
-
-        // Lấy thông tin variant
-        const variant = await this.prisma.productVariants.findUnique({
-          where: { Id: variantId, IsDeleted: false },
-          include: variantInclude
-        });
-
-        if (!variant) {
-          return {
-            success: false,
-            error: 'Variant not found'
-          };
-        }
-
-        // Lấy dữ liệu bán hàng của variant
-        const orderDetails = await this.prisma.orderDetails.findMany({
-          where: {
-            VariantId: variantId,
-            Orders: {
-              CreatedAt: {
-                gte: twoMonthsAgo
-              },
-              Status: {
-                notIn: ['Canceled', 'Returned']
-              }
-            }
-          },
-          include: {
-            Orders: true
-          }
-        });
-
-        // Nhóm bán hàng theo ngày
-        const dailyMap = new Map<
-          string,
-          { quantity: number; revenue: number }
-        >();
-        orderDetails.forEach((detail) => {
-          const dateStr = detail.Orders.CreatedAt.toISOString().split('T')[0];
-          const revenue = detail.Quantity * Number(detail.UnitPrice);
-          const existing = dailyMap.get(dateStr) || { quantity: 0, revenue: 0 };
-          dailyMap.set(dateStr, {
-            quantity: existing.quantity + detail.Quantity,
-            revenue: existing.revenue + revenue
-          });
-        });
-
-        // Tạo mảng records theo ngày được sắp xếp
-        const dailySalesData: DailySalesRecord[] = Array.from(
-          dailyMap.entries()
-        )
-          .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-          .map(([date, data]) => ({
-            date,
-            quantitySold: data.quantity,
-            revenue: data.revenue
-          }));
-
-        // Tính tổng thống kê
-        const totalQuantitySold = dailySalesData.reduce(
-          (sum, record) => sum + record.quantitySold,
-          0
-        );
-        const totalRevenue = dailySalesData.reduce(
-          (sum, record) => sum + record.revenue,
-          0
-        );
-        const daysWithSalesCount = dailySalesData.length;
-        const averageDailySales =
-          daysWithSalesCount > 0
-            ? totalQuantitySold / daysWithSalesCount
-            : 0;
-
-        // Tính metrics tối ưu cho LLM
-        const salesMetrics = calculateSalesMetrics(dailySalesData);
-
-        return {
-          success: true,
-          payload: new VariantSalesAnalyticsResponse({
-            variantId: variant.Id,
-            sku: variant.Sku,
-            productName: variant.Products.Name,
-            volumeMl: variant.VolumeMl,
-            type: variant.Type,
-            basePrice: Number(variant.BasePrice),
-            status: variant.Status,
-            concentrationName: variant.Concentrations.Name,
-            dailySalesData,
-            totalQuantitySold,
-            totalRevenue,
-            averageDailySales: Number(averageDailySales.toFixed(2)),
-            periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
-            periodEndDate: now.toISOString().split('T')[0],
-            daysWithSalesCount,
-            salesMetrics
-          })
-        };
-      },
-      'Failed to fetch variant sales analytics',
-      true
-    );
+    const all = await this.getProductSalesAnalyticsForRestock();
+    if (!all.success || !all.payload) {
+      return { success: false, error: all.error };
+    }
+    const found = all.payload.find(v => v.variantId === variantId);
+    if (!found) return { success: false, error: 'Variant not found in analytics' };
+    return { success: true, payload: found };
   }
 }
+
+type CandidateMode = 'trend' | 'restock';

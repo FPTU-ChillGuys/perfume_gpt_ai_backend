@@ -22,7 +22,6 @@ import { PagedConversationRequest } from 'src/application/dtos/request/paged-con
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
-import { ConversationV10Service } from 'src/infrastructure/domain/conversation/conversationV10.service';
 import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 
@@ -30,8 +29,7 @@ import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extr
 @Controller('conversation')
 export class ConversationController {
   constructor(
-    private conversationService: ConversationService,
-    private conversationV10Service: ConversationV10Service
+    private conversationService: ConversationService
   ) { }
 
   /** Lấy tất cả cuộc hội thoại */
@@ -66,7 +64,7 @@ export class ConversationController {
     if (!conversation.userId) {
       conversation.userId = getTokenPayloadFromRequest(request)?.id;
     }
-    return this.conversationV10Service.chat(conversation);
+    return this.conversationService.chat(conversation);
   }
 
   @Public()
@@ -82,6 +80,6 @@ export class ConversationController {
       conversation.userId = getTokenPayloadFromRequest(request)?.id;
     }
     conversation.isStaff = true;
-    return this.conversationV10Service.chat(conversation);
+    return this.conversationService.chat(conversation);
   }
 }

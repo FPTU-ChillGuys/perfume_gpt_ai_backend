@@ -202,14 +202,33 @@ export class InventoryService {
   async createReportFromBatchAndStock(): Promise<String> {
     const stats = await this.getInventoryOverallStats();
 
-    // Fetch problematic stocks via Redis Repository
-    // pageSize reduced to 200 to prevent OOM while still providing significant data
-    const stockResponse = (await this.inventoryRedisRepo.getPagedStock({
+    // 1. Fetch problematic stocks via Redis Repository
+    const problematicResponse = (await this.inventoryRedisRepo.getPagedStock({
       isLowStock: true,
       pageSize: 200
     })) as { items: RedisInventoryStockResponse[] };
+    const problematicStocks = problematicResponse?.items || [];
 
-    const stocks = stockResponse?.items || [];
+    // 2. Fetch standard stocks (top 500, ordered by quantity ascending) via Redis
+    const standardResponse = (await this.inventoryRedisRepo.getPagedStock({
+      pageSize: 500,
+      sortBy: 'TotalQuantity',
+      sortOrder: 'asc'
+    })) as { items: RedisInventoryStockResponse[] };
+    const standardStocks = standardResponse?.items || [];
+
+    // Merge and remove duplicates
+    const mergedStocks = [...problematicStocks];
+    const existingVariantIds = new Set(mergedStocks.map(s => s.variantId));
+
+    for (const s of standardStocks) {
+      if (!existingVariantIds.has(s.variantId)) {
+        mergedStocks.push(s);
+        existingVariantIds.add(s.variantId);
+      }
+    }
+
+    const stocks = mergedStocks;
 
     // Fetch batches for these variants to provide detailed info
     const batchesByVariantId = new Map<string, any[]>();

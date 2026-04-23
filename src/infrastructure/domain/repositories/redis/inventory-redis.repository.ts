@@ -20,6 +20,8 @@ export class InventoryRedisRepository {
     isLowStock?: boolean;
     stockStatus?: number; // 1=OutOfStock, 2=LowStock, 3=Normal (StockStatus enum)
     variantId?: string;
+    sortBy?: string;
+    sortOrder?: string;
   }) {
     this.logger.log(`Fetching paged stock data: ${JSON.stringify(params)}`);
     return await this.redisRequestResponse.sendRequest<unknown>(

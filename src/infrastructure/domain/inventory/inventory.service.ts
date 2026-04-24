@@ -232,6 +232,8 @@ export class InventoryService {
     }
 
     const stocks = mergedStocks;
+    
+    this.logger.log(`[InventoryService] createReportFromBatchAndStock: problematicStocks=${problematicStocks.length}, standardStocks=${standardStocks.length}, mergedStocks=${stocks.length}`);
 
     // Fetch batches for these variants to provide detailed info
     const batchesByVariantId = new Map<string, BatchItem[]>();
@@ -243,14 +245,16 @@ export class InventoryService {
     for (const s of stocks) {
       if (!s.variantId) continue;
       try {
+        this.logger.log(`[InventoryService] Fetching batches for variant ${s.variantId}`);
         const bResponse = (await this.inventoryNatsRepo.getPagedBatches({
           variantId: s.variantId,
           pageSize: 20 // Only need latest batches for report
         })) as { items: BatchItem[] };
         if (bResponse?.items) {
           batchesByVariantId.set(s.variantId, bResponse.items);
+          this.logger.log(`[InventoryService] Got ${bResponse.items.length} batches for variant ${s.variantId}`);
         }
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error(`Failed to fetch batches for variant ${s.variantId}: ${err.message}`);
       }
     }

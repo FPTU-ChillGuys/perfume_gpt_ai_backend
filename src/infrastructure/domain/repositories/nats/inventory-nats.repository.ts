@@ -15,9 +15,12 @@ export interface InventoryOverallStats {
   criticalAlerts: number;
 }
 
-/** Kết quả paged inventory từ .NET (field capitals vì .NET trả về PascalCase) */
+/** Kết quả paged inventory từ .NET */
 export interface InventoryPagedPayload {
   totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
   items: InventoryStockResponse[];
 }
 
@@ -65,13 +68,15 @@ export class InventoryNatsRepository {
     isExpired?: boolean;
     variantId?: string;
   }): Promise<PagedResult<BatchResponse>> {
-    this.logger.log(`[NATS] ${this.i18n.t('inventory.get_batches')}`);
-    return await this.natsRpc.sendRequest<PagedResult<BatchResponse>>(
+    this.logger.log(`[NATS] ${this.i18n.t('inventory.get_batches')}: variantId=${params.variantId || 'all'}`);
+    const result = await this.natsRpc.sendRequest<PagedResult<BatchResponse>>(
       INVENTORY_REQUEST_CHANNEL,
       'getBatches',
       params,
       DEFAULT_TIMEOUT,
     );
+    this.logger.log(`[NATS] ${this.i18n.t('inventory.get_batches')} result: totalCount=${result?.totalCount || 0}, itemsCount=${result?.items?.length || 0}`);
+    return result;
   }
 
   /**

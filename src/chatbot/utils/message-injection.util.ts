@@ -11,7 +11,7 @@ import { UIMessage } from 'ai';
  */
 export function injectAnalysisToLastUserMessage(
     messages: UIMessage[],
-    analysis: any
+    analysis: Record<string, unknown>
 ): UIMessage[] {
     if (!messages || messages.length === 0 || !analysis) {
         return messages;
@@ -44,11 +44,11 @@ export function injectAnalysisToLastUserMessage(
         }
 
         // Create a new message object with the injected analysis in both places
-        finalMessages[lastUserMessageIndex] = {
+        (finalMessages[lastUserMessageIndex] as any) = {
             ...originalMessage,
             content: injectedText,
             parts: newParts
-        } as any;
+        };
     }
 
     return finalMessages;

@@ -40,14 +40,14 @@ export function encodeToolOutput<T extends any[] | object>(
  * Useful for reducing token usage while keeping some critical fields readable
  * @param items - Array of objects to encode
  * @param readableFields - Fields to keep in original form (optional)
- * @returns { encoded: string, readableFields: any[] } or just encoded string
+ * @returns { encoded: string, readableFields: Partial<T>[] } or just encoded string
  */
 export function encodeItemArray<T extends object>(
   items: T[],
   readableFields?: (keyof T)[]
 ): {
   encoded: string;
-  readable?: Pick<T, any>[];
+  readable?: Partial<T>[];
   compressionRatio: number;
 } {
   if (!Array.isArray(items) || items.length === 0) {
@@ -62,7 +62,11 @@ export function encodeItemArray<T extends object>(
   const originalSize = jsonString.length;
   const encodedSize = encoded.length;
 
-  const result: any = {
+  const result: {
+    encoded: string;
+    readable?: Partial<T>[];
+    compressionRatio: number;
+  } = {
     encoded,
     compressionRatio: Number(((encodedSize / originalSize) * 100).toFixed(2))
   };
@@ -70,7 +74,7 @@ export function encodeItemArray<T extends object>(
   // If readable fields specified, also include those
   if (readableFields && readableFields.length > 0) {
     result.readable = items.map((item) => {
-      const readable: any = {};
+      const readable: Partial<T> = {};
       readableFields.forEach((field) => {
         readable[field] = item[field];
       });
@@ -85,9 +89,9 @@ export function encodeItemArray<T extends object>(
  * Create a hybrid response that includes both encoded data and summary info
  * Perfect for tool outputs that need both data optimization and readability
  */
-export function createHybridToolResponse<T extends any[] | object>(
+export function createHybridToolResponse<T extends unknown[] | object>(
   data: T,
-  summaryInfo?: Record<string, any>
+  summaryInfo?: Record<string, unknown>
 ): {
   data: T;
   encoded: string;
@@ -96,7 +100,7 @@ export function createHybridToolResponse<T extends any[] | object>(
     encodedSize: number;
     compressionRatio: number;
   };
-  summary?: Record<string, any>;
+  summary?: Record<string, unknown>;
 } {
   const result = encodeToolOutput(data);
 
@@ -116,7 +120,7 @@ export function createHybridToolResponse<T extends any[] | object>(
  * Decode TOON-encoded data back to original
  * Useful for verification/testing
  */
-export function decodeToolOutput(encoded: string): any {
+export function decodeToolOutput(encoded: string): unknown {
   try {
     const decoded = encoded; // TOON handles decoding internally through pattern matching
     return JSON.parse(decoded);

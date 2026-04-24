@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { aiModel, aiModelForConversationAnalysis } from 'src/chatbot/ai-model';
 import { objectGenerationFromMessagesToResultWithErrorHandler } from 'src/chatbot/chatbot';
 import { INTERNAL_NORMALIZATION_SYSTEM_PROMPT } from 'src/application/constant/prompts/system.prompt';
+import { MasterDataSearchOutput, MasterDataItem, KeywordMapping } from 'src/application/dtos/response/master-data.response';
 
 @Injectable()
 export class MasterDataTool {
@@ -24,28 +25,45 @@ export class MasterDataTool {
         execute: async ({ searchInfos }) => {
             this.logger.log(`[searchMasterData] searchInfos: ${JSON.stringify(searchInfos)}`);
 
-            const finalResults: any = {
-                brands: [], categories: [], notes: [], families: [], attributes: [], products: []
+            const finalResults: MasterDataSearchOutput = {
+                brands: [],
+                categories: [],
+                notes: [],
+                families: [],
+                attributes: [],
+                products: [],
+                keywordMappings: [],
+                summaryFoundLabels: {
+                    brands: [],
+                    categories: [],
+                    notes: [],
+                    families: [],
+                    attributes: [],
+                    products: []
+                }
             };
 
             const foundKeywords = new Set<string>();
             const keywordToLabelsMap = new Map<string, Set<string>>();
 
-            const getLabelsForRes = (res: any[]) => res.map(item => item.Name || item.Value || item.id || item.Id);
+            const getLabelsForRes = (res: MasterDataItem[]) => res.map(item => item.Name || item.Value || item.Id);
 
             // --- PHASE 1: DIRECT SEARCH ---
             const performSearch = async (kw: string, targetTypes: string[], originalKeyword?: string) => {
                 const types = targetTypes.includes('all') ? ['brand', 'category', 'note', 'family', 'attribute', 'product'] : targetTypes;
                 const pList: Promise<void>[] = [];
 
-                const trackResult = (res: any[], kwUsed: string) => {
+                const trackResult = (res: MasterDataItem[], kwUsed: string) => {
                     if (res.length > 0) {
                         foundKeywords.add(kwUsed);
                         if (originalKeyword) {
                             if (!keywordToLabelsMap.has(originalKeyword)) {
                                 keywordToLabelsMap.set(originalKeyword, new Set());
                             }
-                            getLabelsForRes(res).forEach(l => keywordToLabelsMap.get(originalKeyword)!.add(l));
+                            const labels = keywordToLabelsMap.get(originalKeyword)!;
+                            getLabelsForRes(res).forEach(l => {
+                                if (l) labels.add(String(l));
+                            });
                         }
                     }
                 };
@@ -87,9 +105,9 @@ export class MasterDataTool {
                     "Failed to generate normalization object"
                 );
 
-                if (normalizationResult && (normalizationResult as any).mappings) {
+                if (normalizationResult?.mappings) {
                     const reSearchTasks: Promise<void>[] = [];
-                    for (const mapping of (normalizationResult as any).mappings) {
+                    for (const mapping of normalizationResult.mappings) {
                         if (mapping.corrected) {
                             const correctedTerms = Array.isArray(mapping.corrected) ? mapping.corrected : [mapping.corrected];
                             const originalInfo = searchInfos.find(i => i.keyword === mapping.original);
@@ -112,17 +130,17 @@ export class MasterDataTool {
             }
 
             // --- PHASE 3: DEDUPLICATION & RETURN ---
-            const deduplicate = (arr: any[]) => {
+            const deduplicate = (arr: MasterDataItem[]) => {
                 const seen = new Set();
                 return arr.filter(item => {
-                    const id = item.Id || item.id;
+                    const id = item.Id || item.Name;
                     if (seen.has(id)) return false;
                     seen.add(id);
                     return true;
                 });
             };
 
-            const getLabels = (arr: any[]) => arr.map(item => item.Name || item.Value || item.id || item.Id);
+            const getLabels = (arr: MasterDataItem[]) => arr.map(item => item.Name || item.Value || item.Id);
 
             const keywordMappings = Array.from(keywordToLabelsMap.entries()).map(([kw, labels]) => ({
                 original: kw,

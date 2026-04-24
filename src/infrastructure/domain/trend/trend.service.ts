@@ -1219,7 +1219,7 @@ export class TrendService {
       IsDescending: true
     });
     const bestSellerProducts = bestSellerResponse.success && bestSellerResponse.data
-      ? bestSellerResponse.data.items.map((item: any) => item.product)
+      ? bestSellerResponse.data.items.map((item: { product: unknown }) => item.product)
       : [];
 
     this.logger.log(
@@ -1231,8 +1231,8 @@ export class TrendService {
 
     let mergedProducts: typeof dedupedQueryProducts;
     if (bestSellerProducts.length > 0 && dedupedQueryProducts.length > 0) {
-      const queryProductIds = new Set(dedupedQueryProducts.map((p: any) => p.id));
-      const intersection = bestSellerProducts.filter((p: any) => queryProductIds.has(p.id));
+      const queryProductIds = new Set(dedupedQueryProducts.map((p: { id: string }) => p.id));
+      const intersection = bestSellerProducts.filter((p: { id: string }) => queryProductIds.has(p.id));
       if (intersection.length > 0) {
         mergedProducts = intersection;
         this.logger.log(

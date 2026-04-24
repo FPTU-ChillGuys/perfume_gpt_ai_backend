@@ -5,6 +5,7 @@ import { ProductWithVariantsResponse } from 'src/application/dtos/response/produ
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { encodeToolOutput } from '../utils/toon-encoder.util';
+import { MinimalProduct } from 'src/application/dtos/response/cart-tool.response';
 import * as z from 'zod';
 
 @Injectable()
@@ -13,7 +14,7 @@ export class ProductTool {
 
   constructor(@Inject(forwardRef(() => ProductService)) private readonly productService: ProductService) { }
 
-  private mapToMinimalProduct(product: any) {
+  private mapToMinimalProduct(product: MinimalProduct): MinimalProduct {
     return {
       id: product.id,
       name: product.name,

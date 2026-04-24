@@ -4,14 +4,14 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 
 // Map kiểu primitive
-const primitiveMap: Record<string, any> = {
+const primitiveMap: Record<string, { type: string }> = {
   String: { type: 'string' },
   Number: { type: 'number' },
   Boolean: { type: 'boolean' }
 };
 
 // Kiểm tra primitive
-const isPrimitive = (data: any) =>
+const isPrimitive = (data: unknown) =>
   data === String || data === Number || data === Boolean;
 
 /**
@@ -22,6 +22,7 @@ const isPrimitive = (data: any) =>
 export const ApiBaseResponse = <T extends Function>(
   data: T,
   isArray: boolean = false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   properties?: Record<string, any>
 ) => {
   const schemaData = isPrimitive(data)
@@ -55,6 +56,7 @@ export const ExtendApiBaseResponse = <T extends Function, I extends Function>(
   data: T,
   itemTypeOrIsArray?: I | boolean,
   oldIsArray: boolean = false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   properties?: Record<string, any>
 ) => {
   const isSecondArgBoolean = typeof itemTypeOrIsArray === 'boolean';
@@ -67,7 +69,7 @@ export const ExtendApiBaseResponse = <T extends Function, I extends Function>(
 
   const itemSchema = itemType ? (isPrimitive(itemType) ? primitiveMap[itemType.name] : { $ref: getSchemaPath(itemType) }) : null;
 
-  let payloadSchema: any = isArray ? { type: 'array', items: schemaData } : schemaData;
+  let payloadSchema: unknown = isArray ? { type: 'array', items: schemaData } : schemaData;
 
   // Nếu là PagedResult và có itemType, override items property
   if (itemType && data.name === 'PagedResult') {

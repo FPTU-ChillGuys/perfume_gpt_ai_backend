@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { CartService } from 'src/infrastructure/domain/cart/cart.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { AddToCartResult, CartItemResult } from 'src/application/dtos/response/cart-tool.response';
 import * as z from 'zod';
 
 @Injectable()
@@ -25,7 +26,7 @@ export class CartTool {
             this.logger.log(`[addToCart] called for user ${input.userId} with ${input.items.length} items`);
             return await funcHandlerAsync(
                 async () => {
-                    const results: any[] = [];
+                    const results: CartItemResult[] = [];
                     for (const item of input.items) {
                         const response = await this.cartService.addToCart(input.userId, {
                             variantId: item.variantId,
@@ -34,10 +35,10 @@ export class CartTool {
                         results.push({
                             variantId: item.variantId,
                             success: response.success,
-                            error: response.error,
+                            error: response.error ?? undefined,
                         });
                     }
-                    return { success: true, data: results };
+                    return { success: true, data: results } as AddToCartResult;
                 },
                 'Error occurred while adding items to cart.',
                 true,

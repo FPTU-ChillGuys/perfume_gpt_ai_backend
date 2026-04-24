@@ -142,7 +142,7 @@ export function streamTextGenerationFromPromptToResultWithErrorHandler(
   stopWhen?: number,
   output?: any,
   errorMessage?: string,
-  onFinish?: (data) => void,
+  onFinish?: (data: any) => void,
   temperature?: number,
   toolChoice?: ToolChoice<ToolSet>,
   maxTokens?: number

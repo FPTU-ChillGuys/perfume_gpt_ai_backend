@@ -350,20 +350,20 @@ export class ProfileTool {
     const [ordersResult, profileResult] = await Promise.all([
       orderService
         .getOrderDetailsWithOrdersByUserId(userId)
-        .catch(() => ({ success: false }) as any),
+        .catch(() => ({ success: false, data: [] })),
       profileService
         .getOwnProfile(userId)
-        .catch(() => ({ success: false }) as any)
+        .catch(() => ({ success: false, payload: null }))
     ]);
 
     const orders: OrderResponse[] =
-      ordersResult?.success && Array.isArray(ordersResult.data)
-        ? ordersResult.data.filter(
-            (order) => !['Canceled', 'Returned'].includes(order.orderStatus)
+      ordersResult?.success && Array.isArray((ordersResult as any).data)
+        ? (ordersResult as any).data.filter(
+            (order: OrderResponse) => !['Canceled', 'Returned'].includes(order.orderStatus)
           )
         : [];
 
-    const profile = profileResult?.success ? profileResult.payload : null;
+    const profile = profileResult?.success ? (profileResult as any).payload : null;
 
     const profileKeywords = this.extractProfileKeywords(profile);
     const topOrderProducts = this.extractTopOrderProducts(orders);
@@ -407,8 +407,8 @@ export class ProfileTool {
     // Enrich profileKeywords with order-derived insights if available
     if (orders.length > 0 && Object.keys(orderAggregates).length > 0) {
       const orderInsights = [
-        ...(orderAggregates.scentNotes || []).map((i: any) => i.name),
-        ...(orderAggregates.olfactoryFamilies || []).map((i: any) => i.name)
+        ...(orderAggregates.scentNotes || []).map((i: { name: string }) => i.name),
+        ...(orderAggregates.olfactoryFamilies || []).map((i: { name: string }) => i.name)
       ];
       profileKeywords.push(...orderInsights);
     }

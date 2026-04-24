@@ -63,12 +63,12 @@ export class CartNatsRepository {
     );
   }
 
-  async clearCart(userId: string): Promise<CartMutationResult> {
-    this.logger.log(`[NATS] ${this.i18n.t('cart.clear_cart')}: ${userId}`);
+  async clearCart(userId: string, force: boolean = false): Promise<CartMutationResult> {
+    this.logger.log(`[NATS] ${this.i18n.t('cart.clear_cart')}: ${userId}, force: ${force}`);
     return await this.natsRpc.sendRequest<CartMutationResult>(
       CART_REQUEST_CHANNEL,
       'clearCart',
-      { userId },
+      { userId, force },
       DEFAULT_TIMEOUT,
     );
   }

@@ -5,7 +5,7 @@
     "not_found": "Data not found"
   },
   "conversation": {
-    "error_fetching_inventory": "Failed to fetch inventory stock from Redis.",
+    "error_fetching_inventory": "Failed to fetch inventory stock from the system.",
     "analysis_failed": "Failed to analyze user intent.",
     "chat_success": "AI response successful.",
     "build_prompt_failed": "Failed to build combined prompt.",
@@ -20,64 +20,30 @@
     "ai_response_failed": "Failed to get AI response.",
     "no_products_found": "Currently, the store could not find any products matching your request. Would you like to try searching with different criteria?"
   },
+  "nats": {
+    "not_connected": "Internal service is not ready, please try again later.",
+    "request_timeout": "Request to the system timed out. Please try again.",
+    "request_failed": "Failed to send request to the system. Please try again later.",
+    "product": {
+      "fetch_failed": "Failed to fetch product data from the system.",
+      "not_found": "No matching products found."
+    },
+    "cart": {
+      "fetch_failed": "Failed to fetch cart data.",
+      "update_failed": "Failed to update cart."
+    },
+    "order": {
+      "fetch_failed": "Failed to fetch order data.",
+      "not_found": "Order not found."
+    },
+    "inventory": {
+      "fetch_failed": "Failed to fetch inventory data from the system."
+    },
+    "review": {
+      "fetch_failed": "Failed to fetch review data."
+    }
+  },
   "recommendation": {
     "no_history_fallback": "We appreciate your interest. Since we don't have your purchase history yet, we've provided some starting suggestions to help you explore the fragrance style that suits you best."
-  },
-  "nats": {
-    "connected": "[NATS] Connected to {url}",
-    "connection_failed": "[NATS] Connection failed: {error}",
-    "publishing": "[NATS Req] Publishing {action} to {channel}",
-    "request_error": "[NATS Req Error] Error sending {action} to {channel}: {error}",
-    "connection_not_established": "NATS connection not established.",
-    "repository": {
-      "fetching_stock": "Fetching paged stock data: {params}",
-      "fetching_batches": "Fetching paged batch data: {params}",
-      "fetching_stats": "Fetching overall inventory stats",
-      "fetching_structured": "Fetching products by structured query: {intent}",
-      "fetching_best_selling": "Fetching best selling products: {params}",
-      "fetching_newest": "Fetching newest products: {params}",
-      "fetching_by_ids": "Fetching products by IDs: {count} items",
-      "fetching_cart": "Fetching cart for user: {userId}",
-      "adding_to_cart": "Adding to cart: User {userId}, Variant {variantId}, Qty {quantity}",
-      "clearing_cart": "Clearing cart for user: {userId}",
-      "removing_from_cart": "Removing from cart: User {userId}, Item {cartItemId}",
-      "updating_cart": "Updating cart item: User {userId}, Item {cartItemId}, Qty {quantity}",
-      "fetching_orders": "Fetching orders for user: {userId}",
-      "fetching_order_details": "Fetching order details: User {userId}, Order {orderId}",
-      "fetching_reviews": "Fetching paged review data: {params}",
-      "fetching_variant_reviews": "Fetching all reviews for variantId={variantId}",
-      "fetching_variant_stats": "Fetching review stats for variantId={variantId}",
-      "fetching_sales_analytics": "Fetching variant sales analytics for {months} months",
-      "requesting_catalogs": "[Sourcing] Requesting catalogs for variantId={variantId}",
-      "sourcing_error": "[Sourcing] Failed to get catalogs for variantId={variantId}: {error}",
-      "sourcing_internal_error": "Timeout or internal error requesting catalogs via NATS."
-    },
-    "errors": {
-      "fetch_reviews_failed": "Failed to fetch reviews via NATS.",
-      "fetch_variant_reviews_failed": "Failed to fetch variant reviews via NATS.",
-      "fetch_review_stats_failed": "Failed to fetch review statistics via NATS.",
-      "add_review_log_failed": "Failed to add review log.",
-      "fetch_review_logs_failed": "Failed to fetch review logs.",
-      "fetch_latest_review_log_failed": "Failed to fetch latest review log.",
-      "review_log_not_found": "Review log not found.",
-      "fetch_sales_analytics_failed": "Failed to fetch variant sales analytics for restock.",
-      "fetch_trend_analytics_failed": "Failed to fetch trend sales analytics candidates.",
-      "fetch_restock_analytics_failed": "Failed to fetch restock analytics candidates.",
-      "invalid_sales_analytics_response": "Invalid response from sales analytics repository.",
-      "fetch_orders_failed": "Failed to fetch orders via NATS.",
-      "fetch_order_details_failed": "Failed to fetch order details via NATS.",
-      "fetch_all_orders_failed": "Failed to fetch all orders.",
-      "order_not_found": "No orders found for the user.",
-      "fetch_cart_failed": "Failed to fetch cart via NATS.",
-      "add_to_cart_failed": "Failed to add to cart via NATS.",
-      "update_cart_failed": "Failed to update cart via NATS.",
-      "remove_from_cart_failed": "Failed to remove from cart via NATS.",
-      "clear_cart_failed": "Failed to clear cart via NATS.",
-      "fetch_products_failed": "Failed to fetch products via NATS.",
-      "fetch_best_selling_failed": "Failed to fetch best selling products via NATS.",
-      "fetch_least_selling_failed": "Failed to fetch least selling products via NATS.",
-      "fetch_newest_products_failed": "Failed to fetch newest products via NATS.",
-      "fetch_product_details_failed": "Failed to fetch product details via NATS."
-    }
   }
 }

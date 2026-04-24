@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NatsRpcService } from '../common/nats/nats-rpc.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { CatalogItemResponse } from 'src/application/dtos/response/catalog-item.response';
-import { I18nService } from 'nestjs-i18n';
 
 const CATALOG_REQUEST_CHANNEL = 'catalog_request';
 
@@ -10,20 +9,17 @@ const CATALOG_REQUEST_CHANNEL = 'catalog_request';
 export class SourcingCatalogService {
   private readonly logger = new Logger(SourcingCatalogService.name);
 
-  constructor(
-    private readonly natsRpcService: NatsRpcService,
-    private readonly i18n: I18nService
-  ) {}
+  constructor(private readonly NatsRpcService: NatsRpcService) {}
 
   /**
-   * Fetches catalogs for a specific product variant from the main backend via NATS.
+   * Fetches catalogs for a specific product variant from the main backend via Redis.
    * @param variantId The GUID of the product variant.
    */
   async getCatalogsAsync(variantId: string): Promise<BaseResponseAPI<CatalogItemResponse[]>> {
     try {
-      this.logger.log(this.i18n.t('common.nats.repository.requesting_catalogs', { args: { variantId } }));
+      this.logger.log(`[Sourcing] Requesting catalogs for variantId=${variantId}`);
 
-      const response = await this.natsRpcService.sendRequest<{
+      const response = await this.NatsRpcService.sendRequest<{
         variantId: string;
         catalogs: any[];
         error?: string;
@@ -46,10 +42,10 @@ export class SourcingCatalogService {
         payload: catalogs,
       };
     } catch (err) {
-      this.logger.error(this.i18n.t('common.nats.repository.sourcing_error', { args: { variantId, error: err.message } }));
+      this.logger.error(`[Sourcing] Failed to get catalogs for variantId=${variantId}: ${err.message}`);
       return {
         success: false,
-        error: err.message || this.i18n.t('common.nats.repository.sourcing_internal_error'),
+        error: err.message || 'Timeout or internal error requesting catalogs via Redis.',
         payload: [],
       };
     }

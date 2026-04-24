@@ -12,6 +12,7 @@ import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work'
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
 import { TrendLog } from 'src/domain/entities/trend-log.entity';
+import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Output } from 'ai';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
@@ -83,7 +84,7 @@ export class InventoryService {
   ) { }
 
   private async ensureCriticalLowStockIncluded(
-    restockData: RestockLogPayload | null
+    restockpayload: RestockLogPayload | null
   ): Promise<{ variants: RestockVariantResult[] }> {
     const safeData = (restockData && typeof restockData === 'object' ? restockData : {}) as RestockLogPayload;
     const currentVariants = Array.isArray(safeData.variants)
@@ -320,7 +321,7 @@ export class InventoryService {
           })
         );
         // No need to await or return anything, just fire and forget
-        return { success: true, data: logEntry };
+        return { success: true, payload: logEntry };
       },
       'Failed to create inventory log',
       true
@@ -329,34 +330,34 @@ export class InventoryService {
 
   async getAllInventoryLogs(
     type?: InventoryLogType
-  ): Promise<BaseResponse<InventoryLog[]>> {
+  ): Promise<BaseResponseAPI<InventoryLog[]>> {
     return funcHandlerAsync(
       async () => {
         const where = type ? { type } : {};
         const logs = await this.unitOfWork.InventoryLogRepo.find(where, {
           orderBy: { updatedAt: 'DESC' }
         });
-        return { success: true, data: logs };
+        return { success: true, payload: logs };
       },
       'Failed to fetch inventory logs',
       true
     );
   }
 
-  async getInventoryLogById(id: string): Promise<BaseResponse<InventoryLog>> {
+  async getInventoryLogById(id: string): Promise<BaseResponseAPI<InventoryLog>> {
     return funcHandlerAsync(async () => {
       const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
       if (!log) {
-        return { success: false, error: this.i18n.t('inventory.errors.logNotFound') };
+        return { success: false, error: this.i18n.t('inventory.errors.logNotFound'), payload: null };
       }
-      return { success: true, data: log };
+      return { success: true, payload: log };
     }, 'Failed to fetch inventory log');
   }
 
   async convertInventoryLogMarkdownToPdf(
     id: string
   ): Promise<
-    BaseResponse<{
+    BaseResponseAPI<{
       fileName: string;
       absolutePath: string;
       generatedAt: string;
@@ -429,7 +430,7 @@ export class InventoryService {
 
         return {
           success: true,
-          data: {
+          payload: {
             fileName: pdfFileName,
             absolutePath: pdfPath,
             generatedAt,
@@ -518,12 +519,12 @@ export class InventoryService {
         {},
         { orderBy: { createdAt: 'DESC' }, limit: count }
       );
-      return { success: true, data: logs };
+      return { success: true, payload: logs };
     }, 'Failed to fetch trend logs');
   }
 
   /** Lưu kết quả trend AI vào DB (dùng EntityManager qua repository theo MikroORM v6) */
-  async saveTrendLog(trendData: string): Promise<void> {
+  async saveTrendLog(trendpayload: string): Promise<void> {
     try {
       const log = new TrendLog({ trendData });
       await this.unitOfWork.TrendLogRepo.getEntityManager().persistAndFlush(
@@ -534,7 +535,7 @@ export class InventoryService {
     }
   }
 
-  async generateAIInventoryReport(): Promise<BaseResponse<string>> {
+  async generateAIInventoryReport(): Promise<BaseResponseAPI<string>> {
     const report = await this.createReportFromBatchAndStock();
     if (isDataEmpty(report?.toString())) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
@@ -587,7 +588,7 @@ export class InventoryService {
   }
 
   async generateStructuredAIInventoryReport(): Promise<
-    BaseResponse<AIInventoryReportStructuredResponse>
+    BaseResponseAPI<AIInventoryReportStructuredResponse>
   > {
     const startTime = Date.now();
     const report = await this.createReportFromBatchAndStock();
@@ -596,7 +597,7 @@ export class InventoryService {
         new AIInventoryReportStructuredResponse({
           report: INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT,
           generatedAt: new Date(),
-          metadata: new AIResponseMetadata({
+          metapayload: new AIResponseMetadata({
             processingTimeMs: Date.now() - startTime
           })
         })
@@ -622,14 +623,14 @@ export class InventoryService {
       new AIInventoryReportStructuredResponse({
         report: aiResponse.data ?? '',
         generatedAt: new Date(),
-        metadata: new AIResponseMetadata({
+        metapayload: new AIResponseMetadata({
           processingTimeMs: Date.now() - startTime
         })
       })
     );
   }
 
-  async analyzeRestockNeeds(): Promise<BaseResponse<RestockLogPayload>> {
+  async analyzeRestockNeeds(): Promise<BaseResponseAPI<RestockLogPayload>> {
     const adminPrompt =
       await this.adminInstructionService.getSystemPromptForDomain(
         INSTRUCTION_TYPE_RESTOCK

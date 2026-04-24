@@ -4,6 +4,7 @@ import {
   ReviewListItemResponse,
   ReviewResponse,
   ReviewStatisticsResponse,
+  MediaResponse
 } from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
@@ -12,7 +13,7 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
-import { I18nService } from 'nestjs-i18n';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -24,8 +25,7 @@ function isUUID(id: string): boolean {
 export class ReviewService {
   constructor(
     private readonly reviewNatsRepo: ReviewNatsRepository,
-    private readonly unitOfWork: UnitOfWork,
-    private readonly i18n: I18nService
+    private readonly unitOfWork: UnitOfWork
   ) {}
   
   async getAllReviews(
@@ -54,7 +54,7 @@ export class ReviewService {
 
         return { success: true, payload: result };
       },
-      this.i18n.t('common.nats.errors.fetch_reviews_failed'),
+      'Failed to fetch reviews from Redis',
       true
     );
   }
@@ -70,7 +70,7 @@ export class ReviewService {
 
         return { success: true, payload: (reviews || []).map(r => new ReviewResponse(r)) };
       },
-      this.i18n.t('common.nats.errors.fetch_variant_reviews_failed'),
+      'Failed to fetch variant reviews from Redis via Repository',
       true
     );
   }
@@ -111,7 +111,7 @@ export class ReviewService {
 
         return { success: true, payload: response };
       },
-      this.i18n.t('common.nats.errors.fetch_review_stats_failed'),
+      'Failed to fetch review statistics from Redis',
       true
     );
   }
@@ -131,7 +131,7 @@ export class ReviewService {
         const result = await this.unitOfWork.ReviewLogRepo.insert(log);
         return { success: true, payload: result };
       },
-      this.i18n.t('common.nats.errors.add_review_log_failed'),
+      'Failed to add review log',
       true
     );
   }
@@ -144,7 +144,7 @@ export class ReviewService {
         const logs = await this.unitOfWork.ReviewLogRepo.find({ variantId });
         return { success: true, payload: logs };
       },
-      this.i18n.t('common.nats.errors.fetch_review_logs_failed'),
+      'Failed to fetch review logs',
       true
     );
   }
@@ -163,7 +163,7 @@ export class ReviewService {
         }
         return { success: true, payload: log };
       },
-      this.i18n.t('common.nats.errors.fetch_latest_review_log_failed'),
+      'Failed to fetch latest review log',
       true
     );
   }
@@ -173,11 +173,11 @@ export class ReviewService {
       async () => {
         const log = await this.unitOfWork.ReviewLogRepo.findOne({ id });
         if (!log) {
-          return { success: false, error: this.i18n.t('common.nats.errors.review_log_not_found') };
+          return { success: false, error: 'Review log not found' };
         }
         return { success: true, payload: log };
       },
-      this.i18n.t('common.nats.errors.fetch_review_logs_failed'),
+      'Failed to fetch review log',
       true
     );
   }
@@ -188,12 +188,12 @@ export class ReviewService {
         const result = await this.unitOfWork.ReviewLogRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
         return { success: true, payload: result };
       },
-      this.i18n.t('common.nats.errors.fetch_review_logs_failed'),
+      'Failed to fetch review logs',
       true
     );
   }
 
-  /** Lấy toàn bộ review không phân trang qua NATS Repository – dùng cho AI summary */
+  /** Lấy toàn bộ review không phân trang qua Redis Repository – dùng cho AI summary */
   async getReviewsUnpaged(variantId?: string): Promise<ReviewResponse[]> {
     const reviews = await this.reviewNatsRepo.getVariantReviews(variantId!);
     return (reviews || []).map(r => new ReviewResponse(r));

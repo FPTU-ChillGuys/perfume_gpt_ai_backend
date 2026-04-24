@@ -1,0 +1,10 @@
+{
+  "product": {
+    "fetch_failed": "Không thể lấy dữ liệu sản phẩm từ hệ thống.",
+    "not_found": "Không tìm thấy sản phẩm phù hợp.",
+    "get_by_query": "Tìm kiếm sản phẩm theo tiêu chí.",
+    "get_best_selling": "Lấy sản phẩm bán chạy.",
+    "get_newest": "Lấy sản phẩm mới nhất.",
+    "get_by_ids": "Lấy thông tin sản phẩm theo IDs."
+  }
+}

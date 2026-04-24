@@ -31,6 +31,15 @@ export class InventoryStockResponse {
     @ApiProperty({ description: 'Volume in milliliters', example: 100 })
     volumeMl: number;
 
+    @ApiProperty({ description: 'Available quantity', example: 90 })
+    availableQuantity: number;
+
+    @ApiProperty({ description: 'Variant status string', example: 'Active' })
+    variantStatus: string;
+
+    @ApiProperty({ description: 'Stock status enum string', example: 'InStock' })
+    status: string;
+
     constructor(init?: Partial<InventoryStockResponse>) {
         Object.assign(this, init);
     }

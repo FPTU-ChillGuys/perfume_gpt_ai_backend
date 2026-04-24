@@ -1,0 +1,8 @@
+{
+  "order": {
+    "fetch_failed": "Không thể lấy dữ liệu đơn hàng.",
+    "not_found": "Không tìm thấy đơn hàng.",
+    "get_orders": "Lấy danh sách đơn hàng.",
+    "get_details": "Lấy chi tiết đơn hàng."
+  }
+}

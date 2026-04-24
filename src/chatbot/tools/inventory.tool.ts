@@ -36,18 +36,18 @@ export class InventoryTool {
       return await funcHandlerAsync(
         async () => {
           // Fetch from Redis Repository instead of direct Prisma
-          const response = (await this.inventoryNatsRepo.getPagedStock({
+          const response = await this.inventoryNatsRepo.getPagedStock({
             pageSize: 400 // Limit for AI tool context efficiency
-          })) as { items: RedisInventoryStockResponse[] };
+          });
 
           const items = (response?.items || []).map((s) => ({
             variantId: s.variantId,
             sku: s.variantSku,
             productName: s.productName,
             volumeMl: s.volumeMl,
-            type: s.type,
+            type: 'Standard', // Use default as type may not be included
             basePrice: Number(s.basePrice),
-            status: s.variantStatus,
+            status: s.variantStatus || 'Active',
             concentrationName: s.concentrationName,
             totalQuantity: s.totalQuantity,
             reservedQuantity: Math.max(0, s.totalQuantity - s.availableQuantity),

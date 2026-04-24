@@ -1,6 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NatsRpcService } from 'src/infrastructure/domain/common/nats/nats-rpc.service';
 import { I18nService } from 'nestjs-i18n';
+import { NatsRpcService } from 'src/infrastructure/domain/common/nats/nats-rpc.service';
+import { PagedResult } from 'src/application/dtos/response/common/paged-result';
+import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
+import { BatchResponse } from 'src/application/dtos/response/batch.response';
+
+/** Kết quả stats tồn kho tổng quan */
+export interface InventoryOverallStats {
+  totalSku: number;
+  lowStockSku: number;
+  outOfStockSku: number;
+  expiredBatches: number;
+  nearExpiryBatches: number;
+  criticalAlerts: number;
+}
+
+/** Kết quả paged inventory từ .NET (field capitals vì .NET trả về PascalCase) */
+export interface InventoryPagedPayload {
+  totalCount: number;
+  items: InventoryStockResponse[];
+}
 
 const INVENTORY_REQUEST_CHANNEL = 'inventory_data_request';
 const DEFAULT_TIMEOUT = 15000;
@@ -11,33 +30,33 @@ export class InventoryNatsRepository {
 
   constructor(
     private readonly natsRpc: NatsRpcService,
-    private readonly i18n: I18nService
+    private readonly i18n: I18nService,
   ) {}
 
   /**
-   * Fetch paged stock data from the main backend.
+   * Lấy danh sách tồn kho phân trang từ .NET backend.
    */
   async getPagedStock(params: {
     pageNumber?: number;
     pageSize?: number;
     searchTerm?: string;
     isLowStock?: boolean;
-    stockStatus?: number; // 1=OutOfStock, 2=LowStock, 3=Normal (StockStatus enum)
+    stockStatus?: number;
     variantId?: string;
     sortBy?: string;
     sortOrder?: string;
-  }) {
-    this.logger.log(this.i18n.t('common.nats.repository.fetching_stock', { args: { params: JSON.stringify(params) } }));
-    return await this.natsRpc.sendRequest<unknown>(
+  }): Promise<InventoryPagedPayload> {
+    this.logger.log(`[NATS] ${this.i18n.t('inventory.get_stock')}`);
+    return await this.natsRpc.sendRequest<InventoryPagedPayload>(
       INVENTORY_REQUEST_CHANNEL,
       'getInventory',
       params,
-      DEFAULT_TIMEOUT
+      DEFAULT_TIMEOUT,
     );
   }
 
   /**
-   * Fetch paged batch data from the main backend.
+   * Lấy danh sách lô hàng phân trang từ .NET backend.
    */
   async getPagedBatches(params: {
     pageNumber?: number;
@@ -45,26 +64,26 @@ export class InventoryNatsRepository {
     batchCode?: string;
     isExpired?: boolean;
     variantId?: string;
-  }) {
-    this.logger.log(this.i18n.t('common.nats.repository.fetching_batches', { args: { params: JSON.stringify(params) } }));
-    return await this.natsRpc.sendRequest<unknown>(
+  }): Promise<PagedResult<BatchResponse>> {
+    this.logger.log(`[NATS] ${this.i18n.t('inventory.get_batches')}`);
+    return await this.natsRpc.sendRequest<PagedResult<BatchResponse>>(
       INVENTORY_REQUEST_CHANNEL,
       'getBatches',
       params,
-      DEFAULT_TIMEOUT
+      DEFAULT_TIMEOUT,
     );
   }
 
   /**
-   * Fetch overall inventory statistics.
+   * Lấy thống kê tổng quan tồn kho.
    */
-  async getOverallStats() {
-    this.logger.log(this.i18n.t('common.nats.repository.fetching_stats'));
-    return await this.natsRpc.sendRequest<unknown>(
+  async getOverallStats(): Promise<InventoryOverallStats> {
+    this.logger.log(`[NATS] ${this.i18n.t('inventory.get_stats')}`);
+    return await this.natsRpc.sendRequest<InventoryOverallStats>(
       INVENTORY_REQUEST_CHANNEL,
       'getOverallStats',
       {},
-      DEFAULT_TIMEOUT
+      DEFAULT_TIMEOUT,
     );
   }
 }

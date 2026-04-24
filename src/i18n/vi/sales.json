@@ -1,0 +1,6 @@
+{
+  "sales": {
+    "fetch_failed": "Không thể lấy dữ liệu doanh thu.",
+    "get_analytics": "Lấy thống kê doanh thu theo sản phẩm."
+  }
+}

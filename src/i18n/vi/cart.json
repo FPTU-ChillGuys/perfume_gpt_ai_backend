@@ -1,0 +1,12 @@
+{
+  "cart": {
+    "fetch_failed": "Không thể lấy dữ liệu giỏ hàng.",
+    "update_failed": "Không thể cập nhật giỏ hàng.",
+    "not_found": "Giỏ hàng không tồn tại.",
+    "add_item": "Thêm sản phẩm vào giỏ hàng.",
+    "remove_item": "Xóa sản phẩm khỏi giỏ hàng.",
+    "update_item": "Cập nhật số lượng sản phẩm.",
+    "clear_cart": "Xóa toàn bộ giỏ hàng.",
+    "get_cart": "Lấy thông tin giỏ hàng."
+  }
+}

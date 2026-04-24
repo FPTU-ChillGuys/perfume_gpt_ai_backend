@@ -5,7 +5,7 @@
     "not_found": "Không tìm thấy dữ liệu"
   },
   "conversation": {
-    "error_fetching_inventory": "Không thể lấy dữ liệu tồn kho từ Redis.",
+    "error_fetching_inventory": "Không thể lấy dữ liệu tồn kho từ hệ thống.",
     "analysis_failed": "Phân tích ý định người dùng thất bại.",
     "chat_success": "Phản hồi AI thành công.",
     "build_prompt_failed": "Lỗi khi xây dựng prompt kết hợp.",
@@ -27,64 +27,30 @@
       "fallback_explanation": "Fallback analysis because intermediate analysis failed"
     }
   },
+  "nats": {
+    "not_connected": "Dịch vụ nội bộ chưa sẵn sàng, vui lòng thử lại sau.",
+    "request_timeout": "Hết thời gian chờ phản hồi từ hệ thống. Vui lòng thử lại.",
+    "request_failed": "Không thể gửi yêu cầu đến hệ thống. Vui lòng thử lại sau.",
+    "product": {
+      "fetch_failed": "Không thể lấy dữ liệu sản phẩm từ hệ thống.",
+      "not_found": "Không tìm thấy sản phẩm phù hợp."
+    },
+    "cart": {
+      "fetch_failed": "Không thể lấy dữ liệu giỏ hàng.",
+      "update_failed": "Không thể cập nhật giỏ hàng."
+    },
+    "order": {
+      "fetch_failed": "Không thể lấy dữ liệu đơn hàng.",
+      "not_found": "Không tìm thấy đơn hàng."
+    },
+    "inventory": {
+      "fetch_failed": "Không thể lấy dữ liệu tồn kho từ hệ thống."
+    },
+    "review": {
+      "fetch_failed": "Không thể lấy dữ liệu đánh giá."
+    }
+  },
   "recommendation": {
     "no_history_fallback": "Chúng tôi rất trân trọng sự quan tâm của Quý khách. Hiện tại hệ thống chưa ghi nhận đơn hàng trước đó, nên chúng tôi xin gửi một số gợi ý mở đầu để Quý khách khám phá phong cách hương thơm phù hợp nhất."
-  },
-  "nats": {
-    "connected": "[NATS] Đã kết nối tới {url}",
-    "connection_failed": "[NATS] Kết nối thất bại: {error}",
-    "publishing": "[NATS Req] Đang gửi {action} tới {channel}",
-    "request_error": "[NATS Req Error] Lỗi khi gửi {action} tới {channel}: {error}",
-    "connection_not_established": "Chưa thiết lập kết nối NATS.",
-    "repository": {
-      "fetching_stock": "Đang lấy dữ liệu tồn kho: {params}",
-      "fetching_batches": "Đang lấy dữ liệu lô hàng: {params}",
-      "fetching_stats": "Đang lấy thống kê tồn kho tổng quát",
-      "fetching_structured": "Đang truy vấn sản phẩm: {intent}",
-      "fetching_best_selling": "Đang lấy sản phẩm bán chạy: {params}",
-      "fetching_newest": "Đang lấy sản phẩm mới nhất: {params}",
-      "fetching_by_ids": "Đang lấy sản phẩm theo ID: {count} mục",
-      "fetching_cart": "Đang lấy giỏ hàng cho người dùng: {userId}",
-      "adding_to_cart": "Đang thêm vào giỏ hàng: Người dùng {userId}, Variant {variantId}, SL {quantity}",
-      "clearing_cart": "Đang xóa giỏ hàng cho người dùng: {userId}",
-      "removing_from_cart": "Đang xóa khỏi giỏ hàng: Người dùng {userId}, Mục {cartItemId}",
-      "updating_cart": "Đang cập nhật giỏ hàng: Người dùng {userId}, Mục {cartItemId}, SL {quantity}",
-      "fetching_orders": "Đang lấy đơn hàng cho người dùng: {userId}",
-      "fetching_order_details": "Đang lấy chi tiết đơn hàng: Người dùng {userId}, Đơn {orderId}",
-      "fetching_reviews": "Đang lấy dữ liệu đánh giá: {params}",
-      "fetching_variant_reviews": "Đang lấy toàn bộ đánh giá cho variantId={variantId}",
-      "fetching_variant_stats": "Đang lấy thống kê đánh giá cho variantId={variantId}",
-      "fetching_sales_analytics": "Đang lấy phân tích doanh số cho {months} tháng",
-      "requesting_catalogs": "[Sourcing] Đang yêu cầu danh mục cho variantId={variantId}",
-      "sourcing_error": "[Sourcing] Lỗi khi lấy danh mục cho variantId={variantId}: {error}",
-      "sourcing_internal_error": "Lỗi timeout hoặc lỗi nội bộ khi yêu cầu danh mục qua NATS."
-    },
-    "errors": {
-      "fetch_reviews_failed": "Lỗi khi lấy danh sách đánh giá qua NATS.",
-      "fetch_variant_reviews_failed": "Lỗi khi lấy đánh giá của variant qua NATS.",
-      "fetch_review_stats_failed": "Lỗi khi lấy thống kê đánh giá qua NATS.",
-      "add_review_log_failed": "Lỗi khi thêm log đánh giá.",
-      "fetch_review_logs_failed": "Lỗi khi lấy danh sách log đánh giá.",
-      "fetch_latest_review_log_failed": "Lỗi khi lấy log đánh giá mới nhất.",
-      "review_log_not_found": "Không tìm thấy log đánh giá.",
-      "fetch_sales_analytics_failed": "Lỗi khi lấy phân tích doanh số cho tái cấp hàng.",
-      "fetch_trend_analytics_failed": "Lỗi khi lấy dữ liệu phân tích xu hướng.",
-      "fetch_restock_analytics_failed": "Lỗi khi lấy dữ liệu phân tích tái cấp hàng.",
-      "invalid_sales_analytics_response": "Phản hồi từ repository phân tích doanh số không hợp lệ.",
-      "fetch_orders_failed": "Lỗi khi lấy danh sách đơn hàng qua NATS.",
-      "fetch_order_details_failed": "Lỗi khi lấy chi tiết đơn hàng qua NATS.",
-      "fetch_all_orders_failed": "Lỗi khi lấy toàn bộ đơn hàng.",
-      "order_not_found": "Không tìm thấy đơn hàng cho người dùng này.",
-      "fetch_cart_failed": "Lỗi khi lấy giỏ hàng qua NATS.",
-      "add_to_cart_failed": "Lỗi khi thêm vào giỏ hàng qua NATS.",
-      "update_cart_failed": "Lỗi khi cập nhật giỏ hàng qua NATS.",
-      "remove_from_cart_failed": "Lỗi khi xóa khỏi giỏ hàng qua NATS.",
-      "clear_cart_failed": "Lỗi khi làm trống giỏ hàng qua NATS.",
-      "fetch_products_failed": "Lỗi khi lấy danh sách sản phẩm qua NATS.",
-      "fetch_best_selling_failed": "Lỗi khi lấy sản phẩm bán chạy qua NATS.",
-      "fetch_least_selling_failed": "Lỗi khi lấy sản phẩm bán chậm qua NATS.",
-      "fetch_newest_products_failed": "Lỗi khi lấy sản phẩm mới nhất qua NATS.",
-      "fetch_product_details_failed": "Lỗi khi lấy chi tiết sản phẩm qua NATS."
-    }
   }
 }

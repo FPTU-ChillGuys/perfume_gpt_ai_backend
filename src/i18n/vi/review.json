@@ -1,0 +1,8 @@
+{
+  "review": {
+    "fetch_failed": "Không thể lấy dữ liệu đánh giá.",
+    "get_paged": "Lấy danh sách đánh giá.",
+    "get_by_variant": "Lấy đánh giá theo sản phẩm.",
+    "get_stats": "Lấy thống kê đánh giá."
+  }
+}

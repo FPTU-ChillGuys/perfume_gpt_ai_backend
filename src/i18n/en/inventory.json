@@ -1,4 +1,10 @@
 {
+  "inventory": {
+    "fetch_failed": "Failed to fetch inventory data from the system.",
+    "get_stock": "Fetching inventory stock data.",
+    "get_batches": "Fetching batch data.",
+    "get_stats": "Fetching overall statistics."
+  },
   "report": {
     "title": "INVENTORY STATUS OVERVIEW",
     "totalSku": "Total SKU",

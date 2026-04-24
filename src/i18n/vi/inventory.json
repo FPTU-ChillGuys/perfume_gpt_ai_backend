@@ -1,4 +1,10 @@
 {
+  "inventory": {
+    "fetch_failed": "Không thể lấy dữ liệu tồn kho từ hệ thống.",
+    "get_stock": "Lấy dữ liệu tồn kho.",
+    "get_batches": "Lấy dữ liệu lô hàng.",
+    "get_stats": "Lấy thống kê tổng quan."
+  },
   "report": {
     "title": "TỔNG QUAN TRẠNG THÁI KHO",
     "totalSku": "Tổng số SKU",

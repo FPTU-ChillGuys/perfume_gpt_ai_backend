@@ -1,54 +1,58 @@
-import { Injectable } from '@nestjs/common';
-import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { AddToCartRequest } from 'src/application/dtos/request/cart/add-to-cart.request';
+import { UpdateCartItemRequest } from 'src/application/dtos/request/cart/update-cart-item.request';
+import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { CartNatsRepository } from '../repositories/nats/cart-nats.repository';
-import { I18nService } from 'nestjs-i18n';
 
 @Injectable()
 export class CartService {
-  constructor(
-    private readonly cartNatsRepo: CartNatsRepository,
-    private readonly i18n: I18nService
-  ) {}
+    constructor(private readonly cartNatsRepo: CartNatsRepository) { }
 
-  async getCart(userId: string): Promise<BaseResponseAPI<any>> {
-    return await funcHandlerAsync(async () => {
-      return await this.cartNatsRepo.getCart(userId);
-    }, this.i18n.t('common.nats.errors.fetch_cart_failed'));
-  }
+    async getCart(userId: string): Promise<BaseResponse<any>> {
+        return await funcHandlerAsync(async () => {
+            const result = await this.cartNatsRepo.getCart(userId);
+            const items = (result?.items || []).map((item: any) => ({
+                id: item.cartItemId,
+                variantId: item.variantId,
+                productName: item.variantName,
+                volumeMl: item.volumeMl,
+                type: item.type,
+                price: Number(item.variantPrice),
+                quantity: item.quantity,
+                imageUrl: item.imageUrl,
+                isAvailable: item.isAvailable,
+                subTotal: Number(item.subTotal),
+            }));
+            return { success: true, data: items };
+        }, 'Failed to retrieve cart');
+    }
 
-  async addToCart(
-    userId: string,
-    variantId: string,
-    quantity: number,
-  ): Promise<BaseResponseAPI<any>> {
-    return await funcHandlerAsync(async () => {
-      return await this.cartNatsRepo.addToCart(userId, variantId, quantity);
-    }, this.i18n.t('common.nats.errors.add_to_cart_failed'));
-  }
+    async addToCart(userId: string, request: AddToCartRequest): Promise<BaseResponse<string>> {
+        return await funcHandlerAsync(async () => {
+            const result = await this.cartNatsRepo.addToCart(userId, request.variantId, request.quantity);
+            return { success: result.success, error: result.error, data: 'Thành công' };
+        }, 'Failed to add item to cart');
+    }
 
-  async clearCart(userId: string): Promise<BaseResponseAPI<any>> {
-    return await funcHandlerAsync(async () => {
-      return await this.cartNatsRepo.clearCart(userId);
-    }, this.i18n.t('common.nats.errors.clear_cart_failed'));
-  }
+    async updateCartItem(userId: string, cartItemId: string, request: UpdateCartItemRequest): Promise<BaseResponse<string>> {
+        return await funcHandlerAsync(async () => {
+            const result = await this.cartNatsRepo.updateCartItem(userId, cartItemId, request.quantity);
+            return { success: result.success, error: result.error, data: 'Thành công' };
+        }, 'Failed to update cart item');
+    }
 
-  async removeFromCart(
-    userId: string,
-    cartItemId: string,
-  ): Promise<BaseResponseAPI<any>> {
-    return await funcHandlerAsync(async () => {
-      return await this.cartNatsRepo.removeFromCart(userId, cartItemId);
-    }, this.i18n.t('common.nats.errors.remove_from_cart_failed'));
-  }
+    async removeFromCart(userId: string, cartItemId: string): Promise<BaseResponse<string>> {
+        return await funcHandlerAsync(async () => {
+            const result = await this.cartNatsRepo.removeFromCart(userId, cartItemId);
+            return { success: result.success, error: result.error, data: 'Thành công' };
+        }, 'Failed to remove item from cart');
+    }
 
-  async updateCartItem(
-    userId: string,
-    cartItemId: string,
-    quantity: number,
-  ): Promise<BaseResponseAPI<any>> {
-    return await funcHandlerAsync(async () => {
-      return await this.cartNatsRepo.updateCartItem(userId, cartItemId, quantity);
-    }, this.i18n.t('common.nats.errors.update_cart_failed'));
-  }
+    async clearCart(userId: string): Promise<BaseResponse<string>> {
+        return await funcHandlerAsync(async () => {
+            const result = await this.cartNatsRepo.clearCart(userId);
+            return { success: result.success, error: result.error, data: 'Thành công' };
+        }, 'Failed to clear cart');
+    }
 }

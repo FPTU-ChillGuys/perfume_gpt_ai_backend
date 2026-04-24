@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { connect, NatsConnection, StringCodec } from 'nats';
-import { I18nService } from 'nestjs-i18n';
 
 @Injectable()
 export class NatsRpcService implements OnModuleInit, OnApplicationShutdown {
@@ -9,18 +8,15 @@ export class NatsRpcService implements OnModuleInit, OnApplicationShutdown {
   private nc: NatsConnection;
   private readonly sc = StringCodec();
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly i18n: I18nService
-  ) {}
+  constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
     const url = this.configService.get<string>('NATS_URL', 'nats://127.0.0.1:4222');
     try {
       this.nc = await connect({ servers: url });
-      this.logger.log(this.i18n.t('common.nats.connected', { args: { url } }));
+      this.logger.log(`[NATS] Connected to ${url}`);
     } catch (err) {
-      this.logger.error(this.i18n.t('common.nats.connection_failed', { args: { error: err.message } }));
+      this.logger.error(`[NATS] Failed to connect: ${err.message}`);
     }
   }
 
@@ -39,7 +35,7 @@ export class NatsRpcService implements OnModuleInit, OnApplicationShutdown {
    */
   async sendRequest<T>(channel: string, action: string, payload: any, timeoutMs: number = 15000): Promise<T> {
     if (!this.nc) {
-      throw new Error(this.i18n.t('common.nats.connection_not_established'));
+      throw new Error(`NATS connection is not established.`);
     }
 
     const requestPayload = JSON.stringify({
@@ -48,12 +44,12 @@ export class NatsRpcService implements OnModuleInit, OnApplicationShutdown {
     });
 
     try {
-      this.logger.log(this.i18n.t('common.nats.publishing', { args: { action, channel } }));
+      this.logger.log(`[NATS Req] Publishing ${action} to ${channel}`);
       const msg = await this.nc.request(channel, this.sc.encode(requestPayload), { timeout: timeoutMs });
       const responseString = this.sc.decode(msg.data);
       return JSON.parse(responseString) as T;
     } catch (err) {
-      this.logger.error(this.i18n.t('common.nats.request_error', { args: { action, channel, error: err.message } }));
+      this.logger.error(`[NATS Req Error] Error sending request ${action} to ${channel}: ${err.message}`);
       throw err;
     }
   }

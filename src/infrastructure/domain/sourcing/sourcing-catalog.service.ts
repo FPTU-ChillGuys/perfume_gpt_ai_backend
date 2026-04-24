@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisRequestResponseService } from '../common/redis/redis-request-response.service';
+import { NatsRpcService } from '../common/nats/nats-rpc.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { CatalogItemResponse } from 'src/application/dtos/response/catalog-item.response';
+import { I18nService } from 'nestjs-i18n';
 
 const CATALOG_REQUEST_CHANNEL = 'catalog_request';
 
@@ -9,17 +10,20 @@ const CATALOG_REQUEST_CHANNEL = 'catalog_request';
 export class SourcingCatalogService {
   private readonly logger = new Logger(SourcingCatalogService.name);
 
-  constructor(private readonly redisRequestResponseService: RedisRequestResponseService) {}
+  constructor(
+    private readonly natsRpcService: NatsRpcService,
+    private readonly i18n: I18nService
+  ) {}
 
   /**
-   * Fetches catalogs for a specific product variant from the main backend via Redis.
+   * Fetches catalogs for a specific product variant from the main backend via NATS.
    * @param variantId The GUID of the product variant.
    */
   async getCatalogsAsync(variantId: string): Promise<BaseResponseAPI<CatalogItemResponse[]>> {
     try {
-      this.logger.log(`[Sourcing] Requesting catalogs for variantId=${variantId}`);
+      this.logger.log(this.i18n.t('common.nats.repository.requesting_catalogs', { args: { variantId } }));
 
-      const response = await this.redisRequestResponseService.sendRequest<{
+      const response = await this.natsRpcService.sendRequest<{
         variantId: string;
         catalogs: any[];
         error?: string;
@@ -42,10 +46,10 @@ export class SourcingCatalogService {
         payload: catalogs,
       };
     } catch (err) {
-      this.logger.error(`[Sourcing] Failed to get catalogs for variantId=${variantId}: ${err.message}`);
+      this.logger.error(this.i18n.t('common.nats.repository.sourcing_error', { args: { variantId, error: err.message } }));
       return {
         success: false,
-        error: err.message || 'Timeout or internal error requesting catalogs via Redis.',
+        error: err.message || this.i18n.t('common.nats.repository.sourcing_internal_error'),
         payload: [],
       };
     }

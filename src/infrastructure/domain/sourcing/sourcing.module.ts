@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { SourcingCatalogService } from './sourcing-catalog.service';
-import { RedisModule } from '../common/redis/redis.module';
+import { NatsModule } from '../common/nats/nats.module';
 
 @Module({
-  imports: [RedisModule],
+  imports: [NatsModule],
   controllers: [],
   providers: [SourcingCatalogService],
   exports: [SourcingCatalogService],

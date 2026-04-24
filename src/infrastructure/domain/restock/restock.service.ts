@@ -6,12 +6,13 @@ import {
 } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { calculateSalesMetrics } from 'src/infrastructure/domain/utils/sales-metrics.util';
-import { InventoryRedisRepository } from '../repositories/redis/inventory-redis.repository';
-import { SalesRedisRepository } from '../repositories/redis/sales-redis.repository';
+import { InventoryNatsRepository } from '../repositories/nats/inventory-nats.repository';
+import { SalesNatsRepository } from '../repositories/nats/sales-nats.repository';
 import {
   RedisInventoryStockResponse,
   VariantSalesAnalyticsRedisResponse
 } from 'src/application/dtos/response/redis-internal.response';
+import { I18nService } from 'nestjs-i18n';
 
 export interface ProductVariantSalesCandidate {
   variantId: string;
@@ -47,8 +48,9 @@ export interface ProductSalesAnalyticsCandidate {
 @Injectable()
 export class RestockService {
   constructor(
-    private readonly inventoryRedisRepo: InventoryRedisRepository,
-    private readonly salesRedisRepo: SalesRedisRepository
+    private readonly inventoryNatsRepo: InventoryNatsRepository,
+    private readonly salesNatsRepo: SalesNatsRepository,
+    private readonly i18n: I18nService
   ) {}
 
   private inferAggregateTrend(last7DaysSales: number, last30DaysSales: number): 'INCREASING' | 'STABLE' | 'DECLINING' {
@@ -178,8 +180,7 @@ export class RestockService {
   private async getCriticalLowStockVariants(
     knownVariantIds: Set<string>
   ): Promise<{ variants: VariantSalesAnalyticsResponse[]; ids: Set<string> }> {
-    // Fetch from Redis Repository instead of direct Prisma
-    const response = (await this.inventoryRedisRepo.getPagedStock({
+    const response = (await this.inventoryNatsRepo.getPagedStock({
       isLowStock: true,
       pageSize: 200
     })) as { items: RedisInventoryStockResponse[] };
@@ -235,7 +236,7 @@ export class RestockService {
     if (!analyticsResult.success || !analyticsResult.payload) {
       return {
         success: false,
-        error: analyticsResult.error ?? 'Failed to fetch trend sales analytics candidates'
+        error: analyticsResult.error ?? this.i18n.t('common.nats.errors.fetch_trend_analytics_failed')
       };
     }
 
@@ -252,7 +253,7 @@ export class RestockService {
     if (!analyticsResult.success || !analyticsResult.payload) {
       return {
         success: false,
-        error: analyticsResult.error ?? 'Failed to fetch restock analytics candidates'
+        error: analyticsResult.error ?? this.i18n.t('common.nats.errors.fetch_restock_analytics_failed')
       };
     }
 
@@ -276,7 +277,7 @@ export class RestockService {
   /**
    * Lấy tất cả variant với dữ liệu bán hàng theo ngày (2 tháng gần nhất)
    * Sử dụng cho tool dự đoán tái cấp hàng
-   * Lấy từ Redis Repository thay vì direct Prisma
+   * Lấy từ NATS Repository thay vì direct Prisma
    */
   async getProductSalesAnalyticsForRestock(): Promise<
     BaseResponseAPI<VariantSalesAnalyticsResponse[]>
@@ -287,13 +288,13 @@ export class RestockService {
         const now = new Date();
         const startDate = new Date(now.getFullYear(), now.getMonth() - months, now.getDate());
 
-        // Fetch aggregated sales data from Main Backend via Redis
-        const salesData = (await this.salesRedisRepo.getVariantSalesAnalytics(
+        // Fetch aggregated sales data from Main Backend via NATS
+        const salesData = (await this.salesNatsRepo.getVariantSalesAnalytics(
           months
         )) as VariantSalesAnalyticsRedisResponse[];
 
         if (!Array.isArray(salesData)) {
-          throw new Error('Invalid response from sales analytics repository');
+          throw new Error(this.i18n.t('common.nats.errors.invalid_sales_analytics_response'));
         }
 
         // Map the results to VariantSalesAnalyticsResponse
@@ -340,14 +341,13 @@ export class RestockService {
           payload: results
         };
       },
-      'Failed to fetch variant sales analytics for restock',
+      this.i18n.t('common.nats.errors.fetch_sales_analytics_failed'),
       true
     );
   }
 
   /**
    * Lấy dữ liệu phân tích bán hàng cho một variant cụ thể
-   * TODO: Hiện tại trả về lỗi hoặc lọc từ list chung để tối ưu code
    */
   async getVariantSalesAnalyticsById(
     variantId: string
@@ -357,7 +357,7 @@ export class RestockService {
       return { success: false, error: all.error };
     }
     const found = all.payload.find(v => v.variantId === variantId);
-    if (!found) return { success: false, error: 'Variant not found in analytics' };
+    if (!found) return { success: false, error: this.i18n.t('common.nats.errors.fetch_sales_analytics_failed') };
     return { success: true, payload: found };
   }
 }

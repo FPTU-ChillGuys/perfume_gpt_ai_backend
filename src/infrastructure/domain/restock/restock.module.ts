@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
-import { RedisModule } from '../common/redis/redis.module';
-import { InventoryRedisRepository } from '../repositories/redis/inventory-redis.repository';
-import { SalesRedisRepository } from '../repositories/redis/sales-redis.repository';
+import { NatsModule } from '../common/nats/nats.module';
+import { InventoryNatsRepository } from '../repositories/nats/inventory-nats.repository';
+import { SalesNatsRepository } from '../repositories/nats/sales-nats.repository';
 
 @Module({
-  imports: [RedisModule],
-  providers: [RestockService, InventoryRedisRepository, SalesRedisRepository],
+  imports: [NatsModule],
+  providers: [RestockService, InventoryNatsRepository, SalesNatsRepository],
   exports: [RestockService]
 })
 export class RestockModule { }

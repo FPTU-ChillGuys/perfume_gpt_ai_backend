@@ -1,14 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisRequestResponseService } from 'src/infrastructure/domain/common/redis/redis-request-response.service';
+import { NatsRpcService } from 'src/infrastructure/domain/common/nats/nats-rpc.service';
+import { I18nService } from 'nestjs-i18n';
 
 const INVENTORY_REQUEST_CHANNEL = 'inventory_data_request';
 const DEFAULT_TIMEOUT = 15000;
 
 @Injectable()
-export class InventoryRedisRepository {
-  private readonly logger = new Logger(InventoryRedisRepository.name);
+export class InventoryNatsRepository {
+  private readonly logger = new Logger(InventoryNatsRepository.name);
 
-  constructor(private readonly redisRequestResponse: RedisRequestResponseService) {}
+  constructor(
+    private readonly natsRpc: NatsRpcService,
+    private readonly i18n: I18nService
+  ) {}
 
   /**
    * Fetch paged stock data from the main backend.
@@ -23,8 +27,8 @@ export class InventoryRedisRepository {
     sortBy?: string;
     sortOrder?: string;
   }) {
-    this.logger.log(`Fetching paged stock data: ${JSON.stringify(params)}`);
-    return await this.redisRequestResponse.sendRequest<unknown>(
+    this.logger.log(this.i18n.t('common.nats.repository.fetching_stock', { args: { params: JSON.stringify(params) } }));
+    return await this.natsRpc.sendRequest<unknown>(
       INVENTORY_REQUEST_CHANNEL,
       'getInventory',
       params,
@@ -42,8 +46,8 @@ export class InventoryRedisRepository {
     isExpired?: boolean;
     variantId?: string;
   }) {
-    this.logger.log(`Fetching paged batch data: ${JSON.stringify(params)}`);
-    return await this.redisRequestResponse.sendRequest<unknown>(
+    this.logger.log(this.i18n.t('common.nats.repository.fetching_batches', { args: { params: JSON.stringify(params) } }));
+    return await this.natsRpc.sendRequest<unknown>(
       INVENTORY_REQUEST_CHANNEL,
       'getBatches',
       params,
@@ -55,8 +59,8 @@ export class InventoryRedisRepository {
    * Fetch overall inventory statistics.
    */
   async getOverallStats() {
-    this.logger.log('Fetching overall inventory stats');
-    return await this.redisRequestResponse.sendRequest<unknown>(
+    this.logger.log(this.i18n.t('common.nats.repository.fetching_stats'));
+    return await this.natsRpc.sendRequest<unknown>(
       INVENTORY_REQUEST_CHANNEL,
       'getOverallStats',
       {},

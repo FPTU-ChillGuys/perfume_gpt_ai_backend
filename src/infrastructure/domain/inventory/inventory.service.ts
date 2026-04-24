@@ -35,7 +35,7 @@ import {
 } from 'src/application/dtos/response/ai-structured.response';
 import { restockOutput } from 'src/chatbot/output/restock.output';
 import { SourcingCatalogService } from 'src/infrastructure/domain/sourcing/sourcing-catalog.service';
-import { InventoryRedisRepository } from '../repositories/redis/inventory-redis.repository';
+import { InventoryNatsRepository } from '../repositories/nats/inventory-nats.repository';
 import { RedisInventoryStockResponse } from 'src/application/dtos/response/redis-internal.response';
 
 type RestockVariantResult = {
@@ -73,7 +73,7 @@ export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
   constructor(
-    private readonly inventoryRedisRepo: InventoryRedisRepository,
+    private readonly inventoryNatsRepo: InventoryNatsRepository,
     private readonly unitOfWork: UnitOfWork,
     @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
@@ -92,7 +92,7 @@ export class InventoryService {
 
     // Only fetch genuinely critical items — LowStock or OutOfStock
     // Using pageSize: 100 to provide enough candidates while staying safe
-    const response = (await this.inventoryRedisRepo.getPagedStock({
+    const response = (await this.inventoryNatsRepo.getPagedStock({
       isLowStock: true,
       pageSize: 100
     })) as { items: RedisInventoryStockResponse[] };
@@ -138,7 +138,7 @@ export class InventoryService {
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const payload = (await this.inventoryRedisRepo.getPagedStock({
+        const payload = (await this.inventoryNatsRepo.getPagedStock({
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           searchTerm: request.SearchTerm,
@@ -165,7 +165,7 @@ export class InventoryService {
   ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const payload = (await this.inventoryRedisRepo.getPagedBatches({
+        const payload = (await this.inventoryNatsRepo.getPagedBatches({
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           batchCode: request.batchCode,
@@ -189,7 +189,7 @@ export class InventoryService {
 
   /** Tính toán các thông số tổng quan về tồn kho qua Redis Repository */
   async getInventoryOverallStats() {
-    const stats = (await this.inventoryRedisRepo.getOverallStats()) as {
+    const stats = (await this.inventoryNatsRepo.getOverallStats()) as {
       totalVariants: number;
       lowStockVariantsCount: number;
       outOfStockVariantsCount: number;
@@ -212,14 +212,14 @@ export class InventoryService {
     const l = lang || 'vi';
 
     // 1. Fetch problematic stocks via Redis Repository
-    const problematicResponse = (await this.inventoryRedisRepo.getPagedStock({
+    const problematicResponse = (await this.inventoryNatsRepo.getPagedStock({
       isLowStock: true,
       pageSize: 200
     })) as { items: RedisInventoryStockResponse[] };
     const problematicStocks = problematicResponse?.items || [];
 
     // 2. Fetch standard stocks (top 500, ordered by quantity ascending) via Redis
-    const standardResponse = (await this.inventoryRedisRepo.getPagedStock({
+    const standardResponse = (await this.inventoryNatsRepo.getPagedStock({
       pageSize: 500,
       sortBy: 'TotalQuantity',
       sortOrder: 'asc'
@@ -249,7 +249,7 @@ export class InventoryService {
     for (const s of stocks) {
       if (!s.variantId) continue;
       try {
-        const bResponse = (await this.inventoryRedisRepo.getPagedBatches({
+        const bResponse = (await this.inventoryNatsRepo.getPagedBatches({
           variantId: s.variantId,
           pageSize: 20 // Only need latest batches for report
         })) as { items: BatchItem[] };

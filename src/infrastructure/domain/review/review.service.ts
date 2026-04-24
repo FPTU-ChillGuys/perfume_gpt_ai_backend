@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ReviewRedisRepository } from '../repositories/redis/review-redis.repository';
+import { ReviewNatsRepository } from '../repositories/nats/review-nats.repository';
 import {
   ReviewListItemResponse,
   ReviewResponse,
   ReviewStatisticsResponse,
-  MediaResponse
 } from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
@@ -13,7 +12,7 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
-import { BaseResponse } from 'src/application/dtos/response/common/base-response';
+import { I18nService } from 'nestjs-i18n';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -24,8 +23,9 @@ function isUUID(id: string): boolean {
 @Injectable()
 export class ReviewService {
   constructor(
-    private readonly reviewRedisRepo: ReviewRedisRepository,
-    private readonly unitOfWork: UnitOfWork
+    private readonly reviewNatsRepo: ReviewNatsRepository,
+    private readonly unitOfWork: UnitOfWork,
+    private readonly i18n: I18nService
   ) {}
   
   async getAllReviews(
@@ -33,7 +33,7 @@ export class ReviewService {
   ): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const payload = await this.reviewRedisRepo.getPagedReviews({
+        const payload = await this.reviewNatsRepo.getPagedReviews({
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           variantId: request.VariantId,
@@ -54,7 +54,7 @@ export class ReviewService {
 
         return { success: true, payload: result };
       },
-      'Failed to fetch reviews from Redis',
+      this.i18n.t('common.nats.errors.fetch_reviews_failed'),
       true
     );
   }
@@ -66,11 +66,11 @@ export class ReviewService {
       async () => {
         if (!isUUID(variantId)) return { success: true, payload: [] };
         
-        const reviews = await this.reviewRedisRepo.getVariantReviews(variantId);
+        const reviews = await this.reviewNatsRepo.getVariantReviews(variantId);
 
         return { success: true, payload: (reviews || []).map(r => new ReviewResponse(r)) };
       },
-      'Failed to fetch variant reviews from Redis via Repository',
+      this.i18n.t('common.nats.errors.fetch_variant_reviews_failed'),
       true
     );
   }
@@ -96,7 +96,7 @@ export class ReviewService {
           };
         }
 
-        const stats = await this.reviewRedisRepo.getVariantStats(variantId);
+        const stats = await this.reviewNatsRepo.getVariantStats(variantId);
 
         const response: ReviewStatisticsResponse = {
           variantId,
@@ -111,7 +111,7 @@ export class ReviewService {
 
         return { success: true, payload: response };
       },
-      'Failed to fetch review statistics from Redis',
+      this.i18n.t('common.nats.errors.fetch_review_stats_failed'),
       true
     );
   }
@@ -131,7 +131,7 @@ export class ReviewService {
         const result = await this.unitOfWork.ReviewLogRepo.insert(log);
         return { success: true, payload: result };
       },
-      'Failed to add review log',
+      this.i18n.t('common.nats.errors.add_review_log_failed'),
       true
     );
   }
@@ -144,7 +144,7 @@ export class ReviewService {
         const logs = await this.unitOfWork.ReviewLogRepo.find({ variantId });
         return { success: true, payload: logs };
       },
-      'Failed to fetch review logs',
+      this.i18n.t('common.nats.errors.fetch_review_logs_failed'),
       true
     );
   }
@@ -163,7 +163,7 @@ export class ReviewService {
         }
         return { success: true, payload: log };
       },
-      'Failed to fetch latest review log',
+      this.i18n.t('common.nats.errors.fetch_latest_review_log_failed'),
       true
     );
   }
@@ -173,11 +173,11 @@ export class ReviewService {
       async () => {
         const log = await this.unitOfWork.ReviewLogRepo.findOne({ id });
         if (!log) {
-          return { success: false, error: 'Review log not found' };
+          return { success: false, error: this.i18n.t('common.nats.errors.review_log_not_found') };
         }
         return { success: true, payload: log };
       },
-      'Failed to fetch review log',
+      this.i18n.t('common.nats.errors.fetch_review_logs_failed'),
       true
     );
   }
@@ -188,14 +188,14 @@ export class ReviewService {
         const result = await this.unitOfWork.ReviewLogRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
         return { success: true, payload: result };
       },
-      'Failed to fetch review logs',
+      this.i18n.t('common.nats.errors.fetch_review_logs_failed'),
       true
     );
   }
 
-  /** Lấy toàn bộ review không phân trang qua Redis Repository – dùng cho AI summary */
+  /** Lấy toàn bộ review không phân trang qua NATS Repository – dùng cho AI summary */
   async getReviewsUnpaged(variantId?: string): Promise<ReviewResponse[]> {
-    const reviews = await this.reviewRedisRepo.getVariantReviews(variantId!);
+    const reviews = await this.reviewNatsRepo.getVariantReviews(variantId!);
     return (reviews || []).map(r => new ReviewResponse(r));
   }
 }

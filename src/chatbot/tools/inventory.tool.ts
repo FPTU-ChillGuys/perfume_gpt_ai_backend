@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
-import { InventoryRedisRepository } from 'src/infrastructure/domain/repositories/redis/inventory-redis.repository';
+import { InventoryNatsRepository } from 'src/infrastructure/domain/repositories/nats/inventory-nats.repository';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
@@ -15,7 +15,7 @@ export class InventoryTool {
   private readonly restockAnalyticsProductLimit = 20;
 
   constructor(
-    private readonly inventoryRedisRepo: InventoryRedisRepository,
+    private readonly inventoryNatsRepo: InventoryNatsRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly restockService: RestockService
   ) { }
@@ -36,7 +36,7 @@ export class InventoryTool {
       return await funcHandlerAsync(
         async () => {
           // Fetch from Redis Repository instead of direct Prisma
-          const response = (await this.inventoryRedisRepo.getPagedStock({
+          const response = (await this.inventoryNatsRepo.getPagedStock({
             pageSize: 400 // Limit for AI tool context efficiency
           })) as { items: RedisInventoryStockResponse[] };
 

@@ -1,5 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+export class NatsOrderDetailResponse {
+  @ApiProperty()
+    variantName!: string;
+  @ApiProperty()
+    quantity!: number;
+  @ApiProperty()
+    unitPrice!: number;
+  @ApiProperty()
+    total!: number;
+}
+
 export class NatsOrderListItemResponse {
   @ApiProperty()
     createdAt!: string;
@@ -16,7 +27,7 @@ export class NatsOrderListItemResponse {
   @ApiProperty()
     paymentStatus!: string;
   @ApiProperty({ nullable: true })
-    shippingStatus!: number | null;
+    shippingStatus!: string | null;
   @ApiProperty({ nullable: true })
     staffId!: string | null;
   @ApiProperty({ nullable: true })
@@ -29,6 +40,8 @@ export class NatsOrderListItemResponse {
     type!: string;
   @ApiProperty({ nullable: true })
     updatedAt!: string | null;
+  @ApiProperty({ type: [NatsOrderDetailResponse], nullable: true })
+    orderDetails!: NatsOrderDetailResponse[] | null;
 }
 
 export class NatsOrderPagedResponse {

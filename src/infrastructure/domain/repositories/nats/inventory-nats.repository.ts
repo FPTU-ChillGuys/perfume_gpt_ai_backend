@@ -2,27 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
 import { NatsRpcService } from 'src/infrastructure/domain/common/nats/nats-rpc.service';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
-import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
-
-/** Kết quả stats tồn kho tổng quan */
-export interface InventoryOverallStats {
-  totalSku: number;
-  lowStockSku: number;
-  outOfStockSku: number;
-  expiredBatches: number;
-  nearExpiryBatches: number;
-  criticalAlerts: number;
-}
-
-/** Kết quả paged inventory từ .NET */
-export interface InventoryPagedPayload {
-  totalCount: number;
-  pageNumber: number;
-  pageSize: number;
-  totalPages: number;
-  items: InventoryStockResponse[];
-}
+import {
+  NatsInventoryPagedResponse,
+  NatsInventoryOverallStats
+} from 'src/application/dtos/response/nats/nats-inventory.response';
 
 const INVENTORY_REQUEST_CHANNEL = 'inventory_data_request';
 const DEFAULT_TIMEOUT = 15000;
@@ -48,9 +32,9 @@ export class InventoryNatsRepository {
     variantId?: string;
     sortBy?: string;
     sortOrder?: string;
-  }): Promise<InventoryPagedPayload> {
+  }): Promise<NatsInventoryPagedResponse> {
     this.logger.log(`[NATS] ${this.i18n.t('inventory.get_stock')}`);
-    return await this.natsRpc.sendRequest<InventoryPagedPayload>(
+    return await this.natsRpc.sendRequest<NatsInventoryPagedResponse>(
       INVENTORY_REQUEST_CHANNEL,
       'getInventory',
       params,
@@ -82,9 +66,9 @@ export class InventoryNatsRepository {
   /**
    * Lấy thống kê tổng quan tồn kho.
    */
-  async getOverallStats(): Promise<InventoryOverallStats> {
+  async getOverallStats(): Promise<NatsInventoryOverallStats> {
     this.logger.log(`[NATS] ${this.i18n.t('inventory.get_stats')}`);
-    return await this.natsRpc.sendRequest<InventoryOverallStats>(
+    return await this.natsRpc.sendRequest<NatsInventoryOverallStats>(
       INVENTORY_REQUEST_CHANNEL,
       'getOverallStats',
       {},

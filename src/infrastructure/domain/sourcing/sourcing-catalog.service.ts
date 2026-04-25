@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NatsRpcService } from '../common/nats/nats-rpc.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { CatalogItemResponse } from 'src/application/dtos/response/catalog-item.response';
+import { NatsCatalogResponse } from 'src/application/dtos/response/nats/nats-catalog.response';
 
 const CATALOG_REQUEST_CHANNEL = 'catalog_request';
 
@@ -19,11 +20,11 @@ export class SourcingCatalogService {
     try {
       this.logger.log(`[Sourcing] Requesting catalogs for variantId=${variantId}`);
 
-      const response = await this.NatsRpcService.sendRequest<{
-        variantId: string;
-        catalogs: any[];
-        error?: string;
-      }>(CATALOG_REQUEST_CHANNEL, 'getCatalogs', { variantId });
+      const response = await this.NatsRpcService.sendRequest<NatsCatalogResponse>(
+        CATALOG_REQUEST_CHANNEL,
+        'getCatalogs',
+        { variantId }
+      );
 
       if (response.error) {
         return {

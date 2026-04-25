@@ -1,20 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
 import { NatsRpcService } from 'src/infrastructure/domain/common/nats/nats-rpc.service';
-import { PagedResult } from 'src/application/dtos/response/common/paged-result';
-import { ReviewListItemResponse } from 'src/application/dtos/response/review.response';
-
-/** Thống kê đánh giá của một variant */
-export interface ReviewVariantStats {
-  variantId: string;
-  totalReviews: number;
-  averageRating: number;
-  fiveStarCount: number;
-  fourStarCount: number;
-  threeStarCount: number;
-  twoStarCount: number;
-  oneStarCount: number;
-}
+import {
+  NatsReviewPagedResponse,
+  NatsReviewListItemResponse,
+  NatsReviewVariantStats
+} from 'src/application/dtos/response/nats/nats-review.response';
 
 const REVIEW_REQUEST_CHANNEL = 'review_data_request';
 const DEFAULT_TIMEOUT = 15000;
@@ -40,9 +31,9 @@ export class ReviewNatsRepository {
     minRating?: number;
     maxRating?: number;
     hasImages?: boolean;
-  }): Promise<PagedResult<ReviewListItemResponse>> {
+  }): Promise<NatsReviewPagedResponse> {
     this.logger.log(`[NATS] ${this.i18n.t('review.get_paged')}`);
-    return await this.natsRpc.sendRequest<PagedResult<ReviewListItemResponse>>(
+    return await this.natsRpc.sendRequest<NatsReviewPagedResponse>(
       REVIEW_REQUEST_CHANNEL,
       'getList',
       params,
@@ -53,9 +44,9 @@ export class ReviewNatsRepository {
   /**
    * Lấy toàn bộ đánh giá của một variant (không phân trang).
    */
-  async getVariantReviews(variantId: string): Promise<ReviewListItemResponse[]> {
+  async getVariantReviews(variantId: string): Promise<NatsReviewListItemResponse[]> {
     this.logger.log(`[NATS] ${this.i18n.t('review.get_by_variant')}: ${variantId}`);
-    return await this.natsRpc.sendRequest<ReviewListItemResponse[]>(
+    return await this.natsRpc.sendRequest<NatsReviewListItemResponse[]>(
       REVIEW_REQUEST_CHANNEL,
       'getVariantReviews',
       { variantId },
@@ -66,9 +57,9 @@ export class ReviewNatsRepository {
   /**
    * Lấy thống kê đánh giá của một variant.
    */
-  async getVariantStats(variantId: string): Promise<ReviewVariantStats> {
+  async getVariantStats(variantId: string): Promise<NatsReviewVariantStats> {
     this.logger.log(`[NATS] ${this.i18n.t('review.get_stats')}: ${variantId}`);
-    return await this.natsRpc.sendRequest<ReviewVariantStats>(
+    return await this.natsRpc.sendRequest<NatsReviewVariantStats>(
       REVIEW_REQUEST_CHANNEL,
       'getStats',
       { variantId },

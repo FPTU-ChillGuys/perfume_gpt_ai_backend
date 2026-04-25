@@ -76,7 +76,7 @@ export class ConversationService {
     private readonly profileTool: ProfileTool,
     @Inject(AI_STAFF_CONVERSATION_HELPER) private readonly staffAiHelper: AIHelper,
     private readonly i18n: I18nService
-  ) {}
+  ) { }
 
   // -------------------------------------------------------------------------
   // PUBLIC API
@@ -315,7 +315,7 @@ export class ConversationService {
     isGuestUser: boolean,
     isStaff: boolean
   ): Promise<ConversationDto> {
-    
+
     // 1. Phân tích ý định & bối cảnh
     const { messageText, previousContext } = this.extractMessageContext(convertedMessages);
     const finalAnalysis = await this.performInitialAnalysis(messageText, previousContext, userId, isGuestUser, isStaff);
@@ -325,7 +325,7 @@ export class ConversationService {
 
     // 3. Thực thi truy xuất dữ liệu & Actions
     const { products, taskResults, hasResults } = await this.fetchChatContextData(finalAnalysis, userId, isGuestUser);
-    
+
     // Thêm log các hành động (giỏ hàng, đơn hàng) vào tin nhắn context
     finalMessages.push(...taskResults);
 
@@ -429,7 +429,7 @@ export class ConversationService {
     userId: string,
     isGuestUser: boolean
   ): Promise<{ products: MinimalProduct[], taskResults: UIMessage[], hasResults: boolean }> {
-    
+
     let products: MinimalProduct[] = [];
     const taskResults: UIMessage[] = [];
     const pageSize = analysis.pagination?.pageSize || 5;
@@ -440,14 +440,14 @@ export class ConversationService {
       const res = await this.executeMultiQueries(analysis.queries, analysis, userId, isGuestUser, pageSize);
       products = res.mergedProducts;
       taskResults.push(...res.taskResults);
-    } 
+    }
     // B. Xử lý Legacy Function Call
     else if (analysis.functionCall) {
       this.logger.log(`[processAiChatResponseV10] Executing LEGACY path: ${analysis.functionCall.name}`);
       const res = await this.executeLegacyFunctionCall(analysis.functionCall, analysis, userId, isGuestUser);
       products = res.products;
       if (res.actionResult) taskResults.push(res.actionResult);
-    } 
+    }
     // C. Xử lý Search thuần túy (Nếu không có tool/multi-query đặc biệt)
     else if (['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)) {
       this.logger.log(`[processAiChatResponseV10] Executing base structured search`);
@@ -498,7 +498,7 @@ export class ConversationService {
       } else if (purpose === 'support') {
         const searchRes = await this.productService.getProductsByStructuredQuery({ ...analysis, pagination: { pageNumber: 1, pageSize: 50 } });
         const queryProducts = searchRes.success && searchRes.data ? searchRes.data.items : [];
-        
+
         if (targetItems.length > 0 && queryProducts.length > 0) {
           const queryIds = new Set(queryProducts.map((p: any) => p.id));
           const intersection = targetItems.filter(p => queryIds.has(p.id));
@@ -510,13 +510,13 @@ export class ConversationService {
       }
 
       const minimal: MinimalProduct[] = products.map(p => {
-         const mapped = this.mapToMinimalProduct(p, 'FUNCTION_RESULTS');
-         // Apply budget filter
-         if (analysis.budget && (analysis.budget.min !== null || analysis.budget.max !== null)) {
-            const { min, max } = analysis.budget;
-            mapped.variants = mapped.variants.filter(v => (min === null || v.price >= min) && (max === null || v.price <= max));
-         }
-         return mapped;
+        const mapped = this.mapToMinimalProduct(p, 'FUNCTION_RESULTS');
+        // Apply budget filter
+        if (analysis.budget && (analysis.budget.min !== null || analysis.budget.max !== null)) {
+          const { min, max } = analysis.budget;
+          mapped.variants = mapped.variants.filter(v => (min === null || v.price >= min) && (max === null || v.price <= max));
+        }
+        return mapped;
       }).filter(p => p.variants.length > 0);
 
       return { products: minimal, actionResult: null };
@@ -605,7 +605,7 @@ export class ConversationService {
 
     // 2. Cảnh báo thiếu Profile
     if (!isObjective && this.hasAnalysisFlag(analysis, 'PROFILE_ENRICHMENT_SKIPPED')) {
-      const warningText = isGuestUser 
+      const warningText = isGuestUser
         ? this.i18n.t('common.conversation.system_instructions.guest_user_prompt')
         : this.i18n.t('common.conversation.system_instructions.profile_update_prompt');
       results.push(this.createSystemMessage(warningText));
@@ -725,8 +725,8 @@ export class ConversationService {
 
   private isObjectiveOrGiftFlow(analysis: AnalysisObject): boolean {
     return this.hasAnalysisFlag(analysis, 'PURE_TREND_QUERY') ||
-           this.hasAnalysisFlag(analysis, 'OBJECTIVE_CATALOG_QUERY') ||
-           this.hasAnalysisFlag(analysis, 'GIFT_INTENT');
+      this.hasAnalysisFlag(analysis, 'OBJECTIVE_CATALOG_QUERY') ||
+      this.hasAnalysisFlag(analysis, 'GIFT_INTENT');
   }
 
   private async buildBestSellerFallbackMessage(limit: number = 5): Promise<UIMessage | null> {
@@ -861,7 +861,14 @@ export class ConversationService {
           taskResults.push(await this.executeActionTool(funcName, q.functionCall.arguments || {}, userId, isGuest));
         } else {
           const items = await this.executeFunctionQuery(q);
-          for (const p of items) { if (p.id && !seen.has(p.id)) { seen.add(p.id); functionProducts.push(p); } }
+          // Ensure items is an array before iterating
+          const safeItems = Array.isArray(items) ? items : [];
+          for (const p of safeItems) {
+            if (p && p.id && !seen.has(p.id)) {
+              seen.add(p.id);
+              functionProducts.push(p);
+            }
+          }
         }
       } else if (q.purpose === 'profile' && !isGuest) {
         const items = await this.executeProfileQuery(userId, q, root);

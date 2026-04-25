@@ -68,7 +68,7 @@ export class ReviewService {
         
         const reviews = await this.reviewNatsRepo.getVariantReviews(variantId);
 
-        return { success: true, payload: (reviews || []).map(r => new ReviewResponse(r)) };
+        return { success: true, payload: (reviews || []).map(r => this.mapToReviewResponse(r)) };
       },
       'Failed to fetch variant reviews from Redis via Repository',
       true
@@ -196,6 +196,38 @@ export class ReviewService {
   /** Lấy toàn bộ review không phân trang qua Redis Repository – dùng cho AI summary */
   async getReviewsUnpaged(variantId?: string): Promise<ReviewResponse[]> {
     const reviews = await this.reviewNatsRepo.getVariantReviews(variantId!);
-    return (reviews || []).map(r => new ReviewResponse(r));
+    return (reviews || []).map(r => this.mapToReviewResponse(r));
+  }
+
+  private mapToReviewResponse(r: unknown): ReviewResponse {
+    const data = r as Record<string, unknown>;
+    return new ReviewResponse({
+      id: String(data.id ?? ''),
+      userId: String(data.userId ?? ''),
+      userFullName: String(data.userFullName ?? ''),
+      userProfilePictureUrl: data.userProfilePictureUrl as string | null ?? null,
+      orderDetailId: String(data.orderDetailId ?? ''),
+      variantId: String(data.variantId ?? ''),
+      variantName: String(data.variantName ?? ''),
+      rating: Number(data.rating ?? 0),
+      comment: String(data.comment ?? ''),
+      status: (data.status as string ?? 'Pending') as 'Pending' | 'Approved' | 'Rejected',
+      images: Array.isArray(data.images)
+        ? data.images.map((img: unknown) => {
+            const imgData = img as Record<string, unknown>;
+            return new MediaResponse({
+              id: String(imgData.id ?? ''),
+              url: String(imgData.url ?? ''),
+              altText: imgData.altText as string | null ?? null,
+              displayOrder: Number(imgData.displayOrder ?? 0),
+              isPrimary: Boolean(imgData.isPrimary ?? false),
+              fileSize: Number(imgData.fileSize ?? 0),
+              mimeType: String(imgData.mimeType ?? 'image/jpeg')
+            });
+          })
+        : [],
+      createdAt: String(data.createdAt ?? ''),
+      updatedAt: data.updatedAt as string | null ?? null
+    });
   }
 }

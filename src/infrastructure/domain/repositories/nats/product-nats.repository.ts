@@ -25,11 +25,13 @@ export class ProductNatsRepository {
   ) {}
 
   async getByStructuredQuery(analysis: unknown): Promise<ProductPagedPayload> {
+    // Handle null/undefined analysis gracefully
+    const safeAnalysis = analysis ?? { logic: [], productName: null, sorting: null, budget: {}, pagination: { pageNumber: 1, pageSize: 20 } };
     this.logger.log(`[NATS] ${this.i18n.t('product.get_by_query')}`);
     return await this.natsRpc.sendRequest<ProductPagedPayload>(
       PRODUCT_REQUEST_CHANNEL,
       'getByStructuredQuery',
-      analysis,
+      safeAnalysis,
       DEFAULT_TIMEOUT,
     );
   }

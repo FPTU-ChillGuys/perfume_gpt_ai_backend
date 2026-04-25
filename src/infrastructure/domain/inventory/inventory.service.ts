@@ -138,19 +138,20 @@ export class InventoryService {
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
     return await funcHandlerAsync(
       async () => {
-        const payload = (await this.inventoryNatsRepo.getPagedStock({
+        const payload = await this.inventoryNatsRepo.getPagedStock({
           pageNumber: request.PageNumber,
           pageSize: request.PageSize,
           searchTerm: request.SearchTerm,
           isLowStock: request.IsLowStock
-        })) as PagedResult<InventoryStockResponse>;
+        });
 
+        const { items, pageNumber, pageSize, totalCount, totalPages } = payload || {};
         const result = new PagedResult<InventoryStockResponse>({
-          items: (payload?.items || []).map(s => new InventoryStockResponse(s)),
-          pageNumber: payload?.pageNumber || request.PageNumber,
-          pageSize: payload?.pageSize || request.PageSize,
-          totalCount: payload?.totalCount || 0,
-          totalPages: payload?.totalPages || 0
+          items: (items || []).map(s => new InventoryStockResponse(s)),
+          pageNumber: pageNumber || request.PageNumber,
+          pageSize: pageSize || request.PageSize,
+          totalCount: totalCount || 0,
+          totalPages: totalPages || 0
         });
 
         return { success: true, payload: result };

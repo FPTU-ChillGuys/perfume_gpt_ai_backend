@@ -1185,6 +1185,14 @@ export class TrendService {
           pagination: { pageNumber: 1, pageSize: 10 }
         };
 
+        // Validate expandedAnalysis before calling service
+        if (!expandedAnalysis.logic || !Array.isArray(expandedAnalysis.logic)) {
+          this.logger.warn(
+            `[Trend][Merge][SKIP] requestId=${requestId} keyword="${signal.keyword}" reason=invalid-analysis-logic`
+          );
+          continue;
+        }
+
         const searchResponse = await this.productService.getProductsByStructuredQuery(expandedAnalysis);
         const products = searchResponse.success && searchResponse.data
           ? searchResponse.data.items
@@ -1252,9 +1260,8 @@ export class TrendService {
     }
 
     // Step 4: Convert to ProductCardOutputItem and rank
-    const productOutputItems = this.toProductOutputItems(
-      this.dedupeProductsById(mergedProducts)
-    );
+    const dedupedProducts = this.dedupeProductsById(mergedProducts);
+    const productOutputItems = this.toProductOutputItems(dedupedProducts);
     const rankedProducts = await this.toRankedProductCards(productOutputItems);
 
     this.logger.log(

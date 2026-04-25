@@ -1,35 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
 import { NatsRpcService } from 'src/infrastructure/domain/common/nats/nats-rpc.service';
-
-/** Ánh xạ từ .NET GetCartItemResponse */
-export interface CartItemResponse {
-  cartItemId: string;
-  variantId: string;
-  variantName: string;
-  imageUrl: string;
-  volumeMl: number;
-  type: string;
-  variantPrice: number;
-  quantity: number;
-  isAvailable: boolean;
-  subTotal: number;
-  promotionalQuantity: number;
-  regularQuantity: number;
-  discount: number;
-  finalTotal: number;
-}
-
-/** Ánh xạ từ .NET GetCartItemsResponse */
-export interface CartItemsPayload {
-  items: CartItemResponse[];
-}
-
-/** Kết quả từ mutation actions (add/update/remove) - .NET trả BaseResponse (không có payload field rõ ràng) */
-export interface CartMutationResult {
-  success: boolean;
-  error?: string | null;
-}
+import {
+  NatsCartResponse,
+  NatsCartMutationResponse
+} from 'src/application/dtos/response/nats/nats-cart.response';
 
 const CART_REQUEST_CHANNEL = 'cart_data_request';
 const DEFAULT_TIMEOUT = 10000;
@@ -43,9 +18,9 @@ export class CartNatsRepository {
     private readonly i18n: I18nService,
   ) {}
 
-  async getCart(userId: string): Promise<CartItemsPayload> {
+  async getCart(userId: string): Promise<NatsCartResponse> {
     this.logger.log(`[NATS] ${this.i18n.t('cart.get_cart')}: ${userId}`);
-    return await this.natsRpc.sendRequest<CartItemsPayload>(
+    return await this.natsRpc.sendRequest<NatsCartResponse>(
       CART_REQUEST_CHANNEL,
       'getCart',
       { userId },
@@ -53,9 +28,9 @@ export class CartNatsRepository {
     );
   }
 
-  async addToCart(userId: string, variantId: string, quantity: number): Promise<CartMutationResult> {
+  async addToCart(userId: string, variantId: string, quantity: number): Promise<NatsCartMutationResponse> {
     this.logger.log(`[NATS] ${this.i18n.t('cart.add_item')}: User ${userId}, Variant ${variantId}, Qty ${quantity}`);
-    return await this.natsRpc.sendRequest<CartMutationResult>(
+    return await this.natsRpc.sendRequest<NatsCartMutationResponse>(
       CART_REQUEST_CHANNEL,
       'addToCart',
       { userId, variantId, quantity },
@@ -63,9 +38,9 @@ export class CartNatsRepository {
     );
   }
 
-  async clearCart(userId: string, force: boolean = false): Promise<CartMutationResult> {
+  async clearCart(userId: string, force = false): Promise<NatsCartMutationResponse> {
     this.logger.log(`[NATS] ${this.i18n.t('cart.clear_cart')}: ${userId}, force: ${force}`);
-    return await this.natsRpc.sendRequest<CartMutationResult>(
+    return await this.natsRpc.sendRequest<NatsCartMutationResponse>(
       CART_REQUEST_CHANNEL,
       'clearCart',
       { userId, force },
@@ -73,9 +48,9 @@ export class CartNatsRepository {
     );
   }
 
-  async removeFromCart(userId: string, cartItemId: string): Promise<CartMutationResult> {
+  async removeFromCart(userId: string, cartItemId: string): Promise<NatsCartMutationResponse> {
     this.logger.log(`[NATS] ${this.i18n.t('cart.remove_item')}: User ${userId}, Item ${cartItemId}`);
-    return await this.natsRpc.sendRequest<CartMutationResult>(
+    return await this.natsRpc.sendRequest<NatsCartMutationResponse>(
       CART_REQUEST_CHANNEL,
       'removeFromCart',
       { userId, cartItemId },
@@ -83,9 +58,9 @@ export class CartNatsRepository {
     );
   }
 
-  async updateCartItem(userId: string, cartItemId: string, quantity: number): Promise<CartMutationResult> {
+  async updateCartItem(userId: string, cartItemId: string, quantity: number): Promise<NatsCartMutationResponse> {
     this.logger.log(`[NATS] ${this.i18n.t('cart.update_item')}: User ${userId}, Item ${cartItemId}, Qty ${quantity}`);
-    return await this.natsRpc.sendRequest<CartMutationResult>(
+    return await this.natsRpc.sendRequest<NatsCartMutationResponse>(
       CART_REQUEST_CHANNEL,
       'updateCartItem',
       { userId, cartItemId, quantity },

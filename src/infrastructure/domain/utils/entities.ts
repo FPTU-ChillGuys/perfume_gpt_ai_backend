@@ -5,6 +5,7 @@ import { Conversation } from 'src/domain/entities/conversation.entity';
 import { Message } from 'src/domain/entities/message.entity';
 import { SurveyAnswer } from 'src/domain/entities/survey-answer.entity';
 import { SurveyQuestionAnswer } from 'src/domain/entities/survey-question-answer.entity';
+import { SurveyQuestionAnswerDetail } from 'src/domain/entities/survey-question-answer-detail.entity';
 import { SurveyQuestion } from 'src/domain/entities/survey-question.entity';
 import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
@@ -23,6 +24,7 @@ export const entities = [
   Conversation,
   SurveyQuestion,
   SurveyQuestionAnswer,
+  SurveyQuestionAnswerDetail,
   ReviewSummaryLog,
   AdminInstruction,
   Message,

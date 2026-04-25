@@ -11,7 +11,6 @@ import { InventoryController } from 'src/api/controllers/inventory.controller';
 import { AIAcceptanceController } from 'src/api/controllers/ai-acceptance.controller';
 import { AdminInstructionController } from 'src/api/controllers/admin-instruction.controller';
 import { OrderController } from 'src/api/controllers/order.controller';
-import { CartController } from 'src/api/controllers/cart.controller';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from 'src/application/constant/processor';
 import { ProcessorModule } from 'src/infrastructure/domain/common/processor.module';
@@ -58,7 +57,6 @@ const registerQueue = BullModule.registerQueue(
     AIAcceptanceController,
     AdminInstructionController,
     OrderController,
-    CartController,
   ],
   // providers: [
   //   {

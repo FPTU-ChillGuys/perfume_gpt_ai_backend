@@ -4,7 +4,7 @@ import { Migration } from '@mikro-orm/migrations';
  * Migration để thêm pgvector extension và tạo table product_embeddings
  * Chạy migration này để setup database cho Hybrid Search v4
  */
-export class MigrationPgVectorSetup extends Migration {
+export class Migration20260101000000 extends Migration {
   async up(): Promise<void> {
     // Thêm pgvector extension
     this.addSql('CREATE EXTENSION IF NOT EXISTS vector;');

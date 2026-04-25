@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Delete, Param, Logger } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiBearerAuth, ApiUnauthorizedResponse, ApiForbiddenResponse } from '@nestjs/swagger';
+import { Role } from 'src/application/common/Metadata';
 import { EmbeddingService } from 'src/infrastructure/domain/hybrid-search/embedding.service';
 import { ProductEmbedding } from 'src/infrastructure/domain/hybrid-search/entities/product-embedding.entity';
 
@@ -8,6 +9,10 @@ import { ProductEmbedding } from 'src/infrastructure/domain/hybrid-search/entiti
  * Dùng để manual rebuild embeddings khi cần
  */
 @ApiTags('Hybrid Search - Embeddings')
+@ApiBearerAuth('jwt')
+@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
+@ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
+@Role(['admin'])
 @Controller('hybrid-search/embeddings')
 export class RebuildEmbeddingsController {
   private readonly logger = new Logger(RebuildEmbeddingsController.name);

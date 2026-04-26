@@ -1,17 +1,17 @@
-import { SqlEntityRepository } from '@mikro-orm/postgresql';
 import { Injectable } from '@nestjs/common';
 import { AdminInstruction } from 'src/domain/entities/admin-instruction.entity';
+import { BaseRepository } from './base/base.repository';
 
 /** Repository thao tác dữ liệu AdminInstruction */
 @Injectable()
-export class AdminInstructionRepository extends SqlEntityRepository<AdminInstruction> {
+export class AdminInstructionRepository extends BaseRepository<AdminInstruction> {
 
   /**
    * Lấy tất cả chỉ thị theo loại (instructionType).
    * @param type - Loại chỉ thị cần lọc
    */
   async findByType(type: string): Promise<AdminInstruction[]> {
-    return this.find({ instructionType: type });
+    return this.find({ instructionType: type, isActive: true });
   }
 
   /**
@@ -22,20 +22,5 @@ export class AdminInstructionRepository extends SqlEntityRepository<AdminInstruc
   async getCombinedInstructionsByType(type: string): Promise<string> {
     const instructions = await this.findByType(type);
     return instructions.map((i) => i.instruction).join('\n');
-  }
-
-  /** Thêm entity mới (cần gọi flush sau đó) */
-  add(entity: AdminInstruction): void {
-    this.getEntityManager().persist(entity);
-  }
-
-  /** Xóa entity (cần gọi flush sau đó) */
-  remove(entity: AdminInstruction): void {
-    this.getEntityManager().remove(entity);
-  }
-
-  /** Force đồng bộ dữ liệu với DB */
-  async flush(): Promise<void> {
-    await this.getEntityManager().flush();
   }
 }

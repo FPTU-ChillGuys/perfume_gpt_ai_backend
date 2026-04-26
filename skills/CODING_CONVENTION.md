@@ -34,7 +34,12 @@ Hệ thống được tổ chức theo mô hình Layered Architecture để tác
 - Toàn bộ Model/Interface phải nằm trong `src/application/dtos/`.
 - Phân tách rõ ràng giữa `request` và `response`.
 - Dữ liệu trả về từ các service ngoại vi (Prisma SQL Server, Axios) phải được map sang DTO nội bộ ngay lập tức.
-- **Quy tắc Mapping**: Không sử dụng thư viện mapping bên thứ ba (như AutoMapper). Thay vào đó, định nghĩa các static method hoặc constructor trong class DTO để thực hiện chuyển đổi dữ liệu (ví dụ: `AdminInstructionResponse.fromEntity(entity)`). Điều này giúp code dễ đọc, dễ debug và không phụ thuộc vào thư viện bên ngoài.
+- **Quy tắc Mapping Tĩnh (Static Mapping)**:
+    - Không sử dụng thư viện mapping bên thứ ba (như AutoMapper). 
+    - Định nghĩa các static method trong class DTO để thực hiện chuyển đổi dữ liệu (ví dụ: `fromEntity(entity)`).
+    - **Xử lý Nullability**: Phương thức `fromEntity` phải hỗ trợ kiểu trả về nullable: `static fromEntity(entity: T): TResponse | null`.
+    - Kiểm tra thực thể đầu vào ngay lập tức: `if (!entity) return null;`.
+    - Khi map các collection con (ví dụ: `messages`), sử dụng non-null assertion `!` nếu đã chắc chắn dữ liệu được populate hợp lệ (ví dụ: sau khi gọi `getItems()`).
 
 ---
 
@@ -54,9 +59,10 @@ export class MyService {
 ```
 
 ### ✅ ĐÚNG:
-- **Service chỉ inject và gọi Repository**.
-- Toàn bộ logic liên quan đến database (filter, sort, relations, **persist, flush, remove**) phải nằm trong Repository.
-- **Service KHÔNG được phép**: gọi trực tiếp `EntityManager` (persist/flush) hoặc `UnitOfWork` để thực hiện thay đổi dữ liệu.
+- **Service chỉ inject và gọi- **Repository Layer**:
+    - Mọi Repository phải kế thừa từ `BaseRepository<T>` nằm trong `src/infrastructure/domain/repositories/base/`.
+    - `BaseRepository` cung cấp sẵn các hàm chuẩn: `add()`, `remove()` (soft delete), `flush()`, `getPaged()`, `exists()`.
+    - Không được khai báo lại các hàm persistence cơ bản trong repository con trừ khi có logic đặc biệt.
 - Đối với PostgreSQL: Service gọi Repo, Repo xử lý logic tầng MikroORM.
 - Đối với SQL Server: Sử dụng **PrismaService** (chỉ đọc) và map sang DTO.
 

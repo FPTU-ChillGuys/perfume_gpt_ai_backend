@@ -13,10 +13,12 @@ import {
 import { ApiBearerAuth, ApiBody, ApiForbiddenResponse, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Role } from 'src/application/common/Metadata';
 import {
-  CreateAdminInstructionRequest,
+  CreateAdminInstructionRequest
+} from 'src/application/dtos/request/admin-instruction/create-admin-instruction.request';
+import {
   UpdateAdminInstructionRequest
-} from 'src/application/dtos/request/admin-instruction.request';
-import { AdminInstructionResponse } from 'src/application/dtos/response/admin-instruction.response';
+} from 'src/application/dtos/request/admin-instruction/update-admin-instruction.request';
+import { AdminInstructionResponse } from 'src/application/dtos/response/admin-instruction/admin-instruction.response';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';

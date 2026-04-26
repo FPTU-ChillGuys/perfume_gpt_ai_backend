@@ -23,4 +23,19 @@ export class AdminInstructionRepository extends SqlEntityRepository<AdminInstruc
     const instructions = await this.findByType(type);
     return instructions.map((i) => i.instruction).join('\n');
   }
+
+  /** Thêm entity mới (cần gọi flush sau đó) */
+  add(entity: AdminInstruction): void {
+    this.getEntityManager().persist(entity);
+  }
+
+  /** Xóa entity (cần gọi flush sau đó) */
+  remove(entity: AdminInstruction): void {
+    this.getEntityManager().remove(entity);
+  }
+
+  /** Force đồng bộ dữ liệu với DB */
+  async flush(): Promise<void> {
+    await this.getEntityManager().flush();
+  }
 }

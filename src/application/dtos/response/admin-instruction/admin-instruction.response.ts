@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AdminInstruction } from 'src/domain/entities/admin-instruction.entity';
 
 /** Response chỉ thị admin */
 export class AdminInstructionResponse {
@@ -24,5 +25,17 @@ export class AdminInstructionResponse {
 
   constructor(init?: Partial<AdminInstructionResponse>) {
     Object.assign(this, init);
+  }
+
+  /** Chuyển đổi từ Entity sang Response DTO */
+  static fromEntity(entity: AdminInstruction | null | undefined): AdminInstructionResponse | null {
+    if (!entity) return null;
+    return new AdminInstructionResponse({
+      id: entity.id,
+      instruction: entity.instruction,
+      instructionType: entity.instructionType,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt
+    });
   }
 }

@@ -1161,18 +1161,6 @@ export class ProductService {
       });
 
       const andConditionsForWhere: Prisma.ProductsWhereInput[] = [];
-      const isSemanticOnly = this.configService.get<string>('SEARCH_SEMANTIC_ONLY') === 'true';
-
-      if (isSemanticOnly) {
-        this.logger.log(`[ProductService] Semantic Only mode enabled. Bypassing structured filters (except gender).`);
-        // Only add Gender if present
-        if (genderValues.length > 0) {
-          andConditionsForWhere.push({
-            Gender: { in: genderValues }
-          });
-        }
-      } else {
-        // Original logic for structured filters
 
       if (nameConditions.length > 0) {
         andConditionsForWhere.push({ OR: nameConditions });
@@ -1188,7 +1176,7 @@ export class ProductService {
             some: {
               OR: ageTerms.map(value => ({
                 AttributeValues: {
-                  Value: { contains : value }
+                  Value: { contains: value }
                 }
               }))
             }
@@ -1199,20 +1187,17 @@ export class ProductService {
       if (genderValues.length > 0) {
         const genderCondition = {
           OR: genderValues.map(value => ({
-            Gender: { equals : value }
+            Gender: { equals: value }
           }))
         };
         this.logger.debug(`[SEARCH][GENDER] Building gender filter with ${genderValues.length} values: ${JSON.stringify(genderValues)}`);
-        this.logger.debug(`[SEARCH][GENDER] Gender WHERE condition: ${JSON.stringify(genderCondition)}`);
         andConditionsForWhere.push(genderCondition);
-      } else {
-        this.logger.warn('[SEARCH][GENDER] ⚠️ No gender values extracted! All genders will be returned');
       }
 
       if (originValues.length > 0) {
         andConditionsForWhere.push({
           OR: originValues.map(value => ({
-            Origin: { contains : value }
+            Origin: { contains: value }
           }))
         });
       }
@@ -1239,7 +1224,7 @@ export class ProductService {
               IsDeleted: false,
               OR: concentrationValues.map(value => ({
                 Concentrations: {
-                  Name: { contains : value }
+                  Name: { contains: value }
                 }
               }))
             }
@@ -1253,7 +1238,7 @@ export class ProductService {
             some: {
               IsDeleted: false,
               OR: variantTypeValues.map(value => ({
-                Type: { contains : value }
+                Type: { contains: value }
               }))
             }
           }
@@ -1282,20 +1267,19 @@ export class ProductService {
         });
       }
 
-      if (budget) {
+      if (budget && (budget.min != null || budget.max != null)) {
         andConditionsForWhere.push({
           ProductVariants: {
             some: {
               IsDeleted: false,
               BasePrice: {
-                gte: budget.min ? Number(budget.min) : undefined,
-                lte: budget.max ? Number(budget.max) : undefined
+                gte: budget.min != null ? Number(budget.min) : undefined,
+                lte: budget.max != null ? Number(budget.max) : undefined
               }
             }
           }
         });
       }
-    }
 
       const where: Prisma.ProductsWhereInput = {
         IsDeleted: false,

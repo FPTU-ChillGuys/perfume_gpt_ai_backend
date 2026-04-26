@@ -1,6 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
-import { ConversationV10Service } from 'src/infrastructure/domain/conversation/conversationV10.service';
 import { AIModule } from 'src/infrastructure/domain/ai/ai.module';
 import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.module';
 import { ProductModule } from 'src/infrastructure/domain/product/product.module';
@@ -15,6 +14,9 @@ import { SurveyModule } from 'src/infrastructure/domain/survey/survey.module';
 import { OrderModule } from 'src/infrastructure/domain/order/order.module';
 import { ProfileModule } from 'src/infrastructure/domain/profile/profile.module';
 import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
+import { AIAnalysisHelper } from './helpers/ai-analysis.helper';
+import { AIPersonalizationHelper } from './helpers/ai-personalization.helper';
+import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
 
 @Module({
     imports: [
@@ -32,7 +34,17 @@ import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
         forwardRef(() => RecommendationModule), // Avoid circular dependency if any
         BullModule.registerQueue({ name: QueueName.CONVERSATION_QUEUE }),
     ],
-    providers: [ConversationService, ConversationV10Service],
-    exports: [ConversationService, ConversationV10Service],
+    providers: [
+        ConversationService, 
+        AIAnalysisHelper,
+        AIPersonalizationHelper,
+        AISearchExecutorHelper
+    ],
+    exports: [
+        ConversationService, 
+        AIAnalysisHelper,
+        AIPersonalizationHelper,
+        AISearchExecutorHelper
+    ],
 })
 export class ConversationModule { }

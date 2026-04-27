@@ -34,7 +34,7 @@ import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-
 import { v4 as uuidv4 } from 'uuid';
 import { mergeSurveyQueryResults, SurveyQueryResult, buildSurveyContextForAI } from 'src/infrastructure/domain/survey/survey-merge.util';
 import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/survey-query-validator.service';
-import { QueryFragment, QueryAnswerPayload } from 'src/infrastructure/domain/survey/survey-query.types';
+import { QueryFragment, QueryAnswerPayload, QueryFragmentMatch, QueryFragmentAttribute, QueryFragmentBudget } from 'src/infrastructure/domain/survey/survey-query.types';
 
 
 @Injectable()
@@ -1275,27 +1275,26 @@ export class SurveyService {
     for (const frag of fragments) {
       switch (frag.type) {
         case 'gender':
-          genderValues.push(frag.match);
+          genderValues.push((frag as QueryFragmentMatch).match);
           break;
         case 'origin':
-          originValues.push(frag.match);
+          originValues.push((frag as QueryFragmentMatch).match);
           break;
         case 'concentration':
-          concentrationValues.push(frag.match);
+          concentrationValues.push((frag as QueryFragmentMatch).match);
           break;
         case 'brand':
         case 'category':
         case 'note':
         case 'family':
-          // These go into logic groups → mỗi group là 1 OR condition
-          logic.push([frag.match]);
+          logic.push([(frag as QueryFragmentMatch).match]);
           break;
         case 'attribute':
-          // Attribute values also go into logic groups
-          logic.push([frag.match]);
+          logic.push([(frag as QueryFragmentAttribute).match]);
           break;
         case 'budget':
-          budget = { min: frag.min, max: frag.max };
+          const bFrag = frag as QueryFragmentBudget;
+          budget = { min: bFrag.min, max: bFrag.max };
           break;
       }
     }

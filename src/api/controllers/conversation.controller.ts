@@ -101,7 +101,7 @@ export class ConversationController {
   @Post('chat/v10-staff')
   @ApiBearerAuth('jwt')
   @ApiOperation({ summary: 'Chat V10 Staff (Quick Counter Consultation Mode)' })
-  @ApiBaseResponse(ConversationRequestDto)
+  @ApiBaseResponse(ConversationDto)
   async conversationV10Staff(
     @Req() request: Request,
     @Body() conversation: ConversationRequestDto

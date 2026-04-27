@@ -89,7 +89,9 @@ export class AISearchExecutorHelper {
 
     // Lọc theo ngân sách (Budget strict filter)
     if (rootAnalysis.budget && (rootAnalysis.budget.min !== null || rootAnalysis.budget.max !== null)) {
-      const { min, max } = rootAnalysis.budget;
+      let { min, max } = rootAnalysis.budget;
+      min = min ?? 0;
+      max = max ?? Number.MAX_SAFE_INTEGER;
       combined = combined
         .map(p => ({
           ...p,

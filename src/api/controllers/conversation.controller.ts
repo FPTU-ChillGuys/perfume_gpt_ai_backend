@@ -22,6 +22,7 @@ import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domai
 import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { ConversationOutputDto } from 'src/application/dtos/common/conversation-output.dto';
 import { Sender } from 'src/domain/enum/sender.enum';
+import { processRequestForMobile, processResponseForMobile } from 'src/infrastructure/domain/utils/message-helper';
 
 // New DTOs
 import { ConversationResponse } from 'src/application/dtos/response/conversation/conversation.response';
@@ -81,12 +82,12 @@ export class ConversationController {
     }
     
     // Xử lý mobile input
-    const processedReq = this.processRequestForMobile(chatRequest);
+    const processedReq = processRequestForMobile(chatRequest);
     
     const result = await this.conversationService.chat(processedReq);
     
     // Xử lý mobile output
-    return this.processResponseForMobile(result, chatRequest.isMobile);
+    return processResponseForMobile(result, chatRequest.isMobile);
   }
 
   /** Chat V10 Staff (Quick Counter Consultation Mode) */
@@ -105,55 +106,11 @@ export class ConversationController {
     chatRequest.isStaff = true;
     
     // Xử lý mobile input
-    const processedReq = this.processRequestForMobile(chatRequest);
+    const processedReq = processRequestForMobile(chatRequest);
     
     const result = await this.conversationService.chat(processedReq);
     
     // Xử lý mobile output
-    return this.processResponseForMobile(result, chatRequest.isMobile);
-  }
-
-  /** Xử lý convert ngược Object -> String cho Request từ Mobile */
-  private processRequestForMobile(request: ChatRequest): ChatRequest {
-    if (request.messages && Array.isArray(request.messages)) {
-      request.messages = request.messages.map(msg => {
-        if (typeof msg.message !== 'string') {
-          msg.message = JSON.stringify(msg.message);
-        }
-        return msg;
-      });
-    }
-    return request;
-  }
-
-  /** Xử lý parse message JSON cho Mobile Client (Response) */
-  private processResponseForMobile(
-    response: BaseResponse<ConversationResponse>,
-    isMobile?: boolean
-  ): BaseResponse<ConversationResponse> {
-    if (isMobile && response.success && response.data?.messages) {
-      response.data.isMobile = true;
-      response.data.messages = response.data.messages.map((msg) => {
-        if (msg.sender === Sender.ASSISTANT && typeof msg.message === 'string') {
-          const trimmed = msg.message.trim();
-          if (
-            (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-            (trimmed.startsWith('"') && trimmed.includes('{'))
-          ) {
-            try {
-              let parsed = msg.message;
-              if (trimmed.startsWith('"')) {
-                parsed = JSON.parse(parsed);
-              }
-              msg.message = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
-            } catch (e) {
-              // Ignore parse error
-            }
-          }
-        }
-        return msg;
-      });
-    }
-    return response;
+    return processResponseForMobile(result, chatRequest.isMobile);
   }
 }

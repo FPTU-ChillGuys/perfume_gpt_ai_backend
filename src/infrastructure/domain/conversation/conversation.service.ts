@@ -272,7 +272,7 @@ export class ConversationService {
     const aiResponse = typeof aiResult.data === 'string' ? JSON.parse(aiResult.data) : aiResult.data;
 
     // 6. Hydrate Products (Lấy thông tin đầy đủ cho frontend)
-    await this.hydrateProductsInResponse(aiResponse);
+    await this.hydrateProductsInResponse(aiResponse, analysis.budget);
 
     // 7. Lưu trữ và Logging (Background Queue)
     const finalMessageData = JSON.stringify(aiResponse);
@@ -304,13 +304,32 @@ export class ConversationService {
   }
 
   /** Hỗ trợ lấy thông tin sản phẩm đầy đủ cho AI response */
-  private async hydrateProductsInResponse(aiResponse: any): Promise<void> {
+  private async hydrateProductsInResponse(aiResponse: any, budget?: any): Promise<void> {
     if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
       const ids = aiResponse.productTemp.map((p: any) => p.id).filter((id: any) => !!id);
       if (ids.length > 0) {
         const productRes = await this.productService.getProductsByIdsForOutput(ids);
         if (productRes.success && productRes.data) {
-          aiResponse.products = productRes.data;
+          let hydratedProducts = productRes.data;
+
+          // Re-apply budget filter on variants after hydration
+          if (budget && (budget.min !== undefined || budget.max !== undefined)) {
+            const min = budget.min ? Number(budget.min) : 0;
+            const max = budget.max ? Number(budget.max) : Infinity;
+
+            hydratedProducts = hydratedProducts.map((product: any) => {
+              const filteredVariants = (product.variants || []).filter((v: any) => {
+                const price = Number(v.basePrice);
+                return price >= min && price <= max;
+              });
+              return { ...product, variants: filteredVariants };
+            }).filter((product: any) => product.variants.length > 0);
+
+            this.logger.log(`[HYDRATE] Budget filter applied: ${min}-${max === Infinity ? '∞' : max}. ` +
+              `Products: ${productRes.data.length} → ${hydratedProducts.length}`);
+          }
+
+          aiResponse.products = hydratedProducts;
         }
       }
     }

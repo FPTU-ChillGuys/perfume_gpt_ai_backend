@@ -513,6 +513,23 @@ export class SurveyService {
             }
             return product;
           }).filter(product => product.variants && product.variants.length > 0);
+
+          // Re-apply budget filter on variants after hydration
+          if (analysis?.budget && (analysis.budget.min !== undefined || analysis.budget.max !== undefined)) {
+            const min = analysis.budget.min ? Number(analysis.budget.min) : 0;
+            const max = analysis.budget.max ? Number(analysis.budget.max) : Infinity;
+
+            aiResponse.products = aiResponse.products.map((product: any) => {
+              const filteredVariants = (product.variants || []).filter((v: any) => {
+                const price = Number(v.basePrice);
+                return price >= min && price <= max;
+              });
+              return { ...product, variants: filteredVariants };
+            }).filter((product: any) => product.variants.length > 0);
+
+            this.logger.log(`[SURVEY-HYDRATE] Budget filter applied: ${min}-${max === Infinity ? '∞' : max}. ` +
+              `Products after filter: ${aiResponse.products.length}`);
+          }
         }
       }
     }

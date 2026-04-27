@@ -111,7 +111,7 @@ export class MasterDataTool {
                 }
             }
 
-            // --- PHASE 3: DEDUPLICATION & RETURN ---
+            // --- PHASE 3: DEDUPLICATION ---
             const deduplicate = (arr: any[]) => {
                 const seen = new Set();
                 return arr.filter(item => {
@@ -124,30 +124,100 @@ export class MasterDataTool {
 
             const getLabels = (arr: any[]) => arr.map(item => item.Name || item.Value || item.id || item.Id);
 
-            const keywordMappings = Array.from(keywordToLabelsMap.entries()).map(([kw, labels]) => ({
-                original: kw,
-                corrected: Array.from(labels)
-            }));
+            // Deduplicate all results
+            const dedupedBrands = deduplicate(finalResults.brands);
+            const dedupedCategories = deduplicate(finalResults.categories);
+            const dedupedNotes = deduplicate(finalResults.notes);
+            const dedupedFamilies = deduplicate(finalResults.families);
+            const dedupedAttributes = deduplicate(finalResults.attributes);
+            const dedupedProducts = deduplicate(finalResults.products);
+
+            // --- PHASE 4: PRODUCT VALIDATION (count-based) ---
+            // Validate each found label against actual products in DB.
+            // Remove labels that don't match any product (count = 0).
+            this.logger.log(`[searchMasterData] Starting Phase 4: Product validation...`);
+
+            const validateItems = async (items: any[], type: string): Promise<any[]> => {
+                const validItems: any[] = [];
+                for (const item of items) {
+                    const name = item.Name || item.Value || item.id || item.Id;
+                    if (!name) continue;
+                    // Skip validation for generic/short terms
+                    if (this.shouldSkipNormalizedTerm(name, name)) {
+                        validItems.push(item);
+                        continue;
+                    }
+                    try {
+                        const count = await this.masterDataService.countProductsByField(name, type);
+                        if (count > 0) {
+                            validItems.push(item);
+                        } else {
+                            this.logger.log(`[searchMasterData] REMOVED ${type} "${name}" (count=0)`);
+                        }
+                    } catch (error) {
+                        // If count fails, keep the item (fail-safe)
+                        this.logger.warn(`[searchMasterData] Count failed for ${type} "${name}", keeping it.`);
+                        validItems.push(item);
+                    }
+                }
+                return validItems;
+            };
+
+            // Run validation in parallel for all types
+            const [validBrands, validCategories, validNotes, validFamilies, validAttributes, validProducts] = await Promise.all([
+                validateItems(dedupedBrands, 'brand'),
+                validateItems(dedupedCategories, 'category'),
+                validateItems(dedupedNotes, 'note'),
+                validateItems(dedupedFamilies, 'family'),
+                validateItems(dedupedAttributes, 'attribute'),
+                validateItems(dedupedProducts, 'product'),
+            ]);
+
+            // Build set of valid labels for keywordMappings filtering
+            const validLabelsSet = new Set<string>();
+            for (const items of [validBrands, validCategories, validNotes, validFamilies, validAttributes, validProducts]) {
+                for (const item of items) {
+                    const label = item.Name || item.Value || item.id || item.Id;
+                    if (label) validLabelsSet.add(label);
+                }
+            }
+
+            // Filter keywordMappings: remove labels that were removed by validation
+            const filteredKeywordMappings = Array.from(keywordToLabelsMap.entries())
+                .map(([kw, labels]) => ({
+                    original: kw,
+                    corrected: Array.from(labels).filter(l => validLabelsSet.has(l))
+                }))
+                .filter(m => m.corrected.length > 0);
+
+            this.logger.log(`[searchMasterData] Phase 4 complete. ` +
+                `Brands: ${dedupedBrands.length}->${validBrands.length}, ` +
+                `Categories: ${dedupedCategories.length}->${validCategories.length}, ` +
+                `Notes: ${dedupedNotes.length}->${validNotes.length}, ` +
+                `Families: ${dedupedFamilies.length}->${validFamilies.length}, ` +
+                `Attributes: ${dedupedAttributes.length}->${validAttributes.length}, ` +
+                `Products: ${dedupedProducts.length}->${validProducts.length}`
+            );
 
             return {
                 ...encodeToolOutput({
-                    brands: deduplicate(finalResults.brands),
-                    categories: deduplicate(finalResults.categories),
-                    notes: deduplicate(finalResults.notes),
-                    families: deduplicate(finalResults.families),
-                    attributes: deduplicate(finalResults.attributes),
-                    products: deduplicate(finalResults.products)
+                    brands: validBrands,
+                    categories: validCategories,
+                    notes: validNotes,
+                    families: validFamilies,
+                    attributes: validAttributes,
+                    products: validProducts
                 }),
                 // keywordMappings giúp AI biết nhãn nào thuộc về cùng 1 intent để gộp vào mảng OR
-                keywordMappings,
+                keywordMappings: filteredKeywordMappings,
                 // summaryFoundLabels duy trì cho backward compatibility
                 summaryFoundLabels: {
-                    brands: Array.from(new Set(getLabels(finalResults.brands))),
-                    categories: Array.from(new Set(getLabels(finalResults.categories))),
-                    notes: Array.from(new Set(getLabels(finalResults.notes))),
-                    families: Array.from(new Set(getLabels(finalResults.families))),
-                    attributes: Array.from(new Set(getLabels(finalResults.attributes))),
-                    products: Array.from(new Set(getLabels(finalResults.products)))
+                    brands: Array.from(new Set(getLabels(validBrands))),
+                    categories: Array.from(new Set(getLabels(validCategories))),
+                    notes: Array.from(new Set(getLabels(validNotes))),
+                    families: Array.from(new Set(getLabels(validFamilies))),
+                    attributes: Array.from(new Set(getLabels(validAttributes))),
+                    products: Array.from(new Set(getLabels(validProducts)))
                 }
             };
         }

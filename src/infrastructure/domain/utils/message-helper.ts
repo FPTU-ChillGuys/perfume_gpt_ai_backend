@@ -2,14 +2,18 @@ import { UIMessage } from 'ai';
 import { v4 as uuidv4 } from 'uuid';
 import { ChatMessageRequest } from 'src/application/dtos/request/conversation/chat-message.request';
 import { ChatRequest } from 'src/application/dtos/request/conversation/chat.request';
-import { Sender } from 'src/domain/enum/sender.enum';
 
 /** Chuyển đổi danh sách tin nhắn request sang định dạng UIMessage cho AI SDK */
 export function convertToMessages(messages: ChatMessageRequest[]): UIMessage[] {
   return messages.map((msgReq) => ({
     id: uuidv4(),
     role: msgReq.sender.toString().toLowerCase() === 'user' ? 'user' : 'assistant',
-    parts: [{ type: 'text', text: msgReq.message }]
+    parts: [
+      {
+        type: 'text',
+        text: typeof msgReq.message === 'string' ? msgReq.message : JSON.stringify(msgReq.message)
+      }
+    ]
   }));
 }
 
@@ -19,7 +23,7 @@ export const addMessageToMessages = (
   existingMessages: ChatMessageRequest[]
 ): ChatMessageRequest[] => {
   const newAssistantMessage = new ChatMessageRequest();
-  newAssistantMessage.sender = Sender.ASSISTANT;
+  newAssistantMessage.sender = 'assistant' as any; // Cast for compatibility
   newAssistantMessage.message = aiMessage;
 
   return [...existingMessages, newAssistantMessage];

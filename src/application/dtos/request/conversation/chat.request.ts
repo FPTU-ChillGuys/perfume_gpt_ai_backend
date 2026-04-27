@@ -27,4 +27,9 @@ export class ChatRequest {
   @ApiProperty({ description: 'Chế độ nhân viên tư vấn tại quầy', required: false })
   @IsOptional()
   isStaff?: boolean;
+
+  /** Client là Mobile App để Server tự động parse message JSON */
+  @ApiProperty({ description: 'Client là Mobile App', required: false })
+  @IsOptional()
+  isMobile?: boolean;
 }

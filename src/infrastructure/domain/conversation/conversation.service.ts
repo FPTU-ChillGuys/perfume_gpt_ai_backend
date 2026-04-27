@@ -123,10 +123,19 @@ export class ConversationService {
   /** Cập nhật tin nhắn vào hội thoại (dùng cho background job) */
   async updateMessageToConversation(
     id: string,
-    messageRequests: ChatMessageRequest[]
+    messageRequests: ChatMessageRequest[] | any[]
   ): Promise<BaseResponse<MessageResponse[]>> {
     return await funcHandlerAsync(async () => {
-      const messages = messageRequests.map(req => req.toEntity());
+      // Chuyển đổi từ DTO/Object sang entity
+      const messages = messageRequests.map(req => {
+        if (req instanceof ChatMessageRequest || (req.sender && req.message)) {
+          const entity = new Message();
+          entity.sender = req.sender;
+          entity.message = typeof req.message === 'string' ? req.message : JSON.stringify(req.message);
+          return entity;
+        }
+        return req; // Trường hợp đã là entity
+      });
       
       const conversation = await this.unitOfWork.AIConversationRepo.addMessagesToConversation(
         id,
@@ -154,17 +163,20 @@ export class ConversationService {
     const exists = await this.unitOfWork.AIConversationRepo.exists({ id });
 
     if (!exists) {
-      // Logic addConversation đơn giản
       const entity = new Conversation({
         id,
         userId: conversation.userId
       });
-      // messages mapping...
+      if (conversation.messages && Array.isArray(conversation.messages)) {
+        entity.messages.set(conversation.messages.map((m: any) => {
+           const msg = new Message();
+           msg.sender = m.sender;
+           msg.message = typeof m.message === 'string' ? m.message : JSON.stringify(m.message);
+           return msg;
+        }));
+      }
       await this.unitOfWork.AIConversationRepo.addAndFlush(entity);
     } else {
-      // update messages...
-      // Tùy vào format của conversation object từ queue, 
-      // ta có thể cần mapping từ ChatMessageRequest[]
       await this.updateMessageToConversation(id, conversation.messages || []);
     }
   }
@@ -191,6 +203,8 @@ export class ConversationService {
       .filter(m => m !== lastUserMessage)
       .map(m => `${m.role}: ${m.parts.find(p => p.type === 'text')?.text || ''}`)
       .join('\n');
+
+    this.logger.log(`[CHAT] Analyzing message: "${messageText.substring(0, 50)}..."`);
 
     // 2. Phase 1: Phân tích ý định (Intermediate Analysis)
     const analysis = await this.analysisHelper.analyze(messageText, previousContext, {
@@ -265,7 +279,7 @@ export class ConversationService {
     const responseConversation = overrideMessagesToConversation(
       conversationId,
       userId,
-      addMessageToMessages(finalMessageData, request.messages || [])
+      addMessageToMessages(finalMessageData, (request.messages || []) as any)
     );
 
     await this.conversationQueue.add(ConversationJobName.ADD_MESSAGE_AND_LOG, { 
@@ -273,7 +287,20 @@ export class ConversationService {
       userId 
     });
 
-    return Ok(responseConversation as any); // Tạm thời ép kiểu do helper cũ trả về DTO cũ
+    // Mapping sang ConversationResponse
+    const response = new ConversationResponse();
+    response.id = responseConversation.id || conversationId;
+    response.userId = responseConversation.userId || userId;
+    response.updatedAt = new Date();
+    response.messages = (responseConversation.messages || []).map(m => {
+       const res = new MessageResponse();
+       res.sender = m.sender as Sender;
+       res.message = m.message;
+       res.createdAt = new Date();
+       return res;
+    });
+
+    return Ok(response);
   }
 
   /** Hỗ trợ lấy thông tin sản phẩm đầy đủ cho AI response */

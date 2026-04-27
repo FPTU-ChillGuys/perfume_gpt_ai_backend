@@ -15,7 +15,8 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
-  ApiTags
+  ApiTags,
+  ApiExtraModels
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { SurveyAnswerRequest } from 'src/application/dtos/request/survey-answer.request';
@@ -34,9 +35,18 @@ import { Request } from 'express';
 import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { SurveyAttributeService } from 'src/infrastructure/domain/survey/survey-attribute.service';
 import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/survey-query-validator.service';
-import { SurveyAttributeType, CreateQuestionFromAttributeRequest } from 'src/infrastructure/domain/survey/survey-query.types';
+import {
+  SurveyAttributeType,
+  CreateQuestionFromAttributeRequest,
+  SurveyAttributeValuesResponse,
+  SurveyAttributeTypeInfo,
+  QueryFragmentMatch,
+  QueryFragmentAttribute,
+  QueryFragmentBudget
+} from 'src/infrastructure/domain/survey/survey-query.types';
 
 @ApiTags('Surveys')
+@ApiExtraModels(QueryFragmentMatch, QueryFragmentAttribute, QueryFragmentBudget)
 @Controller('surveys')
 export class SurveyController {
   constructor(
@@ -196,7 +206,7 @@ export class SurveyController {
     const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
     return this.surveyService.processSurveyV4QueryBased(resolvedUserId, surveyAnswers);
   }
-  
+
   /** Trả lời survey và nhận gợi ý nước hoa từ AI (v5 - Hybrid AI + Query fragments + Ranking score) */
   @Public()
   @Post('user/v5')
@@ -220,8 +230,9 @@ export class SurveyController {
   /** Lấy danh sách tất cả loại thuộc tính có thể dùng cho survey */
   @Public()
   @Get('attributes')
+  @ApiBaseResponse(SurveyAttributeTypeInfo, true)
   @ApiOperation({ summary: 'Lấy danh sách loại thuộc tính cho survey' })
-  async getAttributeTypes(): Promise<BaseResponse<any>> {
+  async getAttributeTypes(): Promise<BaseResponse<SurveyAttributeTypeInfo[]>> {
     return Ok(this.surveyAttributeService.getAvailableAttributeTypes());
   }
 
@@ -230,9 +241,10 @@ export class SurveyController {
   @Get('attributes/:type/values')
   @ApiOperation({ summary: 'Lấy giá trị của 1 loại thuộc tính' })
   @ApiParam({ name: 'type', description: 'Loại thuộc tính (gender, brand, category, origin, concentration, note, family, attribute, budget)' })
+  @ApiBaseResponse(SurveyAttributeValuesResponse, true)
   async getAttributeValues(
     @Param('type') type: SurveyAttributeType
-  ): Promise<BaseResponse<any>> {
+  ): Promise<BaseResponse<SurveyAttributeValuesResponse>> {
     try {
       const result = await this.surveyAttributeService.getAttributeValues(type);
       return Ok(result);

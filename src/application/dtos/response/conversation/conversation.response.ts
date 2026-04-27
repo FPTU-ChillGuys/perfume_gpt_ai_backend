@@ -20,6 +20,10 @@ export class ConversationResponse {
   @ApiProperty({ description: 'Ngày cập nhật' })
   updatedAt: Date;
 
+  /** Đánh dấu response được xử lý cho Mobile */
+  @ApiProperty({ description: 'Đánh dấu response cho Mobile', required: false })
+  isMobile?: boolean;
+
   /**
    * Chuyển đổi từ Entity sang DTO.
    * @param entity - Entity Conversation từ database

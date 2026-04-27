@@ -33,14 +33,13 @@ export const ApiBaseResponse = <T extends Function>(
     ApiOkResponse({
       description: `The base response of ${data.name}`,
       schema: {
-        allOf: [
-          { $ref: getSchemaPath(BaseResponse) },
-          {
-            properties: properties ?? {
-              data: isArray ? { type: 'array', items: schemaData } : schemaData
-            }
-          }
-        ]
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', description: 'Kết quả xử lý' },
+          error: { type: 'string', nullable: true, description: 'Thông báo lỗi' },
+          details: { type: 'string', nullable: true, description: 'Chi tiết lỗi' },
+          data: properties?.data ?? (isArray ? { type: 'array', items: schemaData } : schemaData)
+        }
       }
     })
   );
@@ -91,14 +90,12 @@ export const ExtendApiBaseResponse = <T extends Function, I extends Function>(
     ApiOkResponse({
       description: `The base response of ${data.name}`,
       schema: {
-        allOf: [
-          { $ref: getSchemaPath(BaseResponseAPI) },
-          {
-            properties: properties ?? {
-              payload: payloadSchema
-            }
-          }
-        ]
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', description: 'Kết quả xử lý' },
+          error: { type: 'string', nullable: true, description: 'Thông báo lỗi' },
+          payload: properties?.payload ?? payloadSchema
+        }
       }
     })
   );

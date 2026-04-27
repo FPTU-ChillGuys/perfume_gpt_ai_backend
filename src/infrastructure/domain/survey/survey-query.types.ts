@@ -1,3 +1,5 @@
+import { ApiProperty, getSchemaPath } from '@nestjs/swagger';
+
 /**
  * Survey v4 — Query-based answer types.
  * Mỗi câu trả lời survey lưu một queryFragment JSON,
@@ -20,27 +22,37 @@ export const SURVEY_ATTRIBUTE_TYPES = [
 export type SurveyAttributeType = (typeof SURVEY_ATTRIBUTE_TYPES)[number];
 
 // ── Query Fragment: phần query nhúng trong mỗi answer ─────────────
-export interface QueryFragmentBase {
-  type: SurveyAttributeType;
-}
 
 /** Match chính xác 1 giá trị (gender, origin, brand, category, concentration, note, family) */
-export interface QueryFragmentMatch extends QueryFragmentBase {
+export class QueryFragmentMatch {
+  @ApiProperty({ enum: SURVEY_ATTRIBUTE_TYPES, description: 'Loại thuộc tính (trừ attribute và budget)' })
   type: Exclude<SurveyAttributeType, 'attribute' | 'budget'>;
+
+  @ApiProperty({ description: 'Giá trị cần khớp chính xác' })
   match: string;
 }
 
 /** Match một giá trị thuộc tính sản phẩm (attribute) */
-export interface QueryFragmentAttribute extends QueryFragmentBase {
+export class QueryFragmentAttribute {
+  @ApiProperty({ enum: ['attribute'] })
   type: 'attribute';
+
+  @ApiProperty({ description: 'Tên loại thuộc tính (ví dụ: Nồng độ, Độ lưu hương)' })
   attributeName: string;
+
+  @ApiProperty({ description: 'Giá trị thuộc tính cần khớp' })
   match: string;
 }
 
 /** Khoảng ngân sách (budget) */
-export interface QueryFragmentBudget extends QueryFragmentBase {
+export class QueryFragmentBudget {
+  @ApiProperty({ enum: ['budget'] })
   type: 'budget';
+
+  @ApiProperty({ required: false, description: 'Giá tối thiểu' })
   min?: number;
+
+  @ApiProperty({ required: false, description: 'Giá tối đa' })
   max?: number;
 }
 
@@ -62,22 +74,42 @@ export interface QueryValidationResult {
 }
 
 // ── Response types cho API lấy thuộc tính ─────────────────────────
-export interface SurveyAttributeTypeInfo {
+export class SurveyAttributeTypeInfo {
+  @ApiProperty({ enum: SURVEY_ATTRIBUTE_TYPES })
   type: SurveyAttributeType;
+
+  @ApiProperty()
   label: string;
+
+  @ApiProperty()
   description: string;
 }
 
-export interface SurveyAttributeValueItem {
+export class SurveyAttributeValueItem {
+  @ApiProperty()
   displayText: string;
+
+  @ApiProperty({
+    oneOf: [
+      { $ref: getSchemaPath(QueryFragmentMatch) },
+      { $ref: getSchemaPath(QueryFragmentAttribute) },
+      { $ref: getSchemaPath(QueryFragmentBudget) },
+    ],
+  })
   queryFragment: QueryFragment;
 }
 
-export interface SurveyAttributeValuesResponse {
+export class SurveyAttributeValuesResponse {
+  @ApiProperty({ enum: SURVEY_ATTRIBUTE_TYPES })
   type: SurveyAttributeType;
+
+  @ApiProperty()
   label: string;
+
+  @ApiProperty({ type: [SurveyAttributeValueItem], required: false })
   values?: SurveyAttributeValueItem[];
-  /** Chỉ dùng cho type = 'attribute' — gom theo từng attribute */
+
+  @ApiProperty({ required: false })
   subGroups?: {
     attributeName: string;
     values: SurveyAttributeValueItem[];
@@ -85,14 +117,22 @@ export interface SurveyAttributeValuesResponse {
 }
 
 // ── Request tạo câu hỏi từ thuộc tính ────────────────────────────
-export interface CreateQuestionFromAttributeRequest {
+export class CreateQuestionFromAttributeRequest {
+  @ApiProperty()
   question: string;
+
+  @ApiProperty({ enum: ['single', 'multiple'] })
   questionType: 'single' | 'multiple';
+
+  @ApiProperty({ enum: SURVEY_ATTRIBUTE_TYPES })
   attributeType: SurveyAttributeType;
-  /** Bắt buộc khi attributeType = 'attribute' */
+
+  @ApiProperty({ required: false })
   attributeName?: string;
-  /** Chỉ chọn một số giá trị, không phải tất cả */
+
+  @ApiProperty({ type: [String], required: false })
   selectedValues?: string[];
-  /** Dùng cho budget: danh sách các khoảng giá */
+
+  @ApiProperty({ required: false })
   budgetRanges?: { label: string; min?: number; max?: number }[];
 }

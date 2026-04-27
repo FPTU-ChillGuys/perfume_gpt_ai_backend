@@ -10,7 +10,8 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiQuery,
-  ApiTags
+  ApiTags,
+  ApiExtraModels
 } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
@@ -25,8 +26,11 @@ import { ConversationService } from 'src/infrastructure/domain/conversation/conv
 import { ConversationV10Service } from 'src/infrastructure/domain/conversation/conversationV10.service';
 import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
+import { ConversationOutputResponse } from 'src/application/dtos/response/conversation-output.response';
+import { Sender } from 'src/domain/enum/sender.enum';
 
 @ApiTags('Conversation')
+@ApiExtraModels(ConversationOutputResponse)
 @Controller('conversation')
 export class ConversationController {
   constructor(
@@ -86,7 +90,7 @@ export class ConversationController {
   @Post('chat/v10')
   @ApiBearerAuth('jwt')
   @ApiOperation({ summary: 'Chat V10 (Profile-first + Structured Search)' })
-  @ApiBaseResponse(ConversationRequestDto)
+  @ApiBaseResponse(ConversationDto)
   async conversationV10(
     @Req() request: Request,
     @Body() conversation: ConversationRequestDto
@@ -94,7 +98,8 @@ export class ConversationController {
     if (!conversation.userId) {
       conversation.userId = getTokenPayloadFromRequest(request)?.id;
     }
-    return this.conversationV10Service.chat(conversation);
+    const result = await this.conversationV10Service.chat(conversation);
+    return this.processResponseForMobile(result, conversation.isMobile);
   }
 
   @Public()
@@ -110,6 +115,39 @@ export class ConversationController {
       conversation.userId = getTokenPayloadFromRequest(request)?.id;
     }
     conversation.isStaff = true;
-    return this.conversationV10Service.chat(conversation);
+    const result = await this.conversationV10Service.chat(conversation);
+    return this.processResponseForMobile(result, conversation.isMobile);
+  }
+
+  /** Xử lý parse message JSON cho Mobile Client */
+  private processResponseForMobile(
+    response: BaseResponse<ConversationDto>,
+    isMobile?: boolean
+  ): BaseResponse<ConversationDto> {
+    if (isMobile && response.success && response.data?.messages) {
+      response.data.isMobile = true;
+      response.data.messages = response.data.messages.map((msg) => {
+        if (msg.sender === Sender.ASSISTANT && typeof msg.message === 'string') {
+          const trimmed = msg.message.trim();
+          // Kiểm tra xem có phải JSON không
+          if (
+            (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+            (trimmed.startsWith('"') && trimmed.includes('{'))
+          ) {
+            try {
+              let parsed = msg.message;
+              if (trimmed.startsWith('"')) {
+                parsed = JSON.parse(parsed);
+              }
+              msg.message = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+            } catch (e) {
+              // Parse lỗi thì giữ nguyên string
+            }
+          }
+        }
+        return msg;
+      });
+    }
+    return response;
   }
 }

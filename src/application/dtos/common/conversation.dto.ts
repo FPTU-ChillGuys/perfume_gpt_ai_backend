@@ -14,6 +14,10 @@ export class ConversationDto extends CommonResponse {
   @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageDto], required: false })
   messages?: MessageDto[];
 
+  /** Đánh dấu response được xử lý cho Mobile */
+  @ApiProperty({ description: 'Đánh dấu response cho Mobile', required: false })
+  isMobile?: boolean;
+
   constructor(init?: Partial<ConversationDto>) {
     super();
     Object.assign(this, init);
@@ -44,6 +48,11 @@ export class ConversationRequestDto {
   @ApiProperty({ description: 'Chế độ nhân viên tư vấn tại quầy', required: false })
   @IsOptional()
   isStaff?: boolean;
+
+  /** Client là Mobile App để Server tự động parse message JSON */
+  @ApiProperty({ description: 'Client là Mobile App', required: false })
+  @IsOptional()
+  isMobile?: boolean;
 
   constructor(init?: Partial<ConversationRequestDto>) {
     Object.assign(this, init);

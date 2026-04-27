@@ -18,10 +18,10 @@ export class MessageMapper {
     return entities.map((entity) => this.toResponse(entity));
   }
 
-   static toEntity(dto: MessageDto, conversation?: Conversation): Message {
+   static toEntity(dto: MessageDto, conversation?: Array<Message> | Conversation): Message {
     const message = new Message({
       sender: dto.sender as Sender,
-      message: dto.message
+      message: typeof dto.message === 'string' ? dto.message : JSON.stringify(dto.message)
     });
 
     // Set id if provided
@@ -30,7 +30,7 @@ export class MessageMapper {
     }
 
     // Set conversation if provided
-    if (conversation) {
+    if (conversation && !Array.isArray(conversation)) {
       message.conversation = conversation;
     }
 
@@ -47,7 +47,7 @@ export class MessageMapper {
     }
 
     if (dto.message) {
-      entity.message = dto.message;
+      entity.message = typeof dto.message === 'string' ? dto.message : JSON.stringify(dto.message);
     }
 
     return entity;

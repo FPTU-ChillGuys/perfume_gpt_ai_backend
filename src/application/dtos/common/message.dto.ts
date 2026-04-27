@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
 import { CommonResponse } from '../response/common/common.response';
+import { ConversationOutputResponse } from '../response/conversation-output.response';
+import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
 import { Sender } from 'src/domain/enum/sender.enum';
 
 /** DTO tin nhắn (response) */
@@ -10,8 +11,14 @@ export class MessageDto extends CommonResponse {
   sender!: string;
 
   /** Nội dung tin nhắn */
-  @ApiProperty({ description: 'Nội dung tin nhắn' })
-  message!: string;
+  @ApiProperty({ 
+    description: 'Nội dung tin nhắn (chuỗi hoặc object cho assistant)',
+    oneOf: [
+      { type: 'string' },
+      { $ref: '#/components/schemas/ConversationOutputResponse' }
+    ]
+  })
+  message!: string | ConversationOutputResponse;
 
   constructor(init?: Partial<MessageDto>) {
     super();

@@ -116,7 +116,7 @@ export class ConversationV10Service {
           (msg) =>
             new Message({
               sender: msg.sender as Sender,
-              message: msg.message
+              message: typeof msg.message === 'string' ? msg.message : JSON.stringify(msg.message)
             })
         );
 

@@ -14,7 +14,7 @@ export function convertToMessages(message: MessageRequestDto[]): UIMessage[] {
     parts: [
       {
         type: 'text',
-        text: msgReq.message
+        text: typeof msgReq.message === 'string' ? msgReq.message : JSON.stringify(msgReq.message)
       }
     ]
   }));

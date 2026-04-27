@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CommonResponse } from '../response/common/common.response';
-import { ConversationOutputResponse } from '../response/conversation-output.response';
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { ConversationOutputDto } from './conversation-output.dto';
+import { IsEnum, IsNotEmpty, IsObject, IsString, ValidateIf } from 'class-validator';
 import { Sender } from 'src/domain/enum/sender.enum';
 
 /** DTO tin nhắn (response) */
@@ -15,10 +15,10 @@ export class MessageDto extends CommonResponse {
     description: 'Nội dung tin nhắn (chuỗi hoặc object cho assistant)',
     oneOf: [
       { type: 'string' },
-      { $ref: '#/components/schemas/ConversationOutputResponse' }
+      { $ref: '#/components/schemas/ConversationOutputDto' }
     ]
   })
-  message!: string | ConversationOutputResponse;
+  message!: string | ConversationOutputDto;
 
   constructor(init?: Partial<MessageDto>) {
     super();
@@ -34,10 +34,19 @@ export class MessageRequestDto {
   sender!: Sender;
 
   /** Nội dung tin nhắn */
-  @ApiProperty({ description: 'Nội dung tin nhắn' })
+  @ApiProperty({ 
+    description: 'Nội dung tin nhắn',
+    oneOf: [
+      { type: 'string' },
+      { $ref: '#/components/schemas/ConversationOutputDto' }
+    ]
+  })
+  @ValidateIf(o => typeof o.message !== 'string')
+  @IsObject()
+  @ValidateIf(o => typeof o.message === 'string')
   @IsString()
   @IsNotEmpty()
-  message!: string;
+  message!: string | ConversationOutputDto;
 
   constructor(init?: Partial<MessageRequestDto>) {
     Object.assign(this, init);

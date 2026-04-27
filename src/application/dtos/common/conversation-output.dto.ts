@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class ProductCardVariantOutputResponse {
+export class ProductCardVariantOutputDto {
     @ApiProperty({ format: 'uuid' })
     id!: string;
 
@@ -14,7 +14,7 @@ export class ProductCardVariantOutputResponse {
     basePrice!: number;
 }
 
-export class ProductCardOutputItemResponse {
+export class ProductCardOutputItemDto {
     @ApiProperty({ format: 'uuid' })
     id!: string;
 
@@ -27,8 +27,8 @@ export class ProductCardOutputItemResponse {
     @ApiPropertyOptional({ nullable: true })
     primaryImage!: string | null;
 
-    @ApiProperty({ type: [ProductCardVariantOutputResponse] })
-    variants!: ProductCardVariantOutputResponse[];
+    @ApiProperty({ type: [ProductCardVariantOutputDto] })
+    variants!: ProductCardVariantOutputDto[];
 
     @ApiPropertyOptional({ nullable: true })
     reasoning!: string | null;
@@ -37,7 +37,7 @@ export class ProductCardOutputItemResponse {
     source!: string | null;
 }
 
-export class ProductTempItemResponse {
+export class ProductTempItemDto {
     @ApiProperty({ format: 'uuid' })
     id!: string;
 
@@ -64,16 +64,16 @@ export class ProductTempItemResponse {
     source!: string;
 }
 
-/** Class response cho nội dung tin nhắn Assistant (đã parse) */
-export class ConversationOutputResponse {
+/** Class DTO cho nội dung tin nhắn Assistant (dùng cho cả Req/Res) */
+export class ConversationOutputDto {
     @ApiProperty({ description: 'Nội dung tin nhắn văn bản' })
     message!: string;
 
-    @ApiPropertyOptional({ type: [ProductCardOutputItemResponse], nullable: true })
-    products!: ProductCardOutputItemResponse[] | null;
+    @ApiPropertyOptional({ type: [ProductCardOutputItemDto], nullable: true })
+    products!: ProductCardOutputItemDto[] | null;
 
-    @ApiPropertyOptional({ type: [ProductTempItemResponse], nullable: true })
-    productTemp!: ProductTempItemResponse[] | null;
+    @ApiPropertyOptional({ type: [ProductTempItemDto], nullable: true })
+    productTemp!: ProductTempItemDto[] | null;
 
     @ApiProperty({ type: [String], description: 'Gợi ý 3-4 câu hỏi tiếp theo' })
     suggestedQuestions!: string[];

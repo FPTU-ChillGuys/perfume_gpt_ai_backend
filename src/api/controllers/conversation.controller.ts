@@ -26,11 +26,11 @@ import { ConversationService } from 'src/infrastructure/domain/conversation/conv
 import { ConversationV10Service } from 'src/infrastructure/domain/conversation/conversationV10.service';
 import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
-import { ConversationOutputResponse } from 'src/application/dtos/response/conversation-output.response';
+import { ConversationOutputDto } from 'src/application/dtos/common/conversation-output.dto';
 import { Sender } from 'src/domain/enum/sender.enum';
 
 @ApiTags('Conversation')
-@ApiExtraModels(ConversationOutputResponse)
+@ApiExtraModels(ConversationOutputDto)
 @Controller('conversation')
 export class ConversationController {
   constructor(
@@ -98,7 +98,8 @@ export class ConversationController {
     if (!conversation.userId) {
       conversation.userId = getTokenPayloadFromRequest(request)?.id;
     }
-    const result = await this.conversationV10Service.chat(conversation);
+    const processedReq = this.processRequestForMobile(conversation);
+    const result = await this.conversationV10Service.chat(processedReq);
     return this.processResponseForMobile(result, conversation.isMobile);
   }
 
@@ -114,12 +115,26 @@ export class ConversationController {
     if (!conversation.userId) {
       conversation.userId = getTokenPayloadFromRequest(request)?.id;
     }
-    conversation.isStaff = true;
-    const result = await this.conversationV10Service.chat(conversation);
+    const processedReq = this.processRequestForMobile(conversation);
+    processedReq.isStaff = true;
+    const result = await this.conversationV10Service.chat(processedReq);
     return this.processResponseForMobile(result, conversation.isMobile);
   }
 
-  /** Xử lý parse message JSON cho Mobile Client */
+  /** Xử lý convert ngược Object -> String cho Request từ Mobile */
+  private processRequestForMobile(conversation: ConversationRequestDto): ConversationRequestDto {
+    if (conversation.messages && Array.isArray(conversation.messages)) {
+      conversation.messages = conversation.messages.map(msg => {
+        if (typeof msg.message !== 'string') {
+          msg.message = JSON.stringify(msg.message);
+        }
+        return msg;
+      });
+    }
+    return conversation;
+  }
+
+  /** Xử lý parse message JSON cho Mobile Client (Response) */
   private processResponseForMobile(
     response: BaseResponse<ConversationDto>,
     isMobile?: boolean

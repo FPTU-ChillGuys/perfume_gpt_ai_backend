@@ -3,7 +3,10 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -27,6 +30,7 @@ import { SurveyQuestionResponse } from 'src/application/dtos/response/survey-que
 import { SurveyService } from 'src/infrastructure/domain/survey/survey.service';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { SurveyQuestionAnswerResponse } from 'src/application/dtos/response/survey-question-answer.response';
+import { ReorderQuestionsRequest } from 'src/application/dtos/request/reorder-questions.request';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
@@ -310,5 +314,17 @@ export class SurveyController {
       );
     }
     return Ok();
+  }
+
+  @Role(['admin'])
+  @Patch('questions/reorder')
+  @ApiOperation({ summary: 'Sắp xếp lại thứ tự câu hỏi survey' })
+  @ApiBody({ type: ReorderQuestionsRequest })
+  @ApiBaseResponse(Object)
+  @HttpCode(HttpStatus.OK)
+  async reorderQuestions(
+    @Body() body: ReorderQuestionsRequest
+  ): Promise<BaseResponse<void>> {
+    return this.surveyService.reorderQuestions(body.orders.map(o => ({ id: o.id, order: o.order })));
   }
 }

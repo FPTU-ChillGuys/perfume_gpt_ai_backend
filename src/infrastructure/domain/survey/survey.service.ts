@@ -164,7 +164,10 @@ export class SurveyService {
         return { success: false, error: 'Survey question not found' };
       }
 
-      // Cập nhật questionType nếu có
+      if (request.question !== undefined) {
+        surveyQuestion.question = request.question;
+      }
+
       if (request.questionType !== undefined) {
         surveyQuestion.questionType = request.questionType;
       }
@@ -222,7 +225,7 @@ export class SurveyService {
       async () => {
         const surveyQuestions = await this.unitOfWork.AISurveyQuestionRepo.find(
           { isActive: true },
-          { populate: ['answers'], orderBy: { updatedAt: 'DESC' } }
+          { populate: ['answers'], orderBy: { order: 'ASC' } }
         );
 
         const surveyQuestionsResponses =
@@ -358,6 +361,21 @@ export class SurveyService {
     return surveyQuestionAnswer !== null;
   }
 
+  async reorderQuestions(orders: { id: string; order: number }[]): Promise<BaseResponse<void>> {
+    return await funcHandlerAsync(async () => {
+      for (const item of orders) {
+        const question = await this.unitOfWork.AISurveyQuestionRepo.findOne({ id: item.id, isActive: true });
+        if (!question) {
+          return { success: false, error: `Survey question with id ${item.id} not found` };
+        }
+        question.order = item.order;
+      }
+      await this.unitOfWork.AISurveyQuestionRepo.getEntityManager().flush();
+      await this.unitOfWork.AISurveyQuestionRepo.rebuildOrder();
+      return { success: true, data: undefined };
+    }, 'Failed to reorder survey questions', true);
+  }
+
   async mappingFromRequestToEntity(
     request: SurveyQuesAnwsRequest
   ): Promise<SurveyQuestionAnswer> {
@@ -393,6 +411,7 @@ export class SurveyService {
       if (!deleted) {
         return { success: false, error: 'Survey question not found or already deleted' };
       }
+      await this.unitOfWork.AISurveyQuestionRepo.rebuildOrder();
       return { success: true, data: undefined };
     }, 'Failed to delete survey question', true);
   }
@@ -560,6 +579,7 @@ export class SurveyService {
     const queriesWithProducts = queryResults.filter(r => r.products.length > 0);
     this.logger.log(`[SurveyPerQuestion] Completed. Queries with results: ${queriesWithProducts.length}, Final products: ${(aiResponse.products as Record<string, unknown>[])?.length || 0}`);
 
+    await this.saveAIResult(savedId, JSON.stringify(aiResponse));
     return Ok(JSON.stringify(aiResponse));
   }
 
@@ -621,6 +641,8 @@ export class SurveyService {
     }
 
     this.logger.log(`[SurveyV4] Completed. Final products: ${(aiResponse.products as Record<string, unknown>[])?.length || 0}`);
+
+    await this.saveAIResult(savedId, JSON.stringify(aiResponse));
     return Ok(JSON.stringify(aiResponse));
   }
 
@@ -647,7 +669,7 @@ export class SurveyService {
     const { perQuestionAnalysis, quesAnsesForContext } = await this.analyzeV5HybridAnswers(surveyAnswers, surveyQuesesResponse.data);
 
     // Step 3: Save survey record
-    await this.saveSurveyAndLog(userId, surveyAnswers);
+    const savedId = await this.saveSurveyAndLog(userId, surveyAnswers);
 
     // Step 4: Extract Global Budget & Concentration
     const { budget, concentrations } = this.extractV5GlobalConstraints(perQuestionAnalysis);
@@ -679,6 +701,7 @@ export class SurveyService {
       if (attachResult.aiAcceptanceId) aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
     }
 
+    await this.saveAIResult(savedId, JSON.stringify(aiResponse));
     return Ok(JSON.stringify(aiResponse));
   }
 
@@ -699,6 +722,14 @@ export class SurveyService {
     }
     await this.pipelineHelper.logSurveyRecord(userId, savedResponse.data.id);
     return savedResponse.data.id;
+  }
+
+  private async saveAIResult(surveyAnswerId: string, aiResult: string): Promise<void> {
+    const surveyAnswer = await this.unitOfWork.AISurveyQuestionAnswerRepo.findOne({ id: surveyAnswerId });
+    if (surveyAnswer) {
+      surveyAnswer.aiResult = aiResult;
+      await this.unitOfWork.AISurveyQuestionAnswerRepo.getEntityManager().flush();
+    }
   }
 
   /** Merge query results + fallback to bestsellers. Dùng chung cho V3, V4. */

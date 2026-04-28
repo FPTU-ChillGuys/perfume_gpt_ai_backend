@@ -13,6 +13,9 @@ export class SurveyQuestionResponse extends CommonResponse {
   @ApiProperty({ description: 'Nội dung câu hỏi', required: false })
   question?: string;
 
+  @ApiProperty({ description: 'Thứ tự hiển thị', required: false })
+  order?: number;
+
   /** Danh sách câu trả lời */
   @ApiProperty({ description: 'Danh sách câu trả lời', type: () => [SurveyAnswerResponse], required: false })
   answers?: SurveyAnswerResponse[];

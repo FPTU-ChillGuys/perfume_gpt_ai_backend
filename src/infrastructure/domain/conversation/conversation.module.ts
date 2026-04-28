@@ -17,6 +17,8 @@ import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
 import { AIAnalysisHelper } from './helpers/ai-analysis.helper';
 import { AIPersonalizationHelper } from './helpers/ai-personalization.helper';
 import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
+import { ConversationInputHelper } from './helpers/conversation-input.helper';
+import { ConversationResponseBuilder } from './helpers/conversation-response.builder';
 
 @Module({
     imports: [
@@ -38,13 +40,16 @@ import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
         ConversationService, 
         AIAnalysisHelper,
         AIPersonalizationHelper,
-        AISearchExecutorHelper
+        AISearchExecutorHelper,
+        ConversationInputHelper,
+        ConversationResponseBuilder
     ],
     exports: [
         ConversationService, 
         AIAnalysisHelper,
         AIPersonalizationHelper,
-        AISearchExecutorHelper
+        AISearchExecutorHelper,
+        ConversationInputHelper
     ],
 })
 export class ConversationModule { }

@@ -19,12 +19,10 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
 import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
-import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { ConversationOutputDto } from 'src/application/dtos/common/conversation-output.dto';
-import { Sender } from 'src/domain/enum/sender.enum';
-import { processRequestForMobile, processResponseForMobile } from 'src/infrastructure/domain/utils/message-helper';
+import { ConversationInputHelper } from 'src/infrastructure/domain/conversation/helpers/conversation-input.helper';
 
-// New DTOs
+// DTOs
 import { ConversationResponse } from 'src/application/dtos/response/conversation/conversation.response';
 import { ChatRequest } from 'src/application/dtos/request/conversation/chat.request';
 import { PagedConversationRequest } from 'src/application/dtos/request/conversation/paged-conversation.request';
@@ -34,7 +32,8 @@ import { PagedConversationRequest } from 'src/application/dtos/request/conversat
 @Controller('conversation')
 export class ConversationController {
   constructor(
-    private readonly conversationService: ConversationService
+    private readonly conversationService: ConversationService,
+    private readonly inputHelper: ConversationInputHelper
   ) { }
 
   /** Lấy tất cả cuộc hội thoại (Admin) */
@@ -56,10 +55,10 @@ export class ConversationController {
     return await this.conversationService.getConversationById(id);
   }
 
-  /** Lấy danh sách cuộc hội thoại có phân trang (Admin) */
+  /** Lấy danh sách hội thoại có phân trang (Admin) */
   @Role(['admin'])
   @Get('list/paged')
-  @ApiOperation({ summary: 'Lấy danh sách cuộc hội thoại có phân trang' })
+  @ApiOperation({ summary: 'Lấy danh sách hội thoại có phân trang' })
   @ExtendApiBaseResponse(PagedResult, ConversationResponse)
   async getAllConversationsPaginated(
     @Query() request: PagedConversationRequest
@@ -77,17 +76,9 @@ export class ConversationController {
     @Req() request: Request,
     @Body() chatRequest: ChatRequest
   ): Promise<BaseResponse<ConversationResponse>> {
-    if (!chatRequest.userId) {
-      chatRequest.userId = getTokenPayloadFromRequest(request)?.id;
-    }
-    
-    // Xử lý mobile input
-    const processedReq = processRequestForMobile(chatRequest);
-    
-    const result = await this.conversationService.chat(processedReq);
-    
-    // Xử lý mobile output
-    return processResponseForMobile(result, chatRequest.isMobile);
+    const prepared = this.inputHelper.prepareChatRequest(request, chatRequest);
+    const result = await this.conversationService.chat(prepared);
+    return this.inputHelper.processMobileResponse(result, chatRequest.isMobile);
   }
 
   /** Chat V10 Staff (Quick Counter Consultation Mode) */
@@ -100,17 +91,8 @@ export class ConversationController {
     @Req() request: Request,
     @Body() chatRequest: ChatRequest
   ): Promise<BaseResponse<ConversationResponse>> {
-    if (!chatRequest.userId) {
-      chatRequest.userId = getTokenPayloadFromRequest(request)?.id;
-    }
-    chatRequest.isStaff = true;
-    
-    // Xử lý mobile input
-    const processedReq = processRequestForMobile(chatRequest);
-    
-    const result = await this.conversationService.chat(processedReq);
-    
-    // Xử lý mobile output
-    return processResponseForMobile(result, chatRequest.isMobile);
+    const prepared = this.inputHelper.prepareStaffChatRequest(request, chatRequest);
+    const result = await this.conversationService.chat(prepared);
+    return this.inputHelper.processMobileResponse(result, chatRequest.isMobile);
   }
 }

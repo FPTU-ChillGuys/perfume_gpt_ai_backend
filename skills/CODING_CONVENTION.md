@@ -82,15 +82,25 @@ export class MyService {
 
 ## 📏 5. Quy Tắc Đặt Tên (Naming)
 
-| Loại | Pattern | Ví dụ |
-|---|---|---|
-| **Controller** | `*.controller.ts` | `conversation.controller.ts` |
-| **Service** | `*.service.ts` | `product-search.service.ts` |
-| **Repository** | `*.repository.ts` | `event-log.repository.ts` |
-| **DTO Response** | `*.response.ts` | `product-detail.response.ts` |
-| **DTO Request** | `*.request.ts` | `search-query.request.ts` |
-| **Entity** | `*.entity.ts` | `conversation.entity.ts` |
-| **Module** | `*.module.ts` | `inventory.module.ts` |
+| Loại | Pattern | Ví dụ | Mô tả |
+|---|---|---|---|
+| **Controller** | `*.controller.ts` | `conversation.controller.ts` | Chỉ tiếp nhận request, gọi service, trả về response. Không chứa business logic. |
+| **Service** | `*.service.ts` | `product-search.service.ts` | Chứa **TẤT CẢ** business logic. Method không vượt quá 50 dòng. |
+| **Repository** | `*.repository.ts` | `event-log.repository.ts` | Tương tác với DB, kế thừa `BaseRepository<T>`. |
+| **Helper** | `*.helper.ts` | `ai-analysis.helper.ts` | Injectable, chứa logic hỗ trợ cho Service (có thể inject dependencies). Đặt trong `helpers/` của domain. |
+| **Processor** | `*.processor.ts` | `survey.processor.ts` | **DÀNH RIÊNG CHO BULLMQ QUEUE** — xử lý background jobs. Không dùng cho business logic thông thường. |
+| **DTO Response** | `*.response.ts` | `product-detail.response.ts` | Định nghĩa response shape + static `fromEntity()`. |
+| **DTO Request** | `*.request.ts` | `search-query.request.ts` | Định nghĩa request shape + validation rules. |
+| **Entity** | `*.entity.ts` | `conversation.entity.ts` | MikroORM entity. |
+| **Module** | `*.module.ts` | `inventory.module.ts` | NestJS module. |
+
+### ⚠️ Phân biệt Helper vs Processor:
+- **Helper** (`*.helper.ts`): Logic hỗ trợ, có thể inject dependencies, được gọi trực tiếp từ Service.
+- **Processor** (`*.processor.ts`): **Chỉ dùng cho BullMQ Queue** — xử lý background jobs, không được dùng cho request/response transformation.
+
+### ⚠️ Phân biệt Helper vs Utils:
+- **Helper** (`*.helper.ts`): Injectable class, có thể cần dependencies (ConfigService, Logger, v.v.).
+- **Utils** (`*.util.ts`): Pure static functions, không có dependencies, không cần inject. Ví dụ: `toon-encoder.util.ts`.
 
 ---
 

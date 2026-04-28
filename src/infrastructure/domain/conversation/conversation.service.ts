@@ -10,15 +10,10 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { Message } from 'src/domain/entities/message.entity';
 import { Sender } from 'src/domain/enum/sender.enum';
-import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { conversationOutput } from 'src/chatbot/output/search.output';
 import { conversationSystemPrompt, INSTRUCTION_TYPE_CONVERSATION } from 'src/application/constant/prompts';
-import {
-  addMessageToMessages,
-  convertToMessages,
-  overrideMessagesToConversation
-} from 'src/infrastructure/domain/utils/message-helper';
+import { convertToMessages } from 'src/infrastructure/domain/utils/message-helper';
 import { buildCombinedPromptV5 } from 'src/infrastructure/domain/utils/prompt-builder';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
@@ -29,7 +24,7 @@ import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.serv
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 
-// New DTOs
+// DTOs
 import { ConversationResponse } from 'src/application/dtos/response/conversation/conversation.response';
 import { MessageResponse } from 'src/application/dtos/response/conversation/message.response';
 import { ChatRequest } from 'src/application/dtos/request/conversation/chat.request';
@@ -40,6 +35,7 @@ import { ChatMessageRequest } from 'src/application/dtos/request/conversation/ch
 import { AIAnalysisHelper } from './helpers/ai-analysis.helper';
 import { AIPersonalizationHelper } from './helpers/ai-personalization.helper';
 import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
+import { ConversationResponseBuilder } from './helpers/conversation-response.builder';
 
 /**
  * Service quản lý cuộc hội thoại giữa người dùng và AI.
@@ -58,10 +54,11 @@ export class ConversationService {
     @InjectQueue(QueueName.CONVERSATION_QUEUE)
     private readonly conversationQueue: Queue,
     
-    // Nâng cấp: Sử dụng Helpers để tách biệt logic
+    // Helpers
     private readonly analysisHelper: AIAnalysisHelper,
     private readonly personalizationHelper: AIPersonalizationHelper,
-    private readonly searchExecutorHelper: AISearchExecutorHelper
+    private readonly searchExecutorHelper: AISearchExecutorHelper,
+    private readonly responseBuilder: ConversationResponseBuilder
   ) {}
 
   // ==========================================
@@ -187,14 +184,43 @@ export class ConversationService {
 
   /**
    * Phương thức Chat chính (Advanced AI flow).
+   * Được tách thành các private methods theo phase để dễ maintain.
    */
   async chat(request: ChatRequest): Promise<BaseResponse<ConversationResponse>> {
+    const context = this.buildChatContext(request);
+    this.logger.log(`[CHAT] Analyzing message: "${context.messageText.substring(0, 50)}..."`);
+
+    // Phase 1: Phân tích ý định
+    const analysis = await this.analysisHelper.analyze(context.messageText, context.previousContext, {
+      userId: context.userId,
+      isGuestUser: context.isGuestUser,
+      isStaff: context.isStaff
+    });
+
+    // Phase 2-4: Xây dựng context messages
+    const finalMessages = await this.buildContextMessages(context, analysis);
+
+    // Phase 5: Gọi AI chính
+    const aiResponse = await this.executeAIGeneration(finalMessages, context);
+
+    // Phase 6: Hydrate products
+    await this.hydrateProductsInResponse(aiResponse, analysis.budget);
+
+    // Phase 7: Lưu trữ và trả response
+    return this.saveAndBuildResponse(aiResponse, context, request);
+  }
+
+  // ==========================================
+  // 3. PRIVATE METHODS — Chat Pipeline Steps
+  // ==========================================
+
+  /** Xây dựng ChatContext từ request */
+  private buildChatContext(request: ChatRequest) {
     const userId = request.userId ?? uuid();
     const conversationId = request.id;
     const isGuestUser = !request.userId;
     const isStaff = request.isStaff === true;
 
-    // 1. Chuyển đổi tin nhắn sang định dạng AI UI
     const convertedMessages: UIMessage[] = convertToMessages(request.messages || []);
     const lastUserMessage = [...convertedMessages].reverse().find(m => m.role === 'user');
     const messageText = lastUserMessage?.parts.find(p => p.type === 'text')?.text || '';
@@ -204,56 +230,57 @@ export class ConversationService {
       .map(m => `${m.role}: ${m.parts.find(p => p.type === 'text')?.text || ''}`)
       .join('\n');
 
-    this.logger.log(`[CHAT] Analyzing message: "${messageText.substring(0, 50)}..."`);
+    return { userId, conversationId, isGuestUser, isStaff, convertedMessages, messageText, previousContext };
+  }
 
-    // 2. Phase 1: Phân tích ý định (Intermediate Analysis)
-    const analysis = await this.analysisHelper.analyze(messageText, previousContext, {
-      userId,
-      isGuestUser,
-      isStaff
-    });
+  /** Xây dựng danh sách messages cho AI (Phase 2-4) */
+  private async buildContextMessages(
+    context: { convertedMessages: UIMessage[]; userId: string; isGuestUser: boolean },
+    analysis: any
+  ): Promise<UIMessage[]> {
+    const finalMessages = [...context.convertedMessages];
 
-    const finalMessages = [...convertedMessages];
-
-    // 3. Phase 2: Thu thập ngữ cảnh cá nhân hóa (Personalization TOON)
+    // Phase 2: Personalization TOON
     const personalizationMsgs = await this.personalizationHelper.buildPersonalizationToonMessages(
-      userId,
-      isGuestUser,
+      context.userId,
+      context.isGuestUser,
       analysis
     );
     finalMessages.push(...personalizationMsgs);
 
     // Inject kết quả phân tích vào context
-    finalMessages.push({
-      id: uuid(),
-      role: 'system',
-      parts: [{ type: 'text', text: `NORMALIZED_QUERY_ANALYSIS: ${JSON.stringify(analysis)}` }]
-    });
+    finalMessages.push(this.responseBuilder.createSystemMessage(
+      `NORMALIZED_QUERY_ANALYSIS: ${JSON.stringify(analysis)}`
+    ));
 
-    // 4. Phase 3: Thực thi truy vấn dữ liệu (Multi-Query Execution)
+    // Phase 3: Thực thi truy vấn dữ liệu (Multi-Query Execution)
     const shouldQuery = ['Search', 'Consult', 'Recommend', 'Compare', 'Task', 'Other'].includes(analysis.intent);
     if (shouldQuery && Array.isArray(analysis.queries) && analysis.queries.length > 0) {
       const { mergedProducts, taskResults } = await this.searchExecutorHelper.executeMultiQueries(
         analysis.queries,
         analysis,
-        userId,
-        isGuestUser,
+        context.userId,
+        context.isGuestUser,
         analysis.pagination?.pageSize || 5
       );
 
-      // Thêm kết quả Task (Cart/Order) và Search Results vào context
       taskResults.forEach(msg => finalMessages.push(msg));
       if (mergedProducts.length > 0) {
-        finalMessages.push({
-          id: uuid(),
-          role: 'system',
-          parts: [{ type: 'text', text: `SEARCH_RESULTS: ${encodeToolOutput(mergedProducts).encoded}` }]
-        });
+        finalMessages.push(this.responseBuilder.createSystemMessage(
+          `SEARCH_RESULTS: ${encodeToolOutput(mergedProducts).encoded}`
+        ));
       }
     }
 
-    // 5. Phase 4: Xây dựng Prompt và gọi AI chính
-    const promptResult = await buildCombinedPromptV5(INSTRUCTION_TYPE_CONVERSATION, this.adminInstructionService, userId);
+    return finalMessages;
+  }
+
+  /** Phase 5: Gọi AI chính và parse response */
+  private async executeAIGeneration(
+    finalMessages: UIMessage[],
+    context: { userId: string; conversationId: string }
+  ): Promise<any> {
+    const promptResult = await buildCombinedPromptV5(INSTRUCTION_TYPE_CONVERSATION, this.adminInstructionService, context.userId);
     const systemPrompt = conversationSystemPrompt(
       promptResult.data?.adminInstruction || '',
       promptResult.data?.combinedPrompt || ''
@@ -266,41 +293,38 @@ export class ConversationService {
     );
 
     if (!aiResult.success || !aiResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to generate AI response', { userId, conversationId });
+      throw new InternalServerErrorWithDetailsException('Failed to generate AI response', {
+        userId: context.userId,
+        conversationId: context.conversationId
+      });
     }
 
-    const aiResponse = typeof aiResult.data === 'string' ? JSON.parse(aiResult.data) : aiResult.data;
+    return typeof aiResult.data === 'string' ? JSON.parse(aiResult.data) : aiResult.data;
+  }
 
-    // 6. Hydrate Products (Lấy thông tin đầy đủ cho frontend)
-    await this.hydrateProductsInResponse(aiResponse, analysis.budget);
-
-    // 7. Lưu trữ và Logging (Background Queue)
-    const finalMessageData = JSON.stringify(aiResponse);
-    const responseConversation = overrideMessagesToConversation(
-      conversationId,
-      userId,
-      addMessageToMessages(finalMessageData, (request.messages || []) as any)
+  /** Phase 7: Lưu trữ và xây dựng response */
+  private async saveAndBuildResponse(
+    aiResponse: any,
+    context: { userId: string; conversationId: string },
+    request: ChatRequest
+  ): Promise<BaseResponse<ConversationResponse>> {
+    const responseConversation = this.responseBuilder.buildConversationForSave(
+      context.conversationId,
+      context.userId,
+      aiResponse,
+      request.messages || []
     );
 
-    await this.conversationQueue.add(ConversationJobName.ADD_MESSAGE_AND_LOG, { 
-      responseConversation, 
-      userId 
+    await this.conversationQueue.add(ConversationJobName.ADD_MESSAGE_AND_LOG, {
+      responseConversation,
+      userId: context.userId
     });
 
-    // Mapping sang ConversationResponse
-    const response = new ConversationResponse();
-    response.id = responseConversation.id || conversationId;
-    response.userId = responseConversation.userId || userId;
-    response.updatedAt = new Date();
-    response.messages = (responseConversation.messages || []).map(m => {
-       const res = new MessageResponse();
-       res.sender = m.sender as Sender;
-       res.message = m.message;
-       res.createdAt = new Date();
-       return res;
-    });
-
-    return Ok(response);
+    return this.responseBuilder.buildChatResponse(
+      responseConversation,
+      context.conversationId,
+      context.userId
+    );
   }
 
   /** Hỗ trợ lấy thông tin sản phẩm đầy đủ cho AI response */

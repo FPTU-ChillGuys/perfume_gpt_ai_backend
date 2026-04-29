@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { SlowStockService } from 'src/infrastructure/domain/slow-stock/slow-stock.service';
+import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
-import { encodeToolOutput } from '../utils/toon-encoder.util';
+import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import * as z from 'zod';
 
 @Injectable()
@@ -15,7 +15,7 @@ export class InventoryTool {
   private readonly restockAnalyticsProductLimit = 20;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly inventoryPrismaRepo: InventoryPrismaRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly restockService: RestockService,
     private readonly slowStockService: SlowStockService
@@ -36,14 +36,7 @@ export class InventoryTool {
       this.logger.log(`[getInventoryStock] called`);
       return await funcHandlerAsync(
         async () => {
-          const stocks = await this.prisma.stocks.findMany({
-            orderBy: { TotalQuantity: 'asc' },
-            include: {
-              ProductVariants: {
-                include: { Products: true, Concentrations: true }
-              }
-            }
-          });
+          const stocks = await this.inventoryPrismaRepo.findAllStocksForTool();
 
           const items = stocks.map((s) => ({
             variantId: s.VariantId,

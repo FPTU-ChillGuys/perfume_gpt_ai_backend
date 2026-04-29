@@ -7,11 +7,12 @@ import { InventoryTool } from 'src/chatbot/tools/inventory.tool';
 import { RestockModule } from 'src/infrastructure/domain/restock/restock.module';
 import { SlowStockModule } from 'src/infrastructure/domain/slow-stock/slow-stock.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
-import { SourcingModule } from '../sourcing/sourcing.module';
+import { SourcingModule } from 'src/infrastructure/domain/sourcing/sourcing.module';
+import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
 
 @Module({
   imports: [UnitOfWorkModule, AIModule, AdminInstructionModule, RestockModule, SlowStockModule, PrismaModule, SourcingModule],
-  providers: [InventoryService, InventoryTool],
+  providers: [InventoryService, InventoryTool, InventoryPrismaRepository],
   exports: [InventoryService, InventoryTool]
 })
 export class InventoryModule { }

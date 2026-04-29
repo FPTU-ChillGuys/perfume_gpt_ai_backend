@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from 'generated/prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -37,35 +37,12 @@ import {
 } from 'src/application/dtos/response/ai-structured.response';
 import { restockOutput } from 'src/chatbot/output/restock.output';
 import { SourcingCatalogService } from 'src/infrastructure/domain/sourcing/sourcing-catalog.service';
-
-type RestockVariantResult = {
-  id: string;
-  sku: string;
-  productName: string;
-  volumeMl: number;
-  type: string;
-  basePrice: number;
-  status: string;
-  concentrationName: string | null;
-  totalQuantity: number;
-  reservedQuantity: number;
-  averageDailySales: number;
-  suggestedRestockQuantity: number;
-  slowStockRisk?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | null;
-  supplierId?: number;
-  supplierName?: string;
-  negotiatedPrice?: number;
-  estimatedLeadTimeDays?: number;
-};
-
-type RestockLogPayload = {
-  variants?: RestockVariantResult[];
-};
+import { RestockVariantResult, RestockLogPayload } from 'src/application/dtos/response/inventory/restock-variant.response';
 
 @Injectable()
 export class InventoryService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly inventoryPrismaRepo: InventoryPrismaRepository,
     private readonly unitOfWork: UnitOfWork,
     @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
@@ -84,34 +61,26 @@ export class InventoryService {
       ? [...safeData.variants]
       : [];
 
-    const criticalStocks = await this.prisma.stocks.findMany({
-      where: {
-        ProductVariants: {
-          IsDeleted: false,
-          Products: { IsDeleted: false }
-        },
-        TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold }
-      },
-      include: {
-        ProductVariants: {
-          include: {
-            Products: true,
-            Concentrations: true
-          }
-        }
-      }
-    });
+    const criticalStocks = await this.inventoryPrismaRepo.findStocksByThreshold();
 
     if (criticalStocks.length === 0) {
       return { variants: currentVariants };
     }
 
     const existingIds = new Set(currentVariants.map((item) => item.id));
+    const merged = this.mergeCriticalStocks(currentVariants, criticalStocks, existingIds);
+    return { variants: this.sortVariantsByRestockPriority(merged) };
+  }
+
+  private mergeCriticalStocks(
+    currentVariants: RestockVariantResult[],
+    criticalStocks: Awaited<ReturnType<InventoryPrismaRepository['findStocksByThreshold']>>,
+    existingIds: Set<string>
+  ): RestockVariantResult[] {
     for (const stock of criticalStocks) {
       if (existingIds.has(stock.VariantId)) {
         continue;
       }
-
       const status = stock.ProductVariants.Status;
       const isInactive = status === 'Inactive' || status === 'Discontinue';
       const suggestedRestockQuantity = isInactive
@@ -133,15 +102,16 @@ export class InventoryService {
         suggestedRestockQuantity
       });
     }
+    return currentVariants;
+  }
 
-    currentVariants.sort((left, right) => {
+  private sortVariantsByRestockPriority(variants: RestockVariantResult[]): RestockVariantResult[] {
+    return variants.sort((left, right) => {
       if (right.suggestedRestockQuantity !== left.suggestedRestockQuantity) {
         return right.suggestedRestockQuantity - left.suggestedRestockQuantity;
       }
       return left.totalQuantity - right.totalQuantity;
     });
-
-    return { variants: currentVariants };
   }
 
   async getInventoryStock(
@@ -150,58 +120,12 @@ export class InventoryService {
     return await funcHandlerAsync(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
-
-        const where: Prisma.StocksWhereInput = {
-          ...(request.VariantId ? { VariantId: request.VariantId } : {}),
-          ...(request.SearchTerm
-            ? {
-              ProductVariants: {
-                Products: { Name: { contains: request.SearchTerm } }
-              }
-            }
-            : {}),
-          ...(request.IsLowStock != null
-            ? {
-              ProductVariants: {
-                Stocks: request.IsLowStock ? { isNot: null } : undefined
-              }
-            }
-            : {})
-        };
-
+        const where = this.buildStockWhereClause(request);
         const [stocks, totalCount] = await Promise.all([
-          this.prisma.stocks.findMany({
-            where,
-            skip,
-            take,
-            include: {
-              ProductVariants: {
-                include: {
-                  Products: true,
-                  Concentrations: true
-                }
-              }
-            }
-          }),
-          this.prisma.stocks.count({ where })
+          this.inventoryPrismaRepo.findAllStocks(where, skip, request.PageSize),
+          this.inventoryPrismaRepo.countStocks(where)
         ]);
-
-        const items: InventoryStockResponse[] = stocks.map((s) => {
-          const isLowStock = s.TotalQuantity <= s.LowStockThreshold;
-          return new InventoryStockResponse({
-            id: s.Id,
-            variantId: s.VariantId,
-            variantSku: s.ProductVariants.Sku,
-            productName: s.ProductVariants.Products.Name,
-            concentrationName: s.ProductVariants.Concentrations.Name,
-            volumeMl: s.ProductVariants.VolumeMl,
-            totalQuantity: s.TotalQuantity,
-            lowStockThreshold: s.LowStockThreshold,
-            isLowStock
-          });
-        });
-
+        const items = this.mapStocksToResponse(stocks);
         const result = new PagedResult<InventoryStockResponse>({
           items,
           pageNumber: request.PageNumber,
@@ -216,92 +140,42 @@ export class InventoryService {
     );
   }
 
+  private buildStockWhereClause(request: InventoryStockRequest): Prisma.StocksWhereInput {
+    return {
+      ...(request.VariantId ? { VariantId: request.VariantId } : {}),
+      ...(request.SearchTerm
+        ? {
+          ProductVariants: {
+            Products: { Name: { contains: request.SearchTerm } }
+          }
+        }
+        : {}),
+      ...(request.IsLowStock != null
+        ? {
+          ProductVariants: {
+            Stocks: request.IsLowStock ? { isNot: null } : undefined
+          }
+        }
+        : {})
+    };
+  }
+
+  private mapStocksToResponse(stocks: Awaited<ReturnType<InventoryPrismaRepository['findAllStocks']>>): InventoryStockResponse[] {
+    return stocks.map((s) => InventoryStockResponse.fromPrisma(s)!);
+  }
+
   async getBatch(
     request: BatchRequest
   ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
     return await funcHandlerAsync(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
-
-        const where: Prisma.BatchesWhereInput = {
-          ...(request.id ? { Id: request.id } : {}),
-          ...(request.variantId ? { VariantId: request.variantId } : {}),
-          ...(request.batchCode
-            ? { BatchCode: { contains: request.batchCode } }
-            : {}),
-          ...(request.manufactureDate
-            ? { ManufactureDate: { gte: new Date(request.manufactureDate) } }
-            : {}),
-          ...(request.expiryDate
-            ? { ExpiryDate: { lte: new Date(request.expiryDate) } }
-            : {}),
-          ...(request.importQuantity
-            ? { ImportQuantity: { gte: request.importQuantity } }
-            : {}),
-          ...(request.remainingQuantity
-            ? { RemainingQuantity: { gte: request.remainingQuantity } }
-            : {}),
-          ...(request.isExpired != null
-            ? {
-              ExpiryDate: request.isExpired
-                ? { lt: new Date() }
-                : { gte: new Date() }
-            }
-            : {}),
-          ...(request.variantSku ||
-            request.productName ||
-            request.volumeMl ||
-            request.concentrationName
-            ? {
-              ProductVariants: {
-                ...(request.variantSku
-                  ? { Sku: { contains: request.variantSku } }
-                  : {}),
-                ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
-                ...(request.productName
-                  ? { Products: { Name: { contains: request.productName } } }
-                  : {}),
-                ...(request.concentrationName
-                  ? {
-                    Concentrations: {
-                      Name: { contains: request.concentrationName }
-                    }
-                  }
-                  : {})
-              }
-            }
-            : {})
-        };
-
+        const where = this.buildBatchWhereClause(request);
         const [batches, totalCount] = await Promise.all([
-          this.prisma.batches.findMany({
-            where,
-            skip,
-            take,
-            include: {
-              ProductVariants: {
-                include: { Products: true, Concentrations: true }
-              }
-            }
-          }),
-          this.prisma.batches.count({ where })
+          this.inventoryPrismaRepo.findBatches(where, skip, request.PageSize),
+          this.inventoryPrismaRepo.countBatches(where)
         ]);
-
-        const items: BatchResponse[] = batches.map(
-          (b) =>
-            new BatchResponse({
-              id: b.Id,
-              batchCode: b.BatchCode,
-              importQuantity: b.ImportQuantity,
-              remainingQuantity: b.RemainingQuantity,
-              manufactureDate: b.ManufactureDate.toISOString(),
-              expiryDate: b.ExpiryDate.toISOString(),
-              createdAt: b.CreatedAt.toISOString(),
-              variantSku: b.ProductVariants.Sku
-            })
-        );
-
+        const items = this.mapBatchesToResponse(batches);
         const result = new PagedResult<BatchResponse>({
           items,
           pageNumber: request.PageNumber,
@@ -316,7 +190,74 @@ export class InventoryService {
     );
   }
 
-  /** Tính toán các thông số tổng quan về tồn kho (Source of Truth) */
+  private buildBatchWhereClause(request: BatchRequest): Prisma.BatchesWhereInput {
+    return {
+      ...(request.id ? { Id: request.id } : {}),
+      ...(request.variantId ? { VariantId: request.variantId } : {}),
+      ...(request.batchCode
+        ? { BatchCode: { contains: request.batchCode } }
+        : {}),
+      ...(request.manufactureDate
+        ? { ManufactureDate: { gte: new Date(request.manufactureDate) } }
+        : {}),
+      ...(request.expiryDate
+        ? { ExpiryDate: { lte: new Date(request.expiryDate) } }
+        : {}),
+      ...(request.importQuantity
+        ? { ImportQuantity: { gte: request.importQuantity } }
+        : {}),
+      ...(request.remainingQuantity
+        ? { RemainingQuantity: { gte: request.remainingQuantity } }
+        : {}),
+      ...(request.isExpired != null
+        ? {
+          ExpiryDate: request.isExpired
+            ? { lt: new Date() }
+            : { gte: new Date() }
+        }
+        : {}),
+      ...(request.variantSku ||
+        request.productName ||
+        request.volumeMl ||
+        request.concentrationName
+        ? {
+          ProductVariants: {
+            ...(request.variantSku
+              ? { Sku: { contains: request.variantSku } }
+              : {}),
+            ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
+            ...(request.productName
+              ? { Products: { Name: { contains: request.productName } } }
+              : {}),
+            ...(request.concentrationName
+              ? {
+                Concentrations: {
+                  Name: { contains: request.concentrationName }
+                }
+              }
+              : {})
+          }
+        }
+        : {})
+    };
+  }
+
+  private mapBatchesToResponse(batches: Awaited<ReturnType<InventoryPrismaRepository['findBatches']>>): BatchResponse[] {
+    return batches.map(
+      (b) =>
+        new BatchResponse({
+          id: b.Id,
+          batchCode: b.BatchCode,
+          importQuantity: b.ImportQuantity,
+          remainingQuantity: b.RemainingQuantity,
+          manufactureDate: b.ManufactureDate.toISOString(),
+          expiryDate: b.ExpiryDate.toISOString(),
+          createdAt: b.CreatedAt.toISOString(),
+          variantSku: b.ProductVariants.Sku
+        })
+    );
+  }
+
   async getInventoryOverallStats() {
     const now = new Date();
     const thirtyDaysFromNow = new Date();
@@ -329,44 +270,20 @@ export class InventoryService {
       expiredBatches,
       nearExpiryBatches
     ] = await Promise.all([
-      this.prisma.productVariants.count({
-        where: { IsDeleted: false, Products: { IsDeleted: false } }
-      }),
-      this.prisma.stocks.count({
-        where: {
-          TotalQuantity: { gt: 0, lte: this.prisma.stocks.fields.LowStockThreshold },
-          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-        }
-      }),
-      this.prisma.stocks.count({
-        where: {
-          TotalQuantity: 0,
-          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-        }
-      }),
-      this.prisma.batches.count({
-        where: {
-          ExpiryDate: { lt: now },
-          RemainingQuantity: { gt: 0 },
-          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-        }
-      }),
-      this.prisma.batches.count({
-        where: {
-          ExpiryDate: { gte: now, lt: thirtyDaysFromNow },
-          RemainingQuantity: { gt: 0 },
-          ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-        }
-      })
+      this.inventoryPrismaRepo.countVariants(),
+      this.inventoryPrismaRepo.countLowStocks(),
+      this.inventoryPrismaRepo.countOutOfStocks(),
+      this.inventoryPrismaRepo.countExpiredBatches(now),
+      this.inventoryPrismaRepo.countNearExpiryBatches(now, thirtyDaysFromNow)
     ]);
 
     return {
       totalSku,
-      lowStockSku: lowStockSku + outOfStockSku, // Tổng số SKU cần chú ý tồn kho
+      lowStockSku: lowStockSku + outOfStockSku,
       outOfStockSku,
       expiredBatches,
       nearExpiryBatches,
-      criticalAlerts: outOfStockSku // Giả định: Hết hàng hoàn toàn là cảnh báo nghiêm trọng
+      criticalAlerts: outOfStockSku
     };
   }
 
@@ -376,44 +293,23 @@ export class InventoryService {
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(now.getDate() + 30);
 
-    // 1. Fetch all problematic variants first to ensure they are in the report
-    const problematicStocks = await this.prisma.stocks.findMany({
-      where: {
-        OR: [
-          { TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold } },
-          {
-            ProductVariants: {
-              Batches: {
-                some: {
-                  ExpiryDate: { lt: thirtyDaysFromNow },
-                  RemainingQuantity: { gt: 0 }
-                }
-              }
-            }
-          }
-        ],
-        ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
-      },
-      include: {
-        ProductVariants: {
-          include: { Products: true, Concentrations: true }
-        }
-      }
-    });
+    const [problematicStocks, standardStocks] = await Promise.all([
+      this.inventoryPrismaRepo.findProblematicStocks(thirtyDaysFromNow),
+      this.inventoryPrismaRepo.findAllStocksSorted(1000)
+    ]);
 
-    // 2. Fetch standard list (top 1000) sorted by quantity ASC
-    const standardStocks = await this.prisma.stocks.findMany({
-      where: { ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } } },
-      orderBy: { TotalQuantity: 'asc' }, // Sắp xếp theo số lượng tồn tăng dần
-      take: 1000,
-      include: {
-        ProductVariants: {
-          include: { Products: true, Concentrations: true }
-        }
-      }
-    });
+    const { mergedStocks, existingVariantIds } = this.mergeStocks(problematicStocks, standardStocks);
+    const batches = await this.inventoryPrismaRepo.findBatchesByVariantIds(
+      Array.from(existingVariantIds)
+    );
 
-    // Merge and remove duplicates
+    return this.buildReportMarkdown(stats, mergedStocks, batches, now, thirtyDaysFromNow);
+  }
+
+  private mergeStocks(
+    problematicStocks: Awaited<ReturnType<InventoryPrismaRepository['findProblematicStocks']>>,
+    standardStocks: Awaited<ReturnType<InventoryPrismaRepository['findAllStocksSorted']>>
+  ): { mergedStocks: typeof problematicStocks; existingVariantIds: Set<string> } {
     const mergedStocks = [...problematicStocks];
     const existingVariantIds = new Set(mergedStocks.map(s => s.VariantId));
 
@@ -423,17 +319,17 @@ export class InventoryService {
         existingVariantIds.add(s.VariantId);
       }
     }
+    return { mergedStocks, existingVariantIds };
+  }
 
-    // 3. Fetch ALL batches for the variants in our list to ensure linking
-    const batches = await this.prisma.batches.findMany({
-      where: {
-        VariantId: { in: Array.from(existingVariantIds) },
-        RemainingQuantity: { gt: 0 }
-      },
-      orderBy: { ExpiryDate: 'asc' }
-    });
-
-    const batchesByVariantId = new Map<string, any[]>();
+  private buildReportMarkdown(
+    stats: Awaited<ReturnType<InventoryService['getInventoryOverallStats']>>,
+    mergedStocks: Awaited<ReturnType<InventoryPrismaRepository['findProblematicStocks']>>,
+    batches: Awaited<ReturnType<InventoryPrismaRepository['findBatchesByVariantIds']>>,
+    now: Date,
+    thirtyDaysFromNow: Date
+  ): string {
+    const batchesByVariantId = new Map<string, typeof batches>();
     batches.forEach(b => {
       const existing = batchesByVariantId.get(b.VariantId) || [];
       existing.push(b);
@@ -455,19 +351,7 @@ export class InventoryService {
 
     mergedStocks.forEach(s => {
       const variantBatches = batchesByVariantId.get(s.VariantId) || [];
-      let batchInfo = '- (Không có dữ liệu lô hàng còn tồn)';
-
-      if (variantBatches.length > 0) {
-        batchInfo = variantBatches.map(b => {
-          const isExpired = new Date(b.ExpiryDate) < now;
-          const isNearExpiry = !isExpired && new Date(b.ExpiryDate) < thirtyDaysFromNow;
-          let statusLabel = '';
-          if (isExpired) statusLabel = ' [HẾT HẠN]';
-          else if (isNearExpiry) statusLabel = ' [CẬN HẠN]';
-
-          return `- Lô ${b.BatchCode}: Hạn dùng ${b.ExpiryDate.toISOString().split('T')[0]}, Còn lại ${b.RemainingQuantity}${statusLabel}`;
-        }).join('\n  ');
-      }
+      const batchInfo = this.formatBatchInfo(variantBatches, now, thirtyDaysFromNow);
 
       reportLines.push(
         `Sản phẩm: ${s.ProductVariants.Products.Name} (${s.ProductVariants.Concentrations.Name}, ${s.ProductVariants.VolumeMl}ml)`,
@@ -484,20 +368,38 @@ export class InventoryService {
     return reportLines.join('\n');
   }
 
+  private formatBatchInfo(
+    batches: Awaited<ReturnType<InventoryPrismaRepository['findBatchesByVariantIds']>>,
+    now: Date,
+    nearExpiryDate: Date
+  ): string {
+    if (batches.length === 0) {
+      return '- (Không có dữ liệu lô hàng còn tồn)';
+    }
+    return batches.map(b => {
+      const isExpired = new Date(b.ExpiryDate) < now;
+      const isNearExpiry = !isExpired && new Date(b.ExpiryDate) < nearExpiryDate;
+      let statusLabel = '';
+      if (isExpired) statusLabel = ' [HẾT HẠN]';
+      else if (isNearExpiry) statusLabel = ' [CẬN HẠN]';
+
+      return `- Lô ${b.BatchCode}: Hạn dùng ${b.ExpiryDate.toISOString().split('T')[0]}, Còn lại ${b.RemainingQuantity}${statusLabel}`;
+    }).join('\n  ');
+  }
+
   async createInventoryLog(
     report: string,
     type: InventoryLogType = InventoryLogType.REPORT
   ): Promise<BaseResponseAPI<InventoryLog>> {
     return funcHandlerAsync(
       async () => {
-        const logEntry = await this.unitOfWork.InventoryLogRepo.insert(
+        const logEntry = await this.unitOfWork.InventoryLogRepo.persistAndReturn(
           new InventoryLog({
             inventoryLog: report,
             type: type
           })
         );
-        // No need to await or return anything, just fire and forget
-        return { success: true, data: logEntry as any };
+        return { success: true, data: logEntry };
       },
       'Failed to create inventory log',
       true
@@ -549,64 +451,33 @@ export class InventoryService {
 
         const converterRoot = path.join(process.cwd(), 'md-pdf-converter');
         const outputDir = path.join(converterRoot, 'outputs');
-        const stylePath = path.join(
-          converterRoot,
-          'styles',
-          'inventory-report.css'
-        );
+        const stylePath = path.join(converterRoot, 'styles', 'inventory-report.css');
         await fs.promises.mkdir(outputDir, { recursive: true });
 
-        const markdownFileName = `inventory-log-${id}.md`;
-        const pdfFileName = `inventory-log-${id}.pdf`;
-        const markdownPath = path.join(outputDir, markdownFileName);
-        const pdfPath = path.join(outputDir, pdfFileName);
-
-        const title =
-          log.type === InventoryLogType.RESTOCK
-            ? 'Báo cáo phân tích nhập hàng'
-            : 'Báo cáo tồn kho';
         const generatedAt = new Date().toISOString();
-
-        const reportBody = this.buildMarkdownFromInventoryLog(log);
-        const markdownContent = [
-          `# ${title}`,
-          '',
-          `- Log ID: ${id}`,
-          `- Loại log: ${log.type}`,
-          `- Thời điểm convert: ${generatedAt}`,
-          '',
-          '---',
-          '',
-          reportBody
-        ].join('\n');
+        const markdownContent = this.buildPdfMarkdown(log, id, generatedAt);
+        const { markdownPath, pdfPath } = this.resolvePdfPaths(outputDir, id);
 
         await fs.promises.writeFile(markdownPath, markdownContent, 'utf8');
-
-        const { mdToPdf } = await import('md-to-pdf');
         const hasStyleFile = await fs.promises
           .access(stylePath, fs.constants.F_OK)
           .then(() => true)
           .catch(() => false);
 
+        const { mdToPdf } = await import('md-to-pdf');
         const result = await mdToPdf(
           { path: markdownPath },
-          {
-            dest: pdfPath,
-            stylesheet: hasStyleFile ? [stylePath] : []
-          }
+          { dest: pdfPath, stylesheet: hasStyleFile ? [stylePath] : [] }
         );
 
         if (!result || !result.filename) {
-          return {
-            success: false,
-            error: 'Failed to convert markdown to pdf'
-          };
+          return { success: false, error: 'Failed to convert markdown to pdf' };
         }
 
         return {
           success: true,
           data: {
-            fileName: pdfFileName,
+            fileName: `inventory-log-${id}.pdf`,
             absolutePath: pdfPath,
             generatedAt,
             logType: log.type
@@ -615,6 +486,67 @@ export class InventoryService {
       },
       'Failed to convert inventory log markdown to pdf'
     );
+  }
+
+  async readInventoryLogPdf(id: string): Promise<{
+    fileBuffer: Buffer;
+    fileName: string;
+  }> {
+    const converted = await this.convertInventoryLogMarkdownToPdf(id);
+    if (!converted.success) {
+      if (converted.error === 'Inventory log not found') {
+        throw new Error('Inventory log not found');
+      }
+      throw new Error(converted.error || 'Failed to convert markdown to pdf');
+    }
+
+    const filePath = converted.data?.absolutePath;
+    const fileName = converted.data?.fileName || `inventory-log-${id}.pdf`;
+
+    if (!filePath) {
+      throw new Error('PDF file path is empty');
+    }
+
+    const fileBuffer = await fs.promises.readFile(filePath);
+    return { fileBuffer, fileName };
+  }
+
+  async getInventoryLogsPaged(
+    type?: InventoryLogType
+  ): Promise<PagedResult<InventoryLog>> {
+    const where = type ? { type } : {};
+    const logs = await this.unitOfWork.InventoryLogRepo.find(where, {
+      orderBy: { updatedAt: 'DESC' }
+    });
+    return new PagedResult<InventoryLog>({
+      items: logs,
+      totalCount: logs.length
+    });
+  }
+
+  private resolvePdfPaths(outputDir: string, id: string) {
+    const markdownPath = path.join(outputDir, `inventory-log-${id}.md`);
+    const pdfPath = path.join(outputDir, `inventory-log-${id}.pdf`);
+    return { markdownPath, pdfPath };
+  }
+
+  private buildPdfMarkdown(log: InventoryLog, id: string, generatedAt: string): string {
+    const title =
+      log.type === InventoryLogType.RESTOCK
+        ? 'Báo cáo phân tích nhập hàng'
+        : 'Báo cáo tồn kho';
+    const reportBody = this.buildMarkdownFromInventoryLog(log);
+    return [
+      `# ${title}`,
+      '',
+      `- Log ID: ${id}`,
+      `- Loại log: ${log.type}`,
+      `- Thời điểm convert: ${generatedAt}`,
+      '',
+      '---',
+      '',
+      reportBody
+    ].join('\n');
   }
 
   private buildMarkdownFromInventoryLog(log: InventoryLog): string {
@@ -640,6 +572,10 @@ export class InventoryService {
       ].join('\n');
     }
 
+    return this.buildRestockMarkdownTable(variants);
+  }
+
+  private buildRestockMarkdownTable(variants: RestockVariantResult[]): string {
     const tableHeader =
       '| SKU | Tên sản phẩm | Volume | Type | Giá | Tồn kho | Đã đặt | Gợi ý nhập |';
     const tableSeparator =
@@ -687,7 +623,6 @@ export class InventoryService {
     return `${new Intl.NumberFormat('vi-VN').format(Math.round(value))} d`;
   }
 
-  /** Lấy N trend log mới nhất (sắp xếp theo thời gian tạo giảm dần) */
   async getLatestTrendLogs(count: number) {
     return funcHandlerAsync(async () => {
       const logs = await this.unitOfWork.TrendLogRepo.find(
@@ -698,13 +633,10 @@ export class InventoryService {
     }, 'Failed to fetch trend logs');
   }
 
-  /** Lưu kết quả trend AI vào DB (dùng EntityManager qua repository theo MikroORM v6) */
   async saveTrendLog(trendData: string): Promise<void> {
     try {
       const log = new TrendLog({ trendData });
-      await this.unitOfWork.TrendLogRepo.getEntityManager().persistAndFlush(
-        log
-      );
+      await this.unitOfWork.TrendLogRepo.getEntityManager().persistAndFlush(log);
     } catch (err) {
       console.error('Failed to save trend log:', err);
     }
@@ -716,12 +648,8 @@ export class InventoryService {
       return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
     }
     const [inventoryPrompt, slowStockPrompt] = await Promise.all([
-      this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_INVENTORY
-      ),
-      this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_SLOW_STOCK
-      )
+      this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY),
+      this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SLOW_STOCK)
     ]);
     const combinedPrompt = slowStockPrompt
       ? `${inventoryPrompt}\n\n## SLOW STOCK SUPPLEMENT\n${slowStockPrompt}`
@@ -731,12 +659,9 @@ export class InventoryService {
       combinedPrompt
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI inventory report',
-        {
-          service: 'AIHelper'
-        }
-      );
+      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
+        service: 'AIHelper'
+      });
     }
     await this.createInventoryLog(aiResponse.data ?? 'No report generated');
     return Ok(aiResponse.data);
@@ -748,7 +673,6 @@ export class InventoryService {
     try {
       const sourcingResponse = await this.sourcingCatalogService.getCatalogsAsync(variant.id);
       if (sourcingResponse.success && Array.isArray(sourcingResponse.payload)) {
-        // Find the primary catalog with the lowest negotiated price
         const primarySourcing = sourcingResponse.payload
           .filter(c => c.isPrimary)
           .sort((a, b) => Number(a.negotiatedPrice) - Number(b.negotiatedPrice))[0];
@@ -763,7 +687,6 @@ export class InventoryService {
         }
       }
     } catch (err) {
-      // Silent fail - return original variant if sourcing fetch fails
       console.error(`[InventoryService] Failed to enrich sourcing for variant ${variant.id}:`, err);
     }
     return variant;
@@ -786,20 +709,15 @@ export class InventoryService {
       );
     }
     const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_INVENTORY
-      );
+      await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
     const aiResponse = await this.aiHelper.textGenerateFromPrompt(
       inventoryReportPrompt(report.toString()),
       adminPrompt
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI inventory report',
-        {
-          service: 'AIHelper'
-        }
-      );
+      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
+        service: 'AIHelper'
+      });
     }
     return Ok(
       new AIInventoryReportStructuredResponse({
@@ -812,14 +730,10 @@ export class InventoryService {
     );
   }
 
-  async analyzeRestockNeeds(): Promise<BaseResponse<any>> {
+  async analyzeRestockNeeds(): Promise<BaseResponse<{ variants: RestockVariantResult[] }>> {
     const [restockPrompt, slowStockPrompt] = await Promise.all([
-      this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_RESTOCK
-      ),
-      this.adminInstructionService.getSystemPromptForDomain(
-        INSTRUCTION_TYPE_SLOW_STOCK
-      )
+      this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RESTOCK),
+      this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SLOW_STOCK)
     ]);
     const combinedPrompt = slowStockPrompt
       ? `${restockPrompt}\n\n## SLOW STOCK SUPPLEMENT\n${slowStockPrompt}`
@@ -830,19 +744,13 @@ export class InventoryService {
       Output.object({ schema: restockOutput.schema })
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException(
-        'Failed to get AI restock analysis',
-        {
-          service: 'AIRestockHelper'
-        }
-      );
+      throw new InternalServerErrorWithDetailsException('Failed to get AI restock analysis', {
+        service: 'AIRestockHelper'
+      });
     }
 
-    const normalizedResult = await this.ensureCriticalLowStockIncluded(
-      aiResponse.data
-    );
+    const normalizedResult = await this.ensureCriticalLowStockIncluded(aiResponse.data);
 
-    // Enrich all variants with sourcing info in parallel
     if (normalizedResult.variants && normalizedResult.variants.length > 0) {
       normalizedResult.variants = await Promise.all(
         normalizedResult.variants.map(v => this.enrichVariantWithSourcingInfo(v))

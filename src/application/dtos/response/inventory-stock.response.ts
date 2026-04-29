@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { StockWithVariant } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
 
 export class InventoryStockResponse {
     @ApiProperty({ description: 'Concentration name', example: 'Eau de Parfum' })
@@ -30,5 +31,21 @@ export class InventoryStockResponse {
 
     constructor(init?: Partial<InventoryStockResponse>) {
         Object.assign(this, init);
+    }
+
+    static fromPrisma(stock: StockWithVariant): InventoryStockResponse | null {
+        if (!stock) return null;
+        const isLowStock = stock.TotalQuantity <= stock.LowStockThreshold;
+        return new InventoryStockResponse({
+            id: stock.Id,
+            variantId: stock.VariantId,
+            variantSku: stock.ProductVariants.Sku,
+            productName: stock.ProductVariants.Products.Name,
+            concentrationName: stock.ProductVariants.Concentrations.Name,
+            volumeMl: stock.ProductVariants.VolumeMl,
+            totalQuantity: stock.TotalQuantity,
+            lowStockThreshold: stock.LowStockThreshold,
+            isLowStock
+        });
     }
 }

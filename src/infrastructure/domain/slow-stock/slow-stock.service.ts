@@ -1,47 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import {
-    VariantSalesAnalyticsResponse,
-    DailySalesRecord
+    VariantSalesAnalyticsResponse
 } from 'src/application/dtos/response/variant-sales-analytics.response';
-import { RestockService, ProductSalesAnalyticsCandidate } from 'src/infrastructure/domain/restock/restock.service';
+import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
-import { calculateSalesMetrics } from 'src/infrastructure/domain/utils/sales-metrics.util';
+import { SlowStockRepository } from 'src/infrastructure/domain/slow-stock/slow-stock.repository';
+import { SlowStockCandidate, SlowStockVariantCandidate } from 'src/application/dtos/response/slow-stock/slow-stock-analytics.types';
+import { SLOW_STOCK_CONFIG, RESTOCK_CONFIG } from 'src/application/constant/inventory.constant';
 
-export interface SlowStockCandidate {
-    productName: string;
-    variantCount: number;
-    averageDailySales: number;
-    last7DaysSales: number;
-    last30DaysSales: number;
-    salesTrend: 'INCREASING' | 'STABLE' | 'DECLINING';
-    volatility: 'LOW' | 'MEDIUM' | 'HIGH';
-    variants: SlowStockVariantCandidate[];
-}
-
-export interface SlowStockVariantCandidate {
-    variantId: string;
-    sku: string;
-    volumeMl: number;
-    basePrice: number;
-    status: string;
-    totalQuantity: number;
-    reservedQuantity: number;
-    lowStockThreshold: number;
-    averageDailySales: number;
-    last7DaysSales: number;
-    last30DaysSales: number;
-    trend: 'INCREASING' | 'STABLE' | 'DECLINING';
-    volatility: 'LOW' | 'MEDIUM' | 'HIGH';
-}
+export type { SlowStockCandidate, SlowStockVariantCandidate };
 
 @Injectable()
 export class SlowStockService {
-    private readonly slowStockCandidateLimit = 30;
+    private readonly slowStockCandidateLimit = SLOW_STOCK_CONFIG.CANDIDATE_LIMIT;
 
     constructor(
-        private readonly prisma: PrismaService,
+        private readonly slowStockRepo: SlowStockRepository,
         private readonly restockService: RestockService
     ) {}
 
@@ -50,19 +25,7 @@ export class SlowStockService {
             async () => {
                 const [analyticsResult, stocks] = await Promise.all([
                     this.restockService.getProductSalesAnalyticsForRestock(),
-                    this.prisma.stocks.findMany({
-                        where: {
-                            ProductVariants: {
-                                IsDeleted: false,
-                                Products: { IsDeleted: false }
-                            }
-                        },
-                        include: {
-                            ProductVariants: {
-                                include: { Products: true, Concentrations: true }
-                            }
-                        }
-                    })
+                    this.slowStockRepo.findAllStocksWithRelations()
                 ]);
 
                 if (!analyticsResult.success || !analyticsResult.payload) {
@@ -72,115 +35,140 @@ export class SlowStockService {
                     };
                 }
 
-                const stockMap = new Map<string, {
-                    totalQuantity: number;
-                    reservedQuantity: number;
-                    lowStockThreshold: number;
-                }>();
-                for (const s of stocks) {
-                    stockMap.set(s.VariantId, {
-                        totalQuantity: s.TotalQuantity,
-                        reservedQuantity: s.ReservedQuantity,
-                        lowStockThreshold: s.LowStockThreshold
-                    });
-                }
+                const stockMap = this.buildStockMap(stocks);
+                const variantsWithStock = this.filterSlowMovingVariants(analyticsResult.payload, stockMap);
+                const candidates = this.groupVariantsByProduct(variantsWithStock, stockMap);
+                const sorted = this.sortAndLimitCandidates(candidates);
 
-                const salesData = analyticsResult.payload;
-                const variantsWithStock: VariantSalesAnalyticsResponse[] = [];
-
-                for (const variant of salesData) {
-                    const stock = stockMap.get(variant.variantId);
-                    if (!stock) continue;
-                    if (stock.totalQuantity <= 0) continue;
-                    if (variant.status === 'Inactive' || variant.status === 'Discontinue') continue;
-
-                    const avgDaily = variant.averageDailySales ?? 0;
-                    const forecastDemand = 0.7 * avgDaily + 0.3 * ((variant.salesMetrics?.last7DaysSales ?? 0) / 7);
-                    const daysOfSupply = stock.totalQuantity / Math.max(forecastDemand, 0.01);
-
-                    if (daysOfSupply > 60) {
-                        variantsWithStock.push(variant);
-                    }
-                }
-
-                const byProduct = new Map<string, SlowStockCandidate>();
-
-                for (const variant of variantsWithStock) {
-                    const stock = stockMap.get(variant.variantId)!;
-                    const key = variant.productName;
-
-                    const current = byProduct.get(key) ?? {
-                        productName: variant.productName,
-                        variantCount: 0,
-                        averageDailySales: 0,
-                        last7DaysSales: 0,
-                        last30DaysSales: 0,
-                        salesTrend: 'STABLE' as const,
-                        volatility: 'LOW' as const,
-                        variants: []
-                    };
-
-                    current.variantCount += 1;
-                    current.averageDailySales += variant.averageDailySales ?? 0;
-                    current.last7DaysSales += variant.salesMetrics?.last7DaysSales ?? 0;
-                    current.last30DaysSales += variant.salesMetrics?.last30DaysSales ?? 0;
-                    current.variants.push({
-                        variantId: variant.variantId,
-                        sku: variant.sku,
-                        volumeMl: variant.volumeMl,
-                        basePrice: variant.basePrice,
-                        status: variant.status,
-                        totalQuantity: stock.totalQuantity,
-                        reservedQuantity: stock.reservedQuantity,
-                        lowStockThreshold: stock.lowStockThreshold,
-                        averageDailySales: variant.averageDailySales ?? 0,
-                        last7DaysSales: variant.salesMetrics?.last7DaysSales ?? 0,
-                        last30DaysSales: variant.salesMetrics?.last30DaysSales ?? 0,
-                        trend: variant.salesMetrics?.trend ?? 'STABLE',
-                        volatility: variant.salesMetrics?.volatility ?? 'LOW'
-                    });
-
-                    byProduct.set(key, current);
-                }
-
-                const candidates = Array.from(byProduct.values())
-                    .sort((a, b) => {
-                        const aForecast = 0.7 * (a.averageDailySales / a.variantCount) + 0.3 * (a.last7DaysSales / 7 / a.variantCount);
-                        const bForecast = 0.7 * (b.averageDailySales / b.variantCount) + 0.3 * (b.last7DaysSales / 7 / b.variantCount);
-                        return aForecast - bForecast;
-                    })
-                    .slice(0, this.slowStockCandidateLimit);
-
-                candidates.forEach((item) => {
-                    const avgLast30 = item.last30DaysSales / Math.max(item.variantCount, 1) / 4;
-                    const avgLast7 = item.last7DaysSales / Math.max(item.variantCount, 1);
-                    if (avgLast7 < avgLast30 * 0.85) {
-                        item.salesTrend = 'DECLINING';
-                    } else if (avgLast7 > avgLast30 * 1.15) {
-                        item.salesTrend = 'INCREASING';
-                    } else {
-                        item.salesTrend = 'STABLE';
-                    }
-
-                    const volatilities = item.variants.map((v) => v.volatility);
-                    if (volatilities.includes('HIGH')) {
-                        item.volatility = 'HIGH';
-                    } else if (volatilities.includes('MEDIUM')) {
-                        item.volatility = 'MEDIUM';
-                    } else {
-                        item.volatility = 'LOW';
-                    }
-
-                    item.averageDailySales = Number(item.averageDailySales.toFixed(2));
-                });
-
-                return {
-                    success: true,
-                    payload: candidates
-                };
+                return { success: true, payload: sorted };
             },
             'Failed to fetch slow stock candidates',
             true
         );
+    }
+
+    private buildStockMap(stocks: Awaited<ReturnType<SlowStockRepository['findAllStocksWithRelations']>>): Map<string, {
+        totalQuantity: number;
+        reservedQuantity: number;
+        lowStockThreshold: number;
+    }> {
+        const stockMap = new Map<string, {
+            totalQuantity: number;
+            reservedQuantity: number;
+            lowStockThreshold: number;
+        }>();
+        for (const s of stocks) {
+            stockMap.set(s.VariantId, {
+                totalQuantity: s.TotalQuantity,
+                reservedQuantity: s.ReservedQuantity,
+                lowStockThreshold: s.LowStockThreshold
+            });
+        }
+        return stockMap;
+    }
+
+    private filterSlowMovingVariants(
+        variants: VariantSalesAnalyticsResponse[],
+        stockMap: Map<string, { totalQuantity: number; reservedQuantity: number; lowStockThreshold: number }>
+    ): VariantSalesAnalyticsResponse[] {
+        const result: VariantSalesAnalyticsResponse[] = [];
+        for (const variant of variants) {
+            const stock = stockMap.get(variant.variantId);
+            if (!stock) continue;
+            if (stock.totalQuantity <= 0) continue;
+            if (variant.status === 'Inactive' || variant.status === 'Discontinue') continue;
+
+            const avgDaily = variant.averageDailySales ?? 0;
+            const forecastDemand = SLOW_STOCK_CONFIG.FORECAST_RECENT_WEIGHT * avgDaily + SLOW_STOCK_CONFIG.FORECAST_SHORT_TERM_WEIGHT * ((variant.salesMetrics?.last7DaysSales ?? 0) / 7);
+            const daysOfSupply = stock.totalQuantity / Math.max(forecastDemand, SLOW_STOCK_CONFIG.MIN_FORECAST_DEMAND);
+
+            if (daysOfSupply > SLOW_STOCK_CONFIG.DAYS_OF_SUPPLY_THRESHOLD) {
+                result.push(variant);
+            }
+        }
+        return result;
+    }
+
+    private groupVariantsByProduct(
+        variants: VariantSalesAnalyticsResponse[],
+        stockMap: Map<string, { totalQuantity: number; reservedQuantity: number; lowStockThreshold: number }>
+    ): SlowStockCandidate[] {
+        const byProduct = new Map<string, SlowStockCandidate>();
+
+        for (const variant of variants) {
+            const stock = stockMap.get(variant.variantId)!;
+            const key = variant.productName;
+
+            const current = byProduct.get(key) ?? {
+                productName: variant.productName,
+                variantCount: 0,
+                averageDailySales: 0,
+                last7DaysSales: 0,
+                last30DaysSales: 0,
+                salesTrend: 'STABLE' as const,
+                volatility: 'LOW' as const,
+                variants: []
+            };
+
+            current.variantCount += 1;
+            current.averageDailySales += variant.averageDailySales ?? 0;
+            current.last7DaysSales += variant.salesMetrics?.last7DaysSales ?? 0;
+            current.last30DaysSales += variant.salesMetrics?.last30DaysSales ?? 0;
+            current.variants.push({
+                variantId: variant.variantId,
+                sku: variant.sku,
+                volumeMl: variant.volumeMl,
+                basePrice: variant.basePrice,
+                status: variant.status,
+                totalQuantity: stock.totalQuantity,
+                reservedQuantity: stock.reservedQuantity,
+                lowStockThreshold: stock.lowStockThreshold,
+                averageDailySales: variant.averageDailySales ?? 0,
+                last7DaysSales: variant.salesMetrics?.last7DaysSales ?? 0,
+                last30DaysSales: variant.salesMetrics?.last30DaysSales ?? 0,
+                trend: variant.salesMetrics?.trend ?? 'STABLE',
+                volatility: variant.salesMetrics?.volatility ?? 'LOW'
+            });
+
+            byProduct.set(key, current);
+        }
+
+        return this.computeCandidateAggregates(Array.from(byProduct.values()));
+    }
+
+    private computeCandidateAggregates(candidates: SlowStockCandidate[]): SlowStockCandidate[] {
+        candidates.forEach((item) => {
+            const avgLast30 = item.last30DaysSales / Math.max(item.variantCount, 1) / 4;
+            const avgLast7 = item.last7DaysSales / Math.max(item.variantCount, 1);
+            if (avgLast7 < avgLast30 * RESTOCK_CONFIG.TREND_DECLINING_THRESHOLD) {
+                item.salesTrend = 'DECLINING';
+            } else if (avgLast7 > avgLast30 * RESTOCK_CONFIG.TREND_INCREASING_THRESHOLD) {
+                item.salesTrend = 'INCREASING';
+            } else {
+                item.salesTrend = 'STABLE';
+            }
+
+            const volatilities = item.variants.map((v) => v.volatility);
+            if (volatilities.includes('HIGH')) {
+                item.volatility = 'HIGH';
+            } else if (volatilities.includes('MEDIUM')) {
+                item.volatility = 'MEDIUM';
+            } else {
+                item.volatility = 'LOW';
+            }
+
+            item.averageDailySales = Number(item.averageDailySales.toFixed(2));
+        });
+        return candidates;
+    }
+
+    private sortAndLimitCandidates(candidates: SlowStockCandidate[]): SlowStockCandidate[] {
+        return candidates
+            .sort((a, b) => {
+                const aForecast = SLOW_STOCK_CONFIG.FORECAST_RECENT_WEIGHT * (a.averageDailySales / a.variantCount) + SLOW_STOCK_CONFIG.FORECAST_SHORT_TERM_WEIGHT * (a.last7DaysSales / 7 / a.variantCount);
+                const bForecast = SLOW_STOCK_CONFIG.FORECAST_RECENT_WEIGHT * (b.averageDailySales / b.variantCount) + SLOW_STOCK_CONFIG.FORECAST_SHORT_TERM_WEIGHT * (b.last7DaysSales / 7 / b.variantCount);
+                return aForecast - bForecast;
+            })
+            .slice(0, this.slowStockCandidateLimit);
     }
 }

@@ -7,13 +7,14 @@ import { ConversationOutputDto } from '../../common/conversation-output.dto';
 /** DTO yêu cầu gửi tin nhắn */
 export class ChatMessageRequest {
   /** Người gửi tin nhắn (USER hoặc ASSISTANT) */
-  @ApiProperty({ description: 'Người gửi tin nhắn', enum: Sender })
+  @ApiProperty({ description: 'Người gửi tin nhắn (user hoặc assistant)', required: true, enum: Sender })
   @IsEnum(Sender)
   sender: Sender;
 
   /** Nội dung tin nhắn */
   @ApiProperty({ 
     description: 'Nội dung tin nhắn',
+    required: true,
     oneOf: [
       { type: 'string' },
       { $ref: '#/components/schemas/ConversationOutputDto' }

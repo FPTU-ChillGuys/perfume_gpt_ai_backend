@@ -6,22 +6,22 @@ import { MessageResponse } from './message.response';
 export class ConversationResponse {
   /** ID cuộc hội thoại */
   @ApiProperty({ description: 'ID cuộc hội thoại' })
-  id: string;
+  id!: string;
 
   /** ID người dùng sở hữu */
-  @ApiProperty({ description: 'ID người dùng' })
-  userId: string;
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid', required: true })
+  userId!: string;
 
   /** Danh sách tin nhắn */
-  @ApiProperty({ description: 'Danh sách tin nhắn', type: [MessageResponse] })
+  @ApiProperty({ description: 'Danh sách tin nhắn', type: [MessageResponse], required: true })
   messages: MessageResponse[] = [];
 
   /** Ngày cập nhật cuối cùng */
   @ApiProperty({ description: 'Ngày cập nhật' })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   /** Đánh dấu response được xử lý cho Mobile */
-  @ApiProperty({ description: 'Đánh dấu response cho Mobile', required: false })
+  @ApiProperty({ description: 'Đánh dấu response cho Mobile', required: false, default: false })
   isMobile?: boolean;
 
   /**

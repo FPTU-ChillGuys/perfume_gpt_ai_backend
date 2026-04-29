@@ -6,12 +6,13 @@ import { ConversationOutputDto } from '../../common/conversation-output.dto';
 /** DTO phản hồi tin nhắn trong cuộc hội thoại */
 export class MessageResponse {
   /** Người gửi tin nhắn */
-  @ApiProperty({ description: 'Người gửi tin nhắn', enum: Sender })
+  @ApiProperty({ description: 'Người gửi tin nhắn (user hoặc assistant)', required: true, enum: Sender })
   sender: Sender;
 
   /** Nội dung tin nhắn */
   @ApiProperty({ 
-    description: 'Nội dung tin nhắn',
+    description: 'Nội dung tin nhắn (chuỗi hoặc object cho assistant)',
+    required: true,
     oneOf: [
       { type: 'string' },
       { $ref: '#/components/schemas/ConversationOutputDto' }

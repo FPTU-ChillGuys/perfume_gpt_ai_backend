@@ -8,28 +8,27 @@ export class ChatRequest {
   /** ID cuộc hội thoại */
   @ApiProperty({ description: 'ID cuộc hội thoại', format: 'uuid' })
   @IsString()
-  id: string;
+  id!: string;
 
   /** ID người dùng (tự động lấy từ token, không cần truyền) */
-  @ApiProperty({ description: 'ID người dùng', format: 'uuid', required: false })
-  @IsOptional()
+  @ApiProperty({ description: 'ID người dùng (tự động lấy từ token, không cần truyền)', format: 'uuid', required: true })
   @IsString()
   userId?: string;
 
   /** Danh sách tin nhắn */
-  @ApiProperty({ description: 'Danh sách tin nhắn', type: [ChatMessageRequest] })
+  @ApiProperty({ description: 'Danh sách tin nhắn', type: [ChatMessageRequest], required: true })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ChatMessageRequest)
-  messages: ChatMessageRequest[];
+  messages: ChatMessageRequest[] = [];
 
   /** Chế độ nhân viên tư vấn tại quầy */
-  @ApiProperty({ description: 'Chế độ nhân viên tư vấn tại quầy', required: false })
+  @ApiProperty({ description: 'Chế độ nhân viên tư vấn tại quầy', required: false, default: false })
   @IsOptional()
   isStaff?: boolean;
 
   /** Client là Mobile App để Server tự động parse message JSON */
-  @ApiProperty({ description: 'Client là Mobile App', required: false })
+  @ApiProperty({ description: 'Client là Mobile App', required: false, default: false })
   @IsOptional()
   isMobile?: boolean;
 }

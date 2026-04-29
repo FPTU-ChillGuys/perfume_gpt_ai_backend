@@ -111,7 +111,7 @@ export class ConversationService {
         success: true,
         data: new PagedResult<ConversationResponse>({
           ...pagedResult,
-          items: pagedResult.items.map(c => ConversationResponse.fromEntity(c)!)
+          items: pagedResult.items.map(c => ConversationResponse.fromEntity(c)!).reverse() // Đảo ngược thứ tự để hiển thị mới nhất trước
         })
       };
     }, 'Failed to get paginated conversations');

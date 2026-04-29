@@ -45,14 +45,20 @@ export class ConversationController {
     return await this.conversationService.getAllConversations();
   }
 
-  /** Lấy cuộc hội thoại theo ID (Admin) */
-  @Role(['admin'])
-  @Get(':id')
-  @ApiOperation({ summary: 'Lấy cuộc hội thoại theo ID' })
-  async getConversationById(
-    @Query('id') id: string
-  ): Promise<BaseResponse<ConversationResponse>> {
-    return await this.conversationService.getConversationById(id);
+  /** Lấy lịch sử chat của user hiện tại (User/Guest) */
+  @Public()
+  @Get('my/history')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Lấy lịch sử chat của user hiện tại' })
+  @ApiQuery({ name: 'userId', required: false, description: 'Guest userId (nếu chưa đăng nhập)' })
+  @ExtendApiBaseResponse(PagedResult, ConversationResponse)
+  async getMyConversationHistory(
+    @Req() request: Request,
+    @Query() pagedRequest: PagedConversationRequest
+  ): Promise<BaseResponse<PagedResult<ConversationResponse>>> {
+    const userId = this.inputHelper.extractUserId(request, pagedRequest.userId);
+    pagedRequest.userId = userId;
+    return await this.conversationService.getAllConversationsPaginated(pagedRequest);
   }
 
   /** Lấy danh sách hội thoại có phân trang (Admin) */
@@ -64,6 +70,16 @@ export class ConversationController {
     @Query() request: PagedConversationRequest
   ): Promise<BaseResponse<PagedResult<ConversationResponse>>> {
     return await this.conversationService.getAllConversationsPaginated(request);
+  }
+
+  /** Lấy cuộc hội thoại theo ID (Admin) */
+  @Role(['admin'])
+  @Get(':id')
+  @ApiOperation({ summary: 'Lấy cuộc hội thoại theo ID' })
+  async getConversationById(
+    @Query('id') id: string
+  ): Promise<BaseResponse<ConversationResponse>> {
+    return await this.conversationService.getConversationById(id);
   }
 
   /** Chat chính - sử dụng logic V10 Advanced */

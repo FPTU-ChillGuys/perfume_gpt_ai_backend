@@ -1,6 +1,4 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { Output, UIMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
 
@@ -19,7 +17,6 @@ import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { AI_CONVERSATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
-import { ConversationJobName, QueueName } from 'src/application/constant/processor';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
@@ -27,6 +24,7 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 // DTOs
 import { ConversationResponse } from 'src/application/dtos/response/conversation/conversation.response';
 import { MessageResponse } from 'src/application/dtos/response/conversation/message.response';
+import { ChatV11Response, ChatV11AiMessage } from 'src/application/dtos/response/conversation/chat-v11.response';
 import { ChatRequest } from 'src/application/dtos/request/conversation/chat.request';
 import { PagedConversationRequest } from 'src/application/dtos/request/conversation/paged-conversation.request';
 import { ChatMessageRequest } from 'src/application/dtos/request/conversation/chat-message.request';
@@ -51,8 +49,6 @@ export class ConversationService {
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userLogService: UserLogService,
     private readonly productService: ProductService,
-    @InjectQueue(QueueName.CONVERSATION_QUEUE)
-    private readonly conversationQueue: Queue,
     
     // Helpers
     private readonly analysisHelper: AIAnalysisHelper,
@@ -117,21 +113,17 @@ export class ConversationService {
     }, 'Failed to get paginated conversations');
   }
 
-  /** Cập nhật tin nhắn vào hội thoại (dùng cho background job) */
+  /** Cập nhật tin nhắn vào hội thoại */
   async updateMessageToConversation(
     id: string,
-    messageRequests: ChatMessageRequest[] | any[]
+    messageRequests: ChatMessageRequest[]
   ): Promise<BaseResponse<MessageResponse[]>> {
     return await funcHandlerAsync(async () => {
-      // Chuyển đổi từ DTO/Object sang entity
       const messages = messageRequests.map(req => {
-        if (req instanceof ChatMessageRequest || (req.sender && req.message)) {
-          const entity = new Message();
-          entity.sender = req.sender;
-          entity.message = typeof req.message === 'string' ? req.message : JSON.stringify(req.message);
-          return entity;
-        }
-        return req; // Trường hợp đã là entity
+        const entity = new Message();
+        entity.sender = req.sender;
+        entity.message = typeof req.message === 'string' ? req.message : JSON.stringify(req.message);
+        return entity;
       });
       
       const conversation = await this.unitOfWork.AIConversationRepo.addMessagesToConversation(
@@ -152,11 +144,11 @@ export class ConversationService {
     }, 'Failed to update messages');
   }
 
-  /** Lưu hoặc cập nhật hội thoại (Job support) */
+  /** Lưu hoặc cập nhật hội thoại trực tiếp */
   public async saveOrUpdateConversation(
-    conversation: any
+    conversation: ChatRequest
   ): Promise<void> {
-    const id = conversation?.id || '';
+    const id = conversation.id || '';
     const exists = await this.unitOfWork.AIConversationRepo.exists({ id });
 
     if (!exists) {
@@ -165,7 +157,7 @@ export class ConversationService {
         userId: conversation.userId
       });
       if (conversation.messages && Array.isArray(conversation.messages)) {
-        entity.messages.set(conversation.messages.map((m: any) => {
+        entity.messages.set(conversation.messages.map((m) => {
            const msg = new Message();
            msg.sender = m.sender;
            msg.message = typeof m.message === 'string' ? m.message : JSON.stringify(m.message);
@@ -208,6 +200,57 @@ export class ConversationService {
 
     // Phase 7: Lưu trữ và trả response
     return this.saveAndBuildResponse(aiResponse, context, request);
+  }
+
+  // ==========================================
+  // 2b. V11 — Chat with individual message persistence
+  // ==========================================
+
+  async chatV11(request: ChatRequest): Promise<BaseResponse<ChatV11Response>> {
+    const context = this.buildChatContext(request);
+    this.logger.log(`[CHAT-V11] Analyzing message: "${context.messageText.substring(0, 50)}..."`);
+
+    const analysis = await this.analysisHelper.analyze(context.messageText, context.previousContext, {
+      userId: context.userId,
+      isGuestUser: context.isGuestUser,
+      isStaff: context.isStaff
+    });
+
+    const finalMessages = await this.buildContextMessages(context, analysis);
+
+    const aiResponse = await this.executeAIGeneration(finalMessages, context);
+
+    await this.hydrateProductsInResponse(aiResponse, analysis.budget);
+
+    const userMessageText = context.messageText;
+    const userMsg = new Message();
+    userMsg.sender = Sender.USER;
+    userMsg.message = userMessageText;
+    const savedUserMsg = await this.unitOfWork.AIConversationRepo.addSingleMessage(
+      context.conversationId, context.userId, userMsg
+    );
+
+    const aiMessageText = typeof aiResponse === 'string' ? aiResponse : JSON.stringify(aiResponse);
+    const aiMsg = new Message();
+    aiMsg.sender = Sender.ASSISTANT;
+    aiMsg.message = aiMessageText;
+    const savedAiMsg = await this.unitOfWork.AIConversationRepo.addSingleMessage(
+      context.conversationId, context.userId, aiMsg
+    );
+
+    if (context.userId) {
+      await this.unitOfWork.EventLogRepo.createMessageEvent(context.userId, savedAiMsg);
+      await this.userLogService.enqueueRollingSummaryUpdate(context.userId);
+    }
+
+    const response = new ChatV11Response();
+    response.conversationId = context.conversationId;
+    response.aiMessage = new ChatV11AiMessage();
+    response.aiMessage.sender = savedAiMsg.sender;
+    response.aiMessage.message = savedAiMsg.message;
+    response.aiMessage.createdAt = savedAiMsg.createdAt;
+
+    return { success: true, data: response };
   }
 
   // ==========================================
@@ -302,7 +345,7 @@ export class ConversationService {
     return typeof aiResult.data === 'string' ? JSON.parse(aiResult.data) : aiResult.data;
   }
 
-  /** Phase 7: Lưu trữ và xây dựng response */
+  /** Phase 7: Lưu trữ trực tiếp vào DB và xây dựng response */
   private async saveAndBuildResponse(
     aiResponse: any,
     context: { userId: string; conversationId: string },
@@ -315,10 +358,16 @@ export class ConversationService {
       request.messages || []
     );
 
-    await this.conversationQueue.add(ConversationJobName.ADD_MESSAGE_AND_LOG, {
-      responseConversation,
-      userId: context.userId
-    });
+    await this.saveOrUpdateConversation(responseConversation);
+
+    const savedConversation = await this.unitOfWork.AIConversationRepo.findOne(
+      { id: context.conversationId },
+      { populate: ['messages'] }
+    );
+
+    if (savedConversation) {
+      return { success: true, data: ConversationResponse.fromEntity(savedConversation)! };
+    }
 
     return this.responseBuilder.buildChatResponse(
       responseConversation,

@@ -36,11 +36,14 @@ export class ConversationResponse {
     response.userId = entity.userId;
     response.updatedAt = entity.updatedAt;
 
-    // Map danh sách tin nhắn nếu có
     if (entity.messages && entity.messages.isInitialized()) {
-      response.messages = entity.messages
-        .getItems()
-        .map(msg => MessageResponse.fromEntity(msg)!);
+      const messages = entity.messages.getItems();
+      messages.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeA - timeB;
+      });
+      response.messages = messages.map(msg => MessageResponse.fromEntity(msg)!);
     }
 
     return response;

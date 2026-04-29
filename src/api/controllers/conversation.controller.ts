@@ -24,6 +24,7 @@ import { ConversationInputHelper } from 'src/infrastructure/domain/conversation/
 
 // DTOs
 import { ConversationResponse } from 'src/application/dtos/response/conversation/conversation.response';
+import { ChatV11Response } from 'src/application/dtos/response/conversation/chat-v11.response';
 import { ChatRequest } from 'src/application/dtos/request/conversation/chat.request';
 import { PagedConversationRequest } from 'src/application/dtos/request/conversation/paged-conversation.request';
 
@@ -110,5 +111,33 @@ export class ConversationController {
     const prepared = this.inputHelper.prepareStaffChatRequest(request, chatRequest);
     const result = await this.conversationService.chat(prepared);
     return this.inputHelper.processMobileResponse(result, chatRequest.isMobile);
+  }
+
+  /** Chat V11 — Individual message persistence with real timestamps */
+  @Public()
+  @Post('chat/v11')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat với AI (V11 — individual message persistence)' })
+  @ApiBaseResponse(ChatV11Response)
+  async chatV11(
+    @Req() request: Request,
+    @Body() chatRequest: ChatRequest
+  ): Promise<BaseResponse<ChatV11Response>> {
+    const prepared = this.inputHelper.prepareChatRequest(request, chatRequest);
+    return await this.conversationService.chatV11(prepared);
+  }
+
+  /** Chat V11 Staff */
+  @Public()
+  @Post('chat/v11-staff')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat V11 Staff (Quick Counter Consultation Mode)' })
+  @ApiBaseResponse(ChatV11Response)
+  async chatV11Staff(
+    @Req() request: Request,
+    @Body() chatRequest: ChatRequest
+  ): Promise<BaseResponse<ChatV11Response>> {
+    const prepared = this.inputHelper.prepareStaffChatRequest(request, chatRequest);
+    return await this.conversationService.chatV11(prepared);
   }
 }

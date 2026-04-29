@@ -564,7 +564,8 @@
           "default": "'REPORT'",
           "enumItems": [
             "REPORT",
-            "RESTOCK"
+            "RESTOCK",
+            "SLOW_STOCK"
           ],
           "mappedType": "enum"
         }
@@ -1062,6 +1063,16 @@
           "nullable": false,
           "length": 255,
           "mappedType": "string"
+        },
+        "order": {
+          "name": "order",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "0",
+          "mappedType": "integer"
         }
       },
       "name": "survey_question",
@@ -1226,6 +1237,15 @@
           "nullable": false,
           "length": 255,
           "mappedType": "string"
+        },
+        "ai_result": {
+          "name": "ai_result",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "mappedType": "text"
         }
       },
       "name": "survey_question_answer",

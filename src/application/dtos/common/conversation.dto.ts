@@ -7,15 +7,14 @@ import { CommonResponse } from '../response/common/common.response';
 /** DTO cuộc hội thoại (response) */
 export class ConversationDto extends CommonResponse {
   /** ID người dùng sở hữu cuộc hội thoại */
-  @ApiProperty({ description: 'ID người dùng', format: 'uuid', required: false })
+  @ApiProperty({ description: 'ID người dùng', format: 'uuid', required: true })
   userId?: string;
 
   /** Danh sách tin nhắn trong cuộc hội thoại */
-  @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageDto], required: false })
+  @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageDto], required: true })
   messages?: MessageDto[];
-
   /** Đánh dấu response được xử lý cho Mobile */
-  @ApiProperty({ description: 'Đánh dấu response cho Mobile', required: false })
+  @ApiProperty({ description: 'Đánh dấu response cho Mobile', required: false, default: false })
   isMobile?: boolean;
 
   constructor(init?: Partial<ConversationDto>) {
@@ -32,25 +31,24 @@ export class ConversationRequestDto {
   id!: string;
 
   /** ID người dùng (tự động lấy từ JWT token, không cần truyền) */
-  @ApiProperty({ description: 'ID người dùng (tự động lấy từ token, không cần truyền)', format: 'uuid', required: false })
-  @IsOptional()
+  @ApiProperty({ description: 'ID người dùng (tự động lấy từ token, không cần truyền)', format: 'uuid', required: true })
   @IsString()
   userId?: string;
 
   /** Danh sách tin nhắn */
-  @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageRequestDto] })
+  @ApiProperty({ description: 'Danh sách tin nhắn', type: () => [MessageRequestDto], required: true })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MessageRequestDto)
   messages!: MessageRequestDto[];
 
   /** Chế độ nhân viên tư vấn tại quầy */
-  @ApiProperty({ description: 'Chế độ nhân viên tư vấn tại quầy', required: false })
+  @ApiProperty({ description: 'Chế độ nhân viên tư vấn tại quầy', required: false, default: false })
   @IsOptional()
   isStaff?: boolean;
 
   /** Client là Mobile App để Server tự động parse message JSON */
-  @ApiProperty({ description: 'Client là Mobile App', required: false })
+  @ApiProperty({ description: 'Client là Mobile App', required: false, default: false })
   @IsOptional()
   isMobile?: boolean;
 

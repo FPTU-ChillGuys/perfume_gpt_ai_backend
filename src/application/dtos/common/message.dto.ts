@@ -7,12 +7,13 @@ import { Sender } from 'src/domain/enum/sender.enum';
 /** DTO tin nhắn (response) */
 export class MessageDto extends CommonResponse {
   /** Người gửi tin nhắn */
-  @ApiProperty({ description: 'Người gửi tin nhắn (user hoặc assistant)' })
+  @ApiProperty({ description: 'Người gửi tin nhắn (user hoặc assistant)', required: true, enum: Sender })
   sender!: string;
 
   /** Nội dung tin nhắn */
   @ApiProperty({ 
     description: 'Nội dung tin nhắn (chuỗi hoặc object cho assistant)',
+    required: true,
     oneOf: [
       { type: 'string' },
       { $ref: '#/components/schemas/ConversationOutputDto' }

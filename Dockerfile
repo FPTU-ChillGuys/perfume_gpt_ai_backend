@@ -18,6 +18,9 @@ RUN npx prisma generate
 # Build app
 RUN pnpm run build
 
+# Migration up trước khi chạy app
+RUN pnpm run migration:up
+
 EXPOSE 3000
 
 CMD ["node", "dist/src/main.js"]

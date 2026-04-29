@@ -1,28 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Request } from 'express';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ChatRequest } from 'src/application/dtos/request/conversation/chat.request';
 import { ConversationResponse } from 'src/application/dtos/response/conversation/conversation.response';
-import { Sender } from 'src/domain/enum/sender.enum';
 import { getTokenPayloadFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { processRequestForMobile, processResponseForMobile } from 'src/infrastructure/domain/utils/message-helper';
 
-/**
- * Helper xử lý việc chuẩn hóa input/output cho Conversation.
- * - Trích xuất userId từ token
- * - Xử lý mobile request/response transformation
- */
 @Injectable()
 export class ConversationInputHelper {
 
-  /**
-   * Trích xuất userId từ JWT token trong request và gán vào ChatRequest.
-   * Nếu request không có userId, sẽ lấy từ token payload.
-   */
   resolveUserId(request: Request, chatRequest: ChatRequest): ChatRequest {
     if (!chatRequest.userId) {
       chatRequest.userId = getTokenPayloadFromRequest(request)?.id;
     }
+
+    if (!chatRequest.userId) {
+      throw new BadRequestException('userId is required — provide it in the request body or authenticate with a valid JWT token');
+    }
+
     return chatRequest;
   }
 

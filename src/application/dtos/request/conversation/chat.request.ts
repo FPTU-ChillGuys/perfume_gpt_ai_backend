@@ -11,7 +11,7 @@ export class ChatRequest {
   id!: string;
 
   /** ID người dùng (tự động lấy từ token, không cần truyền) */
-  @ApiProperty({ description: 'ID người dùng (tự động lấy từ token, không cần truyền)', format: 'uuid', required: true })
+  @ApiProperty({ description: 'ID người dùng (tự động lấy từ token, không cần truyền)', format: 'uuid' })
   @IsString()
   userId?: string;
 

@@ -3,6 +3,7 @@ import { tool, Tool } from 'ai';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
+import { SlowStockService } from 'src/infrastructure/domain/slow-stock/slow-stock.service';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
@@ -16,7 +17,8 @@ export class InventoryTool {
   constructor(
     private readonly prisma: PrismaService,
     private readonly unitOfWork: UnitOfWork,
-    private readonly restockService: RestockService
+    private readonly restockService: RestockService,
+    private readonly slowStockService: SlowStockService
   ) { }
 
   /**
@@ -166,6 +168,34 @@ export class InventoryTool {
           return { success: true, encodedData: encodingResult.encoded };
         },
         'Error occurred while fetching restock sales analytics candidates.',
+        true
+      );
+    }
+  });
+
+  getSlowStockCandidates: Tool = tool({
+    description:
+      'Get slow-moving stock candidates — products with high inventory but low sales velocity. ' +
+      'Each candidate includes product-level aggregation with per-variant sales signals, stock levels, and trend/volatility data. ' +
+      'Use this to identify current slow stock and predict which variants are becoming slow-moving. ' +
+      'Output is TOON-compressed to reduce token usage.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      this.logger.log(`[getSlowStockCandidates] called`);
+      return await funcHandlerAsync(
+        async () => {
+          const result = await this.slowStockService.getSlowStockCandidates();
+          if (!result.success || !result.payload) {
+            return {
+              success: false,
+              error: result.error ?? 'Failed to fetch slow stock candidates'
+            };
+          }
+
+          const encodingResult = encodeToolOutput(result.payload);
+          return { success: true, encodedData: encodingResult.encoded };
+        },
+        'Error occurred while fetching slow stock candidates.',
         true
       );
     }

@@ -22,7 +22,8 @@ import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruc
 import {
   inventoryReportPrompt,
   INSTRUCTION_TYPE_INVENTORY,
-  INSTRUCTION_TYPE_RESTOCK
+  INSTRUCTION_TYPE_RESTOCK,
+  INSTRUCTION_TYPE_SLOW_STOCK
 } from 'src/application/constant/prompts';
 import {
   isDataEmpty,
@@ -50,6 +51,7 @@ type RestockVariantResult = {
   reservedQuantity: number;
   averageDailySales: number;
   suggestedRestockQuantity: number;
+  slowStockRisk?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | null;
   supplierId?: number;
   supplierName?: string;
   negotiatedPrice?: number;
@@ -713,13 +715,20 @@ export class InventoryService {
     if (isDataEmpty(report?.toString())) {
       return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
     }
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
+    const [inventoryPrompt, slowStockPrompt] = await Promise.all([
+      this.adminInstructionService.getSystemPromptForDomain(
         INSTRUCTION_TYPE_INVENTORY
-      );
+      ),
+      this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_SLOW_STOCK
+      )
+    ]);
+    const combinedPrompt = slowStockPrompt
+      ? `${inventoryPrompt}\n\n## SLOW STOCK SUPPLEMENT\n${slowStockPrompt}`
+      : inventoryPrompt;
     const aiResponse = await this.aiHelper.textGenerateFromPrompt(
       inventoryReportPrompt(report.toString()),
-      adminPrompt
+      combinedPrompt
     );
     if (!aiResponse.success) {
       throw new InternalServerErrorWithDetailsException(
@@ -804,12 +813,19 @@ export class InventoryService {
   }
 
   async analyzeRestockNeeds(): Promise<BaseResponse<any>> {
-    const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(
+    const [restockPrompt, slowStockPrompt] = await Promise.all([
+      this.adminInstructionService.getSystemPromptForDomain(
         INSTRUCTION_TYPE_RESTOCK
-      );
+      ),
+      this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_SLOW_STOCK
+      )
+    ]);
+    const combinedPrompt = slowStockPrompt
+      ? `${restockPrompt}\n\n## SLOW STOCK SUPPLEMENT\n${slowStockPrompt}`
+      : restockPrompt;
     const aiResponse = await this.aiRestockHelper.textGenerateFromPrompt(
-      adminPrompt, // Empty prompt — all context in adminPrompt
+      combinedPrompt,
       '',
       Output.object({ schema: restockOutput.schema })
     );

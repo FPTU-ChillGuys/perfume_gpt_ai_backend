@@ -75,7 +75,9 @@ export class Tools implements OnModuleInit {
       getInventoryStock: this.inventoryTool.getInventoryStock,
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
       getProductSalesAnalyticsForRestock:
-        this.inventoryTool.getProductSalesAnalyticsForRestock
+        this.inventoryTool.getProductSalesAnalyticsForRestock,
+      getSlowStockCandidates:
+        this.inventoryTool.getSlowStockCandidates
     };
   }
 
@@ -84,7 +86,9 @@ export class Tools implements OnModuleInit {
     return {
       getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
       getProductSalesAnalyticsForRestock:
-        this.inventoryTool.getProductSalesAnalyticsForRestock
+        this.inventoryTool.getProductSalesAnalyticsForRestock,
+      getSlowStockCandidates:
+        this.inventoryTool.getSlowStockCandidates
     };
   }
 

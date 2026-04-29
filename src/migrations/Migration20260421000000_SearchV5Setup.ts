@@ -3,7 +3,7 @@ import { Migration } from '@mikro-orm/migrations';
 /**
  * Migration để nâng cấp Product Search lên v5 (BM25 + Hybrid Search)
  */
-export class MigrationSearchV5Setup extends Migration {
+export class Migration20260421000000 extends Migration {
   async up(): Promise<void> {
     // 1. Thêm cột search_text để lưu structured content
     this.addSql('ALTER TABLE product_embeddings ADD COLUMN IF NOT EXISTS search_text TEXT;');

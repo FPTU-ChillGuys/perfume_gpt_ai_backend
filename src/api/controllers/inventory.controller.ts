@@ -8,14 +8,12 @@ import {
   Query,
   Req,
   Res,
-  StreamableFile,
-  UseInterceptors
+  StreamableFile
 } from '@nestjs/common';
-import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Request } from 'express';
 import { Response } from 'express';
-import * as fs from 'fs';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -41,10 +39,9 @@ import {
   AIInventoryReportStructuredResponse
 } from 'src/application/dtos/response/ai-structured.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
-import { add } from 'date-fns';
+import { RestockVariantResult } from 'src/application/dtos/response/inventory/restock-variant.response';
 import { VariantSalesAnalyticsResponse } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 
@@ -63,7 +60,6 @@ export class InventoryController {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) { }
 
-  /** Lấy thông tin tồn kho */
   @Get('stock')
   @ApiOperation({ summary: 'Lấy thông tin tồn kho' })
   @ExtendApiBaseResponse(PagedResult, InventoryStockResponse)
@@ -73,7 +69,6 @@ export class InventoryController {
     return this.inventoryService.getInventoryStock(inventoryStockRequest);
   }
 
-  /** Lấy danh sách batch */
   @Get('batches')
   @ApiOperation({ summary: 'Lấy danh sách batch' })
   @ExtendApiBaseResponse(PagedResult, BatchResponse)
@@ -83,18 +78,14 @@ export class InventoryController {
     return this.inventoryService.getBatch(batchRequest);
   }
 
-  /** Lấy báo cáo tồn kho */
   @Get('report')
   @ApiOperation({ summary: 'Lấy báo cáo tồn kho' })
   @ApiBaseResponse(String)
   async getInventoryReport(): Promise<BaseResponse<string>> {
-    // Fetch stock and batch data
     const report = await this.inventoryService.createReportFromBatchAndStock();
-
     return Ok(report.toString());
   }
 
-  /** Tạo báo cáo tồn kho bằng AI */
   @Get('report/ai')
   @ApiOperation({ summary: 'Tạo báo cáo tồn kho bằng AI' })
   @ApiBaseResponse(String)
@@ -102,10 +93,6 @@ export class InventoryController {
     return this.inventoryService.generateAIInventoryReport();
   }
 
-  /**
-   * Tạo báo cáo tồn kho bằng AI - Phiên bản có cấu trúc.
-   * Trả về response kèm metadata (thời gian xử lý).
-   */
   @Get('report/ai/structured')
   @ApiOperation({ summary: 'Tạo báo cáo tồn kho AI có cấu trúc' })
   @ApiBaseResponse(AIInventoryReportStructuredResponse)
@@ -115,9 +102,6 @@ export class InventoryController {
     return this.inventoryService.generateStructuredAIInventoryReport();
   }
 
-  /**
-   * Khởi tạo job để tạo báo cáo tồn kho bằng AI (caching 6 tiếng)
-   */
   @Public()
   @Get('report/ai/job')
   @ApiOperation({ summary: 'Khởi tạo job để tạo báo cáo tồn kho bằng AI' })
@@ -132,9 +116,7 @@ export class InventoryController {
     @Req() request: Request,
     @Query('forceRefresh') forceRefresh?: boolean | string
   ): Promise<BaseResponse<{ jobId: string }>> {
-    const forceRefreshEnabled =
-      forceRefresh === true || String(forceRefresh) === 'true';
-
+    const forceRefreshEnabled = forceRefresh === true || String(forceRefresh) === 'true';
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIInventoryReport(),
@@ -149,9 +131,6 @@ export class InventoryController {
     );
   }
 
-  /**
-   * Kiểm tra kết quả job tạo báo cáo tồn kho bằng AI
-   */
   @Public()
   @Get('report/ai/job/result/:jobId')
   @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job báo cáo tồn kho' })
@@ -159,7 +138,7 @@ export class InventoryController {
   @ApiParam({ name: 'jobId', description: 'ID của job' })
   async getInventoryReportJobResult(
     @Param('jobId') jobId: string
-  ): Promise<BaseResponse<any>> {
+  ): Promise<BaseResponse<Record<string, unknown>>> {
     return checkBackgroundJobResult(
       this.cacheManager,
       `inventory_report_job_${jobId}`,
@@ -171,30 +150,20 @@ export class InventoryController {
   @ApiOperation({ summary: 'Lấy lịch sử báo cáo tồn kho tổng quan' })
   @ExtendApiBaseResponse(PagedResult, String)
   async getInventoryReportLogs(): Promise<
-    BaseResponseAPI<PagedResult<String>>
+    BaseResponseAPI<PagedResult<InventoryLog>>
   > {
-    const logs = await this.inventoryService.getAllInventoryLogs(InventoryLogType.REPORT);
-    return Ok(
-      new PagedResult<InventoryLog>({
-        items: logs?.data ?? [],
-        totalCount: logs?.data?.length ?? 0
-      })
-    );
+    const result = await this.inventoryService.getInventoryLogsPaged(InventoryLogType.REPORT);
+    return Ok(result);
   }
 
   @Get('restock/logs')
   @ApiOperation({ summary: 'Lấy lịch sử phân tích nhu cầu nhập hàng (restock)' })
   @ExtendApiBaseResponse(PagedResult, String)
   async getInventoryRestockLogs(): Promise<
-    BaseResponseAPI<PagedResult<String>>
+    BaseResponseAPI<PagedResult<InventoryLog>>
   > {
-    const logs = await this.inventoryService.getAllInventoryLogs(InventoryLogType.RESTOCK);
-    return Ok(
-      new PagedResult<InventoryLog>({
-        items: logs?.data ?? [],
-        totalCount: logs?.data?.length ?? 0
-      })
-    );
+    const result = await this.inventoryService.getInventoryLogsPaged(InventoryLogType.RESTOCK);
+    return Ok(result);
   }
 
   @Get('report/logs/:id')
@@ -213,30 +182,19 @@ export class InventoryController {
     @Param('id') id: string,
     @Res({ passthrough: true }) response: Response
   ): Promise<StreamableFile> {
-    const converted = await this.inventoryService.convertInventoryLogMarkdownToPdf(
-      id
-    );
-
-    if (!converted.success) {
-      if (converted.error === 'Inventory log not found') {
-        throw new NotFoundException(converted.error);
+    try {
+      const { fileBuffer, fileName } = await this.inventoryService.readInventoryLogPdf(id);
+      response.setHeader('Content-Type', 'application/pdf');
+      response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      return new StreamableFile(fileBuffer);
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Inventory log not found') {
+        throw new NotFoundException(err.message);
       }
       throw new InternalServerErrorException(
-        converted.error || 'Failed to convert markdown to pdf'
+        err instanceof Error ? err.message : 'Failed to convert markdown to pdf'
       );
     }
-
-    const filePath = converted.data?.absolutePath;
-    const fileName = converted.data?.fileName || `inventory-log-${id}.pdf`;
-
-    if (!filePath) {
-      throw new InternalServerErrorException('PDF file path is empty');
-    }
-
-    const fileBuffer = await fs.promises.readFile(filePath);
-    response.setHeader('Content-Type', 'application/pdf');
-    response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    return new StreamableFile(fileBuffer);
   }
 
   @Get('restock/logs/:id/pdf')
@@ -249,13 +207,10 @@ export class InventoryController {
     return this.convertInventoryLogToPdf(id, response);
   }
 
-  //Tao email cảnh bảo stock
-
-  /** Phân tích nhu cầu nhập hàng (restock) dựa trên xu hướng bán hàng */
   @Get('restock/ai')
   @ApiOperation({ summary: 'Phân tích nhu cầu nhập hàng dựa trên xu hướng (AI)' })
   @ApiBaseResponse(Object)
-  async getAIRestockingNeeds(): Promise<BaseResponse<any>> {
+  async getAIRestockingNeeds(): Promise<BaseResponse<{ variants: RestockVariantResult[] }>> {
     return this.inventoryService.analyzeRestockNeeds();
   }
 
@@ -273,9 +228,7 @@ export class InventoryController {
     @Req() request: Request,
     @Query('forceRefresh') forceRefresh?: boolean | string
   ): Promise<BaseResponse<{ jobId: string }>> {
-    const forceRefreshEnabled =
-      forceRefresh === true || String(forceRefresh) === 'true';
-
+    const forceRefreshEnabled = forceRefresh === true || String(forceRefresh) === 'true';
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIRestockingNeeds(),
@@ -297,7 +250,7 @@ export class InventoryController {
   @ApiParam({ name: 'jobId', description: 'ID của job' })
   async getRestockJobResult(
     @Param('jobId') jobId: string
-  ): Promise<BaseResponse<any>> {
+  ): Promise<BaseResponse<Record<string, unknown>>> {
     return checkBackgroundJobResult(
       this.cacheManager,
       `inventory_restock_job_${jobId}`,
@@ -305,7 +258,6 @@ export class InventoryController {
     );
   }
 
-  /** Lấy dữ liệu phân tích bán hàng tất cả variant (2 tháng gần nhất) cho tái cấp hàng */
   @Public()
   @Get('restock/sales-analytics')
   @ApiOperation({
@@ -317,7 +269,6 @@ export class InventoryController {
     return this.restockService.getProductSalesAnalyticsForRestock();
   }
 
-  /** Lấy dữ liệu phân tích bán hàng cho một variant cụ thể (2 tháng gần nhất) */
   @Public()
   @Get('restock/sales-analytics/:id')
   @ApiOperation({
@@ -331,5 +282,4 @@ export class InventoryController {
   ): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse>> {
     return this.restockService.getVariantSalesAnalyticsById(id);
   }
-
 }

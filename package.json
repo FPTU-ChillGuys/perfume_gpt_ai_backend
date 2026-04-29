@@ -6,7 +6,6 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "setup": "ts-node -r tsconfig-paths/register setup.ts",
     "build": "nest build",
     "build:watch": "nest build --watch",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -87,6 +86,7 @@
     "jwt-decode": "^4.0.0",
     "md-to-pdf": "^5.2.5",
     "natural": "^8.1.1",
+    "nestjs-i18n": "^10.8.0",
     "nodemailer": "^8.0.1",
     "partial-json": "^0.1.7",
     "pg": "^8.17.2",

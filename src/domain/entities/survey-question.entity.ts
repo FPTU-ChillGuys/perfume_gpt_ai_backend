@@ -24,6 +24,10 @@ export class SurveyQuestion extends Common {
   @Property()
   question!: string;
 
+  @ApiProperty({ description: 'Thứ tự hiển thị câu hỏi', default: 0 })
+  @Property({ type: 'number', default: 0 })
+  order: number = 0;
+
   /** Danh sách câu trả lời của câu hỏi */
   @ApiProperty({
     description: 'Danh sách câu trả lời',

@@ -3,11 +3,13 @@ import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work'
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AdminInstruction } from 'src/domain/entities/admin-instruction.entity';
-import { AdminInstructionResponse } from 'src/application/dtos/response/admin-instruction.response';
+import { AdminInstructionResponse } from 'src/application/dtos/response/admin-instruction/admin-instruction.response';
 import {
-  CreateAdminInstructionRequest,
+  CreateAdminInstructionRequest
+} from 'src/application/dtos/request/admin-instruction/create-admin-instruction.request';
+import {
   UpdateAdminInstructionRequest
-} from 'src/application/dtos/request/admin-instruction.request';
+} from 'src/application/dtos/request/admin-instruction/update-admin-instruction.request';
 
 /** Service quản lý chỉ thị admin cho hệ thống AI */
 @Injectable()
@@ -19,7 +21,7 @@ export class AdminInstructionService {
     return await funcHandlerAsync(
       async () => {
         const instructions = await this.unitOfWork.AdminInstructionRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
-        const response = instructions.map((i) => this.toResponse(i));
+        const response = instructions.map(i => AdminInstructionResponse.fromEntity(i)!);
         return { success: true, data: response };
       },
       'Failed to get all admin instructions',
@@ -35,7 +37,7 @@ export class AdminInstructionService {
         if (!instruction) {
           return { success: false, error: 'Admin instruction not found' };
         }
-        return { success: true, data: this.toResponse(instruction) };
+        return { success: true, data: AdminInstructionResponse.fromEntity(instruction)! };
       },
       'Failed to get admin instruction',
       true
@@ -47,7 +49,7 @@ export class AdminInstructionService {
     return await funcHandlerAsync(
       async () => {
         const instructions = await this.unitOfWork.AdminInstructionRepo.findByType(type);
-        const response = instructions.map((i) => this.toResponse(i));
+        const response = instructions.map(i => AdminInstructionResponse.fromEntity(i)!);
         return { success: true, data: response };
       },
       'Failed to get admin instructions by type',
@@ -73,16 +75,12 @@ export class AdminInstructionService {
   ): Promise<BaseResponse<AdminInstructionResponse>> {
     return await funcHandlerAsync(
       async () => {
-        const instruction = new AdminInstruction({
-          instruction: request.instruction,
-          instructionType: request.instructionType
-        });
+        const instruction = new AdminInstruction(request.toEntity());
 
-        const em = this.unitOfWork.AdminInstructionRepo.getEntityManager();
-        em.persist(instruction);
-        await em.flush();
+        this.unitOfWork.AdminInstructionRepo.add(instruction);
+        await this.unitOfWork.AdminInstructionRepo.flush();
 
-        return { success: true, data: this.toResponse(instruction) };
+        return { success: true, data: AdminInstructionResponse.fromEntity(instruction)! };
       },
       'Failed to create admin instruction',
       true
@@ -108,10 +106,9 @@ export class AdminInstructionService {
           instruction.instructionType = request.instructionType;
         }
 
-        const em = this.unitOfWork.AdminInstructionRepo.getEntityManager();
-        await em.flush();
+        await this.unitOfWork.AdminInstructionRepo.flush();
 
-        return { success: true, data: this.toResponse(instruction) };
+        return { success: true, data: AdminInstructionResponse.fromEntity(instruction)! };
       },
       'Failed to update admin instruction',
       true
@@ -127,9 +124,8 @@ export class AdminInstructionService {
           return { success: false, error: 'Admin instruction not found' };
         }
 
-        const em = this.unitOfWork.AdminInstructionRepo.getEntityManager();
-        em.remove(instruction);
-        await em.flush();
+        this.unitOfWork.AdminInstructionRepo.remove(instruction);
+        await this.unitOfWork.AdminInstructionRepo.flush();
 
         return { success: true, data: true };
       },
@@ -150,16 +146,5 @@ export class AdminInstructionService {
     } catch {
       return '';
     }
-  }
-
-  /** Convert entity → response DTO */
-  private toResponse(entity: AdminInstruction): AdminInstructionResponse {
-    return new AdminInstructionResponse({
-      id: entity.id,
-      instruction: entity.instruction,
-      instructionType: entity.instructionType,
-      createdAt: entity.createdAt,
-      updatedAt: entity.updatedAt
-    });
   }
 }

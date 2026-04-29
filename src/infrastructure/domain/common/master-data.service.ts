@@ -183,6 +183,33 @@ export class MasterDataService {
         });
     }
 
+    /**
+     * Count products matching a keyword in a specific type field.
+     * Used to validate that a keyword actually matches real products in DB.
+     */
+    async countProductsByField(keyword: string, type: string): Promise<number> {
+        const where = this.buildTypeWhereClause(keyword, type);
+        if (!where) return 0;
+        return this.prisma.products.count({ where: { IsDeleted: false, ...where } });
+    }
+
+    /**
+     * Build Prisma WHERE clause for a keyword by type.
+     * Maps type to the corresponding product field for count/validation queries.
+     */
+    private buildTypeWhereClause(keyword: string, type: string): any {
+        switch (type) {
+            case 'brand':     return { Brands: { Name: { contains: keyword } } };
+            case 'category':  return { Categories: { Name: { contains: keyword } } };
+            case 'note':      return { ProductNoteMaps: { some: { ScentNotes: { Name: { contains: keyword } } } } };
+            case 'family':    return { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains: keyword } } } } };
+            case 'attribute': return { ProductAttributes: { some: { AttributeValues: { Value: { contains: keyword } } } } };
+            case 'product':   return { Name: { contains: keyword } };
+            case 'gender':    return { Gender: { equals: keyword } };
+            default:          return null;
+        }
+    }
+
     async fuzzySearch(keyword: string, type: 'brand' | 'category' | 'note' | 'family' | 'attribute') {
         let items: { id: string | number, name: string }[] = [];
 

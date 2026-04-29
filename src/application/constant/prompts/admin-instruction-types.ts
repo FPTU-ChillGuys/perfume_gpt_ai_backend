@@ -38,6 +38,9 @@ export const INSTRUCTION_TYPE_SURVEY = 'survey';
 /** Loại instruction cho phân tích nhu cầu nhập hàng (restock) */
 export const INSTRUCTION_TYPE_RESTOCK = 'restock';
 
+/** Loại instruction cho phát hiện hàng tồn chậm (slow stock) */
+export const INSTRUCTION_TYPE_SLOW_STOCK = 'slow_stock';
+
 /** Loại instruction cho trích xuất thông tin tìm kiếm nước hoa (search extraction) */
 export const INSTRUCTION_TYPE_SEARCH_EXTRACTION = 'search_extraction';
 
@@ -56,6 +59,7 @@ export const ALL_INSTRUCTION_TYPES = [
   INSTRUCTION_TYPE_CONVERSATION,
   INSTRUCTION_TYPE_SURVEY,
   INSTRUCTION_TYPE_RESTOCK,
+  INSTRUCTION_TYPE_SLOW_STOCK,
   INSTRUCTION_TYPE_SEARCH_EXTRACTION,
   INSTRUCTION_TYPE_STAFF_CONSULTATION
 ] as const;

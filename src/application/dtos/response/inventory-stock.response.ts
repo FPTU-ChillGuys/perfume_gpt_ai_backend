@@ -1,34 +1,51 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { StockWithVariant } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
 
 export class InventoryStockResponse {
     @ApiProperty({ description: 'Concentration name', example: 'Eau de Parfum' })
-    concentrationName: string;
+    concentrationName!: string;
 
     @ApiProperty({ description: 'Inventory stock ID', example: '550e8400-e29b-41d4-a716-446655440000' })
-    id: string;
+    id!: string;
 
     @ApiProperty({ description: 'Whether the stock is low', example: false })
-    isLowStock: boolean;
+    isLowStock!: boolean;
 
     @ApiProperty({ description: 'Low stock threshold', example: 10 })
-    lowStockThreshold: number;
+    lowStockThreshold!: number;
 
     @ApiProperty({ description: 'Product name', example: 'Chanel No.5' })
-    productName: string;
+    productName!: string;
 
     @ApiProperty({ description: 'Total quantity in stock', example: 100 })
-    totalQuantity: number;
+    totalQuantity!: number;
 
     @ApiProperty({ description: 'Variant ID', example: '550e8400-e29b-41d4-a716-446655440001' })
-    variantId: string;
+    variantId!: string;
 
     @ApiProperty({ description: 'Variant SKU', example: 'CHN5-EDP-100ML' })
-    variantSku: string;
+    variantSku!: string;
 
     @ApiProperty({ description: 'Volume in milliliters', example: 100 })
-    volumeMl: number;
+    volumeMl!: number;
 
     constructor(init?: Partial<InventoryStockResponse>) {
         Object.assign(this, init);
+    }
+
+    static fromPrisma(stock: StockWithVariant): InventoryStockResponse | null {
+        if (!stock) return null;
+        const isLowStock = stock.TotalQuantity <= stock.LowStockThreshold;
+        return new InventoryStockResponse({
+            id: stock.Id,
+            variantId: stock.VariantId,
+            variantSku: stock.ProductVariants.Sku,
+            productName: stock.ProductVariants.Products.Name,
+            concentrationName: stock.ProductVariants.Concentrations.Name,
+            volumeMl: stock.ProductVariants.VolumeMl,
+            totalQuantity: stock.TotalQuantity,
+            lowStockThreshold: stock.LowStockThreshold,
+            isLowStock
+        });
     }
 }

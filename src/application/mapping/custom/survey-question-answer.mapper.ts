@@ -12,6 +12,7 @@ export class SurveyQuestionAnswerMapper {
     const response = new SurveyQuestionAnswerResponse({
       id: entity.id,
       userId: entity.userId,
+      aiResult: entity.aiResult ?? undefined,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt
     });

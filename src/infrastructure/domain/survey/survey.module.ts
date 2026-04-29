@@ -12,6 +12,9 @@ import { ProductModule } from 'src/infrastructure/domain/product/product.module'
 import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.module';
 import { SurveyAttributeService } from 'src/infrastructure/domain/survey/survey-attribute.service';
 import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/survey-query-validator.service';
+import { SurveyInputHelper } from 'src/infrastructure/domain/survey/helpers/survey-input.helper';
+import { SurveyProductHelper } from 'src/infrastructure/domain/survey/helpers/survey-product.helper';
+import { SurveyPipelineHelper } from 'src/infrastructure/domain/survey/helpers/survey-pipeline.helper';
 
 @Module({
   imports: [
@@ -23,8 +26,16 @@ import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/su
     AIAcceptanceModule,
     BullModule.registerQueue({ name: QueueName.SURVEY_QUEUE })
   ],
-  providers: [SurveyService, SurveyQuestionRepository, SurveyAttributeService, SurveyQueryValidatorService],
-  exports: [SurveyService, SurveyAttributeService, SurveyQueryValidatorService]
+  providers: [
+    SurveyService,
+    SurveyQuestionRepository,
+    SurveyAttributeService,
+    SurveyQueryValidatorService,
+    SurveyInputHelper,
+    SurveyProductHelper,
+    SurveyPipelineHelper
+  ],
+  exports: [SurveyService, SurveyAttributeService, SurveyQueryValidatorService, SurveyInputHelper]
 })
 export class SurveyModule {}
 

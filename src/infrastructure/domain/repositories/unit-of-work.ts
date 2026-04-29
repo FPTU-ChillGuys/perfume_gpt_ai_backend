@@ -6,8 +6,8 @@ import { SurveyQuestionRepository } from './survey-question.repository';
 import { UserLogSummaryRepository } from './user-log-summary.repository';
 import { AIAcceptanceRepository } from './ai-acceptance.repository';
 import { ReviewSummaryLogRepository } from './review-summary.repository';
+import { InventoryLogRepository } from './inventory-log.repository';
 import { EntityRepository } from '@mikro-orm/postgresql';
-import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { TrendLog } from 'src/domain/entities/trend-log.entity';
@@ -24,7 +24,7 @@ export class UnitOfWork {
     private readonly userLogSummaryRepository: UserLogSummaryRepository,
     private readonly aiAcceptanceRepository: AIAcceptanceRepository,
     private readonly adminInstructionRepository: AdminInstructionRepository,
-    @InjectRepository(InventoryLog) private readonly inventoryLogRepository: EntityRepository<InventoryLog>,
+    private readonly inventoryLogRepository: InventoryLogRepository,
     @InjectRepository(ReviewLog) private readonly reviewLogRepository: EntityRepository<ReviewLog>,
     @InjectRepository(TrendLog) private readonly trendLogRepository: EntityRepository<TrendLog>
   ) { }
@@ -48,14 +48,13 @@ export class UnitOfWork {
     return this.userLogSummaryRepository;
   }
 
-  get InventoryLogRepo(): EntityRepository<InventoryLog> {
+  get InventoryLogRepo(): InventoryLogRepository {
     return this.inventoryLogRepository;
   }
 
   get AIAcceptanceRepo(): AIAcceptanceRepository {
     return this.aiAcceptanceRepository;
   }
-
   get AdminInstructionRepo(): AdminInstructionRepository {
     return this.adminInstructionRepository;
   }

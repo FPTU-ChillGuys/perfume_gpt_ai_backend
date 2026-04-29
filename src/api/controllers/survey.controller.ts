@@ -3,7 +3,10 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -19,7 +22,6 @@ import {
   ApiExtraModels
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
-import { SurveyAnswerRequest } from 'src/application/dtos/request/survey-answer.request';
 import { SurveyQuesAnsDetailRequest } from 'src/application/dtos/request/survey-ques-ans-detail.request';
 import { SurveyQuesAnwsRequest } from 'src/application/dtos/request/survey-ques-ans.request';
 import { SurveyQuestionRequest } from 'src/application/dtos/request/survey-question.request';
@@ -28,13 +30,13 @@ import { SurveyQuestionResponse } from 'src/application/dtos/response/survey-que
 import { SurveyService } from 'src/infrastructure/domain/survey/survey.service';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { SurveyQuestionAnswerResponse } from 'src/application/dtos/response/survey-question-answer.response';
+import { ReorderQuestionsRequest } from 'src/application/dtos/request/reorder-questions.request';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { Request } from 'express';
-import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { SurveyAttributeService } from 'src/infrastructure/domain/survey/survey-attribute.service';
-import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/survey-query-validator.service';
+import { SurveyInputHelper } from 'src/infrastructure/domain/survey/helpers/survey-input.helper';
 import {
   SurveyAttributeType,
   CreateQuestionFromAttributeRequest,
@@ -52,7 +54,7 @@ export class SurveyController {
   constructor(
     private surveyService: SurveyService,
     private surveyAttributeService: SurveyAttributeService,
-    private surveyQueryValidator: SurveyQueryValidatorService
+    private inputHelper: SurveyInputHelper
   ) { }
 
   /** Lấy tất cả câu hỏi survey */
@@ -155,7 +157,7 @@ export class SurveyController {
     @Query('userId') userId: string,
     @Body() surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    const resolvedUserId = this.inputHelper.resolveUserId(req, userId);
     return this.surveyService.processSurveyAndGetAIResponse(resolvedUserId, surveyAnswers);
   }
 
@@ -171,7 +173,7 @@ export class SurveyController {
     @Query('userId') userId: string,
     @Body() surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    const resolvedUserId = this.inputHelper.resolveUserId(req, userId);
     return this.surveyService.processSurveyV2AndGetAIResponse(resolvedUserId, surveyAnswers);
   }
 
@@ -187,7 +189,7 @@ export class SurveyController {
     @Query('userId') userId: string,
     @Body() surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    const resolvedUserId = this.inputHelper.resolveUserId(req, userId);
     return this.surveyService.processSurveyWithPerQuestionQueries(resolvedUserId, surveyAnswers);
   }
 
@@ -203,7 +205,7 @@ export class SurveyController {
     @Query('userId') userId: string,
     @Body() surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    const resolvedUserId = this.inputHelper.resolveUserId(req, userId);
     return this.surveyService.processSurveyV4QueryBased(resolvedUserId, surveyAnswers);
   }
 
@@ -219,7 +221,7 @@ export class SurveyController {
     @Query('userId') userId: string,
     @Body() surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    const resolvedUserId = userId || resolveLogUserIdFromRequest(req);
+    const resolvedUserId = this.inputHelper.resolveUserId(req, userId);
     return this.surveyService.processSurveyV5Hybrid(resolvedUserId, surveyAnswers);
   }
 
@@ -264,70 +266,7 @@ export class SurveyController {
   async createQuestionFromAttribute(
     @Body() body: CreateQuestionFromAttributeRequest
   ): Promise<BaseResponse<string>> {
-    // 1. Get values for the attribute type
-    const attrValues = await this.surveyAttributeService.getAttributeValues(body.attributeType);
-
-    // 2. Collect all value items
-    let allValues = attrValues.values || [];
-
-    // Handle subGroups for 'attribute' type
-    if (body.attributeType === 'attribute' && attrValues.subGroups) {
-      if (body.attributeName) {
-        const group = attrValues.subGroups.find(g => g.attributeName === body.attributeName);
-        allValues = group?.values || [];
-      } else {
-        throw new BadRequestWithDetailsException(
-          'attributeName is required when attributeType is "attribute"',
-          { attributeType: body.attributeType }
-        );
-      }
-    }
-
-    // Handle budget type with custom ranges
-    if (body.attributeType === 'budget' && body.budgetRanges && body.budgetRanges.length > 0) {
-      allValues = body.budgetRanges.map(r => ({
-        displayText: r.label,
-        queryFragment: { type: 'budget' as const, min: r.min, max: r.max },
-      }));
-    }
-
-    // 3. Filter selected values if specified
-    if (body.selectedValues && body.selectedValues.length > 0) {
-      const selectedSet = new Set(body.selectedValues);
-      allValues = allValues.filter(v => selectedSet.has(v.displayText));
-    }
-
-    if (allValues.length < 2) {
-      throw new BadRequestWithDetailsException(
-        'Cần ít nhất 2 giá trị để tạo câu hỏi',
-        { availableValues: allValues.length }
-      );
-    }
-
-    // 4. Validate all query fragments  
-    for (const val of allValues) {
-      const validation = this.surveyQueryValidator.validateQueryFragment(val.queryFragment);
-      if (!validation.valid) {
-        throw new BadRequestWithDetailsException(
-          `Invalid query fragment for "${val.displayText}": ${validation.errors.join(', ')}`,
-          { displayText: val.displayText, errors: validation.errors }
-        );
-      }
-    }
-
-    // 5. Build survey question request with JSON answers
-    const surveyQuestionReq: SurveyQuestionRequest = {
-      question: body.question,
-      questionType: body.questionType as any,
-      answers: allValues.map(val => new SurveyAnswerRequest({
-        answer: JSON.stringify({
-          displayText: val.displayText,
-          queryFragment: val.queryFragment,
-        }),
-      })),
-    };
-
-    return this.surveyService.addSurveyQues(surveyQuestionReq);
+    return this.surveyService.createQuestionFromAttribute(body);
   }
 
   /** Lấy tất cả câu hỏi và câu trả lời survey của người dùng */
@@ -375,5 +314,17 @@ export class SurveyController {
       );
     }
     return Ok();
+  }
+
+  @Role(['admin'])
+  @Patch('questions/reorder')
+  @ApiOperation({ summary: 'Sắp xếp lại thứ tự câu hỏi survey' })
+  @ApiBody({ type: ReorderQuestionsRequest })
+  @ApiBaseResponse(Object)
+  @HttpCode(HttpStatus.OK)
+  async reorderQuestions(
+    @Body() body: ReorderQuestionsRequest
+  ): Promise<BaseResponse<void>> {
+    return this.surveyService.reorderQuestions(body.orders.map(o => ({ id: o.id, order: o.order })));
   }
 }

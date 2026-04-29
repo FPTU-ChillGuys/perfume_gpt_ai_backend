@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import {
   VariantSalesAnalyticsResponse,
@@ -7,65 +6,25 @@ import {
 } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { calculateSalesMetrics } from 'src/infrastructure/domain/utils/sales-metrics.util';
-import { Prisma } from 'generated/prisma/client';
+import { RestockAnalyticsRepository } from 'src/infrastructure/domain/restock/restock-analytics.repository';
+import { CandidateMode, ProductVariantSalesCandidate, ProductSalesAnalyticsCandidate } from 'src/application/dtos/response/restock/sales-analytics.types';
+import { RESTOCK_CONFIG } from 'src/application/constant/inventory.constant';
 
-const variantInclude = {
-  Products: true,
-  Concentrations: true
-} satisfies Prisma.ProductVariantsInclude;
+export type { ProductVariantSalesCandidate, ProductSalesAnalyticsCandidate };
 
-type VariantWithRelations = Prisma.ProductVariantsGetPayload<{
-  include: typeof variantInclude;
-}>;
-
-type CandidateMode = 'trend' | 'restock';
-
-export interface ProductVariantSalesCandidate {
-  variantId: string;
-  sku: string;
-  volumeMl: number;
-  basePrice: number;
-  status: string;
-  isCriticalStock: boolean;
-  totalQuantitySold: number;
-  averageDailySales: number;
-  last7DaysSales: number;
-  last30DaysSales: number;
-  trend: 'INCREASING' | 'STABLE' | 'DECLINING';
-  volatility: 'LOW' | 'MEDIUM' | 'HIGH';
-}
-
-export interface ProductSalesAnalyticsCandidate {
-  productName: string;
-  variantCount: number;
-  hasCriticalStock: boolean;
-  totalQuantitySold: number;
-  averageDailySales: number;
-  last7DaysSales: number;
-  last30DaysSales: number;
-  salesTrend: 'INCREASING' | 'STABLE' | 'DECLINING';
-  volatility: 'LOW' | 'MEDIUM' | 'HIGH';
-  variants: ProductVariantSalesCandidate[];
-}
-
-/**
- * Service xử lý dữ liệu phân tích bán hàng variant để dự đoán tái cấp hàng
- * Lấy dữ liệu bán hàng từ 2 tháng gần nhất
- */
 @Injectable()
 export class RestockService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly restockAnalyticsRepo: RestockAnalyticsRepository) {}
 
   private inferAggregateTrend(last7DaysSales: number, last30DaysSales: number): 'INCREASING' | 'STABLE' | 'DECLINING' {
     if (last30DaysSales <= 0) {
       return 'STABLE';
     }
-
     const baseline = last30DaysSales / 4;
-    if (last7DaysSales > baseline * 1.15) {
+    if (last7DaysSales > baseline * RESTOCK_CONFIG.TREND_INCREASING_THRESHOLD) {
       return 'INCREASING';
     }
-    if (last7DaysSales < baseline * 0.85) {
+    if (last7DaysSales < baseline * RESTOCK_CONFIG.TREND_DECLINING_THRESHOLD) {
       return 'DECLINING';
     }
     return 'STABLE';
@@ -87,6 +46,16 @@ export class RestockService {
     limit: number,
     criticalVariantIds: Set<string> = new Set<string>()
   ): ProductSalesAnalyticsCandidate[] {
+    const byProduct = this.groupVariantsByProduct(variants, mode, criticalVariantIds);
+    const candidates = this.aggregateAndSortCandidates(byProduct, mode, limit);
+    return candidates;
+  }
+
+  private groupVariantsByProduct(
+    variants: VariantSalesAnalyticsResponse[],
+    mode: CandidateMode,
+    criticalVariantIds: Set<string>
+  ): Map<string, ProductSalesAnalyticsCandidate> {
     const byProduct = new Map<string, ProductSalesAnalyticsCandidate>();
 
     for (const variant of variants) {
@@ -117,8 +86,7 @@ export class RestockService {
       };
 
       current.variantCount += 1;
-      current.hasCriticalStock =
-        current.hasCriticalStock || criticalVariantIds.has(variant.variantId);
+      current.hasCriticalStock = current.hasCriticalStock || criticalVariantIds.has(variant.variantId);
       current.totalQuantitySold += totalQuantitySold;
       current.averageDailySales += variant.averageDailySales ?? 0;
       current.last7DaysSales += last7DaysSales;
@@ -140,7 +108,14 @@ export class RestockService {
 
       byProduct.set(key, current);
     }
+    return byProduct;
+  }
 
+  private aggregateAndSortCandidates(
+    byProduct: Map<string, ProductSalesAnalyticsCandidate>,
+    mode: CandidateMode,
+    limit: number
+  ): ProductSalesAnalyticsCandidate[] {
     const candidates = Array.from(byProduct.values()).map((item) => {
       item.salesTrend = this.inferAggregateTrend(item.last7DaysSales, item.last30DaysSales);
       item.volatility = this.inferAggregateVolatility(item.variants.map((variant) => variant.volatility));
@@ -183,24 +158,7 @@ export class RestockService {
   private async getCriticalLowStockVariants(
     knownVariantIds: Set<string>
   ): Promise<{ variants: VariantSalesAnalyticsResponse[]; ids: Set<string> }> {
-    const stocks = await this.prisma.stocks.findMany({
-      where: {
-        ProductVariants: {
-          IsDeleted: false,
-          Products: { IsDeleted: false }
-        },
-        TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold }
-      },
-      include: {
-        ProductVariants: {
-          include: {
-            Products: true,
-            Concentrations: true
-          }
-        }
-      }
-    });
-
+    const stocks = await this.restockAnalyticsRepo.findCriticalStocks();
     const ids = new Set<string>();
     const variants: VariantSalesAnalyticsResponse[] = [];
     const now = new Date();
@@ -212,7 +170,6 @@ export class RestockService {
       if (knownVariantIds.has(variantId)) {
         continue;
       }
-
       variants.push(
         new VariantSalesAnalyticsResponse({
           variantId,
@@ -272,241 +229,137 @@ export class RestockService {
       };
     }
 
-    const knownVariantIds = new Set(
-      analyticsResult.payload.map((item) => item.variantId)
-    );
+    const knownVariantIds = new Set(analyticsResult.payload.map((item) => item.variantId));
     const criticalVariants = await this.getCriticalLowStockVariants(knownVariantIds);
     const enrichedVariants = [...analyticsResult.payload, ...criticalVariants.variants];
 
     return {
       success: true,
-      payload: this.buildProductCandidates(
-        enrichedVariants,
-        'restock',
-        limit,
-        criticalVariants.ids
-      )
+      payload: this.buildProductCandidates(enrichedVariants, 'restock', limit, criticalVariants.ids)
     };
   }
 
-  /**
-   * Lấy tất cả variant với dữ liệu bán hàng theo ngày (2 tháng gần nhất)
-   * Sử dụng cho tool dự đoán tái cấp hàng
-   */
   async getProductSalesAnalyticsForRestock(): Promise<
     BaseResponseAPI<VariantSalesAnalyticsResponse[]>
   > {
     return await funcHandlerAsync(
       async () => {
-        // Tính toán thời gian 2 tháng gần nhất
         const now = new Date();
         const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
 
-        // Lấy tất cả variant không bị xóa
-        const variants = await this.prisma.productVariants.findMany({
-          where: { IsDeleted: false },
-          include: variantInclude
-        });
+        const [variants, orderDetails] = await Promise.all([
+          this.restockAnalyticsRepo.findAllActiveVariants(),
+          this.restockAnalyticsRepo.findOrderDetailsInDateRange(twoMonthsAgo)
+        ]);
 
-        // Lấy tất cả order details từ 2 tháng gần nhất
-        const orderDetails = await this.prisma.orderDetails.findMany({
-          where: {
-            Orders: {
-              CreatedAt: {
-                gte: twoMonthsAgo
-              },
-              Status: {
-                notIn: ['Canceled', 'Returned']
-              }
-            }
-          },
-          include: {
-            Orders: true
-          }
-        });
+        const salesDataByVariant = this.groupOrderDetailsByVariant(orderDetails);
+        const results = this.buildVariantAnalyticsResponses(variants, salesDataByVariant, twoMonthsAgo, now);
 
-        // Nhóm dữ liệu bán hàng theo variant
-        const salesDataByVariant = new Map<
-          string,
-          { date: string; quantity: number; unitPrice: number }[]
-        >();
-
-        orderDetails.forEach((detail) => {
-          const variantId = detail.VariantId;
-          if (!salesDataByVariant.has(variantId)) {
-            salesDataByVariant.set(variantId, []);
-          }
-          const dateStr = detail.Orders.CreatedAt.toISOString().split('T')[0];
-          salesDataByVariant.get(variantId)!.push({
-            date: dateStr,
-            quantity: detail.Quantity,
-            unitPrice: Number(detail.UnitPrice)
-          });
-        });
-
-        // Xây dựng response
-        const results = variants.map((variant) => {
-          const salesData = salesDataByVariant.get(variant.Id) || [];
-
-          // Nhóm bán hàng theo ngày
-          const dailyMap = new Map<
-            string,
-            { quantity: number; revenue: number }
-          >();
-          salesData.forEach((record) => {
-            const existing = dailyMap.get(record.date) || { quantity: 0, revenue: 0 };
-            dailyMap.set(record.date, {
-              quantity: existing.quantity + record.quantity,
-              revenue: existing.revenue + record.quantity * record.unitPrice
-            });
-          });
-
-          // Tạo mảng records theo ngày được sắp xếp
-          const dailySalesData: DailySalesRecord[] = Array.from(
-            dailyMap.entries()
-          )
-            .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-            .map(([date, data]) => ({
-              date,
-              quantitySold: data.quantity,
-              revenue: data.revenue
-            }));
-
-          // Tính tổng thống kê
-          const totalQuantitySold = dailySalesData.reduce(
-            (sum, record) => sum + record.quantitySold,
-            0
-          );
-          const totalRevenue = dailySalesData.reduce(
-            (sum, record) => sum + record.revenue,
-            0
-          );
-          const daysWithSalesCount = dailySalesData.length;
-          const averageDailySales =
-            daysWithSalesCount > 0 ? totalQuantitySold / daysWithSalesCount : 0;
-
-          // Tính metrics tối ưu cho LLM
-          const salesMetrics = calculateSalesMetrics(dailySalesData);
-
-          return new VariantSalesAnalyticsResponse({
-            variantId: variant.Id,
-            sku: variant.Sku,
-            productName: variant.Products.Name,
-            volumeMl: variant.VolumeMl,
-            type: variant.Type,
-            basePrice: Number(variant.BasePrice),
-            status: variant.Status,
-            concentrationName: variant.Concentrations.Name,
-            dailySalesData,
-            totalQuantitySold,
-            totalRevenue,
-            averageDailySales: Number(averageDailySales.toFixed(2)),
-            periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
-            periodEndDate: now.toISOString().split('T')[0],
-            daysWithSalesCount,
-            salesMetrics
-          });
-        });
-
-        return {
-          success: true,
-          payload: results
-        };
+        return { success: true, payload: results };
       },
       'Failed to fetch variant sales analytics for restock',
       true
     );
   }
 
-  /**
-   * Lấy dữ liệu phân tích bán hàng cho một variant cụ thể
-   * @param variantId ID của variant
-   */
+  private groupOrderDetailsByVariant(orderDetails: Awaited<ReturnType<RestockAnalyticsRepository['findOrderDetailsInDateRange']>>): Map<string, { date: string; quantity: number; unitPrice: number }[]> {
+    const salesDataByVariant = new Map<string, { date: string; quantity: number; unitPrice: number }[]>();
+    orderDetails.forEach((detail) => {
+      const variantId = detail.VariantId;
+      if (!salesDataByVariant.has(variantId)) {
+        salesDataByVariant.set(variantId, []);
+      }
+      const dateStr = detail.Orders.CreatedAt.toISOString().split('T')[0];
+      salesDataByVariant.get(variantId)!.push({
+        date: dateStr,
+        quantity: detail.Quantity,
+        unitPrice: Number(detail.UnitPrice)
+      });
+    });
+    return salesDataByVariant;
+  }
+
+  private buildVariantAnalyticsResponses(
+    variants: Awaited<ReturnType<RestockAnalyticsRepository['findAllActiveVariants']>>,
+    salesDataByVariant: Map<string, { date: string; quantity: number; unitPrice: number }[]>,
+    twoMonthsAgo: Date,
+    now: Date
+  ): VariantSalesAnalyticsResponse[] {
+    return variants.map((variant) => {
+      const salesData = salesDataByVariant.get(variant.Id) || [];
+      const dailySalesData = this.buildDailySalesRecords(salesData);
+      const { totalQuantitySold, totalRevenue, daysWithSalesCount, averageDailySales } = this.computeSalesTotals(dailySalesData);
+      const salesMetrics = calculateSalesMetrics(dailySalesData);
+
+      return new VariantSalesAnalyticsResponse({
+        variantId: variant.Id,
+        sku: variant.Sku,
+        productName: variant.Products.Name,
+        volumeMl: variant.VolumeMl,
+        type: variant.Type,
+        basePrice: Number(variant.BasePrice),
+        status: variant.Status,
+        concentrationName: variant.Concentrations.Name,
+        dailySalesData,
+        totalQuantitySold,
+        totalRevenue,
+        averageDailySales: Number(averageDailySales.toFixed(2)),
+        periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
+        periodEndDate: now.toISOString().split('T')[0],
+        daysWithSalesCount,
+        salesMetrics
+      });
+    });
+  }
+
+  private buildDailySalesRecords(salesData: { date: string; quantity: number; unitPrice: number }[]): DailySalesRecord[] {
+    const dailyMap = new Map<string, { quantity: number; revenue: number }>();
+    salesData.forEach((record) => {
+      const existing = dailyMap.get(record.date) || { quantity: 0, revenue: 0 };
+      dailyMap.set(record.date, {
+        quantity: existing.quantity + record.quantity,
+        revenue: existing.revenue + record.quantity * record.unitPrice
+      });
+    });
+
+    return Array.from(dailyMap.entries())
+      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .map(([date, data]) => ({
+        date,
+        quantitySold: data.quantity,
+        revenue: data.revenue
+      }));
+  }
+
+  private computeSalesTotals(dailySalesData: DailySalesRecord[]): {
+    totalQuantitySold: number;
+    totalRevenue: number;
+    daysWithSalesCount: number;
+    averageDailySales: number;
+  } {
+    const totalQuantitySold = dailySalesData.reduce((sum, record) => sum + record.quantitySold, 0);
+    const totalRevenue = dailySalesData.reduce((sum, record) => sum + record.revenue, 0);
+    const daysWithSalesCount = dailySalesData.length;
+    const averageDailySales = daysWithSalesCount > 0 ? totalQuantitySold / daysWithSalesCount : 0;
+    return { totalQuantitySold, totalRevenue, daysWithSalesCount, averageDailySales };
+  }
+
   async getVariantSalesAnalyticsById(
     variantId: string
   ): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse>> {
     return await funcHandlerAsync(
       async () => {
         const now = new Date();
-        const twoMonthsAgo = new Date(
-          now.getFullYear(),
-          now.getMonth() - 2,
-          now.getDate()
-        );
+        const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
 
-        // Lấy thông tin variant
-        const variant = await this.prisma.productVariants.findUnique({
-          where: { Id: variantId, IsDeleted: false },
-          include: variantInclude
-        });
-
+        const variant = await this.restockAnalyticsRepo.findVariantById(variantId);
         if (!variant) {
-          return {
-            success: false,
-            error: 'Variant not found'
-          };
+          return { success: false, error: 'Variant not found' };
         }
 
-        // Lấy dữ liệu bán hàng của variant
-        const orderDetails = await this.prisma.orderDetails.findMany({
-          where: {
-            VariantId: variantId,
-            Orders: {
-              CreatedAt: {
-                gte: twoMonthsAgo
-              },
-              Status: {
-                notIn: ['Canceled', 'Returned']
-              }
-            }
-          },
-          include: {
-            Orders: true
-          }
-        });
-
-        // Nhóm bán hàng theo ngày
-        const dailyMap = new Map<
-          string,
-          { quantity: number; revenue: number }
-        >();
-        orderDetails.forEach((detail) => {
-          const dateStr = detail.Orders.CreatedAt.toISOString().split('T')[0];
-          const revenue = detail.Quantity * Number(detail.UnitPrice);
-          const existing = dailyMap.get(dateStr) || { quantity: 0, revenue: 0 };
-          dailyMap.set(dateStr, {
-            quantity: existing.quantity + detail.Quantity,
-            revenue: existing.revenue + revenue
-          });
-        });
-
-        // Tạo mảng records theo ngày được sắp xếp
-        const dailySalesData: DailySalesRecord[] = Array.from(
-          dailyMap.entries()
-        )
-          .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-          .map(([date, data]) => ({
-            date,
-            quantitySold: data.quantity,
-            revenue: data.revenue
-          }));
-
-        // Tính tổng thống kê
-        const totalQuantitySold = dailySalesData.reduce(
-          (sum, record) => sum + record.quantitySold,
-          0
-        );
-        const totalRevenue = dailySalesData.reduce(
-          (sum, record) => sum + record.revenue,
-          0
-        );
-        const daysWithSalesCount = dailySalesData.length;
-        const averageDailySales =
-          daysWithSalesCount > 0
-            ? totalQuantitySold / daysWithSalesCount
-            : 0;
-
-        // Tính metrics tối ưu cho LLM
+        const orderDetails = await this.restockAnalyticsRepo.findOrderDetailsByVariantId(variantId, twoMonthsAgo);
+        const dailySalesData = this.buildDailySalesRecordsFromDetails(orderDetails);
+        const { totalQuantitySold, totalRevenue, daysWithSalesCount, averageDailySales } = this.computeSalesTotals(dailySalesData);
         const salesMetrics = calculateSalesMetrics(dailySalesData);
 
         return {
@@ -534,5 +387,28 @@ export class RestockService {
       'Failed to fetch variant sales analytics',
       true
     );
+  }
+
+  private buildDailySalesRecordsFromDetails(
+    orderDetails: Awaited<ReturnType<RestockAnalyticsRepository['findOrderDetailsByVariantId']>>
+  ): DailySalesRecord[] {
+    const dailyMap = new Map<string, { quantity: number; revenue: number }>();
+    orderDetails.forEach((detail) => {
+      const dateStr = detail.Orders.CreatedAt.toISOString().split('T')[0];
+      const revenue = detail.Quantity * Number(detail.UnitPrice);
+      const existing = dailyMap.get(dateStr) || { quantity: 0, revenue: 0 };
+      dailyMap.set(dateStr, {
+        quantity: existing.quantity + detail.Quantity,
+        revenue: existing.revenue + revenue
+      });
+    });
+
+    return Array.from(dailyMap.entries())
+      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .map(([date, data]) => ({
+        date,
+        quantitySold: data.quantity,
+        revenue: data.revenue
+      }));
   }
 }

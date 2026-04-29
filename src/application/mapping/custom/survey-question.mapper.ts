@@ -9,6 +9,7 @@ export class SurveyQuestionMapper {
       id: entity.id,
       questionType: entity.questionType,
       question: entity.question,
+      order: entity.order,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt
     });
@@ -27,7 +28,8 @@ export class SurveyQuestionMapper {
   static toEntity(request: SurveyQuestionRequest): SurveyQuestion {
     const surveyQuestion = new SurveyQuestion({
       question: request.question,
-      ...(request.questionType && { questionType: request.questionType })
+      ...(request.questionType && { questionType: request.questionType }),
+      ...(request.order !== undefined && { order: request.order })
     });
 
     // Map answers if provided
@@ -52,6 +54,10 @@ export class SurveyQuestionMapper {
 
     if (request.question) {
       entity.question = request.question;
+    }
+
+    if (request.order !== undefined) {
+      entity.order = request.order;
     }
 
     if (request.answers) {

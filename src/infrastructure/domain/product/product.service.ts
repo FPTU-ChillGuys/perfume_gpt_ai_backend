@@ -25,6 +25,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { ProductCardOutputItem } from 'src/chatbot/output/product.output';
 import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
 import { DictionaryBuilderService } from 'src/infrastructure/domain/common/dictionary-builder.service';
+import { MasterDataService } from 'src/infrastructure/domain/common/master-data.service';
 import { EntityDictionary } from 'src/domain/types/dictionary.types';
 import { unescapeUnicode } from 'unescape-unicode';
 import { escapeUnicode, isNotAscii } from 'escape-unicode';
@@ -197,6 +198,7 @@ export class ProductService {
     private readonly nlpEngine: NlpEngineService,
     private readonly dictionaryBuilder: DictionaryBuilderService,
     private readonly configService: ConfigService,
+    private readonly masterDataService: MasterDataService,
   ) { }
 
   /**
@@ -218,6 +220,138 @@ export class ProductService {
       this.logger.warn('[SEARCH] Failed to load generic keywords from DB, using fallback', error);
       return this.GENERIC_FILTER_KEYWORDS_FALLBACK;
     }
+  }
+
+  /**
+   * Type-to-DB-field mapping for count validation queries.
+   * Maps a keyword type to the corresponding Prisma WHERE clause on Products table.
+   */
+  private readonly TYPE_FIELD_MAP: Record<string, (keyword: string) => Prisma.ProductsWhereInput> = {
+    brand:     (kw) => ({ Brands: { Name: { contains: kw } } }),
+    category:  (kw) => ({ Categories: { Name: { contains: kw } } }),
+    note:      (kw) => ({ ProductNoteMaps: { some: { ScentNotes: { Name: { contains: kw } } } } }),
+    family:    (kw) => ({ ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains: kw } } } } }),
+    attribute: (kw) => ({ ProductAttributes: { some: { AttributeValues: { Value: { contains: kw } } } } }),
+    product:   (kw) => ({ Name: { contains: kw } }),
+    gender:    (kw) => ({ Gender: { equals: kw } }),
+  };
+
+  /**
+   * Type-to-MasterData-search mapping for re-normalization.
+   * Used when a keyword has count=0 to find alternative labels.
+   */
+  private readonly TYPE_SEARCH_MAP: Record<string, (keyword: string) => Promise<any[]>> = {
+    brand:     (kw) => this.masterDataService.searchBrands(kw),
+    category:  (kw) => this.masterDataService.searchCategories(kw),
+    note:      (kw) => this.masterDataService.searchScentNotes(kw),
+    family:    (kw) => this.masterDataService.searchOlfactoryFamilies(kw),
+    attribute: (kw) => this.masterDataService.searchAttributeValues(kw),
+    product:   (kw) => this.masterDataService.searchProducts(kw),
+  };
+
+  /**
+   * Validate and re-normalize keywords in logic groups using count queries.
+   * Layer 2 safety net: if a keyword has count=0, try re-normalizing once via MasterDataService.
+   * If still count=0 after re-normalization, remove the keyword.
+   */
+  private async validateAndRenormalizeKeywords(
+    logic: any[],
+    normalizationMetadata: any[] | null
+  ): Promise<{ validatedLogic: any[]; removedKeywords: string[]; renormalizedKeywords: string[] }> {
+    const genericFilterKeywords = await this.getGenericFilterKeywords();
+    const removedKeywords: string[] = [];
+    const renormalizedKeywords: string[] = [];
+
+    const validatedLogic = await Promise.all(logic.map(async (group: any) => {
+      const items = Array.isArray(group) ? group : [group];
+      const validatedItems: string[] = [];
+
+      for (const item of items) {
+        const lower = item.toLowerCase();
+
+        // Skip exceptions: generic, price, short/long, unknown type
+        if (genericFilterKeywords.includes(lower) ||
+            lower.includes('price<') || lower.includes('price>') ||
+            item.length < 3 || item.length > 100) {
+          validatedItems.push(item);
+          continue;
+        }
+
+        // Find type from normalizationMetadata
+        const meta = Array.isArray(normalizationMetadata)
+          ? normalizationMetadata.find(m => m.original?.toLowerCase() === lower || m.corrected?.toLowerCase() === lower)
+          : null;
+        const type = meta?.type || 'unknown';
+
+        if (type === 'unknown') {
+          validatedItems.push(item);
+          continue;
+        }
+
+        // Step 1: Count query
+        const fieldWhere = this.TYPE_FIELD_MAP[type]?.(item);
+        if (!fieldWhere) {
+          validatedItems.push(item);
+          continue;
+        }
+
+        try {
+          const count = await this.prisma.products.count({
+            where: { IsDeleted: false, ...fieldWhere }
+          });
+
+          if (count > 0) {
+            validatedItems.push(item);
+            continue;
+          }
+
+          // Step 2: Count = 0 → try re-normalization
+          const searchFn = this.TYPE_SEARCH_MAP[type];
+          if (!searchFn) {
+            removedKeywords.push(item);
+            continue;
+          }
+
+          const searchResults = await searchFn(item);
+          if (searchResults.length > 0) {
+            // Find the best match label
+            const bestMatch = searchResults[0];
+            const newKeyword = bestMatch.Name || bestMatch.Value || bestMatch.id || bestMatch.Id;
+            if (newKeyword && newKeyword.toLowerCase() !== lower) {
+              // Verify new keyword with count query
+              const newFieldWhere = this.TYPE_FIELD_MAP[type]?.(newKeyword);
+              if (newFieldWhere) {
+                const newCount = await this.prisma.products.count({
+                  where: { IsDeleted: false, ...newFieldWhere }
+                });
+                if (newCount > 0) {
+                  validatedItems.push(newKeyword);
+                  renormalizedKeywords.push(`${item}->${newKeyword}`);
+                  this.logger.log(`[VALIDATE] Re-normalized: "${item}" -> "${newKeyword}" (count=${newCount})`);
+                  continue;
+                }
+              }
+            }
+          }
+
+          // Step 3: Still no match → remove
+          removedKeywords.push(item);
+          this.logger.log(`[VALIDATE] Removed keyword: "${item}" (count=0 after re-normalization)`);
+        } catch (error) {
+          // Fail-safe: keep the keyword if validation errors
+          this.logger.warn(`[VALIDATE] Error validating "${item}", keeping it.`);
+          validatedItems.push(item);
+        }
+      }
+
+      return validatedItems.length > 0 ? validatedItems : null;
+    }));
+
+    return {
+      validatedLogic: validatedLogic.filter(g => g !== null),
+      removedKeywords,
+      renormalizedKeywords
+    };
   }
 
   private createEmptyPagedProducts(
@@ -1124,55 +1258,74 @@ export class ProductService {
         return filtered.length > 0 ? filtered : null;
       }).filter(group => group !== null);
 
+      // Layer 2 safety net: Validate + re-normalize keywords via count queries
+      const { validatedLogic, removedKeywords, renormalizedKeywords } = 
+        await this.validateAndRenormalizeKeywords(purifiedLogic, analysis.normalizationMetadata || null);
+
+      if (removedKeywords.length > 0) {
+        this.logger.log(`[SEARCH] Removed invalid keywords: ${removedKeywords.join(', ')}`);
+      }
+      if (renormalizedKeywords.length > 0) {
+        this.logger.log(`[SEARCH] Re-normalized keywords: ${renormalizedKeywords.join(', ')}`);
+      }
+
+      // Use validatedLogic instead of purifiedLogic for building conditions
+      const effectiveLogic = validatedLogic;
+
       // Build AND conditions (each group is a set of OR alternatives)
-      // IMPORTANT: Flatten the nested OR structure to avoid confusion in query execution
-      // Each keyword in a group can match across multiple fields (Name, Brands, Categories, etc)
-      const groupConditions: Prisma.ProductsWhereInput[] = purifiedLogic.map((group: any) => {
+      // Uses type-aware field mapping: if normalizationMetadata has type info,
+      // only search the corresponding field. Otherwise fallback to OR all fields.
+      const normalizationMetadata = analysis.normalizationMetadata || null;
+      const groupConditions: Prisma.ProductsWhereInput[] = effectiveLogic.map((group: any) => {
         const orItems = group;
-        // Flatten: instead of { OR: [{ OR: [...] }, { OR: [...] }] }, 
-        // create { OR: [field1, field2, ...] } with all fields for all items
         const flattenedOrConditions: Prisma.ProductsWhereInput[] = [];
         
         for (const item of orItems) {
-          flattenedOrConditions.push(
-            { Name: { contains : item } },
-            { Brands: { Name: { contains : item } } },
-            { Categories: { Name: { contains : item } } },
-            { Gender: { equals : item } },
-            { Origin: { contains : item } },
-            { ProductNoteMaps: { some: { ScentNotes: { Name: { contains : item } } } } },
-            { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains : item } } } } },
-            { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } },
-            { ProductVariants: { some: { Type: { contains : item } } } },
-            { ProductVariants: { some: { Concentrations: { Name: { contains : item } } } } },
-            { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } } } },
-            ...(this.extractReleaseYear(item) ? [{ ReleaseYear: this.extractReleaseYear(item)! }] : []),
-            ...(this.extractVolumeValues(item).length > 0 ? [{ ProductVariants: { some: { VolumeMl: { in: this.extractVolumeValues(item) } } } }] : []),
-            ...(this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i) !== undefined
-              ? [{ ProductVariants: { some: { Longevity: { gte: this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i)! } } } }]
-              : []),
-            ...(this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i')) !== undefined
-              ? [{ ProductVariants: { some: { Sillage: { gte: this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i'))! } } } }]
-              : [])
-          );
+          // Find type from normalizationMetadata
+          const lower = item.toLowerCase();
+          const meta = Array.isArray(normalizationMetadata)
+            ? normalizationMetadata.find(
+                m => m.original?.toLowerCase() === lower || m.corrected?.toLowerCase() === lower
+              )
+            : null;
+          const type = meta?.type || 'unknown';
+
+          if (type !== 'unknown' && this.TYPE_FIELD_MAP[type]) {
+            // Type-aware: only search the corresponding field
+            const fieldWhere = this.TYPE_FIELD_MAP[type](item);
+            if (fieldWhere) {
+              flattenedOrConditions.push(fieldWhere);
+            }
+          } else {
+            // Fallback: OR across all fields (backward compatible)
+            flattenedOrConditions.push(
+              { Name: { contains : item } },
+              { Brands: { Name: { contains : item } } },
+              { Categories: { Name: { contains : item } } },
+              { Gender: { equals : item } },
+              { Origin: { contains : item } },
+              { ProductNoteMaps: { some: { ScentNotes: { Name: { contains : item } } } } },
+              { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains : item } } } } },
+              { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } },
+              { ProductVariants: { some: { Type: { contains : item } } } },
+              { ProductVariants: { some: { Concentrations: { Name: { contains : item } } } } },
+              { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } } } },
+              ...(this.extractReleaseYear(item) ? [{ ReleaseYear: this.extractReleaseYear(item)! }] : []),
+              ...(this.extractVolumeValues(item).length > 0 ? [{ ProductVariants: { some: { VolumeMl: { in: this.extractVolumeValues(item) } } } }] : []),
+              ...(this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i) !== undefined
+                ? [{ ProductVariants: { some: { Longevity: { gte: this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i)! } } } }]
+                : []),
+              ...(this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i')) !== undefined
+                ? [{ ProductVariants: { some: { Sillage: { gte: this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i'))! } } } }]
+                : [])
+            );
+          }
         }
         
         return { OR: flattenedOrConditions };
       });
 
       const andConditionsForWhere: Prisma.ProductsWhereInput[] = [];
-      const isSemanticOnly = this.configService.get<string>('SEARCH_SEMANTIC_ONLY') === 'true';
-
-      if (isSemanticOnly) {
-        this.logger.log(`[ProductService] Semantic Only mode enabled. Bypassing structured filters (except gender).`);
-        // Only add Gender if present
-        if (genderValues.length > 0) {
-          andConditionsForWhere.push({
-            Gender: { in: genderValues }
-          });
-        }
-      } else {
-        // Original logic for structured filters
 
       if (nameConditions.length > 0) {
         andConditionsForWhere.push({ OR: nameConditions });
@@ -1188,7 +1341,7 @@ export class ProductService {
             some: {
               OR: ageTerms.map(value => ({
                 AttributeValues: {
-                  Value: { contains : value }
+                  Value: { contains: value }
                 }
               }))
             }
@@ -1199,20 +1352,17 @@ export class ProductService {
       if (genderValues.length > 0) {
         const genderCondition = {
           OR: genderValues.map(value => ({
-            Gender: { equals : value }
+            Gender: { equals: value }
           }))
         };
         this.logger.debug(`[SEARCH][GENDER] Building gender filter with ${genderValues.length} values: ${JSON.stringify(genderValues)}`);
-        this.logger.debug(`[SEARCH][GENDER] Gender WHERE condition: ${JSON.stringify(genderCondition)}`);
         andConditionsForWhere.push(genderCondition);
-      } else {
-        this.logger.warn('[SEARCH][GENDER] ⚠️ No gender values extracted! All genders will be returned');
       }
 
       if (originValues.length > 0) {
         andConditionsForWhere.push({
           OR: originValues.map(value => ({
-            Origin: { contains : value }
+            Origin: { contains: value }
           }))
         });
       }
@@ -1239,7 +1389,7 @@ export class ProductService {
               IsDeleted: false,
               OR: concentrationValues.map(value => ({
                 Concentrations: {
-                  Name: { contains : value }
+                  Name: { contains: value }
                 }
               }))
             }
@@ -1253,7 +1403,7 @@ export class ProductService {
             some: {
               IsDeleted: false,
               OR: variantTypeValues.map(value => ({
-                Type: { contains : value }
+                Type: { contains: value }
               }))
             }
           }
@@ -1282,20 +1432,19 @@ export class ProductService {
         });
       }
 
-      if (budget) {
+      if (budget && (budget.min != null || budget.max != null)) {
         andConditionsForWhere.push({
           ProductVariants: {
             some: {
               IsDeleted: false,
               BasePrice: {
-                gte: budget.min ? Number(budget.min) : undefined,
-                lte: budget.max ? Number(budget.max) : undefined
+                gte: budget.min != null ? Number(budget.min) : undefined,
+                lte: budget.max != null ? Number(budget.max) : undefined
               }
             }
           }
         });
       }
-    }
 
       const where: Prisma.ProductsWhereInput = {
         IsDeleted: false,

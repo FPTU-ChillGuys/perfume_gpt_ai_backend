@@ -8,9 +8,21 @@ import { SurveyQuestion } from 'src/domain/entities/survey-question.entity';
 @Injectable()
 export class SurveyQuestionRepository extends SqlEntityRepository<SurveyQuestion> {
   async createWithAnswers(request: SurveyQuestionRequest): Promise<SurveyQuestion> {
+    const em = this.getEntityManager();
+
+    let order = request.order;
+    if (order === undefined || order === null) {
+      const maxResult = await em.findOne(SurveyQuestion, { isActive: true }, {
+        orderBy: { order: 'DESC' },
+        fields: ['order']
+      });
+      order = (maxResult?.order ?? -1) + 1;
+    }
+
     const surveyQuestion = new SurveyQuestion({
       question: request.question,
-      questionType: request.questionType
+      questionType: request.questionType,
+      order
     });
 
     surveyQuestion.answers.set(
@@ -18,12 +30,11 @@ export class SurveyQuestionRepository extends SqlEntityRepository<SurveyQuestion
         (ansReq) =>
           new SurveyAnswer({
             answer: ansReq.answer,
-            question: surveyQuestion // owning side
+            question: surveyQuestion
           })
       )
     );
 
-    const em = this.getEntityManager();
     em.persist(surveyQuestion);
     await em.flush();
 
@@ -36,14 +47,14 @@ export class SurveyQuestionRepository extends SqlEntityRepository<SurveyQuestion
   ): Promise<SurveyQuestion> {
     const em = this.getEntityManager();
 
-    surveyQuestion.surveyQuestionAnswers.removeAll(); // Remove existing answers
+    surveyQuestion.surveyQuestionAnswers.removeAll();
 
     surveyQuestion.answers.set(
       answers.map(
         (ansReq) =>
           new SurveyAnswer({
             answer: ansReq.answer,
-            question: surveyQuestion // owning side
+            question: surveyQuestion
           })
       )
     );
@@ -53,7 +64,6 @@ export class SurveyQuestionRepository extends SqlEntityRepository<SurveyQuestion
     return surveyQuestion;
   }
 
-  /** Soft delete câu hỏi và tất cả câu trả lời liên quan */
   async softDeleteQuestion(id: string): Promise<SurveyQuestion | null> {
     const em = this.getEntityManager();
 
@@ -70,5 +80,14 @@ export class SurveyQuestionRepository extends SqlEntityRepository<SurveyQuestion
 
     await em.flush();
     return surveyQuestion;
+  }
+
+  async rebuildOrder(): Promise<void> {
+    const em = this.getEntityManager();
+    const questions = await this.find({ isActive: true }, { orderBy: { order: 'ASC' } });
+    for (let i = 0; i < questions.length; i++) {
+      questions[i].order = i + 1;
+    }
+    await em.flush();
   }
 }

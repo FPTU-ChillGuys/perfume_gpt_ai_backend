@@ -4,19 +4,16 @@
 
 ## Mục lục
 
-- [🚀 Quick Setup (Cài Đặt Nhanh)](#-quick-setup-cài-đặt-nhanh)
 - [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
-- [Cài đặt từng bước (Manual)](#cài-đặt-từng-bước-manual)
+- [Cài đặt chi tiết (Manual Installation)](#cài-đặt-chi-tiết-manual-installation)
   - [Bước 1: Clone repository & cài đặt dependencies](#bước-1-clone-repository--cài-đặt-dependencies)
-  - [Bước 2: Cài đặt PostgreSQL (Docker)](#bước-2-cài-đặt-postgresql-docker)
-  - [Bước 2b: Cài đặt Redis (Docker)](#bước-2b-cài-đặt-redis-docker)
-  - [Bước 3: Cấu hình file môi trường (.env)](#bước-3-cấu-hình-file-môi-trường-env)
-  - [Bước 4: Cấu hình kết nối database (host-config.mjs)](#bước-4-cấu-hình-kết-nối-database-host-configmjs)
-  - [Bước 5: Cấu hình RSA Keys (public_key.pem)](#bước-5-cấu-hình-rsa-keys-public_keypem)
-  - [Bước 6: Kiểm tra kết nối database](#bước-6-kiểm-tra-kết-nối-database)
-  - [Bước 7: Chạy migration](#bước-7-chạy-migration)
-  - [Bước 8: Seed dữ liệu mặc định](#bước-8-seed-dữ-liệu-mặc-định)
-  - [Bước 9: Chạy project](#bước-9-chạy-project)
+  - [Bước 2: Cấu hình cơ sở dữ liệu (PostgreSQL + pgvector)](#bước-2-cấu-hình-cơ-sở-dữ-liệu-postgresql--pgvector)
+  - [Bước 3: Cấu hình Redis (Docker)](#bước-3-cấu-hình-redis-docker)
+  - [Bước 4: Cấu hình file môi trường (.env)](#bước-4-cấu-hình-file-môi-trường-env)
+  - [Bước 5: Cấu hình kết nối database (host-config.mjs)](#bước-5-cấu-hình-kết-nối-database-host-configmjs)
+  - [Bước 6: Cấu hình RSA Keys (public_key.pem)](#bước-6-cấu-hình-rsa-keys-public_keypem)
+  - [Bước 7: Chạy migration & Seed dữ liệu](#bước-7-chạy-migration--seed-dữ-liệu)
+  - [Bước 8: Chạy project](#bước-8-chạy-project)
 - [NPM Scripts & CLI Commands](#npm-scripts--cli-commands)
 - [Admin Instructions (Chỉ thị AI)](#admin-instructions-chỉ-thị-ai)
 - [BullMQ — Job Queue (Redis)](#bullmq--job-queue-redis)
@@ -43,101 +40,24 @@
 
 ---
 
-## 🚀 Quick Setup (Cài Đặt Nhanh)
-
-> **Recommended:** Dùng script tự động thay vì làm từng bước thủ công.
-
-### Yêu cầu tối thiểu
-
-- **Node.js** >= 18 & **pnpm** >= 8
-- **Docker Desktop** đang chạy (để tạo PostgreSQL & Redis)
-- **SQL Server** instance sẵn có (của .NET backend)
-
-### Chạy setup
-
-```bash
-git clone https://github.com/FPTU-ChillGuys/perfume_gpt_ai_backend.git
-cd perfume_gpt_ai_backend
-pnpm setup
-```
-
-Script sẽ hỏi từng bước và tự xử lý:
-
-| Bước | Việc script làm | Ghi chú |
-|------|----------------|---------|
-| 0 | `pnpm install` | Cài toàn bộ dependencies trước tiên |
-| 1 | **Pre-check** | Kiểm tra Node.js, pnpm, Docker, Prisma CLI, kết nối thực tế tới PostgreSQL & Redis, các file cấu hình, `public_key.pem` |
-| 2 | **Installation** | Hỏi trước khi làm — tạo Docker containers (nếu chưa có hoặc đang bị stop), copy `.env.example` → `.env`, tạo `host-config.mjs`, generate Prisma Client, chạy migrations, seed data |
-| 3 | **Health-check** | Test kết nối thực tế tới PostgreSQL (qua MikroORM), Redis, SQL Server (qua Prisma) |
-| 4 | **Start?** | Hỏi có muốn chạy `pnpm dev` ngay không |
-
-### Output khi mọi thứ OK:
-
-```
-✓ Node.js >= 18 (v22.x.x)
-✓ pnpm found
-✓ Docker is installed & running
-✓ PostgreSQL: Connected
-✓ Redis: Connected
-✓ host-config.mjs exists
-✓ .env exists
-✓ public_key.pem exists
-ℹ 10/10 checks passed. Ready to proceed with setup.
-...
-════════════════════════════════════════════════════════════
-  Database Connection Status
-════════════════════════════════════════════════════════════
-✓ PostgreSQL (MikroORM): Connected
-✓ SQL Server (Prisma): Connected
-✓ Redis (BullMQ): Connected
-════════════════════════════════════════════════════════════
-```
-
-### Khi app khởi động (`pnpm dev`)
-
-App sẽ hiển thị connection status ngay sau khi start:
-
-```
-════════════════════════════════════════════════════════════
-  Database Connection Status
-════════════════════════════════════════════════════════════
-✓ PostgreSQL (MikroORM)
-✓ SQL Server (Prisma)
-✓ Redis (BullMQ)
-════════════════════════════════════════════════════════════
-```
-
-### Nếu setup chưa pass?
-
-| Triệu chứng | Cách xử lý |
-|------------|------------|
-| PostgreSQL / Redis not connected | Script sẽ tự tạo Docker container khi bạn chọn `Y` ở bước Installation |
-| Container stopped | Script tự restart |
-| `.env` chưa có | Script copy từ `.env.example`, sau đó **bạn cần sửa** các credentials thực tế |
-| `host-config.mjs` chưa có | Script tạo từ `host-config.mjs.example` với credentials bạn nhập |
-| `public_key.pem` không tìm thấy | Xem [Bước 5](#bước-5-cấu-hình-rsa-keys-public_keypem) để lấy key từ .NET backend |
-
-Xem [Cài đặt từng bước (Manual)](#cài-đặt-từng-bước-manual) nếu cần control chi tiết hoặc troubleshoot sâu hơn.
-
----
-
 ## Yêu cầu hệ thống
 
 | Tool           | Phiên bản tối thiểu | Ghi chú                                          |
 | -------------- | -------------------- | ------------------------------------------------ |
-| **Node.js**    | >= 18                |                                                  |
-| **pnpm**       | >= 8                 | **Sử dụng pnpm, KHÔNG dùng npm**                 |
+| **Node.js**    | >= 20                | Khuyên dùng bản LTS mới nhất                      |
+| **pnpm**       | >= 9                 | **Sử dụng pnpm, KHÔNG dùng npm**                 |
 | **Docker**     | Latest               | Để chạy PostgreSQL và Redis                      |
-| **PostgreSQL** | >= 14                | AI DB — chạy qua Docker, quản lý bởi MikroORM   |
+| **PostgreSQL** | >= 15                | AI DB — Cần cài thêm extension `pgvector`        |
+| **pgvector**   | >= 0.5.0             | Bắt buộc cho Hybrid Search (Vector Search)       |
 | **Redis**      | >= 7                 | Job queue cho BullMQ — chạy qua Docker           |
 | **SQL Server** | >= 2019              | Main DB của .NET backend — truy cập qua Prisma   |
 | **.NET SDK**   | >= 8.0               | Cho backend chính (perfume-gpt-backend)          |
 
 ---
 
-## Cài đặt từng bước (Manual)
+## Cài đặt chi tiết (Manual Installation)
 
-> Dành cho ai muốn control từng bước hoặc debug khi `pnpm setup` gặp vấn đề.
+> Hướng dẫn cài đặt thủ công để đảm bảo hệ thống hoạt động ổn định nhất. Tham khảo thêm file [INSTALLATION.md](INSTALLATION.md) bản tiếng Anh.
 
 ### Bước 1: Clone repository & cài đặt dependencies
 
@@ -154,9 +74,11 @@ pnpm install
 
 ---
 
-### Bước 2: Cài đặt PostgreSQL (Docker)
+### Bước 2: Cấu hình cơ sở dữ liệu (PostgreSQL + pgvector)
 
-Cài đặt [Docker Desktop](https://www.docker.com/products/docker-desktop/) nếu chưa có, sau đó chạy PostgreSQL container:
+Project sử dụng PostgreSQL làm database cho AI data và lưu trữ Vector Embeddings. ** pgvector** là extension bắt buộc.
+
+Cách tốt nhất là dùng Docker image đã tích hợp sẵn `pgvector`:
 
 ```bash
 docker run --name perfume-gpt-postgres \
@@ -164,7 +86,12 @@ docker run --name perfume-gpt-postgres \
   -e POSTGRES_PASSWORD=your_password \
   -e POSTGRES_DB=perfume_gpt_ai \
   -p 5432:5432 \
-  -d postgres:16
+  -d pgvector/pgvector:pg16
+```
+
+Nếu bạn dùng PostgreSQL thường, hãy đảm bảo đã cài extension và chạy lệnh sau trong DB:
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
 > Thay `your_password` bằng mật khẩu bạn muốn đặt.
@@ -454,15 +381,12 @@ Tất cả câu lệnh đều chạy với `pnpm run <script-name>`.
 **Khi bắt đầu dự án:**
 
 ```bash
-# Auto setup (recommended)
-pnpm setup
-
-# Hoặc manual:
+# Manual Installation:
 pnpm install
-pnpm db:check        # kiểm tra kết nối
-pnpm migration:up    # chạy migrations
-pnpm seed            # seed dữ liệu mặc định
-pnpm dev             # khởi động dev server
+pnpm db:check        # check database connection
+pnpm migration:up    # run migrations
+pnpm seed            # seed default data
+pnpm start:dev       # start development server
 ```
 
 **Khi .NET SQL Server schema thay đổi:**
@@ -952,20 +876,21 @@ Hệ thống gồm **13 controller** (1 trong `AppModule`, 12 trong `ProviderMod
 | Controller | Route prefix | Auth | Role | Số endpoint |
 |---|---|---|---|---|
 | [AppController](#1-appcontroller) | `/` | 🌐 Public | — | 1 |
-| [AdminInstructionController](#2-admininstructioncontroller) | `/admin/instructions` | 🔒 JWT | `admin` (GET all: admin+user) | 7 |
+| [AdminInstructionController](#2-admininstructioncontroller) | `/admin/instructions` | 🔒 JWT | `admin` | 7 |
 | [AIAcceptanceController](#3-aiacceptancecontroller) | `/ai-acceptance` | 🔒 JWT | — | 5 |
 | [OrderController](#4-ordercontroller) | `/orders` | 🔒 JWT | `admin` | 4 |
-| [InventoryController](#5-inventorycontroller) | `/inventory` | 🔒 JWT | `admin` (2 endpoint public) | 9 |
-| [ConversationController](#6-conversationcontroller) | `/conversation` | Hỗn hợp | `admin` (CRUD) | 12 |
+| [InventoryController](#5-inventorycontroller) | `/inventory` | 🔒 JWT | `admin` | 9 |
+| [ConversationController](#6-conversationcontroller) | `/conversation` | Hỗn hợp | — | 12 |
 | [ProductController](#7-productcontroller) | `/products` | 🌐 Public | — | 5 |
-| [ProfileController](#8-profilecontroller) | `/profile` | 🔒 JWT | `admin` hoặc `user` | 2 |
+| [ProfileController](#8-profilecontroller) | `/profile` | 🔒 JWT | — | 2 |
 | [ReviewController](#9-reviewcontroller) | `/reviews` | 🔒 JWT | `admin` | 8 |
-| [QuizController](#10-quizcontroller) | `/quizzes` | Hỗn hợp | `admin` (tạo câu hỏi) | 9 |
-| [LogController](#11-logcontroller) | `/logs` | 🔒 JWT | `admin` (1 public) | 12 (+1 cron) |
-| [TrendController](#12-trendcontroller) | `/trends` | Hỗn hợp | `admin`/`user` (2 endpoint public) | 4 |
+| [SurveyController](#10-surveycontroller) | `/surveys` | Hỗn hợp | — | 15 |
+| [LogController](#11-logcontroller) | `/logs` | 🔒 JWT | `admin` | 13 |
+| [TrendController](#12-trendcontroller) | `/trends` | Hỗn hợp | — | 4 |
 | [RecommendationController](#13-recommendationcontroller) | `/recommendation` | 🌐 Public | — | 5 |
 | [AIController](#14-aicontroller) | `/ai` | 🌐 Public | — | 1 |
-| [EmailController](#15-emailcontroller) | `/email` | 🔒 JWT | `admin` | 1 |
+| [DictionaryController](#15-dictionarycontroller) | `/api/v1/dictionary`| 🌐 Public | — | 6 |
+| [RebuildEmbeddingsController](#16-rebuildembeddingscontroller)| `/api/v1/rebuild-embeddings`| 🌐 Public | — | 2 |
 
 > **Ký hiệu:**
 >
@@ -1396,50 +1321,35 @@ curl -H "Authorization: Bearer <admin_token>" http://localhost:3000/reviews/summ
 
 ---
 
-### 10. QuizController
+### 10. SurveyController
 
-**Route:** `/quizzes` | **Auth:** 🌐 Public | **Tag Swagger:** `Quizzes`
+**Route:** `/surveys` | **Auth:** Hỗn hợp | **Tag Swagger:** `Surveys`
 
-Quản lý câu hỏi quiz tìm hiểu sở thích nước hoa và nhận gợi ý từ AI dựa trên câu trả lời.
+Quản lý câu hỏi khảo sát (survey/quiz) tìm hiểu sở thích nước hoa và nhận gợi ý từ AI dựa trên nhiều cấp độ phân tích (V1-V5).
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| `GET` | `/quizzes/questions` | Lấy danh sách câu hỏi quiz | 🌐 Public |
-| `GET` | `/quizzes/questions/:id` | Lấy câu hỏi quiz theo ID | 🌐 Public |
-| `POST` | `/quizzes/questions` | Tạo câu hỏi quiz mới | 🔒 admin |
-| `POST` | `/quizzes/questions/list` | Tạo nhiều câu hỏi quiz cùng lúc (batch) | 🌐 Public |
-| `PUT` | `/quizzes/questions/:id` | Cập nhật câu trả lời quiz | 🔒 JWT |
-| `GET` | `/quizzes/user/:userId/check-first-time` | Kiểm tra user đã làm quiz chưa | 🌐 Public |
-| `POST` | `/quizzes/user?userId=` | Trả lời quiz V1 và nhận gợi ý nước hoa từ AI | 🌐 Public |
-| `POST` | `/quizzes/user/v2?userId=` | Trả lời quiz V2 — dùng Bull queue xử lý background | 🌐 Public |
-| `GET` | `/quizzes/user/:userId` | Lấy lịch sử câu hỏi/câu trả lời quiz của user | 🌐 Public |
+| `GET` | `/surveys/questions` | Lấy danh sách câu hỏi survey | 🌐 Public |
+| `GET` | `/surveys/questions/:id` | Lấy câu hỏi theo ID | 🌐 Public |
+| `POST` | `/surveys/questions` | Tạo câu hỏi survey mới | 🔒 admin |
+| `PUT` | `/surveys/questions/:id` | Cập nhật câu hỏi/trả lời | 🔒 admin |
+| `DELETE` | `/surveys/questions/:id` | Xóa mềm câu hỏi | 🔒 admin |
+| `GET` | `/surveys/user/:userId/check-first-time`| Kiểm tra user đã làm survey chưa | 🌐 Public |
+| `POST` | `/surveys/user` | Trả lời survey V1 — AI phân tích cơ bản | 🌐 Public |
+| `POST` | `/surveys/user/v2` | Trả lời survey V2 — Monolithic query | 🌐 Public |
+| `POST` | `/surveys/user/v3` | Trả lời survey V3 — Per-question decomposition | 🌐 Public |
+| `POST` | `/surveys/user/v4` | Trả lời survey V4 — Direct query-based (no AI) | 🌐 Public |
+| `POST` | `/surveys/user/v5` | **Trả lời survey V5** — Hybrid Search & Ranking | 🌐 Public |
+| `GET` | `/surveys/attributes` | Lấy danh sách thuộc tính NLP hỗ trợ | 🌐 Public |
+| `GET` | `/surveys/user/:userId` | Lấy lịch sử trả lời survey của user | 🌐 Public |
 
 **Cách sử dụng:**
-
 ```bash
-# Lấy câu hỏi quiz
-curl http://localhost:3000/quizzes/questions
-
-# Trả lời quiz
+# Trả lời survey V5 (Khuyên dùng)
 curl -X POST -H "Content-Type: application/json" \
-  -d '[{"questionId":"<qId>","answerId":"<aId>"}]' \
-  "http://localhost:3000/quizzes/user?userId=<userId>"
+  -d '[{"questionId":"q1","answerId":"a1"}]' \
+  "http://localhost:3000/surveys/user/v5?userId=user123"
 ```
-
-**HTTP Status Codes:**
-
-| Code | Khi nào | Response Body Example |
-|------|---------|----------------------|
-| 200 | Request thành công | `{ "success": true, "data": { "recommendations": [...], "quizAnswerId": "..." } }` |
-| 400 | Thiếu userId, questionId/answerId không hợp lệ, body format sai | `{ "success": false, "error": "Missing userId parameter", "statusCode": 400 }` |
-| 404 | Question ID hoặc Answer ID không tồn tại | `{ "success": false, "error": "Question or answer not found", "statusCode": 404 }` |
-| 500 | AI service error (OpenAI API error), lỗi database | `{ "success": false, "error": "Internal server error", "statusCode": 500 }` |
-
-> **Lưu ý:**
->
-> - Endpoint `POST /quizzes/user` thực hiện nhiều bước: lấy câu hỏi → match câu trả lời → tạo prompt → lưu quiz answer → lưu user log → gọi AI.
-> - Việc lưu user log đã được `await` và có cơ chế chống trùng (`ON CONFLICT DO NOTHING`) cho quiz detail log.
-> - `POST /quizzes/questions` yêu cầu role **admin** (`@Role(['admin'])`). `POST /quizzes/questions/list` vẫn public (dùng để import batch).
 
 ---
 
@@ -1593,107 +1503,59 @@ curl -X POST -H "Content-Type: application/json" \
 
 **Route:** `/ai` | **Auth:** 🌐 Public | **Tag Swagger:** `AI`
 
-Endpoint đơn giản để tìm kiếm/hỏi đáp trực tiếp với AI mà không cần context về user hay sản phẩm.
+Endpoint đơn giản để tìm kiếm/hỏi đáp trực tiếp với AI.
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
 | `POST` | `/ai/search?prompt=` | Tìm kiếm/hỏi đáp với AI | 🌐 Public |
 
-**Cách sử dụng:**
-
-```bash
-curl -X POST "http://localhost:3000/ai/search?prompt=Nước hoa nào phù hợp cho mùa đông?"
-```
-
-**HTTP Status Codes:**
-
-| Code | Khi nào | Response Body Example |
-|------|---------|----------------------|
-| 200 | Request thành công | `{ "success": true, "data": "Nước hoa phù hợp cho mùa đông nên có..." }` |
-| 400 | Thiếu prompt parameter | `{ "success": false, "error": "Missing prompt parameter", "statusCode": 400 }` |
-| 500 | AI service error (OpenAI API error) | `{ "success": false, "error": "Internal server error", "statusCode": 500 }` |
-
-> **Lưu ý:**
->
-> - Endpoint này gọi thẳng `aiService.textGenerateFromPrompt` mà **không có system prompt** hay admin instruction.
-> - Kết quả phụ thuộc hoàn toàn vào model AI mặc định (OpenAI GPT).
-> - Phù hợp cho việc test nhanh hoặc hỏi đáp tổng quát.
-
 ---
 
-### 15. EmailController
+### 15. DictionaryController
 
-**Route:** `/email` | **Auth:** 🔒 JWT + Role `admin` | **Tag Swagger:** `Email`
+**Route:** `/api/v1/dictionary` | **Auth:** 🌐 Public | **Tag Swagger:** `Dictionary`
 
-Gửi email văn bản cơ bản thông qua NodeMailer. Dành riêng cho admin.
+Quản lý từ điển NLP (winkNLP), hỗ trợ chuẩn hóa thực thể từ text thô.
 
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| `POST` | `/email/send` | Gửi email text đơn giản | 🔒 admin |
+| `GET` | `/api/v1/dictionary/snapshot` | Lấy thông tin thống kê từ điển | 🌐 Public |
+| `POST` | `/api/v1/dictionary/parse` | Phân tích và chuẩn hóa text | 🌐 Public |
 
-**Cách sử dụng:**
+---
 
-```bash
-curl -X POST -H "Authorization: Bearer <admin_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"to":"user@example.com","subject":"Thông báo","text":"Nội dung email"}' \
-  http://localhost:3000/email/send
-```
+### 16. RebuildEmbeddingsController
 
-**HTTP Status Codes:**
+**Route:** `/api/v1/rebuild-embeddings` | **Auth:** 🌐 Public | **Tag Swagger:** `Embeddings`
 
-| Code | Khi nào | Response Body Example |
-|------|---------|----------------------|
-| 200 | Gửi email thành công | `{ "success": true, "data": "Email sent successfully" }` |
-| 400 | Body không hợp lệ, thiếu `to`/`subject`/`text` | `{ "success": false, "error": "Invalid request body", "statusCode": 400 }` |
-| 401 | Không có token hoặc token không hợp lệ | `{ "success": false, "error": "Unauthorized", "statusCode": 401 }` |
-| 403 | User không có role admin | `{ "success": false, "error": "Forbidden resource", "statusCode": 403 }` |
-| 500 | Lỗi NodeMailer, SMTP config sai, mạng bị ngắt | `{ "success": false, "error": "Internal server error", "statusCode": 500 }` |
+Quản lý việc tạo lại Vector Embeddings cho sản phẩm.
 
-> **Lưu ý:**
->
-> - Cần cấu hình SMTP trong `.env` để email hoạt động (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM).
-> - Chỉ admin mới gửi được email — user thường sẽ bị 403 Forbidden.
+| Method | Endpoint | Mô tả | Auth |
+|--------|----------|-------|------|
+| `POST` | `/api/v1/rebuild-embeddings/all` | Rebuild toàn bộ embeddings | 🌐 Public |
+| `POST` | `/api/v1/rebuild-embeddings/missing`| Chỉ build những sản phẩm chưa có embedding | 🌐 Public |
 
 ---
 
 ### Ghi chú chung về Controller
 
-1. **Response format:** Tất cả controller đều trả về cấu trúc `BaseResponse<T>`:
-
-   ```json
-   { "success": true, "data": <T> }
-   // hoặc
-   { "success": false, "error": "Error message" }
-   ```
-
-2. **Endpoint `/structured`:** Các phiên bản structured trả thêm `metadata` gồm `processingTimeMs` (thời gian xử lý AI), `generatedAt` (thời điểm tạo).
-
-3. **Insufficient data:** Khi không đủ dữ liệu để phân tích, AI không được gọi. Thay vào đó trả về message mặc định → tiết kiệm token OpenAI.
-
-4. **Backend .NET dependency:** Các controller Products, Orders, Inventory, Reviews, Profile đều gọi API tới backend .NET. **Cần backend .NET chạy song song** (mặc định `https://localhost:7011/api`). Một số service còn dùng **Prisma** để đọc trực tiếp từ SQL Server (không qua HTTP).
-
-5. **Admin Instructions:** Hầu hết các endpoint AI đều hỗ trợ Admin Instructions — cho phép admin tùy chỉnh hành vi AI qua API thay vì sửa code.
-
-6. **BullMQ Queue Endpoints (V5/V6/V7):** Các endpoint chat V5/V6/V7 và Quiz V2 sử dụng BullMQ + Redis để lưu conversation/log trong background. Yêu cầu **Redis đang chạy** (`REDIS_HOST`, `REDIS_PORT` trong `.env`). Các endpoint V1–V4 và Quiz V1 không dùng queue, vẫn hoạt động khi Redis không có.
-
-7. **API Reference (Scalar):** Truy cập `http://localhost:3000/reference` để xem Scalar API docs với đầy đủ schema, parameters, response types. Để xác thực, tìm phần **Bearer Token** trong trang và nhập JWT token vào ô **Token** — Scalar sẽ tự động gửi kèm header `Authorization: Bearer <token>` cho tất cả request sau đó.
+1. **Response format:** Tất cả controller đều trả về cấu trúc `BaseResponse<T>`: `{ "success": true, "data": <T> }`.
+2. **Endpoint `/structured`:** Trả thêm `metadata` gồm `processingTimeMs` và `generatedAt`.
+3. **Backend .NET dependency:** Các controller Products, Orders, Inventory, Reviews, Profile đều gọi API tới backend .NET hoặc đọc trực tiếp từ SQL Server qua **Prisma**.
+4. **BullMQ Queue:** Các endpoint chat V5/V6/V7 và Survey V5 sử dụng BullMQ + Redis để xử lý background.
 
 ---
 
 ## Tóm tắt nhanh
 
-| Bước | Lệnh / Hành động                                                      | Mô tả                                             |
-| ---- | ---------------------------------------------------------------------- | ------------------------------------------------- |
-| 1    | `pnpm install`                                                         | Cài đặt dependencies (dùng pnpm)                  |
-| 2    | `docker run ... postgres:16`                                           | Chạy PostgreSQL (AI DB) bằng Docker               |
-| 2b   | `docker run ... redis:7`                                               | Chạy Redis (BullMQ job queue) bằng Docker         |
-| 3    | Tạo file `.env`                                                        | Cấu hình biến môi trường (bao gồm Redis, Prisma)  |
-| 4    | `cp host-config.mjs.example host-config.mjs`                          | Cấu hình kết nối PostgreSQL cho MikroORM          |
-| 5    | Copy `public_key.pem` vào thư mục gốc                                 | Cấu hình RSA public key cho JWT                   |
-| 6    | `npx mikro-orm debug`                                                  | Kiểm tra kết nối PostgreSQL                       |
-| 7    | `npx mikro-orm migration:up`                                           | Chạy migration tạo bảng trên PostgreSQL            |
-| 8    | `pnpm run seed`                                                        | Seed dữ liệu Admin Instructions mặc định          |
-| 9    | `pnpm run start:dev`                                                   | Khởi chạy server development                      |
+| Bước | Lệnh / Hành động | Mô tả |
+| ---- | ---------------- | ----- |
+| 1 | `pnpm install` | Cài đặt dependencies |
+| 2 | `docker run ... pgvector/pgvector:pg16` | Chạy PostgreSQL với pgvector extension |
+| 3 | `docker run ... redis:7` | Chạy Redis cho BullMQ & Cache |
+| 4 | Cấu hình `.env` & `host-config.mjs` | Thiết lập thông tin kết nối |
+| 5 | `pnpm migration:up` | Tạo cấu trúc bảng database |
+| 6 | `pnpm run seed` | Seed dữ liệu behavioral instructions |
+| 7 | `pnpm run start:dev` | Khởi chạy server development |
 
-> **Nhớ:** Cần chạy [perfume-gpt-backend](https://github.com/FPTU-ChillGuys/perfume-gpt-backend) (.NET) song song để sử dụng đầy đủ các chức năng (Product, Order, Inventory, Review, ...). SQL Server của .NET backend cũng cần chạy để Prisma kết nối được (runtime dùng `SQL_SERVER_DATABASE_*` riêng lẻ, CLI dùng `SQL_SERVER_DATABASE_URL`).
+> **Lưu ý:** Cần chạy backend .NET song song để hệ thống hoạt động đầy đủ.

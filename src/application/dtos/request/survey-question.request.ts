@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { SurveyAnswerRequest } from './survey-answer.request';
 import { QuestionType } from 'src/domain/entities/survey-question.entity';
 
@@ -17,6 +17,11 @@ export class SurveyQuestionRequest {
   @IsOptional()
   @IsEnum(QuestionType)
   questionType?: QuestionType;
+
+  @ApiPropertyOptional({ description: 'Thứ tự hiển thị', default: 0 })
+  @IsOptional()
+  @IsNumber()
+  order?: number;
 
   /** Danh sách câu trả lời */
   @ApiProperty({ description: 'Danh sách câu trả lời', type: [SurveyAnswerRequest] })

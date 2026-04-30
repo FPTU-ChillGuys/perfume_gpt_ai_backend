@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { Message } from 'src/domain/entities/message.entity';
 import { ConversationOutputDto } from '../../common/conversation-output.dto';
@@ -7,10 +7,10 @@ import { ConversationOutputDto } from '../../common/conversation-output.dto';
 export class MessageResponse {
   /** Người gửi tin nhắn */
   @ApiProperty({ description: 'Người gửi tin nhắn (user hoặc assistant)', required: true, enum: Sender })
-  sender: Sender;
+  sender!: Sender;
 
   /** Nội dung tin nhắn */
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Nội dung tin nhắn (chuỗi hoặc object cho assistant)',
     required: true,
     oneOf: [
@@ -18,15 +18,15 @@ export class MessageResponse {
       { $ref: '#/components/schemas/ConversationOutputDto' }
     ]
   })
-  message: string | ConversationOutputDto;
+  message!: string | ConversationOutputDto;
 
   /** ID tin nhắn */
-  @ApiProperty({ description: 'ID tin nhắn' })
-  id: string;
+  @ApiPropertyOptional({ description: 'ID tin nhắn', required: false, nullable: true })
+  id!: string;
 
   /** Ngày tạo */
   @ApiProperty({ description: 'Ngày tạo' })
-  createdAt: Date;
+  createdAt!: Date;
 
   /**
    * Chuyển đổi từ Entity sang DTO.

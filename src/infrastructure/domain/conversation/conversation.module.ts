@@ -5,8 +5,6 @@ import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.modul
 import { ProductModule } from 'src/infrastructure/domain/product/product.module';
 import { AdminInstructionModule } from 'src/infrastructure/domain/admin-instruction/admin-instruction.module';
 import { UnitOfWorkModule } from 'src/infrastructure/domain/common/unit-of-work.module';
-import { BullModule } from '@nestjs/bullmq';
-import { QueueName } from 'src/application/constant/processor';
 import { RecommendationModule } from 'src/infrastructure/domain/recommendation/recommendation.module';
 import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.module';
 import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.module';
@@ -33,8 +31,7 @@ import { ConversationResponseBuilder } from './helpers/conversation-response.bui
         AIAcceptanceModule,
         AdminInstructionModule,
         DictionaryModule,
-        forwardRef(() => RecommendationModule), // Avoid circular dependency if any
-        BullModule.registerQueue({ name: QueueName.CONVERSATION_QUEUE }),
+        forwardRef(() => RecommendationModule),
     ],
     providers: [
         ConversationService, 

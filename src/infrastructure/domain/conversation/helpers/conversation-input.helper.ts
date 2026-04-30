@@ -9,30 +9,24 @@ import { processRequestForMobile, processResponseForMobile } from 'src/infrastru
 @Injectable()
 export class ConversationInputHelper {
 
-  resolveUserId(request: Request, chatRequest: ChatRequest): ChatRequest {
-    if (!chatRequest.userId) {
-      chatRequest.userId = getTokenPayloadFromRequest(request)?.id;
-    }
-
-    if (!chatRequest.userId) {
+  extractUserId(request: Request, fallbackUserId?: string): string {
+    const fromToken = getTokenPayloadFromRequest(request)?.id;
+    const resolved = fallbackUserId ?? fromToken;
+    if (!resolved) {
       throw new BadRequestException('userId is required — provide it in the request body or authenticate with a valid JWT token');
     }
+    return resolved;
+  }
 
+  resolveUserId(request: Request, chatRequest: ChatRequest): ChatRequest {
+    chatRequest.userId = this.extractUserId(request, chatRequest.userId);
     return chatRequest;
   }
 
-  /**
-   * Xử lý convert ngược Object → String cho Request từ Mobile.
-   * Mobile client gửi message dạng Object, cần stringify trước khi xử lý.
-   */
   processMobileRequest(chatRequest: ChatRequest): ChatRequest {
     return processRequestForMobile(chatRequest);
   }
 
-  /**
-   * Xử lý parse message JSON cho Mobile Client (Response).
-   * Nếu client là Mobile, parse JSON string trong assistant messages thành Object.
-   */
   processMobileResponse(
     response: BaseResponse<ConversationResponse>,
     isMobile?: boolean
@@ -40,19 +34,11 @@ export class ConversationInputHelper {
     return processResponseForMobile(response, isMobile);
   }
 
-  /**
-   * Chuẩn bị ChatRequest hoàn chỉnh: resolve userId + mobile processing.
-   * Gộp 2 bước resolveUserId + processMobileRequest thành 1 call duy nhất.
-   */
   prepareChatRequest(request: Request, chatRequest: ChatRequest): ChatRequest {
     this.resolveUserId(request, chatRequest);
     return this.processMobileRequest(chatRequest);
   }
 
-  /**
-   * Chuẩn bị ChatRequest cho Staff mode.
-   * Tự động set isStaff = true.
-   */
   prepareStaffChatRequest(request: Request, chatRequest: ChatRequest): ChatRequest {
     this.resolveUserId(request, chatRequest);
     chatRequest.isStaff = true;

@@ -14,7 +14,7 @@ import { RestockService } from 'src/infrastructure/domain/restock/restock.servic
 import { ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { HybridSearchService } from 'src/infrastructure/domain/hybrid-search/hybrid-search.service';
-import { HybridSearchResponse } from 'src/infrastructure/domain/hybrid-search/hybrid-search.service';
+import { HybridSearchResponse } from 'src/application/dtos/response/hybrid-search/hybrid-search.response';
 import { Request } from 'express';
 import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { SearchRequest } from 'src/application/dtos/request/search.request';

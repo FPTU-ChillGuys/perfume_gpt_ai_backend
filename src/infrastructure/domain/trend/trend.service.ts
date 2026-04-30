@@ -17,6 +17,13 @@ import {
   ProductCardVariantResponse
 } from 'src/application/dtos/response/product-card.response';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
+import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
+import { VariantSalesSignal } from 'src/application/dtos/trend/variant-sales-signal.type';
+import { TrendSeedKeyword, TrendSeedStage } from 'src/application/dtos/trend/trend-seed-keyword.type';
+import { GoogleTrendSignal } from 'src/application/dtos/trend/google-trend-signal.type';
+import { TrendKeywordMapperResult } from 'src/application/dtos/trend/trend-keyword-mapper-result.type';
+import { TrendPipelineSource, TrendPipelineResult } from 'src/application/dtos/trend/trend-pipeline-result.type';
+import { TrendProductsCachePayload } from 'src/application/dtos/trend/trend-products-cache-payload.type';
 import {
   ProductCardOutputItem,
   ProductCardVariantOutput
@@ -27,56 +34,7 @@ import { ProductService } from 'src/infrastructure/domain/product/product.servic
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
-
-type VariantSalesSignal = {
-  last30DaysSales: number;
-  totalQuantitySold: number;
-};
-
-type TrendSeedStage = 'name' | 'attribute';
-
-type TrendSeedKeyword = {
-  keyword: string;
-  stage: TrendSeedStage;
-};
-
-type GoogleTrendSignal = {
-  keyword: string;
-  score: number;
-  source: 'interest_over_time' | 'related_query';
-  stage: TrendSeedStage;
-  parentKeyword?: string;
-};
-
-type TrendKeywordMapperResult = {
-  primaryKeywords: string[];
-  expansionKeywords: string[];
-  negativeTerms: string[];
-  confidence: number;
-  explanation: string;
-};
-
-type TrendPipelineSource = 'live-google' | 'cache' | 'trend-log' | 'empty';
-
-type TrendPipelineResult = {
-  products: ProductCardResponse[];
-  keywordsUsed: string[];
-  sourceUsed: TrendPipelineSource;
-  fallbackTier: 'none' | 'cache' | 'trend-log' | 'empty';
-  googleSignals: GoogleTrendSignal[];
-  mapperResult: TrendKeywordMapperResult;
-};
-
-type TrendProductsCachePayload = {
-  version: 'trend-v2';
-  generatedAt: string;
-  products: ProductCardResponse[];
-  keywordsUsed: string[];
-  sourceUsed: TrendPipelineSource;
-  fallbackTier: TrendPipelineResult['fallbackTier'];
-  googleSignals: GoogleTrendSignal[];
-  mapperResult: TrendKeywordMapperResult;
-};
+import { TrendHelpersUtil } from 'src/infrastructure/domain/trend/trend-helpers.util';
 
 const TREND_PRODUCT_LIMIT = 15;
 const TREND_SEARCH_PAGE_SIZE = 20;
@@ -87,7 +45,6 @@ const GOOGLE_FETCH_RETRY_COUNT = 1;
 const GOOGLE_FETCH_RETRY_DELAY_MS = 300;
 const GOOGLE_TREND_GEO = 'VN';
 const GOOGLE_SIGNAL_PROMPT_LIMIT = 40;
-const FALLBACK_TREND_LOG_COUNT = 5;
 const SIMPLE_TREND_BASE_KEYWORD = 'nước hoa';
 
 const emptyMapperResult: TrendKeywordMapperResult = {
@@ -115,98 +72,9 @@ export class TrendService {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  private safeParseJson<T = unknown>(value: unknown): T | null {
-    if (typeof value !== 'string') {
-      return (value as T) ?? null;
-    }
-
-    try {
-      return JSON.parse(value) as T;
-    } catch {
-      return null;
-    }
-  }
-
-  private normalizeKeyword(keyword: string): string {
-    return keyword.trim().replace(/\s+/g, ' ');
-  }
-
-  private uniqueKeywords(keywords: string[], maxCount: number): string[] {
-    const result: string[] = [];
-    const seen = new Set<string>();
-
-    for (const keyword of keywords) {
-      const normalized = this.normalizeKeyword(keyword);
-      if (!normalized) {
-        continue;
-      }
-
-      const key = normalized.toLowerCase();
-      if (seen.has(key)) {
-        continue;
-      }
-
-      seen.add(key);
-      result.push(normalized);
-      if (result.length >= maxCount) {
-        break;
-      }
-    }
-
-    return result;
-  }
-
-  private truncateForLog(value: string, maxLength = 240): string {
-    if (value.length <= maxLength) {
-      return value;
-    }
-
-    return `${value.slice(0, maxLength)}...(truncated:${value.length - maxLength})`;
-  }
-
-  private estimateTokenCountFromChars(charCount: number): number {
-    return Math.ceil(charCount / 4);
-  }
-
-  private summarizeSignals(signals: GoogleTrendSignal[]): {
-    relatedQueryCount: number;
-    interestOverTimeCount: number;
-    preview: string;
-  } {
-    const relatedQueryCount = signals.filter(
-      (signal) => signal.source === 'related_query'
-    ).length;
-    const interestOverTimeCount = signals.filter(
-      (signal) => signal.source === 'interest_over_time'
-    ).length;
-
-    const preview = this.truncateForLog(
-      signals
-        .slice(0, 8)
-        .map((signal) => `${signal.keyword}:${signal.score}`)
-        .join(' | '),
-      360
-    );
-
-    return {
-      relatedQueryCount,
-      interestOverTimeCount,
-      preview
-    };
-  }
-
   private getForceRefreshFlag(allUserLogRequest: AllUserLogRequest): boolean {
     const rawValue = (allUserLogRequest as { forceRefresh?: unknown }).forceRefresh;
     return rawValue === true || String(rawValue).toLowerCase() === 'true';
-  }
-
-  private toValidDate(value: unknown, fallback: Date): Date {
-    if (!value) {
-      return fallback;
-    }
-
-    const parsed = value instanceof Date ? value : new Date(String(value));
-    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
   }
 
   private resolveDateRange(allUserLogRequest: AllUserLogRequest): {
@@ -214,10 +82,10 @@ export class TrendService {
     endDate: Date;
   } {
     const now = new Date();
-    const endDate = this.toValidDate(allUserLogRequest.endDate, now);
+    const endDate = TrendHelpersUtil.toValidDate(allUserLogRequest.endDate, now);
 
     if (allUserLogRequest.startDate) {
-      const startDate = this.toValidDate(allUserLogRequest.startDate, subDays(endDate, 30));
+      const startDate = TrendHelpersUtil.toValidDate(allUserLogRequest.startDate, subDays(endDate, 30));
       return { startDate, endDate };
     }
 
@@ -249,38 +117,6 @@ export class TrendService {
     return `${TREND_CACHE_PREFIX}:${hash}`;
   }
 
-  private async wait(milliseconds: number): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, milliseconds));
-  }
-
-  private async withTimeout<T>(
-    operation: () => Promise<T>,
-    timeoutMs: number,
-    timeoutErrorMessage: string
-  ): Promise<T> {
-    let timeoutHandle: NodeJS.Timeout | null = null;
-
-    return new Promise<T>((resolve, reject) => {
-      timeoutHandle = setTimeout(() => {
-        reject(new Error(timeoutErrorMessage));
-      }, timeoutMs);
-
-      operation()
-        .then((value) => {
-          if (timeoutHandle) {
-            clearTimeout(timeoutHandle);
-          }
-          resolve(value);
-        })
-        .catch((error) => {
-          if (timeoutHandle) {
-            clearTimeout(timeoutHandle);
-          }
-          reject(error);
-        });
-    });
-  }
-
   private async executeWithRetry<T>(
     requestId: string,
     operationName: string,
@@ -291,7 +127,7 @@ export class TrendService {
       const startedAt = Date.now();
 
       try {
-        const result = await this.withTimeout(
+        const result = await TrendHelpersUtil.withTimeout(
           operation,
           GOOGLE_FETCH_TIMEOUT_MS,
           `${operationName} timeout`
@@ -310,7 +146,7 @@ export class TrendService {
         );
 
         if (attempt < GOOGLE_FETCH_RETRY_COUNT) {
-          await this.wait(GOOGLE_FETCH_RETRY_DELAY_MS);
+          await TrendHelpersUtil.wait(GOOGLE_FETCH_RETRY_DELAY_MS);
         }
       }
     }
@@ -318,330 +154,97 @@ export class TrendService {
     return null;
   }
 
-  private extractInterestScore(rawPayload: unknown): number {
-    const payload =
-      rawPayload && typeof rawPayload === 'object'
-        ? (rawPayload as Record<string, unknown>)
-        : null;
-    const defaultData =
-      payload?.default && typeof payload.default === 'object'
-        ? (payload.default as Record<string, unknown>)
-        : null;
-    const timelineData = Array.isArray(defaultData?.timelineData)
-      ? defaultData.timelineData
-      : [];
-
-    if (timelineData.length === 0) {
-      return 0;
-    }
-
-    const total = timelineData.reduce((sum, item) => {
-      const row =
-        item && typeof item === 'object'
-          ? (item as Record<string, unknown>)
-          : null;
-      const values = Array.isArray(row?.value) ? row.value : [];
-      const firstValue = values.length > 0 ? Number(values[0]) : 0;
-      return sum + (Number.isFinite(firstValue) ? firstValue : 0);
-    }, 0);
-
-    return Number((total / timelineData.length).toFixed(2));
-  }
-
-  private extractRelatedSignals(
-    rawPayload: unknown,
-    parentKeyword: string,
-    stage: TrendSeedStage
-  ): GoogleTrendSignal[] {
-    const payload =
-      rawPayload && typeof rawPayload === 'object'
-        ? (rawPayload as Record<string, unknown>)
-        : null;
-    const defaultData =
-      payload?.default && typeof payload.default === 'object'
-        ? (payload.default as Record<string, unknown>)
-        : null;
-    const rankedList = Array.isArray(defaultData?.rankedList)
-      ? defaultData.rankedList
-      : [];
-
-    const signals: GoogleTrendSignal[] = [];
-
-    for (const listItem of rankedList) {
-      const rankedKeyword =
-        listItem && typeof listItem === 'object'
-          ? (listItem as Record<string, unknown>).rankedKeyword
-          : null;
-
-      if (!Array.isArray(rankedKeyword)) {
-        continue;
-      }
-
-      for (const keywordEntry of rankedKeyword.slice(0, 5)) {
-        const row =
-          keywordEntry && typeof keywordEntry === 'object'
-            ? (keywordEntry as Record<string, unknown>)
-            : null;
-
-        const query = typeof row?.query === 'string' ? row.query.trim() : '';
-        if (!query) {
-          continue;
-        }
-
-        const numericValue = Number(row?.value);
-        const score = Number.isFinite(numericValue) ? numericValue : 0;
-
-        signals.push({
-          keyword: query,
-          score,
-          source: 'related_query',
-          stage,
-          parentKeyword
-        });
-      }
-    }
-
-    return signals;
-  }
-
-  private readString(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
-    }
-
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
-  }
-
-  private readNullableString(value: unknown): string | null {
-    if (value === null || value === undefined) {
-      return null;
-    }
-
-    return this.readString(value);
-  }
-
-  private extractProductsFromUnknown(
-    unknownProducts: unknown[]
-  ): ProductCardOutputItem[] {
-    const products: ProductCardOutputItem[] = [];
-
-    for (const unknownItem of unknownProducts) {
-      const item =
-        unknownItem && typeof unknownItem === 'object'
-          ? (unknownItem as Record<string, unknown>)
-          : null;
-
-      if (!item) {
-        continue;
-      }
-
-      const id = this.readString(item.id);
-      const name = this.readString(item.name);
-      const brandName = this.readString(item.brandName) ?? 'Unknown';
-      const rawVariants = Array.isArray(item.variants) ? item.variants : [];
-
-      const variants: ProductCardVariantOutput[] = [];
-      for (const rawVariant of rawVariants) {
-        const variant =
-          rawVariant && typeof rawVariant === 'object'
-            ? (rawVariant as Record<string, unknown>)
-            : null;
-
-        if (!variant) {
-          continue;
-        }
-
-        const variantId = this.readString(variant.id);
-        const sku = this.readString(variant.sku);
-        const volumeMl = Number(variant.volumeMl);
-        const basePrice = Number(variant.basePrice);
-
-        if (
-          !variantId ||
-          !sku ||
-          !Number.isFinite(volumeMl) ||
-          !Number.isFinite(basePrice)
-        ) {
-          continue;
-        }
-
-        variants.push({
-          id: variantId,
-          sku,
-          volumeMl,
-          basePrice
-        });
-      }
-
-      if (!id || !name || variants.length === 0) {
-        continue;
-      }
-
-      products.push({
-        id,
-        name,
-        brandName,
-        primaryImage: this.readNullableString(item.primaryImage),
-        reasoning: this.readNullableString(item.reasoning),
-        source: this.readNullableString(item.source),
-        variants
-      });
-    }
-
-    return products;
-  }
-
-  private async getVariantSalesSignalMap(
-    variantIds: Set<string>
-  ): Promise<Map<string, VariantSalesSignal>> {
-    const salesSignalMap = new Map<string, VariantSalesSignal>();
-
-    if (variantIds.size === 0) {
-      return salesSignalMap;
-    }
-
-    const analyticsResult = await this.restockService.getProductSalesAnalyticsForRestock();
-    if (!analyticsResult.success || !analyticsResult.payload) {
-      this.logger.warn('[Trend][Rank] Cannot load sales analytics for variant ranking.');
-      return salesSignalMap;
-    }
-
-    for (const variant of analyticsResult.payload) {
-      if (!variantIds.has(variant.variantId)) {
-        continue;
-      }
-
-      salesSignalMap.set(variant.variantId, {
-        last30DaysSales: variant.salesMetrics?.last30DaysSales ?? -1,
-        totalQuantitySold: variant.totalQuantitySold ?? -1
-      });
-    }
-
-    return salesSignalMap;
-  }
-
-  private rankVariantsBySalesPriority(
-    variants: ProductCardVariantOutput[],
-    salesSignalMap: Map<string, VariantSalesSignal>
-  ): ProductCardVariantResponse[] {
-    return [...variants]
-      .sort((left, right) => {
-        const leftSignal = salesSignalMap.get(left.id);
-        const rightSignal = salesSignalMap.get(right.id);
-
-        const leftLast30 = leftSignal?.last30DaysSales ?? -1;
-        const rightLast30 = rightSignal?.last30DaysSales ?? -1;
-        if (rightLast30 !== leftLast30) {
-          return rightLast30 - leftLast30;
-        }
-
-        const leftTotalSold = leftSignal?.totalQuantitySold ?? -1;
-        const rightTotalSold = rightSignal?.totalQuantitySold ?? -1;
-        if (rightTotalSold !== leftTotalSold) {
-          return rightTotalSold - leftTotalSold;
-        }
-
-        if (left.basePrice !== right.basePrice) {
-          return left.basePrice - right.basePrice;
-        }
-
-        if (left.volumeMl !== right.volumeMl) {
-          return left.volumeMl - right.volumeMl;
-        }
-
-        return left.id.localeCompare(right.id);
-      })
-      .map((variant) => ({
-        id: variant.id,
-        sku: variant.sku,
-        volumeMl: variant.volumeMl,
-        basePrice: variant.basePrice
-      }));
-  }
-
-  private toTrendProductCards(
-    products: ProductCardOutputItem[],
-    salesSignalMap: Map<string, VariantSalesSignal>
-  ): ProductCardResponse[] {
-    return products
-      .map((product) => {
-        const orderedVariants = this.rankVariantsBySalesPriority(
-          product.variants,
-          salesSignalMap
-        );
-        const displayVariant = orderedVariants[0];
-
-        if (!displayVariant) {
-          return null;
-        }
-
-        return {
-          id: product.id,
-          name: product.name,
-          brandName: product.brandName,
-          primaryImage: product.primaryImage,
-          variants: orderedVariants,
-          sizesCount: orderedVariants.length,
-          displayPrice: displayVariant.basePrice
-        };
-      })
-      .filter((product): product is ProductCardResponse => product !== null);
-  }
-
-  private async collectTrendLogNameSeeds(requestId: string): Promise<string[]> {
-    try {
-      const trendLogsResult = await this.inventoryService.getLatestTrendLogs(2);
-      if (!trendLogsResult.success || !Array.isArray(trendLogsResult.data)) {
-        this.logger.warn(
-          `[Trend][Seed][TrendLog] requestId=${requestId} status=skip reason=latest-trend-log-unavailable`
-        );
-        return [];
-      }
-
-      const names: string[] = [];
-      for (const log of trendLogsResult.data) {
-        const parsed = this.safeParseJson<Record<string, unknown>>(log.trendData);
-        if (!parsed) {
-          continue;
-        }
-
-        const rawProducts = Array.isArray(parsed.products) ? parsed.products : [];
-        for (const rawProduct of rawProducts) {
-          const product =
-            rawProduct && typeof rawProduct === 'object'
-              ? (rawProduct as Record<string, unknown>)
-              : null;
-
-          const name = this.readString(product?.name);
-          if (name) {
-            names.push(name);
-          }
-        }
-      }
-
-      const normalizedNames = this.uniqueKeywords(names, 5);
-      this.logger.log(
-        `[Trend][Seed][TrendLog] requestId=${requestId} extractedNameCount=${normalizedNames.length}`
-      );
-      return normalizedNames;
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.warn(
-        `[Trend][Seed][TrendLog] requestId=${requestId} status=error error=${errorMessage}`
-      );
-      return [];
-    }
-  }
-
   private buildSeedKeywords(): TrendSeedKeyword[] {
-    // Keep only one broad seed keyword and let AI map related queries into product keywords.
-    const nameKeywords = this.uniqueKeywords([SIMPLE_TREND_BASE_KEYWORD], 1).map(
+    return TrendHelpersUtil.uniqueKeywords([SIMPLE_TREND_BASE_KEYWORD], 1).map(
       (keyword) => ({ keyword, stage: 'name' as const })
     );
+  }
 
-    return nameKeywords;
+  private async fetchRelatedQueries(
+    requestId: string,
+    seed: TrendSeedKeyword,
+    startDate: Date,
+    endDate: Date
+  ): Promise<GoogleTrendSignal[]> {
+    if (seed.stage !== 'name') {
+      return [];
+    }
+
+    const relatedRaw = await this.executeWithRetry(
+      requestId,
+      'related_queries',
+      seed.keyword,
+      () =>
+        googleTrends.relatedQueries({
+          keyword: seed.keyword,
+          startTime: startDate,
+          endTime: endDate,
+          geo: GOOGLE_TREND_GEO
+        })
+    );
+
+    if (!relatedRaw) {
+      return [];
+    }
+
+    const relatedRawText =
+      typeof relatedRaw === 'string' ? relatedRaw : JSON.stringify(relatedRaw);
+    const relatedSignals = TrendHelpersUtil.extractRelatedSignals(
+      TrendHelpersUtil.safeParseJson(relatedRaw),
+      seed.keyword,
+      seed.stage
+    );
+
+    this.logger.log(
+      `[Trend][GoogleFetch][RAW] requestId=${requestId} operation=related_queries keyword="${seed.keyword}" rawChars=${relatedRawText.length} parsedSignalCount=${relatedSignals.length} preview="${TrendHelpersUtil.truncateForLog(
+        relatedSignals
+          .slice(0, 8)
+          .map((signal) => `${signal.keyword}:${signal.score}`)
+          .join(' | '),
+        360
+      )}"`
+    );
+
+    return relatedSignals;
+  }
+
+  private async fetchInterestOverTime(
+    requestId: string,
+    seed: TrendSeedKeyword,
+    startDate: Date,
+    endDate: Date
+  ): Promise<GoogleTrendSignal | null> {
+    const interestRaw = await this.executeWithRetry(
+      requestId,
+      'interest_over_time',
+      seed.keyword,
+      () =>
+        googleTrends.interestOverTime({
+          keyword: seed.keyword,
+          startTime: startDate,
+          endTime: endDate,
+          geo: GOOGLE_TREND_GEO
+        })
+    );
+
+    if (!interestRaw) {
+      return null;
+    }
+
+    const interestRawText =
+      typeof interestRaw === 'string' ? interestRaw : JSON.stringify(interestRaw);
+    const score = TrendHelpersUtil.extractInterestScore(TrendHelpersUtil.safeParseJson(interestRaw));
+
+    this.logger.log(
+      `[Trend][GoogleFetch][RAW] requestId=${requestId} operation=interest_over_time keyword="${seed.keyword}" rawChars=${interestRawText.length} score=${score}`
+    );
+
+    return {
+      keyword: seed.keyword,
+      score,
+      source: 'interest_over_time',
+      stage: seed.stage
+    };
   }
 
   private async fetchGoogleSignals(
@@ -658,81 +261,16 @@ export class TrendService {
     const signals: GoogleTrendSignal[] = [];
 
     for (const seed of seedKeywords) {
-      let hasRelatedSignals = false;
+      const relatedSignals = await this.fetchRelatedQueries(requestId, seed, startDate, endDate);
 
-      if (seed.stage === 'name') {
-        const relatedRaw = await this.executeWithRetry(
-          requestId,
-          'related_queries',
-          seed.keyword,
-          () =>
-            googleTrends.relatedQueries({
-              keyword: seed.keyword,
-              startTime: startDate,
-              endTime: endDate,
-              geo: GOOGLE_TREND_GEO
-            })
-        );
-
-        if (relatedRaw) {
-          const relatedRawText =
-            typeof relatedRaw === 'string' ? relatedRaw : JSON.stringify(relatedRaw);
-          const relatedSignals = this.extractRelatedSignals(
-            this.safeParseJson(relatedRaw),
-            seed.keyword,
-            seed.stage
-          );
-
-          this.logger.log(
-            `[Trend][GoogleFetch][RAW] requestId=${requestId} operation=related_queries keyword="${seed.keyword}" rawChars=${relatedRawText.length} parsedSignalCount=${relatedSignals.length} preview="${this.truncateForLog(
-              relatedSignals
-                .slice(0, 8)
-                .map((signal) => `${signal.keyword}:${signal.score}`)
-                .join(' | '),
-              360
-            )}"`
-          );
-
-          if (relatedSignals.length > 0) {
-            hasRelatedSignals = true;
-            signals.push(...relatedSignals);
-          }
-        }
-      }
-
-      // Fall back to a single interest-over-time call if related queries are unavailable.
-      if (hasRelatedSignals) {
+      if (relatedSignals.length > 0) {
+        signals.push(...relatedSignals);
         continue;
       }
 
-      const interestRaw = await this.executeWithRetry(
-        requestId,
-        'interest_over_time',
-        seed.keyword,
-        () =>
-          googleTrends.interestOverTime({
-            keyword: seed.keyword,
-            startTime: startDate,
-            endTime: endDate,
-            geo: GOOGLE_TREND_GEO
-          })
-      );
-
-      if (interestRaw) {
-        const interestRawText =
-          typeof interestRaw === 'string' ? interestRaw : JSON.stringify(interestRaw);
-        const score = this.extractInterestScore(this.safeParseJson(interestRaw));
-
-        this.logger.log(
-          `[Trend][GoogleFetch][RAW] requestId=${requestId} operation=interest_over_time keyword="${seed.keyword}" rawChars=${interestRawText.length} score=${score}`
-        );
-
-        signals.push({
-          keyword: seed.keyword,
-          score,
-          source: 'interest_over_time',
-          stage: seed.stage
-        });
+      const interestSignal = await this.fetchInterestOverTime(requestId, seed, startDate, endDate);
+      if (interestSignal) {
+        signals.push(interestSignal);
       }
     }
 
@@ -766,12 +304,12 @@ export class TrendService {
       .filter((seed) => seed.stage === 'attribute')
       .map((seed) => seed.keyword);
 
-    const primaryKeywords = this.uniqueKeywords(
+    const primaryKeywords = TrendHelpersUtil.uniqueKeywords(
       [...nameSignalKeywords, ...seedNameKeywords],
       5
     );
 
-    const expansionKeywords = this.uniqueKeywords(
+    const expansionKeywords = TrendHelpersUtil.uniqueKeywords(
       [...attributeSignalKeywords, ...seedAttributeKeywords],
       8
     );
@@ -803,7 +341,7 @@ export class TrendService {
     const compactSignals = signals
       .sort((left, right) => right.score - left.score)
       .slice(0, GOOGLE_SIGNAL_PROMPT_LIMIT);
-    const signalSummary = this.summarizeSignals(compactSignals);
+    const signalSummary = TrendHelpersUtil.summarizeSignals(compactSignals);
 
     const mapped = this.buildKeywordFallback(requestId, seedKeywords, compactSignals);
 
@@ -819,7 +357,7 @@ export class TrendService {
       mapperResult.negativeTerms.map((term) => term.toLowerCase())
     );
 
-    const mergedKeywords = this.uniqueKeywords(
+    const mergedKeywords = TrendHelpersUtil.uniqueKeywords(
       [...mapperResult.primaryKeywords, ...mapperResult.expansionKeywords],
       TREND_SEARCH_KEYWORD_LIMIT
     );
@@ -938,6 +476,103 @@ export class TrendService {
       .filter((product): product is ProductCardOutputItem => product !== null);
   }
 
+  private async getVariantSalesSignalMap(
+    variantIds: Set<string>
+  ): Promise<Map<string, VariantSalesSignal>> {
+    const salesSignalMap = new Map<string, VariantSalesSignal>();
+
+    if (variantIds.size === 0) {
+      return salesSignalMap;
+    }
+
+    const analyticsResult = await this.restockService.getProductSalesAnalyticsForRestock();
+    if (!analyticsResult.success || !analyticsResult.payload) {
+      this.logger.warn('[Trend][Rank] Cannot load sales analytics for variant ranking.');
+      return salesSignalMap;
+    }
+
+    for (const variant of analyticsResult.payload) {
+      if (!variantIds.has(variant.variantId)) {
+        continue;
+      }
+
+      salesSignalMap.set(variant.variantId, {
+        last30DaysSales: variant.salesMetrics?.last30DaysSales ?? -1,
+        totalQuantitySold: variant.totalQuantitySold ?? -1
+      });
+    }
+
+    return salesSignalMap;
+  }
+
+  private rankVariantsBySalesPriority(
+    variants: ProductCardVariantOutput[],
+    salesSignalMap: Map<string, VariantSalesSignal>
+  ): ProductCardVariantResponse[] {
+    return [...variants]
+      .sort((left, right) => {
+        const leftSignal = salesSignalMap.get(left.id);
+        const rightSignal = salesSignalMap.get(right.id);
+
+        const leftLast30 = leftSignal?.last30DaysSales ?? -1;
+        const rightLast30 = rightSignal?.last30DaysSales ?? -1;
+        if (rightLast30 !== leftLast30) {
+          return rightLast30 - leftLast30;
+        }
+
+        const leftTotalSold = leftSignal?.totalQuantitySold ?? -1;
+        const rightTotalSold = rightSignal?.totalQuantitySold ?? -1;
+        if (rightTotalSold !== leftTotalSold) {
+          return rightTotalSold - leftTotalSold;
+        }
+
+        if (left.basePrice !== right.basePrice) {
+          return left.basePrice - right.basePrice;
+        }
+
+        if (left.volumeMl !== right.volumeMl) {
+          return left.volumeMl - right.volumeMl;
+        }
+
+        return left.id.localeCompare(right.id);
+      })
+      .map((variant) => ({
+        id: variant.id,
+        sku: variant.sku,
+        volumeMl: variant.volumeMl,
+        basePrice: variant.basePrice
+      }));
+  }
+
+  private toTrendProductCards(
+    products: ProductCardOutputItem[],
+    salesSignalMap: Map<string, VariantSalesSignal>
+  ): ProductCardResponse[] {
+    return products
+      .map((product) => {
+        const orderedVariants = this.rankVariantsBySalesPriority(
+          product.variants,
+          salesSignalMap
+        );
+        const displayVariant = orderedVariants[0];
+
+        if (!displayVariant) {
+          return null;
+        }
+
+        return {
+          id: product.id,
+          name: product.name,
+          brandName: product.brandName,
+          primaryImage: product.primaryImage,
+          variants: orderedVariants,
+          sizesCount: orderedVariants.length,
+          displayPrice: displayVariant.basePrice
+        };
+      })
+      .filter((product): product is ProductCardResponse => product !== null);
+  }
+
   private async toRankedProductCards(
     products: ProductCardOutputItem[]
   ): Promise<ProductCardResponse[]> {
@@ -1007,100 +642,6 @@ export class TrendService {
     }
   }
 
-  private async extractProductsFromSnapshot(
-    requestId: string,
-    snapshot: Record<string, unknown>
-  ): Promise<ProductCardOutputItem[]> {
-    const products = Array.isArray(snapshot.products)
-      ? this.extractProductsFromUnknown(snapshot.products)
-      : [];
-
-    if (products.length > 0) {
-      return products;
-    }
-
-    const productTemp = Array.isArray(snapshot.productTemp)
-      ? snapshot.productTemp
-      : [];
-
-    const ids = this.uniqueKeywords(
-      productTemp
-        .map((item) => {
-          const row =
-            item && typeof item === 'object'
-              ? (item as Record<string, unknown>)
-              : null;
-          return this.readString(row?.id);
-        })
-        .filter((id): id is string => Boolean(id)),
-      20
-    );
-
-    if (ids.length === 0) {
-      return [];
-    }
-
-    this.logger.log(
-      `[Trend][TrendLogFallback][HYDRATE] requestId=${requestId} productTempIdCount=${ids.length}`
-    );
-
-    const hydratedProducts = await this.productService.getProductsByIdsForOutput(ids);
-    if (!hydratedProducts.success || !Array.isArray(hydratedProducts.data)) {
-      return [];
-    }
-
-    return hydratedProducts.data;
-  }
-
-  private async getTrendProductsFromLatestLogs(
-    requestId: string
-  ): Promise<ProductCardResponse[]> {
-    try {
-      const trendLogsResult = await this.inventoryService.getLatestTrendLogs(
-        FALLBACK_TREND_LOG_COUNT
-      );
-
-      if (!trendLogsResult.success || !Array.isArray(trendLogsResult.data)) {
-        this.logger.warn(
-          `[Trend][TrendLogFallback][MISS] requestId=${requestId} reason=no-logs`
-        );
-        return [];
-      }
-
-      for (const log of trendLogsResult.data) {
-        const snapshot = this.safeParseJson<Record<string, unknown>>(log.trendData);
-        if (!snapshot) {
-          continue;
-        }
-
-        const products = await this.extractProductsFromSnapshot(requestId, snapshot);
-        if (products.length === 0) {
-          continue;
-        }
-
-        const rankedProducts = await this.toRankedProductCards(products);
-        if (rankedProducts.length > 0) {
-          this.logger.log(
-            `[Trend][TrendLogFallback][HIT] requestId=${requestId} productCount=${rankedProducts.length}`
-          );
-          return rankedProducts;
-        }
-      }
-
-      this.logger.warn(
-        `[Trend][TrendLogFallback][MISS] requestId=${requestId} reason=no-valid-products`
-      );
-      return [];
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.warn(
-        `[Trend][TrendLogFallback][ERROR] requestId=${requestId} error=${errorMessage}`
-      );
-      return [];
-    }
-  }
-
   private async persistTrendSnapshot(
     requestId: string,
     payload: TrendProductsCachePayload
@@ -1119,45 +660,10 @@ export class TrendService {
     }
   }
 
-  private async analyzeTrendWithAI(
+  private async collectProductsPerSignal(
     requestId: string,
     signals: GoogleTrendSignal[]
-  ): Promise<import('src/chatbot/output/analysis.output').AnalysisObject | null> {
-    const startedAt = Date.now();
-    try {
-      const compactSignals = signals
-        .sort((a, b) => b.score - a.score)
-        .slice(0, GOOGLE_SIGNAL_PROMPT_LIMIT)
-        .map(s => ({ keyword: s.keyword, score: s.score, source: s.source }));
-
-      this.logger.log(
-        `[Trend][AIAnalysis][START] requestId=${requestId} signalCount=${compactSignals.length}`
-      );
-
-      const analysisObject = await this.aiAnalysisService.analyzeTrend(compactSignals);
-
-      this.logger.log(
-        `[Trend][AIAnalysis][DONE] requestId=${requestId} success=${!!analysisObject} logicGroups=${analysisObject?.logic?.length ?? 0} durationMs=${Date.now() - startedAt}`
-      );
-
-      return analysisObject;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.warn(
-        `[Trend][AIAnalysis][FAIL] requestId=${requestId} error=${errorMessage} durationMs=${Date.now() - startedAt}`
-      );
-      return null;
-    }
-  }
-
-  private async mergeTrendProducts(
-    requestId: string,
-    signals: GoogleTrendSignal[]
-  ): Promise<ProductCardResponse[]> {
-    const startedAt = Date.now();
-    const allQueryProducts: import('src/application/dtos/response/product-with-variants.response').ProductWithVariantsResponse[] = [];
-
-    // Step 1: Process each signal individually
+  ): Promise<ProductWithVariantsResponse[]> {
     const topSignals = signals
       .sort((a, b) => b.score - a.score)
       .slice(0, GOOGLE_SIGNAL_PROMPT_LIMIT);
@@ -1166,9 +672,10 @@ export class TrendService {
       `[Trend][Merge][START] requestId=${requestId} signalCount=${topSignals.length} strategy=per-keyword`
     );
 
+    const allQueryProducts: ProductWithVariantsResponse[] = [];
+
     for (const signal of topSignals) {
       try {
-        // Analyze a single keyword to get a tight, focused AnalysisObject
         const singleAnalysis = await this.aiAnalysisService.analyzeTrend([
           { keyword: signal.keyword, score: signal.score, source: signal.source }
         ]);
@@ -1202,7 +709,6 @@ export class TrendService {
         );
       }
 
-      // Early exit if we already have enough candidates
       if (allQueryProducts.length >= TREND_PRODUCT_LIMIT * 6) {
         this.logger.log(
           `[Trend][Merge][EARLY_EXIT] requestId=${requestId} accumulated=${allQueryProducts.length}`
@@ -1211,7 +717,47 @@ export class TrendService {
       }
     }
 
-    // Step 2: Best seller products for intersection boost
+    return allQueryProducts;
+  }
+
+  private intersectWithBestSellers(
+    requestId: string,
+    queryProducts: ProductWithVariantsResponse[],
+    bestSellerProducts: ProductWithVariantsResponse[]
+  ): ProductWithVariantsResponse[] {
+    const dedupedQueryProducts = this.dedupeProductsById(queryProducts);
+
+    if (bestSellerProducts.length > 0 && dedupedQueryProducts.length > 0) {
+      const queryProductIds = new Set(dedupedQueryProducts.map((p) => p.id));
+      const intersection = bestSellerProducts.filter((p) => queryProductIds.has(p.id));
+      if (intersection.length > 0) {
+        this.logger.log(
+          `[Trend][Merge][INTERSECTION] requestId=${requestId} intersectionCount=${intersection.length} — using best seller order`
+        );
+        return intersection;
+      }
+
+      this.logger.log(
+        `[Trend][Merge][FALLBACK] requestId=${requestId} dedupedCount=${dedupedQueryProducts.length} — no intersection, fallback to query products`
+      );
+      return dedupedQueryProducts;
+    }
+
+    const used = dedupedQueryProducts.length > 0 ? 'query' : 'bestseller';
+    this.logger.log(
+      `[Trend][Merge][ONE_SIDE] requestId=${requestId} using=${used}`
+    );
+    return dedupedQueryProducts.length > 0 ? dedupedQueryProducts : bestSellerProducts;
+  }
+
+  private async mergeTrendProducts(
+    requestId: string,
+    signals: GoogleTrendSignal[]
+  ): Promise<ProductCardResponse[]> {
+    const startedAt = Date.now();
+
+    const allQueryProducts = await this.collectProductsPerSignal(requestId, signals);
+
     const bestSellerResponse = await this.productService.getBestSellingProducts({
       PageNumber: 1,
       PageSize: 50,
@@ -1219,39 +765,15 @@ export class TrendService {
       IsDescending: true
     });
     const bestSellerProducts = bestSellerResponse.success && bestSellerResponse.data
-      ? bestSellerResponse.data.items.map((item: any) => item.product)
+      ? bestSellerResponse.data.items.map((item: BestSellingProductResponse) => item.product)
       : [];
 
     this.logger.log(
       `[Trend][Merge][BESTSELLER] requestId=${requestId} bestSellerCount=${bestSellerProducts.length}`
     );
 
-    // Step 3: Support merge — deduplicate then intersect with best sellers
-    const dedupedQueryProducts = this.dedupeProductsById(allQueryProducts);
+    const mergedProducts = this.intersectWithBestSellers(requestId, allQueryProducts, bestSellerProducts);
 
-    let mergedProducts: typeof dedupedQueryProducts;
-    if (bestSellerProducts.length > 0 && dedupedQueryProducts.length > 0) {
-      const queryProductIds = new Set(dedupedQueryProducts.map((p: any) => p.id));
-      const intersection = bestSellerProducts.filter((p: any) => queryProductIds.has(p.id));
-      if (intersection.length > 0) {
-        mergedProducts = intersection;
-        this.logger.log(
-          `[Trend][Merge][INTERSECTION] requestId=${requestId} intersectionCount=${intersection.length} — using best seller order`
-        );
-      } else {
-        mergedProducts = dedupedQueryProducts;
-        this.logger.log(
-          `[Trend][Merge][FALLBACK] requestId=${requestId} dedupedCount=${dedupedQueryProducts.length} — no intersection, fallback to query products`
-        );
-      }
-    } else {
-      mergedProducts = dedupedQueryProducts.length > 0 ? dedupedQueryProducts : bestSellerProducts;
-      this.logger.log(
-        `[Trend][Merge][ONE_SIDE] requestId=${requestId} using=${dedupedQueryProducts.length > 0 ? 'query' : 'bestseller'}`
-      );
-    }
-
-    // Step 4: Convert to ProductCardOutputItem and rank
     const productOutputItems = this.toProductOutputItems(
       this.dedupeProductsById(mergedProducts)
     );
@@ -1328,6 +850,43 @@ export class TrendService {
   }
 
 
+  private makePipelineResult(
+    products: ProductCardResponse[],
+    sourceUsed: TrendPipelineSource,
+    fallbackTier: TrendPipelineResult['fallbackTier'],
+    keywordsUsed: string[] = [],
+    googleSignals: GoogleTrendSignal[] = [],
+    mapperResult: TrendKeywordMapperResult = emptyMapperResult
+  ): TrendPipelineResult {
+    return {
+      products,
+      keywordsUsed,
+      sourceUsed,
+      fallbackTier,
+      googleSignals,
+      mapperResult
+    };
+  }
+
+  private async handlePipelineFallback(
+    requestId: string,
+    cacheKey: string,
+    startedAt: number
+  ): Promise<TrendPipelineResult> {
+    const cachedProducts = await this.readCachedTrendProducts(requestId, cacheKey);
+    if (cachedProducts.length > 0) {
+      this.logger.log(
+        `[Trend][EXIT] requestId=${requestId} source=cache fallbackTier=cache productCount=${cachedProducts.length} durationMs=${Date.now() - startedAt}`
+      );
+      return this.makePipelineResult(cachedProducts, 'cache', 'cache');
+    }
+
+    this.logger.warn(
+      `[Trend][EXIT] requestId=${requestId} source=empty fallbackTier=empty productCount=0 durationMs=${Date.now() - startedAt}`
+    );
+    return this.makePipelineResult([], 'empty', 'empty');
+  }
+
   private async resolveTrendPipeline(
     requestId: string,
     allUserLogRequest: AllUserLogRequest
@@ -1346,15 +905,7 @@ export class TrendService {
         this.logger.log(
           `[Trend][EXIT] requestId=${requestId} source=cache fallbackTier=cache productCount=${warmCacheProducts.length} durationMs=${Date.now() - startedAt}`
         );
-
-        return {
-          products: warmCacheProducts,
-          keywordsUsed: [],
-          sourceUsed: 'cache',
-          fallbackTier: 'cache',
-          googleSignals: [],
-          mapperResult: emptyMapperResult
-        };
+        return this.makePipelineResult(warmCacheProducts, 'cache', 'cache');
       }
     }
 
@@ -1395,50 +946,7 @@ export class TrendService {
         `[Trend][LIVE_FAIL] requestId=${requestId} error=${errorMessage}`
       );
 
-      const cachedProducts = await this.readCachedTrendProducts(requestId, cacheKey);
-      if (cachedProducts.length > 0) {
-        this.logger.log(
-          `[Trend][EXIT] requestId=${requestId} source=cache fallbackTier=cache productCount=${cachedProducts.length} durationMs=${Date.now() - startedAt}`
-        );
-
-        return {
-          products: cachedProducts,
-          keywordsUsed: [],
-          sourceUsed: 'cache',
-          fallbackTier: 'cache',
-          googleSignals: [],
-          mapperResult: emptyMapperResult
-        };
-      }
-
-      const trendLogProducts = await this.getTrendProductsFromLatestLogs(requestId);
-      if (trendLogProducts.length > 0) {
-        this.logger.log(
-          `[Trend][EXIT] requestId=${requestId} source=trend-log fallbackTier=trend-log productCount=${trendLogProducts.length} durationMs=${Date.now() - startedAt}`
-        );
-
-        return {
-          products: trendLogProducts,
-          keywordsUsed: [],
-          sourceUsed: 'trend-log',
-          fallbackTier: 'trend-log',
-          googleSignals: [],
-          mapperResult: emptyMapperResult
-        };
-      }
-
-      this.logger.warn(
-        `[Trend][EXIT] requestId=${requestId} source=empty fallbackTier=empty productCount=0 durationMs=${Date.now() - startedAt}`
-      );
-
-      return {
-        products: [],
-        keywordsUsed: [],
-        sourceUsed: 'empty',
-        fallbackTier: 'empty',
-        googleSignals: [],
-        mapperResult: emptyMapperResult
-      };
+      return this.handlePipelineFallback(requestId, cacheKey, startedAt);
     }
   }
 

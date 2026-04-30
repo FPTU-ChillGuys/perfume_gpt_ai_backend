@@ -93,15 +93,6 @@ export class UserLogService {
     );
   }
 
-  /** Lay tat ca log */
-  async getAllLogs(): Promise<BaseResponse<EventLog[]>> {
-    return {
-      success: false,
-      error:
-        'Deprecated: user_log table has been removed. Use event log APIs instead.'
-    };
-  }
-
   async getAllEventLogs(): Promise<BaseResponse<EventLog[]>> {
     return await funcHandlerAsync(
       async () => {
@@ -388,17 +379,6 @@ export class UserLogService {
     this.logger.log(`[SUMMARY] Updated existing rolling summary for userId=${userId}`);
   }
 
-  /** Lay tat ca log */
-  async getUserLogsWithPeriod(
-    allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<EventLog[]>> {
-    return {
-      success: false,
-      error: 'Deprecated alias. Use event log APIs instead.',
-      data: []
-    };
-  }
-
   async getEventLogsWithPeriod(
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<EventLog[]>> {
@@ -423,38 +403,17 @@ export class UserLogService {
     );
   }
 
-  /** Lay log tu userId */
-  async getUserLogsByUserId(userId: string): Promise<BaseResponse<EventLog[]>> {
-    return {
-      success: true,
-      data: []
-    };
-  }
-
-  async addUserSearch(
-    searchText: string,
-    userId: string
-  ): Promise<BaseResponse<{ id: string }>> {
-    return await funcHandlerAsync(async () => {
-      const id = await this.unitOfWork.EventLogRepo.createSearchEvent(
-        userId,
-        searchText
-      );
-      await this.enqueueRollingSummaryUpdate(userId);
-      return { success: true, data: { id } };
-    }, 'Failed to add user search log');
-  }
-
-  async addSearchLogToUserLog(
-    userId: string,
-    searchText: string
-  ): Promise<string> {
+  async addSearchTextLog(userId: string, searchText: string): Promise<string> {
     const id = await this.unitOfWork.EventLogRepo.createSearchEvent(
       userId,
       searchText
     );
     await this.enqueueRollingSummaryUpdate(userId);
     return id;
+  }
+
+  async addSearchLogToUserLog(userId: string, searchText: string): Promise<string> {
+    return this.addSearchTextLog(userId, searchText);
   }
 
   async addProductViewLog(
@@ -472,15 +431,6 @@ export class UserLogService {
       productName,
       variantName,
       metadata
-    );
-    await this.enqueueRollingSummaryUpdate(userId);
-    return id;
-  }
-
-  async addSearchTextLog(userId: string, searchText: string): Promise<string> {
-    const id = await this.unitOfWork.EventLogRepo.createSearchEvent(
-      userId,
-      searchText
     );
     await this.enqueueRollingSummaryUpdate(userId);
     return id;
@@ -581,7 +531,7 @@ export class UserLogService {
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
     return await funcHandlerAsync(
       async () => {
-        console.log(
+        this.logger.debug(
           `Start Date: ${
             startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
           }, End Date: ${
@@ -670,10 +620,10 @@ export class UserLogService {
         const { searchContents, messageContents, surveyContents, count } =
           buildContentSectionsFromEvents(eventLogs);
 
-        console.log(`User ID: ${userLogRequest.userId}`);
-        console.log(`Search Contents: ${searchContents}`);
-        console.log(`Message Contents: ${messageContents}`);
-        console.log(`Survey Contents: ${surveyContents}`);
+        this.logger.debug(`User ID: ${userLogRequest.userId}`);
+        this.logger.debug(`Search Contents: ${searchContents}`);
+        this.logger.debug(`Message Contents: ${messageContents}`);
+        this.logger.debug(`Survey Contents: ${surveyContents}`);
 
         // Tao prompt de tong hop log
         const prompt = generateSummaryPrompt(
@@ -713,9 +663,9 @@ export class UserLogService {
           );
         }
 
-        console.log(`Period: ${allUserLogRequest.period}`);
-        console.log(`Start Date: ${allUserLogRequest.startDate}`);
-        console.log(`End Date: ${allUserLogRequest.endDate}`);
+        this.logger.debug(`Period: ${allUserLogRequest.period}`);
+        this.logger.debug(`Start Date: ${allUserLogRequest.startDate}`);
+        this.logger.debug(`End Date: ${allUserLogRequest.endDate}`);
 
         const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
           startDate: startOfDay(convertToUTC(allUserLogRequest.startDate!)),
@@ -737,10 +687,10 @@ export class UserLogService {
           const { searchContents, messageContents, surveyContents } =
             buildContentSectionsFromEvents(userEventLogs);
 
-          console.log(`User ID: ${userId}`);
-          console.log(`Search Contents: ${searchContents}`);
-          console.log(`Message Contents: ${messageContents}`);
-          console.log(`Survey Contents: ${surveyContents}`);
+          this.logger.debug(`User ID: ${userId}`);
+          this.logger.debug(`Search Contents: ${searchContents}`);
+          this.logger.debug(`Message Contents: ${messageContents}`);
+          this.logger.debug(`Survey Contents: ${surveyContents}`);
 
           // Tao prompt de tong hop log
           prompt +=
@@ -773,56 +723,6 @@ export class UserLogService {
   async getAllUserIdsFromLogs(): Promise<string[]> {
     const userIds = await this.unitOfWork.EventLogRepo.getDistinctUserIds();
     return Array.from(new Set(userIds));
-  }
-
-
-
-  private resolveAllUserLogRange(request: AllUserLogRequest): {
-    startDate: Date;
-    endDate: Date;
-  } {
-    const endDate = convertToUTC(request.endDate || new Date());
-    const startDate = request.startDate
-      ? convertToUTC(request.startDate)
-      : getFirstDateOfPeriod(request.period, endDate);
-
-    return {
-      startDate: startOfDay(startDate),
-      endDate: endOfDay(endDate)
-    };
-  }
-
-  private buildSummaryResponseFromEvents(
-    userId: string,
-    eventLogs: EventLog[]
-  ): UserLogSummaryResponse {
-    const featureSnapshot = normalizeFeatureSnapshot();
-    const dailyFeatureSnapshot = normalizeDailyFeatureSnapshot();
-
-    for (const event of eventLogs) {
-      applyEventToFeatureSnapshot(featureSnapshot, event);
-      applyEventToDailyFeatureSnapshot(dailyFeatureSnapshot, event);
-    }
-
-    const totalEvents = eventLogs.length;
-    const dailyLogSummary = buildDailyLogSummaryMap(dailyFeatureSnapshot);
-    const updatedAt =
-      eventLogs.length > 0
-        ? new Date(
-            Math.max(...eventLogs.map((event) => event.createdAt.getTime()))
-          )
-        : new Date();
-
-    return new UserLogSummaryResponse({
-      userId,
-      logSummary: buildRollingSummaryText(featureSnapshot, totalEvents),
-      featureSnapshot,
-      dailyLogSummary,
-      dailyFeatureSnapshot,
-      totalEvents,
-      createdAt: updatedAt,
-      updatedAt
-    });
   }
 
   async getUserLogSummary(
@@ -889,7 +789,6 @@ export class UserLogService {
     );
   }
 
-  /** Kiem tra neu co log trong tuan khong bat dau tu chu nhat luc 23:59 */
   async isLogsFromLastWeek(userId: string): Promise<boolean> {
     const response = await this.getReportAndPromptSummaryUserLogs(
       new UserLogRequest({
@@ -899,13 +798,12 @@ export class UserLogService {
       })
     );
     if (!response.success) {
-      console.log(`Failed to get user logs for userId: ${userId}`);
+      this.logger.warn(`Failed to get user logs for userId: ${userId}`);
       return false;
     }
     return response.data?.count! > 0;
   }
 
-  /** Kiem tra neu co log trong thang khong */
   async isLogsFromLastMonth(userId: string): Promise<boolean> {
     const response = await this.getReportAndPromptSummaryUserLogs(
       new UserLogRequest({
@@ -915,7 +813,7 @@ export class UserLogService {
       })
     );
     if (!response.success) {
-      console.log(`Failed to get user logs for userId: ${userId}`);
+      this.logger.warn(`Failed to get user logs for userId: ${userId}`);
       return false;
     }
     return response.data?.count! > 0;
@@ -931,43 +829,10 @@ export class UserLogService {
       })
     );
     if (!response.success) {
-      console.log(`Failed to get user logs for userId: ${userId}`);
+      this.logger.warn(`Failed to get user logs for userId: ${userId}`);
       return false;
     }
     return response.data?.count! > 0;
-  }
-
-  /** Lay log tu userId */
-  async getUserLogs(
-    userId: string,
-    endDate?: Date,
-    startDate?: Date
-  ): Promise<BaseResponse<EventLog[]>> {
-    return {
-      success: true,
-      data: []
-    };
-  }
-
-  /** Lay log tu userId theo tuan */
-  async getUserLogsByWeek(userId: string): Promise<BaseResponse<EventLog[]>> {
-    const endDate = endOfWeek(convertToUTC(new Date()));
-    const startDate = startOfWeek(convertToUTC(new Date()));
-    return this.getUserLogs(userId, endDate, startDate);
-  }
-
-  /** Lay log tu userId theo thang */
-  async getUserLogsByMonth(userId: string): Promise<BaseResponse<EventLog[]>> {
-    const endDate = endOfMonth(convertToUTC(new Date()));
-    const startDate = startOfMonth(convertToUTC(new Date(endDate)));
-    return this.getUserLogs(userId, endDate, startDate);
-  }
-
-  /** Lay log tu userId theo nam */
-  async getUserLogsByYear(userId: string): Promise<BaseResponse<EventLog[]>> {
-    const endDate = endOfYear(convertToUTC(new Date()));
-    const startDate = startOfYear(convertToUTC(new Date(endDate)));
-    return this.getUserLogs(userId, endDate, startDate);
   }
 
   /** Lay user log summary tu userId */

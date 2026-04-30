@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
-import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { SlowStockService } from 'src/infrastructure/domain/slow-stock/slow-stock.service';
 import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
@@ -16,7 +15,6 @@ export class InventoryTool {
 
   constructor(
     private readonly inventoryPrismaRepo: InventoryPrismaRepository,
-    private readonly unitOfWork: UnitOfWork,
     private readonly restockService: RestockService,
     private readonly slowStockService: SlowStockService
   ) { }
@@ -57,40 +55,6 @@ export class InventoryTool {
           return { success: true, encodedData: encodingResult.encoded };
         },
         'Error occurred while fetching inventory stock.',
-        true
-      );
-    }
-  });
-
-  /**
-   * Lấy 2 trend log mới nhất từ DB.
-   * AI dùng tool này để điều chỉnh mức ưu tiên restock theo xu hướng hiện tại.
-   */
-  getLatestTrendLogs: Tool = tool({
-    description:
-      'Get the 2 most recent AI-generated trend snapshots. ' +
-      'Use this to understand which product groups are trending and adjust restock priority. ' +
-      'Output is TOON-compressed to reduce token usage. ' +
-      'Do NOT use this to calculate sales velocity — only use for priority adjustment.',
-    inputSchema: z.object({}),
-    execute: async () => {
-      this.logger.log(`[getLatestTrendLogs] called`);
-      return await funcHandlerAsync(
-        async () => {
-          const logs = await this.unitOfWork.TrendLogRepo.find(
-            {},
-            { orderBy: { createdAt: 'DESC' }, limit: 2 }
-          );
-
-          const fullData = logs.map((l) => ({
-            createdAt: l.createdAt,
-            trendData: l.trendData
-          }));
-
-          const encodingResult = encodeToolOutput(fullData);
-          return { success: true, encodedData: encodingResult.encoded };
-        },
-        'Error occurred while fetching trend logs.',
         true
       );
     }

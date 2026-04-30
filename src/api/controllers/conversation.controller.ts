@@ -24,6 +24,7 @@ import { ConversationInputHelper } from 'src/infrastructure/domain/conversation/
 
 // DTOs
 import { ConversationResponse } from 'src/application/dtos/response/conversation/conversation.response';
+import { ChatV11Response } from 'src/application/dtos/response/conversation/chat-v11.response';
 import { ChatRequest } from 'src/application/dtos/request/conversation/chat.request';
 import { PagedConversationRequest } from 'src/application/dtos/request/conversation/paged-conversation.request';
 
@@ -45,14 +46,20 @@ export class ConversationController {
     return await this.conversationService.getAllConversations();
   }
 
-  /** Lấy cuộc hội thoại theo ID (Admin) */
-  @Role(['admin'])
-  @Get(':id')
-  @ApiOperation({ summary: 'Lấy cuộc hội thoại theo ID' })
-  async getConversationById(
-    @Query('id') id: string
-  ): Promise<BaseResponse<ConversationResponse>> {
-    return await this.conversationService.getConversationById(id);
+  /** Lấy lịch sử chat của user hiện tại (User/Guest) */
+  @Public()
+  @Get('my/history')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Lấy lịch sử chat của user hiện tại' })
+  @ApiQuery({ name: 'userId', required: false, description: 'Guest userId (nếu chưa đăng nhập)' })
+  @ExtendApiBaseResponse(PagedResult, ConversationResponse)
+  async getMyConversationHistory(
+    @Req() request: Request,
+    @Query() pagedRequest: PagedConversationRequest
+  ): Promise<BaseResponse<PagedResult<ConversationResponse>>> {
+    const userId = this.inputHelper.extractUserId(request, pagedRequest.userId);
+    pagedRequest.userId = userId;
+    return await this.conversationService.getAllConversationsPaginated(pagedRequest);
   }
 
   /** Lấy danh sách hội thoại có phân trang (Admin) */
@@ -64,6 +71,16 @@ export class ConversationController {
     @Query() request: PagedConversationRequest
   ): Promise<BaseResponse<PagedResult<ConversationResponse>>> {
     return await this.conversationService.getAllConversationsPaginated(request);
+  }
+
+  /** Lấy cuộc hội thoại theo ID (Admin) */
+  @Role(['admin'])
+  @Get(':id')
+  @ApiOperation({ summary: 'Lấy cuộc hội thoại theo ID' })
+  async getConversationById(
+    @Query('id') id: string
+  ): Promise<BaseResponse<ConversationResponse>> {
+    return await this.conversationService.getConversationById(id);
   }
 
   /** Chat chính - sử dụng logic V10 Advanced */
@@ -94,5 +111,33 @@ export class ConversationController {
     const prepared = this.inputHelper.prepareStaffChatRequest(request, chatRequest);
     const result = await this.conversationService.chat(prepared);
     return this.inputHelper.processMobileResponse(result, chatRequest.isMobile);
+  }
+
+  /** Chat V11 — Individual message persistence with real timestamps */
+  @Public()
+  @Post('chat/v11')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat với AI (V11 — individual message persistence)' })
+  @ApiBaseResponse(ChatV11Response)
+  async chatV11(
+    @Req() request: Request,
+    @Body() chatRequest: ChatRequest
+  ): Promise<BaseResponse<ChatV11Response>> {
+    const prepared = this.inputHelper.prepareChatRequest(request, chatRequest);
+    return await this.conversationService.chatV11(prepared);
+  }
+
+  /** Chat V11 Staff */
+  @Public()
+  @Post('chat/v11-staff')
+  @ApiBearerAuth('jwt')
+  @ApiOperation({ summary: 'Chat V11 Staff (Quick Counter Consultation Mode)' })
+  @ApiBaseResponse(ChatV11Response)
+  async chatV11Staff(
+    @Req() request: Request,
+    @Body() chatRequest: ChatRequest
+  ): Promise<BaseResponse<ChatV11Response>> {
+    const prepared = this.inputHelper.prepareStaffChatRequest(request, chatRequest);
+    return await this.conversationService.chatV11(prepared);
   }
 }

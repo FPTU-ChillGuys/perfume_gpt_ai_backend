@@ -14,7 +14,7 @@ export const restockVariantSchema = z.object({
     reservedQuantity: z.number(),
     averageDailySales: z.number(),
     suggestedRestockQuantity: z.number(),
-    slowStockRisk: z.enum(['CRITICAL', 'HIGH', 'MEDIUM']).nullable().default(null)
+    slowStockRisk: z.enum(['CRITICAL', 'HIGH', 'MEDIUM']).nullable()
 });
 
 /** Schema Zod cho toàn bộ output restock (array các variant) */

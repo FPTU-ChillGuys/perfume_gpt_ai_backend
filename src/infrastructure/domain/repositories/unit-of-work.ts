@@ -7,11 +7,11 @@ import { UserLogSummaryRepository } from './user-log-summary.repository';
 import { AIAcceptanceRepository } from './ai-acceptance.repository';
 import { ReviewSummaryLogRepository } from './review-summary.repository';
 import { InventoryLogRepository } from './inventory-log.repository';
+import { TrendLogRepository } from './trend-log.repository';
+import { EventLogRepository } from './event-log.repository';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
-import { TrendLog } from 'src/domain/entities/trend-log.entity';
-import { EventLogRepository } from './event-log.repository';
 
 @Injectable()
 export class UnitOfWork {
@@ -25,8 +25,8 @@ export class UnitOfWork {
     private readonly aiAcceptanceRepository: AIAcceptanceRepository,
     private readonly adminInstructionRepository: AdminInstructionRepository,
     private readonly inventoryLogRepository: InventoryLogRepository,
-    @InjectRepository(ReviewLog) private readonly reviewLogRepository: EntityRepository<ReviewLog>,
-    @InjectRepository(TrendLog) private readonly trendLogRepository: EntityRepository<TrendLog>
+    private readonly trendLogRepository: TrendLogRepository,
+    @InjectRepository(ReviewLog) private readonly reviewLogRepository: EntityRepository<ReviewLog>
   ) { }
 
   get AIConversationRepo(): ConversationRepository {
@@ -63,7 +63,7 @@ export class UnitOfWork {
     return this.reviewLogRepository;
   }
 
-  get TrendLogRepo(): EntityRepository<TrendLog> {
+  get TrendLogRepo(): TrendLogRepository {
     return this.trendLogRepository;
   }
 }

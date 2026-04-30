@@ -14,9 +14,6 @@ import { CartTool } from './tools/cart.tool';
 @Injectable()
 export class Tools implements OnModuleInit {
   get getToolsForChatbot(): ToolSet {
-    // Không cho phép gọi trực tiếp qua AI chính.
-    // Tất cả function giờ chuyển sang được gọi gián tiếp bởi Intermediate AI (thông qua analysis functionCall).
-    // Giao quyền lại cho ConversationV10Service xử lý payload.
     return {};
   }
 
@@ -56,14 +53,12 @@ export class Tools implements OnModuleInit {
   }
 
   get getToolsForTrend(): ToolSet {
-    if (!this.productTool || !this.logTool || !this.inventoryTool) return {};
+    if (!this.productTool || !this.inventoryTool) return {};
     return {
       searchProduct: this.productTool.searchProduct,
       queryProducts: this.productTool.queryProducts,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
-      getUserLogSummaryByWeek: this.logTool.getUserLogSummaryByWeek,
-      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
       getProductSalesAnalyticsForTrend:
         this.inventoryTool.getProductSalesAnalyticsForTrend
     };
@@ -73,7 +68,6 @@ export class Tools implements OnModuleInit {
     if (!this.inventoryTool) return {};
     return {
       getInventoryStock: this.inventoryTool.getInventoryStock,
-      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
       getProductSalesAnalyticsForRestock:
         this.inventoryTool.getProductSalesAnalyticsForRestock,
       getSlowStockCandidates:
@@ -84,7 +78,6 @@ export class Tools implements OnModuleInit {
   get getToolsForInventoryReport(): ToolSet {
     if (!this.inventoryTool) return {};
     return {
-      getLatestTrendLogs: this.inventoryTool.getLatestTrendLogs,
       getProductSalesAnalyticsForRestock:
         this.inventoryTool.getProductSalesAnalyticsForRestock,
       getSlowStockCandidates:
@@ -93,7 +86,7 @@ export class Tools implements OnModuleInit {
   }
 
   get getToolsForRecomendationAndRepurchase(): ToolSet {
-    if (!this.productTool || !this.orderTool || !this.profileTool || !this.logTool || !this.userTool) return {};
+    if (!this.productTool || !this.orderTool || !this.profileTool || !this.userTool) return {};
     return {
       getAllProducts: this.productTool.getAllProducts,
       getNewestProducts: this.productTool.getNewestProducts,

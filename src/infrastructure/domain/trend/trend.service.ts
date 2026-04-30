@@ -45,7 +45,6 @@ const GOOGLE_FETCH_RETRY_COUNT = 1;
 const GOOGLE_FETCH_RETRY_DELAY_MS = 300;
 const GOOGLE_TREND_GEO = 'VN';
 const GOOGLE_SIGNAL_PROMPT_LIMIT = 40;
-const FALLBACK_TREND_LOG_COUNT = 5;
 const SIMPLE_TREND_BASE_KEYWORD = 'nước hoa';
 
 const emptyMapperResult: TrendKeywordMapperResult = {
@@ -159,52 +158,6 @@ export class TrendService {
     return TrendHelpersUtil.uniqueKeywords([SIMPLE_TREND_BASE_KEYWORD], 1).map(
       (keyword) => ({ keyword, stage: 'name' as const })
     );
-  }
-
-  private async collectTrendLogNameSeeds(requestId: string): Promise<string[]> {
-    try {
-      const trendLogsResult = await this.inventoryService.getLatestTrendLogs(2);
-      if (!trendLogsResult.success || !Array.isArray(trendLogsResult.data)) {
-        this.logger.warn(
-          `[Trend][Seed][TrendLog] requestId=${requestId} status=skip reason=latest-trend-log-unavailable`
-        );
-        return [];
-      }
-
-      const names: string[] = [];
-      for (const log of trendLogsResult.data) {
-        const parsed = TrendHelpersUtil.safeParseJson<Record<string, unknown>>(log.trendData);
-        if (!parsed) {
-          continue;
-        }
-
-        const rawProducts = Array.isArray(parsed.products) ? parsed.products : [];
-        for (const rawProduct of rawProducts) {
-          const product =
-            rawProduct && typeof rawProduct === 'object'
-              ? (rawProduct as Record<string, unknown>)
-              : null;
-
-          const name = TrendHelpersUtil.readString(product?.name);
-          if (name) {
-            names.push(name);
-          }
-        }
-      }
-
-      const normalizedNames = TrendHelpersUtil.uniqueKeywords(names, 5);
-      this.logger.log(
-        `[Trend][Seed][TrendLog] requestId=${requestId} extractedNameCount=${normalizedNames.length}`
-      );
-      return normalizedNames;
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.warn(
-        `[Trend][Seed][TrendLog] requestId=${requestId} status=error error=${errorMessage}`
-      );
-      return [];
-    }
   }
 
   private async fetchRelatedQueries(
@@ -689,100 +642,6 @@ export class TrendService {
     }
   }
 
-  private async extractProductsFromSnapshot(
-    requestId: string,
-    snapshot: Record<string, unknown>
-  ): Promise<ProductCardOutputItem[]> {
-    const products = Array.isArray(snapshot.products)
-      ? TrendHelpersUtil.extractProductsFromUnknown(snapshot.products)
-      : [];
-
-    if (products.length > 0) {
-      return products;
-    }
-
-    const productTemp = Array.isArray(snapshot.productTemp)
-      ? snapshot.productTemp
-      : [];
-
-    const ids = TrendHelpersUtil.uniqueKeywords(
-      productTemp
-        .map((item) => {
-          const row =
-            item && typeof item === 'object'
-              ? (item as Record<string, unknown>)
-              : null;
-          return TrendHelpersUtil.readString(row?.id);
-        })
-        .filter((id): id is string => Boolean(id)),
-      20
-    );
-
-    if (ids.length === 0) {
-      return [];
-    }
-
-    this.logger.log(
-      `[Trend][TrendLogFallback][HYDRATE] requestId=${requestId} productTempIdCount=${ids.length}`
-    );
-
-    const hydratedProducts = await this.productService.getProductsByIdsForOutput(ids);
-    if (!hydratedProducts.success || !Array.isArray(hydratedProducts.data)) {
-      return [];
-    }
-
-    return hydratedProducts.data;
-  }
-
-  private async getTrendProductsFromLatestLogs(
-    requestId: string
-  ): Promise<ProductCardResponse[]> {
-    try {
-      const trendLogsResult = await this.inventoryService.getLatestTrendLogs(
-        FALLBACK_TREND_LOG_COUNT
-      );
-
-      if (!trendLogsResult.success || !Array.isArray(trendLogsResult.data)) {
-        this.logger.warn(
-          `[Trend][TrendLogFallback][MISS] requestId=${requestId} reason=no-logs`
-        );
-        return [];
-      }
-
-      for (const log of trendLogsResult.data) {
-        const snapshot = TrendHelpersUtil.safeParseJson<Record<string, unknown>>(log.trendData);
-        if (!snapshot) {
-          continue;
-        }
-
-        const products = await this.extractProductsFromSnapshot(requestId, snapshot);
-        if (products.length === 0) {
-          continue;
-        }
-
-        const rankedProducts = await this.toRankedProductCards(products);
-        if (rankedProducts.length > 0) {
-          this.logger.log(
-            `[Trend][TrendLogFallback][HIT] requestId=${requestId} productCount=${rankedProducts.length}`
-          );
-          return rankedProducts;
-        }
-      }
-
-      this.logger.warn(
-        `[Trend][TrendLogFallback][MISS] requestId=${requestId} reason=no-valid-products`
-      );
-      return [];
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.warn(
-        `[Trend][TrendLogFallback][ERROR] requestId=${requestId} error=${errorMessage}`
-      );
-      return [];
-    }
-  }
-
   private async persistTrendSnapshot(
     requestId: string,
     payload: TrendProductsCachePayload
@@ -1020,14 +879,6 @@ export class TrendService {
         `[Trend][EXIT] requestId=${requestId} source=cache fallbackTier=cache productCount=${cachedProducts.length} durationMs=${Date.now() - startedAt}`
       );
       return this.makePipelineResult(cachedProducts, 'cache', 'cache');
-    }
-
-    const trendLogProducts = await this.getTrendProductsFromLatestLogs(requestId);
-    if (trendLogProducts.length > 0) {
-      this.logger.log(
-        `[Trend][EXIT] requestId=${requestId} source=trend-log fallbackTier=trend-log productCount=${trendLogProducts.length} durationMs=${Date.now() - startedAt}`
-      );
-      return this.makePipelineResult(trendLogProducts, 'trend-log', 'trend-log');
     }
 
     this.logger.warn(

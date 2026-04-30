@@ -2,6 +2,7 @@ import { Controller, Get, Inject, Param, Query, Req, UseInterceptors } from '@ne
 import { Request } from 'express';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors, ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
 import { AllUserLogRequest, AllUserLogWithForceRefreshRequest } from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
@@ -28,6 +29,7 @@ export class TrendController {
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
   @Get('summary')
   @Public()
+  @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
   @ApiBaseResponse(String)
   @ApiBody({ type: AllUserLogRequest })
@@ -48,6 +50,7 @@ export class TrendController {
   // kích hoạt cache response
   @Public()
   @Get("product/caching")
+  @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng (caching)' })
   @ApiBaseResponse(ProductCardResponse)
   @ApiBody({ type: AllUserLogRequest })
@@ -65,6 +68,7 @@ export class TrendController {
    */
   @Public()
   @Get('product/job')
+  @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Khởi tạo job để lấy product từ xu hướng' })
   @ApiBaseResponse(String)
   // @CacheTTL(cachingTrendTTL) // cache kết quả API (tức là jobId) trong 1 ngày
@@ -92,6 +96,7 @@ export class TrendController {
    */
   @Public()
   @Get('product/job/:jobId')
+  @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job' })
   @ApiBaseResponse(Object) // Trả về dynamic object
   async getProductTrendJobResult(
@@ -107,6 +112,7 @@ export class TrendController {
   /** Lấy product từ xu hướng người dùng */
   @Public()
   @Get("product")
+  @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
   @ApiBaseResponse(ProductCardResponse)
   @ApiBody({ type: AllUserLogRequest })
@@ -123,6 +129,7 @@ export class TrendController {
    * Dự đoán xu hướng có cấu trúc - Trả về metadata bổ sung (thời gian xử lý, khoảng thời gian phân tích).
    */
   @Get('summary/structured')
+  @ApiAdminErrors()
   @ApiOperation({ summary: 'Dự đoán xu hướng có cấu trúc với metadata' })
   @ApiBaseResponse(AITrendForecastStructuredResponse)
   @ApiBody({ type: AllUserLogRequest })

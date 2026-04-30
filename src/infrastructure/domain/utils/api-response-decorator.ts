@@ -1,104 +1,95 @@
-import { applyDecorators } from '@nestjs/common';
+import { Type, applyDecorators } from '@nestjs/common';
 import { ApiExtraModels, ApiOkResponse, getSchemaPath } from '@nestjs/swagger';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 
-// Map kiểu primitive
-const primitiveMap: Record<string, any> = {
+type PrimitiveClass = typeof String | typeof Number | typeof Boolean;
+
+type SchemaDefinition = Record<string, unknown>;
+
+const primitiveSchemaMap: Record<string, SchemaDefinition> = {
   String: { type: 'string' },
   Number: { type: 'number' },
-  Boolean: { type: 'boolean' }
+  Boolean: { type: 'boolean' },
+  Object: { type: 'object', additionalProperties: true }
 };
 
-// Kiểm tra primitive
-const isPrimitive = (data: any) =>
-  data === String || data === Number || data === Boolean;
+const isPrimitive = (cls: Type<unknown> | PrimitiveClass): cls is PrimitiveClass =>
+  cls === String || cls === Number || cls === Boolean;
 
-/**
- * =====================================================
- * ApiBaseResponse
- * =====================================================
- */
-export const ApiBaseResponse = <T extends Function>(
-  data: T,
+const resolveSchema = (cls: Type<unknown> | PrimitiveClass): SchemaDefinition =>
+  isPrimitive(cls) ? primitiveSchemaMap[cls.name] : { $ref: getSchemaPath(cls) };
+
+interface PropertyOverrides {
+  data?: SchemaDefinition;
+  payload?: SchemaDefinition;
+}
+
+export const ApiBaseResponse = <T>(
+  dataClass: Type<T> | PrimitiveClass,
   isArray: boolean = false,
-  properties?: Record<string, any>
+  overrides?: PropertyOverrides
 ) => {
-  const schemaData = isPrimitive(data)
-    ? primitiveMap[data.name] // Primitive schema
-    : { $ref: getSchemaPath(data) }; // DTO schema
+  const schemaData = resolveSchema(dataClass);
+  const extraModels = isPrimitive(dataClass) ? [] : [dataClass as Type<unknown>];
 
   return applyDecorators(
-    ApiExtraModels(BaseResponse, ...(isPrimitive(data) ? [] : [data])),
+    ApiExtraModels(BaseResponse, ...extraModels),
     ApiOkResponse({
-      description: `The base response of ${data.name}`,
+      description: `The base response of ${dataClass.name}`,
       schema: {
         type: 'object',
         properties: {
           success: { type: 'boolean', description: 'Kết quả xử lý' },
           error: { type: 'string', nullable: true, description: 'Thông báo lỗi' },
           details: { type: 'string', nullable: true, description: 'Chi tiết lỗi' },
-          data: properties?.data ?? (isArray ? { type: 'array', items: schemaData } : schemaData)
+          data: overrides?.data ?? (isArray ? { type: 'array', items: schemaData } : schemaData)
         }
       }
     })
   );
 };
 
-/**
- * =====================================================
- * ExtendApiBaseResponse
- * =====================================================
- */
-export const ExtendApiBaseResponse = <T extends Function, I extends Function>(
-  data: T,
-  itemTypeOrIsArray?: I | boolean,
-  oldIsArray: boolean = false,
-  properties?: Record<string, any>
+export const ExtendApiBaseResponse = <T, I>(
+  dataClass: Type<T> | PrimitiveClass,
+  itemTypeOrIsArray?: Type<I> | PrimitiveClass | boolean,
+  fallbackIsArray: boolean = false,
+  overrides?: PropertyOverrides
 ) => {
-  const isSecondArgBoolean = typeof itemTypeOrIsArray === 'boolean';
-  const isArray = isSecondArgBoolean ? (itemTypeOrIsArray as boolean) : oldIsArray;
-  const itemType = isSecondArgBoolean ? undefined : (itemTypeOrIsArray as I);
+  const secondArgIsBoolean = typeof itemTypeOrIsArray === 'boolean';
+  const isArray = secondArgIsBoolean ? (itemTypeOrIsArray as boolean) : fallbackIsArray;
+  const itemClass = secondArgIsBoolean ? undefined : (itemTypeOrIsArray as Type<I> | PrimitiveClass | undefined);
 
-  const schemaData = isPrimitive(data)
-    ? primitiveMap[data.name]
-    : { $ref: getSchemaPath(data) };
+  const schemaData = resolveSchema(dataClass);
+  const itemSchema = itemClass ? resolveSchema(itemClass) : null;
 
-  const itemSchema = itemType ? (isPrimitive(itemType) ? primitiveMap[itemType.name] : { $ref: getSchemaPath(itemType) }) : null;
+  let payloadSchema: SchemaDefinition = isArray ? { type: 'array', items: schemaData } : schemaData;
 
-  let payloadSchema: any = isArray ? { type: 'array', items: schemaData } : schemaData;
-
-  // Nếu là PagedResult và có itemType, override items property
-  if (itemType && data.name === 'PagedResult') {
+  if (itemClass && dataClass.name === 'PagedResult') {
     payloadSchema = {
       allOf: [
-        { $ref: getSchemaPath(data) },
-        {
-          properties: {
-            items: {
-              type: 'array',
-              items: itemSchema
-            }
-          }
-        }
+        { $ref: getSchemaPath(dataClass as Type<unknown>) },
+        { properties: { items: { type: 'array', items: itemSchema } } }
       ]
     };
   }
 
+  const extraModels: Type<unknown>[] = [];
+  if (!isPrimitive(dataClass)) extraModels.push(dataClass as Type<unknown>);
+  if (itemClass && !isPrimitive(itemClass)) extraModels.push(itemClass as Type<unknown>);
+
   return applyDecorators(
-    ApiExtraModels(BaseResponseAPI, ...(isPrimitive(data) ? [] : [data]), ...(itemType && !isPrimitive(itemType) ? [itemType] : [])),
+    ApiExtraModels(BaseResponseAPI, ...extraModels),
     ApiOkResponse({
-      description: `The base response of ${data.name}`,
+      description: `The base response of ${dataClass.name}`,
       schema: {
         type: 'object',
         properties: {
           success: { type: 'boolean', description: 'Kết quả xử lý' },
           error: { type: 'string', nullable: true, description: 'Thông báo lỗi' },
-          payload: properties?.payload ?? payloadSchema
+          payload: overrides?.payload ?? payloadSchema
         }
       }
     })
   );
 };
-
-

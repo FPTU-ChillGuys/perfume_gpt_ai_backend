@@ -3,10 +3,10 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
-  ApiTags,
-  ApiUnauthorizedResponse
+  ApiTags
 } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
+import { ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
 import { CreateResponseAIAcceptanceRequest } from 'src/application/dtos/request/ai-acceptance.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
@@ -16,9 +16,7 @@ import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-de
 
 @ApiTags('AI Acceptance')
 @Public()
-@ApiUnauthorizedResponse({
-  description: 'Token JWT không hợp lệ hoặc không được cung cấp'
-})
+@ApiPublicErrorResponses()
 @Controller('ai-acceptance')
 export class AIAcceptanceController {
   private readonly logger = new Logger(AIAcceptanceController.name);

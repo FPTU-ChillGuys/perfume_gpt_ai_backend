@@ -8,6 +8,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
+import { ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
 import { DictionaryBuilderService } from 'src/infrastructure/domain/common/dictionary-builder.service';
 import { NlpEngineService } from 'src/infrastructure/domain/common/nlp-engine.service';
 import { VocabularySnapshotService } from 'src/infrastructure/domain/common/vocabulary-snapshot.service';
@@ -19,6 +20,7 @@ import { VocabularySnapshotService } from 'src/infrastructure/domain/common/voca
 @Public()
 @ApiTags('Dictionary')
 @ApiExtraModels()
+@ApiPublicErrorResponses()
 @Controller('api/v1/dictionary')
 export class DictionaryController {
   private readonly logger = new Logger(DictionaryController.name);

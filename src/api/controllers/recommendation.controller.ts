@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors, ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
@@ -33,6 +34,7 @@ export class RecommendationController {
    */
   @Public()
   @Post('test-recommendation')
+  @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Test sinh recommendation cho user và gửi email' })
   @ApiQuery({
     name: 'userId',
@@ -52,6 +54,7 @@ export class RecommendationController {
    */
   @Public()
   @Post('test-repurchase')
+  @ApiPublicErrorResponses()
   @ApiOperation({
     summary: 'Test sinh repurchase recommendation cho user và gửi email'
   })
@@ -76,6 +79,7 @@ export class RecommendationController {
   @Post('daily/send')
   @Role(['admin'])
   @ApiBearerAuth('jwt')
+  @ApiAdminErrors()
   @ApiOperation({
     summary:
       'Manual trigger gửi daily recommendation cho user active (sync)'
@@ -99,6 +103,7 @@ export class RecommendationController {
    */
   @Public()
   @Get('v3/simple')
+  @ApiPublicErrorResponses()
   @ApiOperation({
     summary:
       'Recommend đơn giản và ổn định dựa trên Order và Best Sellers (không fallback mảng rỗng)'

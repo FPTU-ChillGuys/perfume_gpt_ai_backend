@@ -7,6 +7,7 @@ import {
   ApiTags
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors } from 'src/application/decorators/swagger-error.decorator';
 import { UserLogSummaryRequest } from 'src/application/dtos/request/user-log-summary.request';
 import {
   AllUserLogRequest,
@@ -35,6 +36,7 @@ import { PeriodEnum } from 'src/domain/enum/period.enum';
 @Role(['admin'])
 @ApiBearerAuth('jwt')
 @ApiTags('Logs')
+@ApiAdminErrors()
 @Controller('logs')
 export class LogController {
   private readonly logger = new Logger(LogController.name);
@@ -92,7 +94,7 @@ export class LogController {
   @CacheTTL(0)
   @Get('all')
   @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng' })
-  @ApiBaseResponse(Array<EventLog>)
+  @ApiBaseResponse(EventLog, true)
   async getAllUserLogs(): Promise<BaseResponse<EventLog[]>> {
     return this.userLogService.getAllEventLogs();
   }
@@ -101,7 +103,7 @@ export class LogController {
   @CacheTTL(0)
   @Get('events')
   @ApiOperation({ summary: 'Lấy event log dạng mới' })
-  @ApiBaseResponse(Array<EventLog>)
+  @ApiBaseResponse(EventLog, true)
   async getEventLogs(
     @Query() request: EventLogQueryRequest
   ): Promise<BaseResponse<EventLog[]>> {
@@ -157,7 +159,7 @@ export class LogController {
   @ApiOperation({
     summary: 'Lấy tất cả log hoạt động người dùng theo khoảng thời gian'
   })
-  @ApiBaseResponse(Array<EventLog>)
+  @ApiBaseResponse(EventLog, true)
   async getUserLogsWithPeriod(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<EventLog[]>> {

@@ -15,6 +15,7 @@ import {
 } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors, ApiAiErrors, ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
@@ -40,6 +41,7 @@ export class ConversationController {
   /** Lấy tất cả cuộc hội thoại (Admin) */
   @Role(['admin'])
   @Get()
+  @ApiAdminErrors()
   @ApiOperation({ summary: 'Lấy tất cả cuộc hội thoại' })
   @ApiBaseResponse(ConversationResponse)
   async getAllConversations(): Promise<BaseResponse<ConversationResponse[]>> {
@@ -50,6 +52,7 @@ export class ConversationController {
   @Public()
   @Get('my/history')
   @ApiBearerAuth('jwt')
+  @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Lấy lịch sử chat của user hiện tại' })
   @ApiQuery({ name: 'userId', required: false, description: 'Guest userId (nếu chưa đăng nhập)' })
   @ExtendApiBaseResponse(PagedResult, ConversationResponse)
@@ -65,6 +68,7 @@ export class ConversationController {
   /** Lấy danh sách hội thoại có phân trang (Admin) */
   @Role(['admin'])
   @Get('list/paged')
+  @ApiAdminErrors()
   @ApiOperation({ summary: 'Lấy danh sách hội thoại có phân trang' })
   @ExtendApiBaseResponse(PagedResult, ConversationResponse)
   async getAllConversationsPaginated(
@@ -76,6 +80,7 @@ export class ConversationController {
   /** Lấy cuộc hội thoại theo ID (Admin) */
   @Role(['admin'])
   @Get(':id')
+  @ApiAdminErrors()
   @ApiOperation({ summary: 'Lấy cuộc hội thoại theo ID' })
   async getConversationById(
     @Query('id') id: string
@@ -87,6 +92,7 @@ export class ConversationController {
   @Public()
   @Post('chat/v10')
   @ApiBearerAuth('jwt')
+  @ApiAiErrors()
   @ApiOperation({ summary: 'Chat với AI (Advanced V10 logic)' })
   @ApiBaseResponse(ConversationResponse)
   async chat(
@@ -102,6 +108,7 @@ export class ConversationController {
   @Public()
   @Post('chat/v10-staff')
   @ApiBearerAuth('jwt')
+  @ApiAiErrors()
   @ApiOperation({ summary: 'Chat V10 Staff (Quick Counter Consultation Mode)' })
   @ApiBaseResponse(ConversationResponse)
   async chatStaff(
@@ -117,6 +124,7 @@ export class ConversationController {
   @Public()
   @Post('chat/v11')
   @ApiBearerAuth('jwt')
+  @ApiAiErrors()
   @ApiOperation({ summary: 'Chat với AI (V11 — individual message persistence)' })
   @ApiBaseResponse(ChatV11Response)
   async chatV11(
@@ -131,6 +139,7 @@ export class ConversationController {
   @Public()
   @Post('chat/v11-staff')
   @ApiBearerAuth('jwt')
+  @ApiAiErrors()
   @ApiOperation({ summary: 'Chat V11 Staff (Quick Counter Consultation Mode)' })
   @ApiBaseResponse(ChatV11Response)
   async chatV11Staff(

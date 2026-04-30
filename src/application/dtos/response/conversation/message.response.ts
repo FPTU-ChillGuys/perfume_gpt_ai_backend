@@ -20,10 +20,6 @@ export class MessageResponse {
   })
   message!: string | ConversationOutputDto;
 
-  /** ID tin nhắn */
-  @ApiPropertyOptional({ description: 'ID tin nhắn', required: false, nullable: true })
-  id!: string;
-
   /** Ngày tạo */
   @ApiProperty({ description: 'Ngày tạo' })
   createdAt!: Date;
@@ -36,7 +32,6 @@ export class MessageResponse {
     if (!entity) return null;
     
     const response = new MessageResponse();
-    response.id = entity.id;
     response.sender = entity.sender;
     response.message = entity.message; // Mặc định là string từ DB, controller sẽ parse nếu cần
     response.createdAt = entity.createdAt;

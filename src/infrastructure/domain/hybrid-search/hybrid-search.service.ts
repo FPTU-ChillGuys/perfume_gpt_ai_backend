@@ -1,58 +1,49 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
 import { QueryNormalizerOrchestrator, NormalizedQueryFilters } from './normalizers/orchestrator';
+import { PriceNormalizerOutput } from './normalizers/price.normalizer';
 import { EmbeddingService } from './embedding.service';
 import { RerankService } from '../ai/rerank.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
-import { PagedResult } from 'src/application/dtos/response/common/paged-result';
-import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
+import { HybridSearchResponse } from 'src/application/dtos/response/hybrid-search/hybrid-search.response';
+import { VectorSearchResult } from 'src/application/dtos/response/hybrid-search/hybrid-search.types';
+import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
+import { HYBRID_SEARCH_CONFIG } from 'src/application/constant/hybrid-search.config';
 
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Prisma } from 'generated/prisma/client';
 
-/**
- * Response cho Hybrid Search v4
- */
-export class HybridSearchResponse extends PagedResult<ProductWithVariantsResponse> {
-  /** Danh sách bản ghi */
-  @ApiProperty({ description: 'Danh sách bản ghi', type: () => [ProductWithVariantsResponse] })
-  declare items: ProductWithVariantsResponse[];
+type ProductWithIncludes = Prisma.ProductsGetPayload<{
+  include: {
+    Brands: true;
+    Categories: true;
+    ProductVariants: {
+      where: { IsDeleted: false };
+      include: {
+        Concentrations: true;
+        Media: { where: { IsPrimary: true } };
+        ProductAttributes: { include: { Attributes: true; AttributeValues: true } };
+      };
+      orderBy: { BasePrice: 'asc' };
+    };
+    ProductNoteMaps: { include: { ScentNotes: true } };
+    ProductFamilyMaps: { include: { OlfactoryFamilies: true } };
+    ProductAttributes: { include: { Attributes: true; AttributeValues: true } };
+    Media: { where: { IsPrimary: true } };
+  };
+}>;
 
-  /** Bộ lọc query đã extract */
-  @ApiPropertyOptional({ description: 'Filters found in query', type: () => NormalizedQueryFilters, nullable: true })
-  queryFilters?: NormalizedQueryFilters | null;
-
-  /** Có sử dụng vector similarity không */
-  @ApiProperty({ description: 'Whether vector similarity was used' })
-  vectorSimilarity?: boolean;
-}
-
-
-/**
- * HybridSearchService - Orchestrator cho Hybrid Search v4
- * Kết hợp Query Layer (hard filters) và Vector Layer (similarity search)
- */
 @Injectable()
 export class HybridSearchService {
+  private readonly logger = new Logger(HybridSearchService.name);
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly embeddingService: EmbeddingService,
     private readonly queryNormalizer: QueryNormalizerOrchestrator,
     private readonly rerankService: RerankService
-  ) { }
+  ) {}
 
-  /**
-   * Search products bằng Hybrid Search v4
-   * 1. Query Layer: Phân tích và filter bằng hard filters (giá, gender, year, origin)
-   * 2. Vector Layer: Tìm similarity bằng vector embeddings
-   * 3. Merge: Intersection của query results và vector results, sort theo similarity
-   * 
-   * @param searchText - Text tìm kiếm
-   * @param request - Pagination & sorting request
-   * @returns PagedResult với products sorted theo vector similarity
-   */
   async search(
     searchText: string,
     request: PagedAndSortedRequest
@@ -60,269 +51,231 @@ export class HybridSearchService {
     try {
       const pageNumber = request.PageNumber || 1;
       const pageSize = request.PageSize || 10;
-      const k = 60; // RRF constant
 
-      // ====== Bước 1: Query Layer (Hard Filters) ======
-      let queryFilters = await this.queryNormalizer.normalize(searchText);
-
-      // Build hard filter IDs if filters exist
-      let hardFilterIds: string[] | null = null;
-      if (queryFilters) {
-        const whereClause = this.buildWhereClause(queryFilters);
-        const filteredProducts = await this.prisma.products.findMany({
-          where: whereClause,
-          select: { Id: true },
-          distinct: ['Id']
-        });
-
-        // Nếu filter ra 0 sản phẩm -> trả về trống luôn, đỡ phải query vector/BM25
-        if (filteredProducts.length === 0) {
-          return { success: true, payload: this.createEmptyResponse(pageNumber, pageSize) };
-        }
-
-        hardFilterIds = filteredProducts.map(p => p.Id);
+      const queryFilters = await this.queryNormalizer.normalize(searchText);
+      const hardFilterIds = await this.resolveHardFilterIds(queryFilters);
+      if (hardFilterIds?.length === 0) {
+        return { success: true, payload: this.createEmptyResponse(pageNumber, pageSize) };
       }
 
-      // ====== Bước 2: Hybrid Retrieval (Vector + BM25) ======
-      const queryEmbedding = await this.embeddingService.generateEmbedding(searchText);
-      const embeddingString = `[${queryEmbedding.join(',')}]`;
+      const embeddingString = `[${(await this.embeddingService.generateEmbedding(searchText)).join(',')}]`;
 
-      const retrievalLimit = 10;
+      const { bm25Ids, vectorData } = await this.executeHybridRetrieval(
+        searchText, embeddingString, hardFilterIds
+      );
 
-      // 1. Get BM25 Candidates
-      const bm25Params: any[] = [];
-      if (hardFilterIds) bm25Params.push(hardFilterIds);
-      bm25Params.push(searchText); // query for BM25
-      bm25Params.push(retrievalLimit);
-
-      const bm25Rows = await this.embeddingService.em.getConnection().execute(`
-        SELECT product_id 
-        FROM product_embeddings 
-        WHERE is_active = true 
-        ${hardFilterIds ? 'AND product_id IN (?)' : ''}
-        ORDER BY search_text <@> ?
-        LIMIT ?
-      `, bm25Params);
-
-      // 2. Get Vector Candidates
-      const vectorParams: any[] = [];
-      vectorParams.push(embeddingString); // Parameter 1: For SELECT similarity
-      if (hardFilterIds) vectorParams.push(hardFilterIds); // Parameter 2: For WHERE IN
-      vectorParams.push(embeddingString); // Parameter 3: For ORDER BY
-      vectorParams.push(retrievalLimit); // Parameter 4: For LIMIT
-
-      const vectorRows = await this.embeddingService.em.getConnection().execute(`
-        SELECT product_id, 1 - (vector <=> ?::vector(1024)) as similarity 
-        FROM product_embeddings 
-        WHERE is_active = true 
-        ${hardFilterIds ? 'AND product_id IN (?)' : ''}
-        ORDER BY vector <=> ?::vector(1024)
-        LIMIT ?
-      `, vectorParams);
-
-      const bm25Ids = (Array.isArray(bm25Rows) ? bm25Rows : (bm25Rows as any)?.rows ?? []).map((r: any) => r.product_id);
-      const vectorData = (Array.isArray(vectorRows) ? vectorRows : (vectorRows as any)?.rows ?? []);
-      const vectorIds = vectorData.map((r: any) => r.product_id);
-
-      // 3. Intersection Merge (Giao của 2 mảng)
-      const candidateIds = bm25Ids.filter(id => vectorIds.includes(id));
-
-      console.log(`[HybridSearch] BM25 found ${bm25Ids.length} candidates`);
-      console.log(`[HybridSearch] Vector found ${vectorIds.length} candidates (top score: ${vectorData[0]?.similarity || 0})`);
-      console.log(`[HybridSearch] Intersection candidates (Giao): ${candidateIds.length}`);
+      const candidateIds = this.intersectCandidateIds(bm25Ids, vectorData);
+      this.logger.log(`BM25: ${bm25Ids.length}, Vector: ${vectorData.length}, Intersection: ${candidateIds.length}`);
 
       if (candidateIds.length === 0) {
         return { success: true, payload: this.createEmptyResponse(pageNumber, pageSize) };
       }
 
-      // ====== Bước 3: Fetch candidate details ======
-      const products = await this.prisma.products.findMany({
-        where: { Id: { in: candidateIds }, IsDeleted: false },
-        include: {
-          Brands: true,
-          Categories: true,
-          ProductVariants: {
-            where: { IsDeleted: false },
-            include: {
-              Concentrations: true,
-              Media: { where: { IsPrimary: true } },
-              ProductAttributes: { include: { Attributes: true, AttributeValues: true } }
-            },
-            orderBy: { BasePrice: 'asc' }
-          },
-          ProductNoteMaps: { include: { ScentNotes: true } },
-          ProductFamilyMaps: { include: { OlfactoryFamilies: true } },
-          ProductAttributes: { include: { Attributes: true, AttributeValues: true } },
-          Media: { where: { IsPrimary: true } }
-        }
-      });
+      const products = await this.fetchProductDetails(candidateIds);
+      const rerankedProducts = await this.rerankAndFilter(searchText, products);
+      if (rerankedProducts.length === 0) {
+        return { success: true, payload: this.createEmptyResponse(pageNumber, pageSize) };
+      }
 
-      // Log chi tiết tên cho BM25 và Vector
-      const nameMap = new Map(products.map(p => [p.Id, p.Name]));
-      console.log('[HybridSearch] BM25 Product Names:', bm25Ids.map(id => nameMap.get(id) || 'Unknown'));
-      console.log('[HybridSearch] Vector Product Names:', vectorIds.map(id => nameMap.get(id) || 'Unknown'));
-
-      // ====== Bước 4: AI Reranking ======
-      // Map candidates with their texts for reranking
-      const rerankCandidates = products.map(p => {
-        const scentNotes = p.ProductNoteMaps.map(n => n.ScentNotes.Name).join(', ');
-        const families = p.ProductFamilyMaps.map(f => f.OlfactoryFamilies.Name).join(', ');
-        return {
-          ...p,
-          text: `name: ${p.Name} brand: ${p.Brands.Name} category: ${p.Categories.Name} notes: ${scentNotes} families: ${families} description: ${p.Description || ''}`
-        };
-      });
-
-      const rerankedResults = await this.rerankService.rerank(searchText, rerankCandidates, retrievalLimit);
-
-      // ====== Bước 5: Filtering by Rerank Score (Thanh lọc kết quả) ======
-      const threshold = 0.2;
-      const filteredResults = rerankedResults.filter(r => r.rerankScore >= threshold);
-      console.log(`[HybridSearch] Reranked ${rerankedResults.length} items, ${filteredResults.length} passed threshold ${threshold}`);
-
-      // ====== Bước 6: Pagination & Mapping ======
-      const startIndex = (pageNumber - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedResults = filteredResults.slice(startIndex, endIndex);
-
-      const items = paginatedResults.map(product => this.mapToProductResponse(product, queryFilters || undefined));
-
-      const response: HybridSearchResponse = {
-        items,
-        pageNumber,
-        pageSize,
-        totalCount: filteredResults.length,
-        totalPages: Math.ceil(filteredResults.length / pageSize),
-        hasPreviousPage: pageNumber > 1,
-        hasNextPage: endIndex < filteredResults.length,
-        queryFilters,
-        vectorSimilarity: true
-      };
-
-      return { success: true, payload: response };
+      return this.buildPaginatedResponse(
+        rerankedProducts, queryFilters, pageNumber, pageSize
+      );
     } catch (error) {
-      console.error('[HybridSearch] Error:', error);
+      this.logger.error('Hybrid search error', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
-  /**
-   * Build Prisma WHERE clause từ NormalizedQueryFilters
-   */
-  private buildWhereClause(filters: NormalizedQueryFilters): any {
-    const conditions: any[] = [];
+  private async resolveHardFilterIds(
+    filters: NormalizedQueryFilters | null
+  ): Promise<string[] | null> {
+    if (!filters) return null;
+    const whereClause = this.buildWhereClause(filters);
+    const filteredProducts = await this.prisma.products.findMany({
+      where: whereClause,
+      select: { Id: true },
+      distinct: ['Id']
+    });
+    return filteredProducts.map(p => p.Id);
+  }
 
-    // Price filter
-    if (filters.price) {
-      const { min, max, operator } = filters.price;
+  private async executeHybridRetrieval(
+    searchText: string,
+    embeddingString: string,
+    hardFilterIds: string[] | null
+  ): Promise<{ bm25Ids: string[]; vectorData: VectorSearchResult[] }> {
+    const limit = HYBRID_SEARCH_CONFIG.RETRIEVAL_LIMIT;
+    const filterClause = hardFilterIds ? 'AND product_id = ANY(?::uuid[])' : '';
+    const params: unknown[] = [];
 
-      if (operator === 'lte' || operator === 'lt') {
-        conditions.push({
-          ProductVariants: {
-            some: {
-              BasePrice: operator === 'lte' ? { lte: max } : { lt: max },
-              IsDeleted: false
-            }
-          }
-        });
-      } else if (operator === 'gte' || operator === 'gt') {
-        conditions.push({
-          ProductVariants: {
-            some: {
-              BasePrice: operator === 'gte' ? { gte: min } : { gt: min },
-              IsDeleted: false
-            }
-          }
-        });
-      } else if (operator === 'between') {
-        conditions.push({
-          ProductVariants: {
-            some: {
-              BasePrice: {
-                gte: min,
-                lte: max
-              },
-              IsDeleted: false
-            }
-          }
-        });
+    const bm25Params: unknown[] = [];
+    if (hardFilterIds) bm25Params.push(hardFilterIds);
+    bm25Params.push(searchText, limit);
+
+    const bm25Result = await this.embeddingService.em.getConnection().execute(
+      `SELECT product_id FROM product_embeddings WHERE is_active = true ${filterClause} ORDER BY search_text <@> ? LIMIT ?`,
+      bm25Params
+    );
+    const bm25Rows = this.extractRows(bm25Result);
+    const bm25Ids = bm25Rows.map(r => r.product_id as string);
+
+    const vectorParams: unknown[] = [embeddingString];
+    if (hardFilterIds) vectorParams.push(hardFilterIds);
+    vectorParams.push(embeddingString, limit);
+
+    const vectorResult = await this.embeddingService.em.getConnection().execute(
+      `SELECT product_id, 1 - (vector <=> ?::vector(1024)) as similarity FROM product_embeddings WHERE is_active = true ${filterClause} ORDER BY vector <=> ?::vector(1024) LIMIT ?`,
+      vectorParams
+    );
+    const vectorRows = this.extractRows(vectorResult);
+    const vectorData: VectorSearchResult[] = vectorRows.map(r => ({
+      productId: r.product_id as string,
+      similarity: parseFloat(r.similarity as string)
+    }));
+
+    return { bm25Ids, vectorData };
+  }
+
+  private intersectCandidateIds(bm25Ids: string[], vectorData: VectorSearchResult[]): string[] {
+    const vectorIdSet = new Set(vectorData.map(v => v.productId));
+    return bm25Ids.filter(id => vectorIdSet.has(id));
+  }
+
+  private async fetchProductDetails(candidateIds: string[]): Promise<ProductWithIncludes[]> {
+    return this.prisma.products.findMany({
+      where: { Id: { in: candidateIds }, IsDeleted: false },
+      include: {
+        Brands: true,
+        Categories: true,
+        ProductVariants: {
+          where: { IsDeleted: false },
+          include: {
+            Concentrations: true,
+            Media: { where: { IsPrimary: true } },
+            ProductAttributes: { include: { Attributes: true, AttributeValues: true } }
+          },
+          orderBy: { BasePrice: 'asc' }
+        },
+        ProductNoteMaps: { include: { ScentNotes: true } },
+        ProductFamilyMaps: { include: { OlfactoryFamilies: true } },
+        ProductAttributes: { include: { Attributes: true, AttributeValues: true } },
+        Media: { where: { IsPrimary: true } }
       }
-    }
+    });
+  }
 
-    // Gender filter
-    if (filters.gender?.value) {
-      let dbGender = filters.gender.value as string;
-      if (dbGender === 'Nam') dbGender = 'Male';
-      else if (dbGender === 'Nữ') dbGender = 'Female';
+  private async rerankAndFilter(
+    searchText: string,
+    products: ProductWithIncludes[]
+  ): Promise<ProductWithIncludes[]> {
+    const candidates = products.map(p => ({
+      ...p,
+      text: `name: ${p.Name} brand: ${p.Brands.Name} category: ${p.Categories.Name} notes: ${p.ProductNoteMaps.map(n => n.ScentNotes.Name).join(', ')} families: ${p.ProductFamilyMaps.map(f => f.OlfactoryFamilies.Name).join(', ')} description: ${p.Description || ''}`
+    }));
 
-      conditions.push({
-        Gender: dbGender
-      });
-    }
+    const reranked = await this.rerankService.rerank(
+      searchText, candidates, HYBRID_SEARCH_CONFIG.RETRIEVAL_LIMIT
+    );
 
-    // Year filter
-    if (filters.year) {
-      const { year, operator } = filters.year;
+    const productMap = new Map(products.map(p => [p.Id, p]));
+    return reranked
+      .filter(r => r.rerankScore >= HYBRID_SEARCH_CONFIG.RERANK_THRESHOLD)
+      .map(r => productMap.get(r.Id))
+      .filter((p): p is ProductWithIncludes => p !== undefined);
+  }
 
-      if (operator === 'eq') {
-        conditions.push({ ReleaseYear: year });
-      } else if (operator === 'gte') {
-        conditions.push({ ReleaseYear: { gte: year } });
-      } else if (operator === 'lte') {
-        conditions.push({ ReleaseYear: { lte: year } });
-      } else if (operator === 'newer') {
-        conditions.push({ ReleaseYear: { gte: year } });
-      } else if (operator === 'older') {
-        conditions.push({ ReleaseYear: { lte: year } });
-      }
-    }
+  private buildPaginatedResponse(
+    rerankedProducts: ProductWithIncludes[],
+    queryFilters: NormalizedQueryFilters | null | undefined,
+    pageNumber: number,
+    pageSize: number
+  ): BaseResponseAPI<HybridSearchResponse> {
+    const startIndex = (pageNumber - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginated = rerankedProducts.slice(startIndex, endIndex);
 
-    // Origin filter
-    if (filters.origin?.origins && filters.origin.origins.length > 0) {
-      conditions.push({
-        Origin: {
-          in: filters.origin.origins
-        }
-      });
-    }
+    const items = paginated.map(p => this.mapToProductResponse(p, queryFilters || undefined));
 
-    // Nếu có nhiều conditions thì AND lại
+    const response: HybridSearchResponse = {
+      items,
+      pageNumber,
+      pageSize,
+      totalCount: rerankedProducts.length,
+      totalPages: Math.ceil(rerankedProducts.length / pageSize),
+      hasPreviousPage: pageNumber > 1,
+      hasNextPage: endIndex < rerankedProducts.length,
+      queryFilters,
+      vectorSimilarity: true
+    };
+
+    return { success: true, payload: response };
+  }
+
+  private buildWhereClause(filters: NormalizedQueryFilters): Prisma.ProductsWhereInput {
+    const conditions: Prisma.ProductsWhereInput[] = [];
+
+    this.applyPriceFilter(filters, conditions);
+    this.applyGenderFilter(filters, conditions);
+    this.applyYearFilter(filters, conditions);
+    this.applyOriginFilter(filters, conditions);
+
     if (conditions.length === 0) {
       return { IsDeleted: false };
-    } else if (conditions.length === 1) {
+    }
+    if (conditions.length === 1) {
       return { ...conditions[0], IsDeleted: false };
-    } else {
-      return {
-        AND: conditions,
-        IsDeleted: false
-      };
+    }
+    return { AND: conditions, IsDeleted: false };
+  }
+
+  private applyPriceFilter(filters: NormalizedQueryFilters, conditions: Prisma.ProductsWhereInput[]): void {
+    if (!filters.price) return;
+    const { min, max, operator } = filters.price;
+
+    if (operator === 'lte' || operator === 'lt') {
+      conditions.push({
+        ProductVariants: { some: { BasePrice: operator === 'lte' ? { lte: max } : { lt: max }, IsDeleted: false } }
+      });
+    } else if (operator === 'gte' || operator === 'gt') {
+      conditions.push({
+        ProductVariants: { some: { BasePrice: operator === 'gte' ? { gte: min } : { gt: min }, IsDeleted: false } }
+      });
+    } else if (operator === 'between') {
+      conditions.push({
+        ProductVariants: { some: { BasePrice: { gte: min, lte: max }, IsDeleted: false } }
+      });
     }
   }
 
-  /**
-   * Map product từ Prisma sang ProductWithVariantsResponse
-   */
-  private mapToProductResponse(product: any, filters?: NormalizedQueryFilters): ProductWithVariantsResponse {
+  private applyGenderFilter(filters: NormalizedQueryFilters, conditions: Prisma.ProductsWhereInput[]): void {
+    if (!filters.gender?.value) return;
+    const genderMap: Record<string, string> = { 'Nam': 'Male', 'Nữ': 'Female' };
+    conditions.push({ Gender: genderMap[filters.gender.value] ?? filters.gender.value });
+  }
+
+  private applyYearFilter(filters: NormalizedQueryFilters, conditions: Prisma.ProductsWhereInput[]): void {
+    if (!filters.year) return;
+    const { year, operator } = filters.year;
+    const yearConditions: Record<string, Prisma.IntFilter> = {
+      eq: { equals: year },
+      gte: { gte: year },
+      lte: { lte: year },
+      newer: { gte: year },
+      older: { lte: year }
+    };
+    const cond = yearConditions[operator ?? 'eq'];
+    if (cond) conditions.push({ ReleaseYear: cond });
+  }
+
+  private applyOriginFilter(filters: NormalizedQueryFilters, conditions: Prisma.ProductsWhereInput[]): void {
+    if (!filters.origin?.origins?.length) return;
+    conditions.push({ Origin: { in: filters.origin.origins } });
+  }
+
+  private mapToProductResponse(product: ProductWithIncludes, filters?: NormalizedQueryFilters): ProductWithVariantsResponse {
     let variants = product.ProductVariants || [];
-
-    // Filter variants based on price filters if present
-    if (filters?.price) {
-      const { min, max, operator } = filters.price;
-      variants = variants.filter((v: any) => {
-        const price = Number(v.BasePrice);
-        if (operator === 'lte' || operator === 'lt') {
-          return operator === 'lte' ? price <= (max as number) : price < (max as number);
-        } else if (operator === 'gte' || operator === 'gt') {
-          return operator === 'gte' ? price >= (min as number) : price > (min as number);
-        } else if (operator === 'between') {
-          return price >= (min as number) && price <= (max as number);
-        }
-        return true;
-      });
-    }
-
-    // Sort variants by price ascending so the first one is the cheapest
-    variants.sort((a: any, b: any) => Number(a.BasePrice) - Number(b.BasePrice));
+    variants = this.filterVariantsByPrice(variants, filters?.price);
+    variants.sort((a, b) => Number(a.BasePrice) - Number(b.BasePrice));
 
     return {
       id: product.Id,
@@ -331,7 +284,7 @@ export class HybridSearchService {
       brandName: product.Brands.Name,
       categoryId: product.CategoryId,
       categoryName: product.Categories.Name,
-      description: product.Description,
+      description: product.Description ?? undefined,
       primaryImage: product.Media[0]?.Url || null,
       variants: variants.map(v => ({
         id: v.Id,
@@ -346,12 +299,9 @@ export class HybridSearchService {
         concentrationId: v.ConcentrationId,
         longevity: v.Longevity,
         sillage: v.Sillage,
-        concentration: {
-          id: v.Concentrations.Id,
-          name: v.Concentrations.Name
-        },
+        concentration: { id: v.Concentrations.Id, name: v.Concentrations.Name },
         stock: null,
-        attributes: (v.ProductAttributes ?? []).map((pa: any) => ({
+        attributes: (v.ProductAttributes ?? []).map(pa => ({
           id: pa.Id,
           attributeId: pa.AttributeId,
           attributeName: pa.Attributes?.Name,
@@ -361,8 +311,8 @@ export class HybridSearchService {
           value: pa.AttributeValues?.Value ?? '',
           valueName: pa.AttributeValues?.Value
         })),
-        url: v.Media?.find((m: any) => m.IsPrimary)?.Url || v.Media?.[0]?.Url || null,
-        media: (v.Media ?? []).map((m: any) => ({
+        url: v.Media?.find(m => m.IsPrimary)?.Url || v.Media?.[0]?.Url || null,
+        media: (v.Media ?? []).map(m => ({
           id: m.Id,
           url: m.Url,
           altText: m.AltText ?? null,
@@ -389,9 +339,27 @@ export class HybridSearchService {
     };
   }
 
-  /**
-   * Tạo empty response
-   */
+  private filterVariantsByPrice(
+    variants: ProductWithIncludes['ProductVariants'],
+    priceFilter?: PriceNormalizerOutput
+  ): ProductWithIncludes['ProductVariants'] {
+    if (!priceFilter) return variants;
+    const { min, max, operator } = priceFilter;
+    return variants.filter(v => {
+      const price = Number(v.BasePrice);
+      if (operator === 'lte' || operator === 'lt') {
+        return operator === 'lte' ? price <= (max as number) : price < (max as number);
+      }
+      if (operator === 'gte' || operator === 'gt') {
+        return operator === 'gte' ? price >= (min as number) : price > (min as number);
+      }
+      if (operator === 'between') {
+        return price >= (min as number) && price <= (max as number);
+      }
+      return true;
+    });
+  }
+
   private createEmptyResponse(pageNumber: number, pageSize: number): HybridSearchResponse {
     return {
       items: [],
@@ -404,5 +372,12 @@ export class HybridSearchService {
       queryFilters: undefined,
       vectorSimilarity: false
     };
+  }
+
+  private extractRows(result: unknown): Record<string, unknown>[] {
+    if (Array.isArray(result)) return result as Record<string, unknown>[];
+    const obj = result as Record<string, unknown>;
+    if (obj?.rows && Array.isArray(obj.rows)) return obj.rows as Record<string, unknown>[];
+    return [];
   }
 }

@@ -18,6 +18,7 @@ RUN npx prisma generate
 # Build app
 RUN pnpm run build
 
+
 EXPOSE 3000
 
 CMD ["node", "dist/src/main.js"]

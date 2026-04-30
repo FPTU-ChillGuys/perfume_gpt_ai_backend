@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
@@ -14,6 +14,7 @@ import {
 /** Service quản lý chỉ thị admin cho hệ thống AI */
 @Injectable()
 export class AdminInstructionService {
+  private readonly logger = new Logger(AdminInstructionService.name);
   constructor(private unitOfWork: UnitOfWork) {}
 
   /** Lấy tất cả chỉ thị */
@@ -143,7 +144,8 @@ export class AdminInstructionService {
     try {
       const combined = await this.unitOfWork.AdminInstructionRepo.getCombinedInstructionsByType(domain);
       return combined || '';
-    } catch {
+    } catch (error) {
+      this.logger.error(`Failed to get system prompt for domain "${domain}"`, error);
       return '';
     }
   }

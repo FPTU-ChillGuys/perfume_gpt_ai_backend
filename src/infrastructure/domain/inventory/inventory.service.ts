@@ -101,7 +101,8 @@ export class InventoryService {
         totalQuantity: stock.TotalQuantity,
         reservedQuantity: stock.ReservedQuantity,
         averageDailySales: 0,
-        suggestedRestockQuantity
+        suggestedRestockQuantity,
+        slowStockRisk: null
       });
     }
     return currentVariants;

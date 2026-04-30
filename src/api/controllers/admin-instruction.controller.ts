@@ -10,8 +10,9 @@ import {
   Query,
   UseInterceptors
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiForbiddenResponse, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors } from 'src/application/decorators/swagger-error.decorator';
 import {
   CreateAdminInstructionRequest
 } from 'src/application/dtos/request/admin-instruction/create-admin-instruction.request';
@@ -29,8 +30,7 @@ import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-de
  */
 @ApiTags('Admin Instructions')
 @ApiBearerAuth('jwt')
-@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
-@ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
+@ApiAdminErrors()
 @Controller('admin/instructions')
 export class AdminInstructionController {
   constructor(

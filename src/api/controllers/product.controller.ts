@@ -1,16 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, ParseUUIDPipe, Post, Query, Req, UseInterceptors } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
+import { ApiPublicErrorResponses, ApiAiErrors } from 'src/application/decorators/swagger-error.decorator';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { ProductResponse } from 'src/application/dtos/response/product.response';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
-import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
-import { VariantSalesAnalyticsResponse } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.service';
-import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { HybridSearchService } from 'src/infrastructure/domain/hybrid-search/hybrid-search.service';
@@ -22,6 +20,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dtos/request/product-log.request';
 
 @ApiTags('Products')
+@ApiPublicErrorResponses()
 @Controller('products')
 export class ProductController {
   private readonly logger = new Logger(ProductController.name);
@@ -44,6 +43,7 @@ export class ProductController {
   /** Tìm kiếm sản phẩm bằng semantic search */
   @Public()
   @Get('search')
+  @ApiAiErrors()
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search' })
   @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
   async getProductsBySemanticSearch(@Req() req: Request, @Query() request: SearchRequest): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
@@ -53,111 +53,10 @@ export class ProductController {
     return result;
   }
 
-  /** [TEST] Lấy danh sách sản phẩm kèm toàn bộ variants (phân trang) */
-  @Public()
-  @Get('all/with-variants')
-  @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm kèm toàn bộ variants' })
-  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
-  async getAllProductsWithVariants(
-    @Query() request: PagedAndSortedRequest
-  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    return this.productService.getAllProductsWithVariants(request);
-  }
-
-  /** [TEST] Lấy danh sách sản phẩm mới nhất */
-  @Public()
-  @Get('all/newest')
-  @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm mới nhất' })
-  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
-  async getNewestProductsWithVariants(
-    @Query() request: PagedAndSortedRequest
-  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    return this.productService.getNewestProductsWithVariants(request);
-  }
-
-  /** [TEST] Lấy danh sách sản phẩm bán chạy */
-  @Public()
-  @Get('all/best-sellers')
-  @ApiOperation({ summary: '[TEST] Lấy danh sách sản phẩm bán chạy' })
-  @ExtendApiBaseResponse(PagedResult, BestSellingProductResponse)
-  async getBestSellingProducts(
-    @Query() request: PagedAndSortedRequest
-  ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
-    return this.productService.getBestSellingProducts(request);
-  }
-
-  /** Tìm kiếm sản phẩm bằng semantic search, trả về kèm toàn bộ variants */
-  @Public()
-  @Get('search/with-variants')
-  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search, kết quả kèm toàn bộ variants' })
-  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
-  async getProductsBySemanticSearchWithVariants(
-    @Req() req: Request,
-    @Query() request: SearchRequest
-  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    const result = await this.productService.getProductsUsingSemanticSearchWithVariants(
-      request.searchText,
-      request
-    );
-    const logUserId = resolveLogUserIdFromRequest(req);
-    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
-    return result;
-  }
-
-  /** Tìm kiếm sản phẩm bằng semantic search v2 (AI extraction) */
-  @Public()
-  @Get('search/v2')
-  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search v2 (AI extraction)' })
-  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
-  async getProductsByAiSearch(
-    @Req() req: Request,
-    @Query() request: SearchRequest
-  ): Promise<BaseResponseAPI<any>> {
-    const isSemanticOnly = process.env.SEARCH_SEMANTIC_ONLY === 'true';
-    
-    if (isSemanticOnly) {
-      this.logger.log(`[SEARCH][V2] Semantic Only mode enabled. Redirecting to Hybrid Search v4 for text: "${request.searchText}"`);
-      const result = await this.hybridSearchService.search(request.searchText, request);
-      return result;
-    }
-
-    const analysis = await this.aiAnalysisService.analyze(request.searchText);
-
-    this.logger.log(`Analysis: ${JSON.stringify(analysis)}`);
-
-    const result = analysis
-      ? await this.productService.getProductsByStructuredQuery(analysis)
-      : await this.productService.getAllProductsWithVariants(request);
-
-    const logUserId = resolveLogUserIdFromRequest(req);
-    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
-
-    return {
-      success: true,
-      payload: result.data
-    };
-  }
-
-  /** Tìm kiếm sản phẩm bằng parser path (winkNLP parse -> query builder) để kiểm chứng */
-  @Public()
-  @Get('search/v3')
-  @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng parser path (parse -> query)' })
-  @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
-  async getProductsByParsedSearch(
-    @Req() req: Request,
-    @Query() request: SearchRequest
-  ): Promise<BaseResponseAPI<any>> {
-    const result = await this.productService.getProductsUsingParsedSearch(request.searchText, request);
-
-    const logUserId = resolveLogUserIdFromRequest(req);
-    await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
-
-    return result;
-  }
-
   /** Hybrid Search v4 - Query Layer + Vector Layer */
   @Public()
   @Get('search/v4')
+  @ApiAiErrors()
   @ApiOperation({ summary: 'Hybrid Search v4 - Kết hợp Query Layer (hard filters) và Vector Layer (similarity)' })
   @ExtendApiBaseResponse(HybridSearchResponse)
   async getProductsByHybridSearch(
@@ -171,19 +70,7 @@ export class ProductController {
 
     return result;
   }
-
-  /** [TEST] Lấy chi tiết một sản phẩm kèm toàn bộ variants */
-  @Public()
-  @Get(':id/with-variants')
-  @ApiOperation({ summary: '[TEST] Lấy chi tiết sản phẩm kèm toàn bộ variants' })
-  @ApiParam({ name: 'id', description: 'UUID của sản phẩm', format: 'uuid' })
-  @ExtendApiBaseResponse(ProductWithVariantsResponse)
-  async getProductWithVariants(
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string
-  ): Promise<BaseResponse<ProductWithVariantsResponse>> {
-    return this.productService.getProductWithVariants(id);
-  }
-
+  
   /** Ghi log khi người dùng click vào một sản phẩm hoặc variant */
   @Public()
   @Post('log/view')

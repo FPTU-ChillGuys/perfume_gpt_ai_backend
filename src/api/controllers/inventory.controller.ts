@@ -16,14 +16,13 @@ import { Request } from 'express';
 import { Response } from 'express';
 import {
   ApiBearerAuth,
-  ApiForbiddenResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
-  ApiTags,
-  ApiUnauthorizedResponse
+  ApiTags
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors } from 'src/application/decorators/swagger-error.decorator';
 import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
 import { CACHE_TTL_1HOUR } from 'src/infrastructure/domain/common/cacheable/cacheable.constants';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
@@ -48,10 +47,7 @@ import { RestockService } from 'src/infrastructure/domain/restock/restock.servic
 @Role(['admin'])
 @ApiTags('Inventory')
 @ApiBearerAuth('jwt')
-@ApiUnauthorizedResponse({
-  description: 'Token JWT không hợp lệ hoặc không được cung cấp'
-})
-@ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
+@ApiAdminErrors()
 @Controller('inventory')
 export class InventoryController {
   constructor(

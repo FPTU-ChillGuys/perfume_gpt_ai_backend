@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Delete, Param, Logger } from '@nestjs/common';
-import { ApiOperation, ApiTags, ApiBearerAuth, ApiUnauthorizedResponse, ApiForbiddenResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors } from 'src/application/decorators/swagger-error.decorator';
 import { EmbeddingService } from 'src/infrastructure/domain/hybrid-search/embedding.service';
 import { ProductEmbedding } from 'src/infrastructure/domain/hybrid-search/entities/product-embedding.entity';
 
@@ -10,8 +11,7 @@ import { ProductEmbedding } from 'src/infrastructure/domain/hybrid-search/entiti
  */
 @ApiTags('Hybrid Search - Embeddings')
 @ApiBearerAuth('jwt')
-@ApiUnauthorizedResponse({ description: 'Token JWT không hợp lệ hoặc không được cung cấp' })
-@ApiForbiddenResponse({ description: 'Yêu cầu role: admin' })
+@ApiAdminErrors()
 @Role(['admin'])
 @Controller('hybrid-search/embeddings')
 export class RebuildEmbeddingsController {

@@ -5,6 +5,7 @@ import { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
 import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
 import { Public, Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors } from 'src/application/decorators/swagger-error.decorator';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { ReviewListItemResponse } from 'src/application/dtos/response/review.response';
 import { ReviewService } from 'src/infrastructure/domain/review/review.service';
@@ -23,6 +24,7 @@ import { CACHE_TTL_1MONTH } from 'src/infrastructure/domain/common/cacheable/cac
 @ApiBearerAuth('jwt')
 @Role(['admin'])
 @ApiTags('Reviews')
+@ApiAdminErrors()
 @Controller('reviews')
 export class ReviewController {
 

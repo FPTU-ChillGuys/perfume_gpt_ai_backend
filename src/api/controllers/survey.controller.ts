@@ -22,6 +22,7 @@ import {
   ApiExtraModels
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
+import { ApiAdminErrors, ApiSharedValidationErrors } from 'src/application/decorators/swagger-error.decorator';
 import { SurveyQuesAnsDetailRequest } from 'src/application/dtos/request/survey-ques-ans-detail.request';
 import { SurveyQuesAnwsRequest } from 'src/application/dtos/request/survey-ques-ans.request';
 import { SurveyQuestionRequest } from 'src/application/dtos/request/survey-question.request';
@@ -49,6 +50,7 @@ import {
 
 @ApiTags('Surveys')
 @ApiExtraModels(QueryFragmentMatch, QueryFragmentAttribute, QueryFragmentBudget)
+@ApiAdminErrors()
 @Controller('surveys')
 export class SurveyController {
   constructor(

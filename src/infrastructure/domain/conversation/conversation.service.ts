@@ -198,8 +198,7 @@ export class ConversationService {
     // Phase 6: Hydrate products
     await this.hydrateProductsInResponse(aiResponse, analysis.budget);
 
-    // Phase 7: Lưu trữ và trả response
-    return this.saveAndBuildResponse(aiResponse, context, request);
+    return this.buildResponseOnly(aiResponse, context, request);
   }
 
   // ==========================================
@@ -345,29 +344,18 @@ export class ConversationService {
     return typeof aiResult.data === 'string' ? JSON.parse(aiResult.data) : aiResult.data;
   }
 
-  /** Phase 7: Lưu trữ trực tiếp vào DB và xây dựng response */
-  private async saveAndBuildResponse(
+  /** Build response only (V10 — no DB persistence) */
+  private buildResponseOnly(
     aiResponse: any,
     context: { userId: string; conversationId: string },
     request: ChatRequest
-  ): Promise<BaseResponse<ConversationResponse>> {
+  ): BaseResponse<ConversationResponse> {
     const responseConversation = this.responseBuilder.buildConversationForSave(
       context.conversationId,
       context.userId,
       aiResponse,
       request.messages || []
     );
-
-    await this.saveOrUpdateConversation(responseConversation);
-
-    const savedConversation = await this.unitOfWork.AIConversationRepo.findOne(
-      { id: context.conversationId },
-      { populate: ['messages'] }
-    );
-
-    if (savedConversation) {
-      return { success: true, data: ConversationResponse.fromEntity(savedConversation)! };
-    }
 
     return this.responseBuilder.buildChatResponse(
       responseConversation,

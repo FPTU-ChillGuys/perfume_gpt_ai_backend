@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
@@ -7,6 +7,8 @@ import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.serv
 
 @Injectable()
 export class UserLogAIService {
+  private readonly logger = new Logger(UserLogAIService.name);
+
   constructor(
     private readonly userLogService: UserLogService
   ) {}
@@ -47,18 +49,18 @@ export class UserLogAIService {
   /** Build rolling summary cho tat ca user */
   async summarizeAndSaveForAllUsers(period: PeriodEnum): Promise<void> {
     const userIds = await this.userLogService.getAllUserIdsFromLogs();
-    console.log(`Found ${userIds.length} unique user IDs.`);
+    this.logger.log(`Found ${userIds.length} unique user IDs.`);
     for (const userId of userIds) {
       await this.summarizeAndSaveForUser(userId, period);
     }
-    console.log('Scheduled task completed: User logs summarized and saved.');
+    this.logger.log('Scheduled task completed: User logs summarized and saved.');
   }
 
   async summarizePerWeek(): Promise<void> {
     try {
       await this.summarizeAndSaveForAllUsers(PeriodEnum.WEEKLY);
     } catch (error) {
-      console.error('Error summarizing weekly logs:', error);
+      this.logger.error('Error summarizing weekly logs:', error);
     }
   }
 
@@ -66,7 +68,7 @@ export class UserLogAIService {
     try {
       await this.summarizeAndSaveForAllUsers(PeriodEnum.MONTHLY);
     } catch (error) {
-      console.error('Error summarizing monthly logs:', error);
+      this.logger.error('Error summarizing monthly logs:', error);
     }
   }
 
@@ -74,10 +76,7 @@ export class UserLogAIService {
     try {
       await this.summarizeAndSaveForAllUsers(PeriodEnum.YEARLY);
     } catch (error) {
-      console.error('Error summarizing yearly logs:', error);
+      this.logger.error('Error summarizing yearly logs:', error);
     }
   }
-
-  /** ---------------------- CRON JOB DISABLED ---------------------------- */
-
 }

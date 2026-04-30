@@ -77,10 +77,7 @@ export class InventoryTool {
       this.logger.log(`[getLatestTrendLogs] called`);
       return await funcHandlerAsync(
         async () => {
-          const logs = await this.unitOfWork.TrendLogRepo.find(
-            {},
-            { orderBy: { createdAt: 'DESC' }, limit: 2 }
-          );
+          const logs = await this.unitOfWork.TrendLogRepo.getLatestLogs(2);
 
           const fullData = logs.map((l) => ({
             createdAt: l.createdAt,

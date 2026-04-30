@@ -96,14 +96,11 @@ export class Tools implements OnModuleInit {
     if (!this.productTool || !this.orderTool || !this.profileTool || !this.logTool || !this.userTool) return {};
     return {
       getAllProducts: this.productTool.getAllProducts,
-      searchProduct: this.productTool.searchProduct,
-      queryProducts: this.productTool.queryProducts,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
       getOrderDetailsWithOrdersByUserId:
         this.orderTool.getOrderDetailsWithOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,
-      getUserLogSummary: this.logTool.getUserLogSummary,
       getUserById: this.userTool.getUserById
     };
   }

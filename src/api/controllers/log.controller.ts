@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Post, Query, UseInterceptors } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -37,6 +37,8 @@ import { PeriodEnum } from 'src/domain/enum/period.enum';
 @ApiTags('Logs')
 @Controller('logs')
 export class LogController {
+  private readonly logger = new Logger(LogController.name);
+
   constructor(
     protected userLogService: UserLogService,
     protected userLogAIService: UserLogAIService
@@ -92,12 +94,7 @@ export class LogController {
   @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng' })
   @ApiBaseResponse(Array<EventLog>)
   async getAllUserLogs(): Promise<BaseResponse<EventLog[]>> {
-    const response = await this.userLogService.getAllEventLogs();
-
-    return {
-      success: response.success,
-      data: response.data
-    };
+    return this.userLogService.getAllEventLogs();
   }
 
   /** Lấy event log dạng mới (message/search/survey) */
@@ -108,12 +105,7 @@ export class LogController {
   async getEventLogs(
     @Query() request: EventLogQueryRequest
   ): Promise<BaseResponse<EventLog[]>> {
-    const response = await this.userLogService.getEventLogs(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
+    return this.userLogService.getEventLogs(request);
   }
 
   /** Lấy event log dạng mới có phân trang */
@@ -124,12 +116,7 @@ export class LogController {
   async getPagedEventLogs(
     @Query() request: EventLogPagedQueryRequest
   ): Promise<BaseResponse<PagedResult<EventLog>>> {
-    const response = await this.userLogService.getEventLogsPaged(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
+    return this.userLogService.getEventLogsPaged(request);
   }
 
   /** Tạo event log theo contract mới */
@@ -140,12 +127,7 @@ export class LogController {
   async createEventLog(
     @Body() request: EventLogCreateRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    const response = await this.userLogService.createEventLog(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
+    return this.userLogService.createEventLog(request);
   }
 
   /** Thống kê nhanh event log cho dashboard */
@@ -155,12 +137,7 @@ export class LogController {
   async getEventLogsSummary(
     @Query() request: EventLogSummaryQueryRequest
   ): Promise<BaseResponse<EventLogSummaryResponse>> {
-    const response = await this.userLogService.getEventLogsSummary(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
+    return this.userLogService.getEventLogsSummary(request);
   }
 
   /** Thống kê time-series event log cho dashboard chart */
@@ -172,12 +149,7 @@ export class LogController {
   async getEventLogsTimeSeries(
     @Query() request: EventLogSummaryQueryRequest
   ): Promise<BaseResponse<EventLogTimeSeriesResponse>> {
-    const response = await this.userLogService.getEventLogsTimeSeries(request);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
+    return this.userLogService.getEventLogsTimeSeries(request);
   }
 
   /** Lấy tất cả log hoạt động người dùng theo khoảng thời gian */
@@ -189,13 +161,7 @@ export class LogController {
   async getUserLogsWithPeriod(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<EventLog[]>> {
-    const response =
-      await this.userLogService.getEventLogsWithPeriod(allUserLogRequest);
-
-    return {
-      success: response.success,
-      data: response.data
-    };
+    return this.userLogService.getEventLogsWithPeriod(allUserLogRequest);
   }
 
 
@@ -357,7 +323,7 @@ export class LogController {
           successCount++;
         } catch (error) {
           failedUserIds.push(userId);
-          console.error(`Failed to rebuild summary for user ${userId}:`, error);
+          this.logger.error(`Failed to rebuild summary for user ${userId}: ${error}`);
         }
       }
 

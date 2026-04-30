@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from 'generated/prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -41,6 +41,8 @@ import { RestockVariantResult, RestockLogPayload } from 'src/application/dtos/re
 
 @Injectable()
 export class InventoryService {
+  private readonly logger = new Logger(InventoryService.name);
+
   constructor(
     private readonly inventoryPrismaRepo: InventoryPrismaRepository,
     private readonly unitOfWork: UnitOfWork,
@@ -623,12 +625,9 @@ export class InventoryService {
     return `${new Intl.NumberFormat('vi-VN').format(Math.round(value))} d`;
   }
 
-  async getLatestTrendLogs(count: number) {
+  async getLatestTrendLogs(limit: number) {
     return funcHandlerAsync(async () => {
-      const logs = await this.unitOfWork.TrendLogRepo.find(
-        {},
-        { orderBy: { createdAt: 'DESC' }, limit: count }
-      );
+      const logs = await this.unitOfWork.TrendLogRepo.getLatestLogs(limit);
       return { success: true, data: logs };
     }, 'Failed to fetch trend logs');
   }
@@ -636,9 +635,9 @@ export class InventoryService {
   async saveTrendLog(trendData: string): Promise<void> {
     try {
       const log = new TrendLog({ trendData });
-      await this.unitOfWork.TrendLogRepo.getEntityManager().persistAndFlush(log);
+      await this.unitOfWork.TrendLogRepo.addAndFlush(log);
     } catch (err) {
-      console.error('Failed to save trend log:', err);
+      this.logger.error('Failed to save trend log:', err);
     }
   }
 

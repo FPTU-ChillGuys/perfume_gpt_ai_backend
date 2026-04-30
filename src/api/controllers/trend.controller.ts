@@ -96,7 +96,7 @@ export class TrendController {
   @ApiBaseResponse(Object) // Trả về dynamic object
   async getProductTrendJobResult(
     @Param('jobId') jobId: string
-  ): Promise<BaseResponse<any>> {
+  ): Promise<BaseResponse<{ jobId: string; result?: unknown; status?: string }>> {
     return checkBackgroundJobResult(
       this.cacheManager,
       `trend_job_${jobId}`,

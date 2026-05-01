@@ -3,7 +3,7 @@ import { tool, Tool } from 'ai';
 import { productDetailTabsContent } from 'src/application/constant/productDetailTabContent';
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 
@@ -11,7 +11,7 @@ import * as z from 'zod';
 export class ProductTool {
   private readonly logger = new Logger(ProductTool.name);
 
-  constructor(@Inject(forwardRef(() => ProductService)) private readonly productService: ProductService) { }
+  constructor(@Inject(forwardRef(() => ProductService)) private readonly productService: ProductService, private readonly err: I18nErrorHandler) { }
 
   private mapToMinimalProduct(product: any) {
     return {
@@ -34,13 +34,12 @@ export class ProductTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getAllProducts] called`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.productService.getAllProductsWithVariants(
             {
               PageNumber: input.pageNumber,
               PageSize: input.pageSize,
-              // SortBy: input.sortBy || '',
               SortOrder: input.sortOrder,
               IsDescending: input.isDescending
             }
@@ -53,7 +52,6 @@ export class ProductTool {
           const items = response.data?.items || [];
           const minimalItems = items.map(this.mapToMinimalProduct);
 
-          // Encode large datasets to optimize token usage
           if (minimalItems.length > 5) {
             const encodingResult = encodeToolOutput(minimalItems);
             return {
@@ -64,8 +62,7 @@ export class ProductTool {
 
           return { success: true, data: minimalItems };
         },
-        'Error occurred while fetching products.',
-        true
+        'errors.product.tool_fetch'
       );
     }
   });
@@ -87,10 +84,9 @@ export class ProductTool {
       )
     }),
     execute: async (input) => {
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           this.logger.log(`[searchProduct] called with ${input.searches.length} search(es)`);
-          // Tạo array search để search nhiều từ khóa đê tổng hợp
           let results: ProductWithVariantsResponse[] = [];
 
           for (const item of input.searches) {
@@ -100,7 +96,6 @@ export class ProductTool {
                 {
                   PageNumber: item.pageNumber,
                   PageSize: item.pageSize,
-                  // SortBy: item.sortBy || '',
                   SortOrder: item.sortOrder,
                   IsDescending: item.isDescending
                 }
@@ -112,7 +107,6 @@ export class ProductTool {
 
           const minimalResults = results.map(this.mapToMinimalProduct);
 
-          // Encode large result sets to optimize token usage
           if (minimalResults.length > 5) {
             const encodingResult = encodeToolOutput(minimalResults);
             return {
@@ -123,8 +117,7 @@ export class ProductTool {
 
           return { success: true, data: minimalResults || [] };
         },
-        'Error occurred while fetching products.',
-        true
+        'errors.product.tool_fetch'
       );
     }
   });
@@ -136,7 +129,7 @@ export class ProductTool {
       pageSize: z.number().min(1).max(100)
     }),
     execute: async (input) => {
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           this.logger.log(`[getNewestProducts] called`);
 
@@ -158,8 +151,7 @@ export class ProductTool {
           const items = (response.data?.items || []).map(this.mapToMinimalProduct);
           return { success: true, ...encodeToolOutput(items) };
         },
-        'Error occurred while fetching newest products.',
-        true
+        'errors.product.tool_newest'
       );
     }
   });
@@ -172,7 +164,7 @@ export class ProductTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getBestSellingProducts] called`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.productService.getBestSellingProducts({
             PageNumber: input.pageNumber,
@@ -191,8 +183,7 @@ export class ProductTool {
           const items = (response.data?.items || []).map(this.mapToMinimalProduct);
           return { success: true, ...encodeToolOutput(items) };
         },
-        'Error occurred while fetching best-selling products.',
-        true
+        'errors.product.tool_best_selling'
       );
     }
   });
@@ -205,7 +196,7 @@ export class ProductTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getLeastSellingProducts] called`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.productService.getLeastSellingProducts({
             PageNumber: input.pageNumber,
@@ -224,8 +215,7 @@ export class ProductTool {
           const items = (response.data?.items || []).map(this.mapToMinimalProduct);
           return { success: true, ...encodeToolOutput(items) };
         },
-        'Error occurred while fetching least-selling products.',
-        true
+        'errors.product.tool_least_selling'
       );
     }
   });
@@ -280,7 +270,7 @@ export class ProductTool {
     }),
     execute: async ({ productIds }) => {
       this.logger.log(`[getProductDetail] called for ${productIds.length} products`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.productService.getProductsByIdsForOutput(productIds);
           if (!response.success) {
@@ -288,8 +278,7 @@ export class ProductTool {
           }
           return { success: true, data: response.data };
         },
-        'Error occurred while fetching product details.',
-        true
+        'errors.product.tool_detail'
       );
     }
   });

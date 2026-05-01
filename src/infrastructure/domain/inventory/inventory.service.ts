@@ -7,7 +7,7 @@ import { InventoryStockRequest } from 'src/application/dtos/request/inventory-st
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
@@ -49,7 +49,8 @@ export class InventoryService {
     @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
-    private readonly sourcingCatalogService: SourcingCatalogService
+    private readonly sourcingCatalogService: SourcingCatalogService,
+    private readonly err: I18nErrorHandler
   ) { }
 
   private async ensureCriticalLowStockIncluded(
@@ -120,7 +121,7 @@ export class InventoryService {
   async getInventoryStock(
     request: InventoryStockRequest
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
         const where = this.buildStockWhereClause(request);
@@ -138,8 +139,7 @@ export class InventoryService {
         });
         return { success: true, payload: result };
       },
-      'Failed to fetch inventory stock',
-      true
+      'errors.inventory.fetch_stock'
     );
   }
 
@@ -170,7 +170,7 @@ export class InventoryService {
   async getBatch(
     request: BatchRequest
   ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
         const where = this.buildBatchWhereClause(request);
@@ -188,8 +188,7 @@ export class InventoryService {
         });
         return { success: true, payload: result };
       },
-      'Failed to fetch batches',
-      true
+      'errors.inventory.fetch_batch'
     );
   }
 
@@ -394,7 +393,7 @@ export class InventoryService {
     report: string,
     type: InventoryLogType = InventoryLogType.REPORT
   ): Promise<BaseResponseAPI<InventoryLog>> {
-    return funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const logEntry = await this.unitOfWork.InventoryLogRepo.persistAndReturn(
           new InventoryLog({
@@ -404,15 +403,14 @@ export class InventoryService {
         );
         return { success: true, data: logEntry };
       },
-      'Failed to create inventory log',
-      true
+      'errors.inventory.create_log'
     );
   }
 
   async getAllInventoryLogs(
     type?: InventoryLogType
   ): Promise<BaseResponse<InventoryLog[]>> {
-    return funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const where = type ? { type } : {};
         const logs = await this.unitOfWork.InventoryLogRepo.find(where, {
@@ -420,19 +418,18 @@ export class InventoryService {
         });
         return { success: true, data: logs };
       },
-      'Failed to fetch inventory logs',
-      true
+      'errors.inventory.fetch_logs'
     );
   }
 
   async getInventoryLogById(id: string): Promise<BaseResponse<InventoryLog>> {
-    return funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
       if (!log) {
-        return { success: false, error: 'Inventory log not found' };
+        return this.err.fail('errors.inventory.not_found');
       }
       return { success: true, data: log };
-    }, 'Failed to fetch inventory log');
+    }, 'errors.inventory.fetch_log');
   }
 
   async convertInventoryLogMarkdownToPdf(
@@ -445,11 +442,11 @@ export class InventoryService {
       logType: InventoryLogType;
     }>
   > {
-    return funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
         if (!log) {
-          return { success: false, error: 'Inventory log not found' };
+          return this.err.fail('errors.inventory.not_found');
         }
 
         const converterRoot = path.join(process.cwd(), 'md-pdf-converter');
@@ -474,7 +471,7 @@ export class InventoryService {
         );
 
         if (!result || !result.filename) {
-          return { success: false, error: 'Failed to convert markdown to pdf' };
+          return this.err.fail('errors.inventory.pdf_convert');
         }
 
         return {
@@ -487,7 +484,7 @@ export class InventoryService {
           }
         };
       },
-      'Failed to convert inventory log markdown to pdf'
+      'errors.inventory.pdf_convert'
     );
   }
 
@@ -497,17 +494,17 @@ export class InventoryService {
   }> {
     const converted = await this.convertInventoryLogMarkdownToPdf(id);
     if (!converted.success) {
-      if (converted.error === 'Inventory log not found') {
-        throw new Error('Inventory log not found');
+      if (converted.error === this.err.t('errors.inventory.not_found')) {
+        this.err.throw('errors.inventory.not_found', InternalServerErrorWithDetailsException);
       }
-      throw new Error(converted.error || 'Failed to convert markdown to pdf');
+      this.err.throw('errors.inventory.pdf_convert', InternalServerErrorWithDetailsException);
     }
 
     const filePath = converted.data?.absolutePath;
     const fileName = converted.data?.fileName || `inventory-log-${id}.pdf`;
 
     if (!filePath) {
-      throw new Error('PDF file path is empty');
+      this.err.throw('errors.inventory.pdf_empty_path', InternalServerErrorWithDetailsException);
     }
 
     const fileBuffer = await fs.promises.readFile(filePath);
@@ -627,10 +624,10 @@ export class InventoryService {
   }
 
   async getLatestTrendLogs(limit: number) {
-    return funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const logs = await this.unitOfWork.TrendLogRepo.getLatestLogs(limit);
       return { success: true, data: logs };
-    }, 'Failed to fetch trend logs');
+    }, 'errors.inventory.fetch_trend_logs');
   }
 
   async saveTrendLog(trendData: string): Promise<void> {
@@ -638,7 +635,7 @@ export class InventoryService {
       const log = new TrendLog({ trendData });
       await this.unitOfWork.TrendLogRepo.addAndFlush(log);
     } catch (err) {
-      this.logger.error('Failed to save trend log:', err);
+      this.err.log('errors.inventory.trend_log_save');
     }
   }
 
@@ -659,7 +656,7 @@ export class InventoryService {
       combinedPrompt
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
+      this.err.throw('errors.inventory.ai_report', InternalServerErrorWithDetailsException, {
         service: 'AIHelper'
       });
     }
@@ -687,7 +684,7 @@ export class InventoryService {
         }
       }
     } catch (err) {
-      console.error(`[InventoryService] Failed to enrich sourcing for variant ${variant.id}:`, err);
+      this.err.log('errors.inventory.enrich_sourcing');
     }
     return variant;
   }
@@ -715,7 +712,7 @@ export class InventoryService {
       adminPrompt
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
+      this.err.throw('errors.inventory.ai_report', InternalServerErrorWithDetailsException, {
         service: 'AIHelper'
       });
     }
@@ -744,7 +741,7 @@ export class InventoryService {
       Output.object({ schema: restockOutput.schema })
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI restock analysis', {
+      this.err.throw('errors.inventory.ai_restock', InternalServerErrorWithDetailsException, {
         service: 'AIRestockHelper'
       });
     }
@@ -759,7 +756,7 @@ export class InventoryService {
 
     const restockDataStr = JSON.stringify(normalizedResult);
     this.createInventoryLog(restockDataStr, InventoryLogType.RESTOCK).catch(
-      (err) => console.error('Failed to save restock log:', err)
+      () => this.err.log('errors.inventory.trend_log_save')
     );
 
     return Ok(normalizedResult);

@@ -4,7 +4,7 @@ import {
   VariantSalesAnalyticsResponse,
   DailySalesRecord
 } from 'src/application/dtos/response/variant-sales-analytics.response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { calculateSalesMetrics } from 'src/infrastructure/domain/utils/sales-metrics.util';
 import { RestockAnalyticsRepository } from 'src/infrastructure/domain/restock/restock-analytics.repository';
 import { CandidateMode, ProductVariantSalesCandidate, ProductSalesAnalyticsCandidate } from 'src/application/dtos/response/restock/sales-analytics.types';
@@ -14,7 +14,10 @@ export type { ProductVariantSalesCandidate, ProductSalesAnalyticsCandidate };
 
 @Injectable()
 export class RestockService {
-  constructor(private readonly restockAnalyticsRepo: RestockAnalyticsRepository) {}
+  constructor(
+    private readonly restockAnalyticsRepo: RestockAnalyticsRepository,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   private inferAggregateTrend(last7DaysSales: number, last30DaysSales: number): 'INCREASING' | 'STABLE' | 'DECLINING' {
     if (last30DaysSales <= 0) {
@@ -206,10 +209,7 @@ export class RestockService {
   ): Promise<BaseResponseAPI<ProductSalesAnalyticsCandidate[]>> {
     const analyticsResult = await this.getProductSalesAnalyticsForRestock();
     if (!analyticsResult.success || !analyticsResult.payload) {
-      return {
-        success: false,
-        error: analyticsResult.error ?? 'Failed to fetch trend sales analytics candidates'
-      };
+      return this.err.fail('errors.restock.fetch_candidates');
     }
 
     return {
@@ -223,10 +223,7 @@ export class RestockService {
   ): Promise<BaseResponseAPI<ProductSalesAnalyticsCandidate[]>> {
     const analyticsResult = await this.getProductSalesAnalyticsForRestock();
     if (!analyticsResult.success || !analyticsResult.payload) {
-      return {
-        success: false,
-        error: analyticsResult.error ?? 'Failed to fetch restock sales analytics candidates'
-      };
+      return this.err.fail('errors.restock.fetch_candidates');
     }
 
     const knownVariantIds = new Set(analyticsResult.payload.map((item) => item.variantId));
@@ -242,7 +239,7 @@ export class RestockService {
   async getProductSalesAnalyticsForRestock(): Promise<
     BaseResponseAPI<VariantSalesAnalyticsResponse[]>
   > {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const now = new Date();
         const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
@@ -257,8 +254,7 @@ export class RestockService {
 
         return { success: true, payload: results };
       },
-      'Failed to fetch variant sales analytics for restock',
-      true
+      'errors.inventory.fetch_sales_analytics'
     );
   }
 
@@ -347,14 +343,14 @@ export class RestockService {
   async getVariantSalesAnalyticsById(
     variantId: string
   ): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const now = new Date();
         const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
 
         const variant = await this.restockAnalyticsRepo.findVariantById(variantId);
         if (!variant) {
-          return { success: false, error: 'Variant not found' };
+          return this.err.fail('errors.restock.not_found');
         }
 
         const orderDetails = await this.restockAnalyticsRepo.findOrderDetailsByVariantId(variantId, twoMonthsAgo);
@@ -384,8 +380,7 @@ export class RestockService {
           })
         };
       },
-      'Failed to fetch variant sales analytics',
-      true
+      'errors.restock.fetch_candidates'
     );
   }
 

@@ -5,7 +5,7 @@ import { OrderResponse } from 'src/application/dtos/response/order.response';
 import { ProfileResponse } from 'src/application/dtos/response/profile.response';
 import { OrderService } from 'src/infrastructure/domain/order/order.service';
 import { ProfileService } from 'src/infrastructure/domain/profile/profile.service';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -33,7 +33,7 @@ export class ProfileTool {
   private orderService?: OrderService;
   private prismaService?: PrismaService;
 
-  constructor(private readonly moduleRef: ModuleRef) {}
+  constructor(private readonly moduleRef: ModuleRef, private readonly err: I18nErrorHandler) {}
 
   private getPrismaService(): PrismaService {
     if (!this.prismaService) {
@@ -463,7 +463,7 @@ export class ProfileTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getOwnProfile] called for userId: ${input.userId}`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.getProfileService().getOwnProfile(
             input.userId
@@ -482,8 +482,7 @@ export class ProfileTool {
 
           return { success: true, data: response.payload || {} };
         },
-        'Error occurred while fetching profile.',
-        true
+        'errors.profile.tool_fetch'
       );
     }
   });
@@ -505,7 +504,7 @@ export class ProfileTool {
         `[getProfileRecommendationContext] called for userId: ${input.userId}, requestedComponents: ${input.requestedComponents?.join(',') || 'auto (order > profile)'}`
       );
 
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const payload = await this.getProfileRecommendationContextPayload(
             input.userId,
@@ -521,8 +520,7 @@ export class ProfileTool {
             data: payload
           };
         },
-        'Error occurred while building profile recommendation context.',
-        true
+        'errors.profile.tool_context'
       );
     }
   });
@@ -542,7 +540,7 @@ export class ProfileTool {
     }),
     execute: async (input) => {
       this.logger.log(`[searchProfile] called with query: ${input.query}`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.getProfileService().searchProfile(
             input.query
@@ -555,8 +553,7 @@ export class ProfileTool {
           }
           return { success: true, data: response.payload || [] };
         },
-        'Error occurred while searching profiles.',
-        true
+        'errors.profile.tool_search'
       );
     }
   });

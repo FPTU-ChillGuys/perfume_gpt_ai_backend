@@ -8,7 +8,7 @@ import {
 } from 'src/application/dtos/response/order.response';
 import { OrderService } from 'src/infrastructure/domain/order/order.service';
 import { UserService } from 'src/infrastructure/domain/user/user.service';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 
@@ -16,7 +16,7 @@ import * as z from 'zod';
 export class OrderTool {
   private readonly logger = new Logger(OrderTool.name);
 
-  constructor(private readonly orderService: OrderService, private readonly userService: UserService) { }
+  constructor(private readonly orderService: OrderService, private readonly userService: UserService, private readonly err: I18nErrorHandler) { }
 
   getOrdersByUserId: Tool = tool({
     description: 'Get all orders for a specific user with pagination and sorting. ' +
@@ -31,7 +31,7 @@ export class OrderTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getOrdersByUserId] called for userId: ${input.userId}`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.orderService.getOrdersByUserId(
             input.userId,
@@ -44,7 +44,6 @@ export class OrderTool {
 
           const items = response.payload?.items || [];
 
-          // Encode large datasets to optimize token usage
           if (items.length > 5) {
             const encodingResult = encodeToolOutput(items);
             return {
@@ -55,8 +54,7 @@ export class OrderTool {
 
           return { success: true, data: items };
         },
-        'Error occurred while fetching user orders.',
-        true
+        'errors.order.tool_fetch'
       );
     }
   });
@@ -68,17 +66,15 @@ export class OrderTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getOrderById] called for orderId: ${input.orderId}`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.orderService.getOrderById(input.orderId);
-          console.log('OrderTool - getOrderById response:', response.payload);
           if (!response.success) {
             return { success: false, error: `Failed to fetch order ${input.orderId}.` };
           }
           return { success: true, data: response.payload || {} };
         },
-        'Error occurred while fetching order details.',
-        true
+        'errors.order.tool_detail'
       );
     }
   });
@@ -92,7 +88,7 @@ export class OrderTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getOrderDetailsWithOrdersByUserId] called for userId: ${input.userId}`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.orderService.getOrderDetailsWithOrdersByUserId(
             input.userId
@@ -104,7 +100,6 @@ export class OrderTool {
 
           const data = response.data || [];
 
-          // Encode large datasets to optimize token usage
           if (Array.isArray(data) && data.length > 5) {
             const encodingResult = encodeToolOutput(data);
             return {
@@ -115,8 +110,7 @@ export class OrderTool {
 
           return { success: true, data };
         },
-        'Error occurred while fetching order details.',
-        true
+        'errors.order.tool_detail'
       );
     }
   });
@@ -129,7 +123,7 @@ export class OrderTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getOrderReport] called for userId: ${input.userId}`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const response = await this.orderService.getOrderReportFromGetOrderDetailsWithOrdersByUserId(
             input.userId
@@ -140,8 +134,7 @@ export class OrderTool {
           }
           return { success: true, data: response.data || '' };
         },
-        'Error occurred while generating order report.',
-        true
+        'errors.order.tool_report'
       );
     }
   });

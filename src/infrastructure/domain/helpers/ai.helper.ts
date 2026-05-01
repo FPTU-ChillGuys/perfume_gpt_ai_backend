@@ -1,6 +1,6 @@
 import { LanguageModel, Schema, ToolChoice, ToolSet, UIMessage } from 'ai';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { funcHandler, funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import {
   objectGenerationFromMessagesToResultWithErrorHandler,
   streamTextGenerationFromMessagesToResultWithErrorHandler,
@@ -84,7 +84,8 @@ export class AIHelper {
     private toolChoice?: ToolChoice<ToolSet>,
     private model?: LanguageModel,
     private promptOptimizationConfig?: PromptOptimizationConfig,
-    private maxTokens?: number
+    private maxTokens?: number,
+    private readonly err?: I18nErrorHandler
   ) { }
 
   private get resolvedTools(): ToolSet | undefined {
@@ -99,7 +100,7 @@ export class AIHelper {
     output?: any,
     errorMessage?: string
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err?.wrap(async () => {
       const requestId = this.createRequestId('prompt');
       const model = this.resolveModel();
       const modelName = this.resolveModelName(model);
@@ -151,7 +152,7 @@ export class AIHelper {
         );
         throw error;
       }
-    }, 'Failed to generate text from prompt');
+    }, 'errors.ai_helper.text_from_prompt') ?? { success: false, error: 'Failed to generate text from prompt' };
   }
 
   async textGenerateFromMessages(
@@ -160,7 +161,7 @@ export class AIHelper {
     output?: any,
     errorMessage?: string
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err?.wrap(async () => {
       const requestId = this.createRequestId('messages');
       const model = this.resolveModel();
       const modelName = this.resolveModelName(model);
@@ -170,7 +171,6 @@ export class AIHelper {
         modelName,
         `messageCount=${messages.length} tools=${this.resolvedTools ? Object.keys(this.resolvedTools).length : 0}`
       );
-
 
       let systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
       try {
@@ -208,7 +208,7 @@ export class AIHelper {
         );
         throw error;
       }
-    }, 'Failed to generate text from messages');
+    }, 'errors.ai_helper.text_from_messages') ?? { success: false, error: 'Failed to generate text from messages' };
   }
 
   textGenerateStreamFromPrompt(
@@ -217,7 +217,7 @@ export class AIHelper {
     output?: any,
     errorMessage?: string
   ): BaseResponse<ReadableStream<any>> {
-    return funcHandler(() => {
+    try {
       const requestId = this.createRequestId('stream-prompt');
       const model = this.resolveModel();
       const modelName = this.resolveModelName(model);
@@ -247,7 +247,10 @@ export class AIHelper {
       );
 
       return { success: true, data: stream };
-    }, 'Failed to generate text stream from prompt');
+    } catch (error) {
+      this.logger.error(this.err?.t('errors.ai_helper.stream_from_prompt'), error);
+      return { success: false, error: this.err?.t('errors.ai_helper.stream_from_prompt') ?? 'Failed to generate text stream from prompt' };
+    }
   }
 
   textGenerateStreamFromMessages(
@@ -291,7 +294,7 @@ export class AIHelper {
     additionalSystemPrompt?: string,
     errorMessage?: string
   ): Promise<BaseResponse<T>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err?.wrap(async () => {
       const requestId = this.createRequestId('object-messages');
       const model = this.resolveModel();
       const modelName = this.resolveModelName(model);
@@ -340,6 +343,6 @@ export class AIHelper {
         );
         throw error;
       }
-    }, 'Failed to generate object from messages');
+    }, 'errors.ai_helper.object_from_messages') ?? { success: false, error: 'Failed to generate object from messages' };
   }
 }

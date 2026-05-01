@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { ReviewService } from 'src/infrastructure/domain/review/review.service';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 
@@ -9,7 +9,7 @@ import * as z from 'zod';
 export class ReviewTool {
     private readonly logger = new Logger(ReviewTool.name);
 
-    constructor(private readonly reviewService: ReviewService) { }
+    constructor(private readonly reviewService: ReviewService, private readonly err: I18nErrorHandler) { }
 
     /**
      * Lấy danh sách review của một variant sản phẩm.
@@ -26,7 +26,7 @@ export class ReviewTool {
         }),
         execute: async (input) => {
             this.logger.log(`[getReviewsByVariantId] called for variantId: ${input.variantId}`);
-            return await funcHandlerAsync(
+            return await this.err.wrap(
                 async () => {
                     const response = await this.reviewService.getReviewsByVariantId(input.variantId);
                     if (!response.success) {
@@ -35,7 +35,6 @@ export class ReviewTool {
 
                     const reviews = response.payload ?? [];
 
-                    // Encode large datasets to optimize token usage
                     if (Array.isArray(reviews) && reviews.length > 5) {
                         const encodingResult = encodeToolOutput(reviews);
                         return {
@@ -46,8 +45,7 @@ export class ReviewTool {
 
                     return { success: true, data: reviews };
                 },
-                'Error occurred while fetching reviews.',
-                true
+                'errors.review.tool_reviews'
             );
         }
     });
@@ -66,7 +64,7 @@ export class ReviewTool {
         }),
         execute: async (input) => {
             this.logger.log(`[getReviewStatisticsByVariantId] called for variantId: ${input.variantId}`);
-            return await funcHandlerAsync(
+            return await this.err.wrap(
                 async () => {
                     const response = await this.reviewService.getReviewStatisticByVariantId(input.variantId);
                     if (!response.success) {
@@ -74,8 +72,7 @@ export class ReviewTool {
                     }
                     return { success: true, data: response.payload ?? null };
                 },
-                'Error occurred while fetching review statistics.',
-                true
+                'errors.review.tool_statistics'
             );
         }
     });
@@ -108,7 +105,7 @@ export class ReviewTool {
         }),
         execute: async (input) => {
             this.logger.log(`[getPagedReviews] called`);
-            return await funcHandlerAsync(
+            return await this.err.wrap(
                 async () => {
                     const response = await this.reviewService.getAllReviews({
                         PageNumber: input.pageNumber,
@@ -127,7 +124,6 @@ export class ReviewTool {
                     }
 
                     const data = response.payload ?? null;
-                    // If payload is an array, optionally encode it
                     if (Array.isArray(data) && data.length > 5) {
                         const encodingResult = encodeToolOutput(data);
                         return {
@@ -138,8 +134,7 @@ export class ReviewTool {
 
                     return { success: true, data };
                 },
-                'Error occurred while fetching paged reviews.',
-                true
+                'errors.review.tool_paged'
             );
         }
     });
@@ -158,7 +153,7 @@ export class ReviewTool {
         }),
         execute: async (input) => {
             this.logger.log(`[getLatestReviewSummaryByVariantId] called for variantId: ${input.variantId}`);
-            return await funcHandlerAsync(
+            return await this.err.wrap(
                 async () => {
                     const response = await this.reviewService.getLatestReviewLogByVariantId(input.variantId);
                     if (!response.success) {
@@ -169,8 +164,7 @@ export class ReviewTool {
                     }
                     return { success: true, data: response.payload.reviewLog };
                 },
-                'Error occurred while fetching latest review summary.',
-                true
+                'errors.review.tool_summary'
             );
         }
     });

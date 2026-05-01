@@ -14,7 +14,7 @@ import {
   VariantStockResponse
 } from 'src/application/dtos/response/product-with-variants.response';
 import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { Prisma } from 'generated/prisma/client';
@@ -199,6 +199,7 @@ export class ProductService {
     private readonly dictionaryBuilder: DictionaryBuilderService,
     private readonly configService: ConfigService,
     private readonly masterDataService: MasterDataService,
+    private readonly err: I18nErrorHandler,
   ) { }
 
   /**
@@ -427,11 +428,7 @@ export class ProductService {
     const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
 
     if (!structuredResult.success || !structuredResult.data) {
-      return {
-        success: false,
-        error: structuredResult.error || 'Failed to fetch products by parsed query',
-        payload: this.createEmptyPagedProducts(request)
-      };
+      return this.err.fail(structuredResult.error || 'errors.product.search');
     }
 
     return {
@@ -443,7 +440,7 @@ export class ProductService {
   async getAllProducts(
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
         const take = request.PageSize;
@@ -466,8 +463,7 @@ export class ProductService {
         });
         return { success: true, payload: result };
       },
-      'Failed to fetch products',
-      true
+      'errors.product.fetch'
     );
   }
 
@@ -475,7 +471,7 @@ export class ProductService {
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         if (!searchText?.trim()) {
           return { success: true, payload: this.createEmptyPagedProducts(request) };
@@ -484,8 +480,7 @@ export class ProductService {
         this.logger.log('[SEARCH][QUERY_ONLY] getProductsUsingSemanticSearch -> parsed query path');
         return await this.runParsedQuerySearch(searchText, request);
       },
-      'Failed to fetch products using semantic query path',
-      true
+      'errors.product.search'
     );
   }
 
@@ -496,7 +491,7 @@ export class ProductService {
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         if (!searchText?.trim()) {
           return { success: true, payload: this.createEmptyPagedProducts(request) };
@@ -505,8 +500,7 @@ export class ProductService {
         this.logger.log('[SEARCH][NLP_ONLY] getProductsUsingAiSearch -> parsed query path');
         return await this.runParsedQuerySearch(searchText, request);
       },
-      'Failed to fetch products using NLP query path',
-      true
+      'errors.product.search'
     );
   }
 
@@ -518,7 +512,7 @@ export class ProductService {
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<any>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const parsedResult = this.nlpEngine.parseAndNormalize(searchText);
         const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
@@ -536,8 +530,7 @@ export class ProductService {
           },
         };
       },
-      'Failed to fetch products using parsed query path',
-      true,
+      'errors.product.search'
     );
   }
 
@@ -909,7 +902,7 @@ export class ProductService {
   async getProductWithVariants(
     @Query('id') id: string
   ): Promise<BaseResponse<ProductWithVariantsResponse>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const product = await this.prisma.products.findFirst({
           where: { Id: id, IsDeleted: false },
@@ -922,8 +915,7 @@ export class ProductService {
 
         return { success: true, data: mapProductWithVariants(product) };
       },
-      'Failed to fetch product with variants',
-      true
+      'errors.product.fetch_variants'
     );
   }
 
@@ -931,7 +923,7 @@ export class ProductService {
   async getAllProductsWithVariants(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
         const take = request.PageSize;
@@ -966,15 +958,14 @@ export class ProductService {
           })
         };
       },
-      'Failed to fetch product with variants',
-      true
+      'errors.product.fetch_all_with_variants'
     );
   }
 
   async getNewestProductsWithVariants(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
         const take = request.PageSize;
@@ -1001,15 +992,14 @@ export class ProductService {
           })
         };
       },
-      'Failed to fetch newest products with variants',
-      true
+      'errors.product.fetch_newest'
     );
   }
 
   async getBestSellingProducts(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
         const take = request.PageSize;
@@ -1116,15 +1106,14 @@ export class ProductService {
           })
         };
       },
-      'Failed to fetch best selling products',
-      true
+      'errors.product.fetch_best_selling'
     );
   }
 
   async getLeastSellingProducts(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
         const take = request.PageSize;
@@ -1210,15 +1199,14 @@ export class ProductService {
           })
         };
       },
-      'Failed to fetch least selling products',
-      true
+      'errors.product.fetch_least_selling'
     );
   }
 
   async getProductsByStructuredQuery(
     analysis: any // Should be AnalysisObject but keeping any for simplicity in import
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err.wrap(async () => {
       const { logic, sorting, budget, pagination, productNames } = analysis;
       const genericFilterKeywords = await this.getGenericFilterKeywords();
       
@@ -1604,11 +1592,11 @@ export class ProductService {
           totalPages: Math.ceil(totalCount / take)
         })
       };
-    }, 'Failed to fetch products by structured query');
+    }, 'errors.product.structured_query');
   }
 
   async getProductsByIdsForOutput(ids: string[]): Promise<BaseResponse<ProductCardOutputItem[]>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err.wrap(async () => {
       if (!ids || ids.length === 0) return { success: true, data: [] };
 
       const products = await this.prisma.products.findMany({
@@ -1670,6 +1658,6 @@ export class ProductService {
         success: true,
         data: mappedProducts
       };
-    }, 'Failed to fetch products for AI output cards');
+    }, 'errors.product.fetch_by_ids');
   }
 }

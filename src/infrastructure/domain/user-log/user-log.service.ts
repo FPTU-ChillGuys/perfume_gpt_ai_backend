@@ -1,7 +1,7 @@
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import {
   AllUserLogRequest,
@@ -64,6 +64,7 @@ export class UserLogService {
 
   constructor(
     protected unitOfWork: UnitOfWork,
+    private readonly err: I18nErrorHandler,
     @InjectQueue(QueueName.USER_LOG_SUMMARY_QUEUE)
     private readonly userLogSummaryQueue: Queue
   ) {}
@@ -94,13 +95,12 @@ export class UserLogService {
   }
 
   async getAllEventLogs(): Promise<BaseResponse<EventLog[]>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({});
         return { success: true, data: eventLogs };
       },
-      'Failed to get all event logs',
-      true
+      'errors.user_log.get_all'
     );
   }
 
@@ -108,7 +108,7 @@ export class UserLogService {
   async getEventLogs(
     request: EventLogQueryRequest
   ): Promise<BaseResponse<EventLog[]>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
           userId: request.userId,
@@ -123,15 +123,14 @@ export class UserLogService {
 
         return { success: true, data: eventLogs };
       },
-      'Failed to get event logs',
-      true
+      'errors.user_log.get_by_user'
     );
   }
 
   async getEventLogsPaged(
     request: EventLogPagedQueryRequest
   ): Promise<BaseResponse<PagedResult<EventLog>>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const pageNumber = Math.max(Number(request.PageNumber) || 1, 1);
         const pageSize = Math.max(Number(request.PageSize) || 10, 1);
@@ -154,15 +153,14 @@ export class UserLogService {
 
         return { success: true, data: paged };
       },
-      'Failed to get paged event logs',
-      true
+      'errors.user_log.get_paged'
     );
   }
 
   async createEventLog(
     request: EventLogCreateRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         this.logger.debug(
           `[EVENT-LOG] Creating event log type=${request.eventType}, entityType=${request.entityType}, userId=${request.userId || 'anonymous'}`
@@ -183,15 +181,14 @@ export class UserLogService {
 
         return { success: true, data: { id } };
       },
-      'Failed to create event log',
-      true
+      'errors.user_log.create'
     );
   }
 
   async getEventLogsSummary(
     request: EventLogSummaryQueryRequest
   ): Promise<BaseResponse<EventLogSummaryResponse>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
           userId: request.userId,
@@ -230,15 +227,14 @@ export class UserLogService {
           }
         };
       },
-      'Failed to summarize event logs',
-      true
+      'errors.user_log.summarize'
     );
   }
 
   async getEventLogsTimeSeries(
     request: EventLogSummaryQueryRequest
   ): Promise<BaseResponse<EventLogTimeSeriesResponse>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const granularity = request.granularity || 'day';
         const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
@@ -298,8 +294,7 @@ export class UserLogService {
           }
         };
       },
-      'Failed to build event log time series',
-      true
+      'errors.user_log.timeseries'
     );
   }
 
@@ -382,7 +377,7 @@ export class UserLogService {
   async getEventLogsWithPeriod(
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<EventLog[]>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         if (!allUserLogRequest.startDate) {
           allUserLogRequest.startDate = getFirstDateOfPeriod(
@@ -398,8 +393,7 @@ export class UserLogService {
 
         return { success: true, data: eventLogs };
       },
-      'Failed to get event logs with period',
-      true
+      'errors.user_log.get_with_period',
     );
   }
 
@@ -464,7 +458,7 @@ export class UserLogService {
     dailyLogSummary?: Record<string, string>,
     dailyFeatureSnapshot?: Record<string, unknown>
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const existingSummary =
           await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
@@ -494,8 +488,7 @@ export class UserLogService {
         );
         return { success: true, data: existingSummary.logSummary };
       },
-      'Failed to save user log summary',
-      true
+      'errors.user_log.save_summary',
     );
   }
 
@@ -505,12 +498,12 @@ export class UserLogService {
     endDate: Date,
     summary: string
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const existingSummary =
           await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
         if (!existingSummary) {
-          return { success: false, error: 'User log summary not found' };
+          return this.err.fail('errors.user_log.summary_not_found');
         }
         existingSummary.logSummary = summary;
         await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
@@ -518,8 +511,7 @@ export class UserLogService {
         );
         return { success: true, data: existingSummary.logSummary };
       },
-      'Failed to update user log summary',
-      true
+      'errors.user_log.update_summary',
     );
   }
 
@@ -529,7 +521,7 @@ export class UserLogService {
     startDate?: Date,
     endDate?: Date
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         this.logger.debug(
           `Start Date: ${
@@ -545,15 +537,14 @@ export class UserLogService {
           }
         );
         if (!userLogSummary) {
-          return { success: false, error: 'User log summary not found' };
+          return this.err.fail('errors.user_log.summary_not_found');
         }
         return {
           success: true,
           data: [UserLogSummaryMapper.toResponse(userLogSummary)]
         };
       },
-      'Failed to get user log summary',
-      true
+      'errors.user_log.get_summary'
     );
   }
 
@@ -563,7 +554,7 @@ export class UserLogService {
     startDate?: Date,
     endDate?: Date
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const userLogSummaries = await this.getUserLogSummariesByUserId(
           userId,
@@ -571,7 +562,7 @@ export class UserLogService {
           endDate
         );
         if (!userLogSummaries.success || !userLogSummaries.data) {
-          return { success: false, error: 'User log summaries not found' };
+          return this.err.fail('errors.user_log.summaries_not_found');
         }
         // Tao data tu cac log summary
         const data = userLogSummaries.data
@@ -585,8 +576,7 @@ export class UserLogService {
 
         return { success: true, data: report };
       },
-      'Failed to get user log summary report',
-      true
+      'errors.user_log.summary_report'
     );
   }
 
@@ -596,7 +586,7 @@ export class UserLogService {
   ): Promise<
     BaseResponse<{ prompt: string; response: string; count: number }>
   > {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         // Xu ly neu khong co startDate thi lay theo period
         if (!userLogRequest.startDate) {
@@ -614,7 +604,7 @@ export class UserLogService {
         });
 
         if (!eventLogs.length) {
-          return { success: false, error: 'User log not found' };
+          return this.err.fail('errors.user_log.not_found');
         }
 
         const { searchContents, messageContents, surveyContents, count } =
@@ -645,8 +635,7 @@ export class UserLogService {
 
         return { success: true, data: { prompt, response, count } };
       },
-      'Failed to summarize user logs',
-      true
+      'errors.user_log.summarize_user'
     );
   }
 
@@ -654,7 +643,7 @@ export class UserLogService {
   async getReportAndPromptSummaryAllUsersLogs(
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         if (!allUserLogRequest.startDate) {
           allUserLogRequest.startDate = getFirstDateOfPeriod(
@@ -714,8 +703,7 @@ export class UserLogService {
 
         return { success: true, data: { prompt, response } };
       },
-      'Failed to summarize user logs',
-      true
+      'errors.user_log.summarize_all'
     );
   }
 
@@ -730,14 +718,11 @@ export class UserLogService {
   ): Promise<
     BaseResponse<UserLogSummaryResponse>
   > {
-    return funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const summaries = await this.getAllUserLogSummary(allUserLogRequest);
         if (!summaries.success || !summaries.data?.length) {
-          return {
-            success: false,
-            error: 'User log summaries not found'
-          };
+          return this.err.fail('errors.user_log.summaries_not_found');
         }
 
         const normalizedSnapshots = summaries.data.map((summary) =>
@@ -784,8 +769,7 @@ export class UserLogService {
           })
         };
       },
-      'Failed to aggregate user log summaries',
-      true
+      'errors.user_log.aggregate'
     );
   }
 
@@ -842,7 +826,7 @@ export class UserLogService {
     startDate?: Date,
     endDate?: Date
   ): Promise<BaseResponse<UserLogSummaryResponse | null>> {
-    return funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         if (startDate || endDate || period) {
           const normalizedEndDate = endDate
@@ -864,11 +848,7 @@ export class UserLogService {
           });
 
           if (!eventLogs.length) {
-            return {
-              success: false,
-              error: 'User log summary not found in selected period',
-              data: null
-            };
+            return this.err.fail('errors.user_log.summary_period_not_found');
           }
 
           return {
@@ -884,26 +864,21 @@ export class UserLogService {
         );
 
         if (!userLogSummary) {
-          return {
-            success: false,
-            error: 'User log summary not found',
-            data: null
-          };
+          return this.err.fail('errors.user_log.summary_not_found');
         }
         return {
           success: true,
           data: UserLogSummaryMapper.toResponse(userLogSummary)
         };
       },
-      'Failed to get user log summary',
-      true
+      'errors.user_log.get_summary'
     );
   }
 
   async getAllUserLogSummary(
     allUserLogRequest?: AllUserLogRequest
   ): Promise<BaseResponse<UserLogSummaryResponse[] | null>> {
-    return funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         if (allUserLogRequest) {
           const { startDate, endDate } =
@@ -942,11 +917,7 @@ export class UserLogService {
         );
 
         if (!userLogSummaryEntities) {
-          return {
-            success: false,
-            error: 'User log summary not found',
-            data: null
-          };
+          return this.err.fail('errors.user_log.summary_not_found');
         }
 
         return {
@@ -954,21 +925,16 @@ export class UserLogService {
           data: UserLogSummaryMapper.toResponseList(userLogSummaryEntities)
         };
       },
-      'Failed to get user log summary',
-      true
+      'errors.user_log.get_summary'
     );
   }
 
   async getAllUserLogSummaryReport(): Promise<BaseResponse<string | null>> {
-    return funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const summaries = await this.getAllUserLogSummary();
         if (!summaries.success) {
-          return {
-            success: false,
-            error: 'User log summary not found',
-            data: null
-          };
+          return this.err.fail('errors.user_log.summary_not_found');
         }
 
         const report = summaries.data
@@ -976,8 +942,7 @@ export class UserLogService {
           .join('\n');
         return { success: true, data: report };
       },
-      'Failed to get user log summary report',
-      true
+      'errors.user_log.summary_report'
     );
   }
 

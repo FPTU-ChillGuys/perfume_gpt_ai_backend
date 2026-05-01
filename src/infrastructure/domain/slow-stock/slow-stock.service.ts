@@ -4,7 +4,7 @@ import {
     VariantSalesAnalyticsResponse
 } from 'src/application/dtos/response/variant-sales-analytics.response';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { SlowStockRepository } from 'src/infrastructure/domain/slow-stock/slow-stock.repository';
 import { SlowStockCandidate, SlowStockVariantCandidate } from 'src/application/dtos/response/slow-stock/slow-stock-analytics.types';
 import { SLOW_STOCK_CONFIG, RESTOCK_CONFIG } from 'src/application/constant/inventory.constant';
@@ -17,11 +17,12 @@ export class SlowStockService {
 
     constructor(
         private readonly slowStockRepo: SlowStockRepository,
-        private readonly restockService: RestockService
+        private readonly restockService: RestockService,
+        private readonly err: I18nErrorHandler
     ) {}
 
     async getSlowStockCandidates(): Promise<BaseResponseAPI<SlowStockCandidate[]>> {
-        return await funcHandlerAsync(
+        return this.err.wrap(
             async () => {
                 const [analyticsResult, stocks] = await Promise.all([
                     this.restockService.getProductSalesAnalyticsForRestock(),
@@ -29,10 +30,7 @@ export class SlowStockService {
                 ]);
 
                 if (!analyticsResult.success || !analyticsResult.payload) {
-                    return {
-                        success: false,
-                        error: analyticsResult.error ?? 'Failed to fetch sales analytics'
-                    };
+                    return this.err.fail('errors.slow_stock.fetch_sales_analytics');
                 }
 
                 const stockMap = this.buildStockMap(stocks);
@@ -42,8 +40,7 @@ export class SlowStockService {
 
                 return { success: true, payload: sorted };
             },
-            'Failed to fetch slow stock candidates',
-            true
+            'errors.slow_stock.fetch_candidates'
         );
     }
 

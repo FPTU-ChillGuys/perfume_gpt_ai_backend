@@ -17,9 +17,10 @@ import { AIPersonalizationHelper } from './helpers/ai-personalization.helper';
 import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
 import { ConversationInputHelper } from './helpers/conversation-input.helper';
 import { ConversationResponseBuilder } from './helpers/conversation-response.builder';
+import { ProviderModule } from 'src/infrastructure/domain/common/provider.module';
 
 @Module({
-    imports: [
+    imports: [ProviderModule,
         UnitOfWorkModule,
         AIModule,
         UserLogModule,

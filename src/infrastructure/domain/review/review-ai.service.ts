@@ -3,6 +3,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { reviewSummaryPrompt, INSTRUCTION_TYPE_REVIEW } from 'src/application/constant/prompts';
 import { isArrayEmpty, INSUFFICIENT_DATA_MESSAGES } from 'src/infrastructure/domain/utils/insufficient-data';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import {
   AIReviewSummaryStructuredResponse,
@@ -18,7 +19,8 @@ export class ReviewAIService {
   constructor(
     private readonly reviewService: ReviewService,
     private readonly adminInstructionService: AdminInstructionService,
-    @Inject(AI_REVIEW_HELPER) private readonly aiHelper: AIHelper
+    @Inject(AI_REVIEW_HELPER) private readonly aiHelper: AIHelper,
+    private readonly err: I18nErrorHandler
   ) {}
 
   /** Tóm tắt tất cả đánh giá bằng AI */
@@ -34,7 +36,7 @@ export class ReviewAIService {
     const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
     const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt);
     if (!aiResponse.success) {
-      return { success: false, error: 'Failed to generate review summary' };
+      return this.err.fail('errors.review.summary');
     }
     return Ok(aiResponse.data);
   }
@@ -52,7 +54,7 @@ export class ReviewAIService {
     const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
     const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt);
     if (!aiResponse.success) {
-      return { success: false, error: 'Failed to generate review summary' };
+      return this.err.fail('errors.review.summary');
     }
     return Ok(aiResponse.data);
   }
@@ -64,10 +66,7 @@ export class ReviewAIService {
     const startTime = Date.now();
     const reviews = await this.reviewService.getReviewsUnpaged(variantId);
     if (isArrayEmpty(reviews)) {
-      throw new InternalServerErrorWithDetailsException(
-        INSUFFICIENT_DATA_MESSAGES.REVIEW_SUMMARY,
-        { variantId }
-      );
+      this.err.throw('errors.review.summary', InternalServerErrorWithDetailsException, { variantId });
     }
     const reviewsText = reviews
       .map(r => `${r.userFullName} (${r.rating}★): ${r.comment}`)
@@ -76,7 +75,7 @@ export class ReviewAIService {
     const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_REVIEW);
     const aiResponse = await this.aiHelper.textGenerateFromPrompt(prompt, systemPrompt);
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to generate structured review summary', { variantId });
+      this.err.throw('errors.review.structured_summary', InternalServerErrorWithDetailsException, { variantId });
     }
     const processingTimeMs = Date.now() - startTime;
     const result = new AIReviewSummaryStructuredResponse({

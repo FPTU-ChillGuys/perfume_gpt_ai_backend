@@ -2,16 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { ProfileResponse } from 'src/application/dtos/response/profile.response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   async getOwnProfile(
     userId: string
   ): Promise<BaseResponseAPI<ProfileResponse>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const profile = await this.prisma.customerProfiles.findUnique({
           where: { UserId: userId },
@@ -34,7 +37,7 @@ export class ProfileService {
           }
         });
         if (!profile) {
-          return { success: false, error: 'Profile not found' };
+          return this.err.fail('errors.profile.not_found');
         }
 
         const scentPreference =
@@ -77,12 +80,11 @@ export class ProfileService {
         });
         return { success: true, payload: response };
       },
-      'Failed to fetch profile'
+      'errors.profile.fetch'
     );
   }
 
   async createProfileReport(profileResponse?: ProfileResponse): Promise<string> {
-    // Convert profileResponse to string for prompt
     const profileReport = `User Profile:
     - User ID: ${profileResponse?.userId}
     - Profile ID: ${profileResponse?.id}
@@ -105,7 +107,7 @@ export class ProfileService {
   }
 
   async searchProfile(query: string): Promise<BaseResponseAPI<any[]>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const users = await this.prisma.aspNetUsers.findMany({
         where: {
           OR: [
@@ -135,7 +137,6 @@ export class ProfileService {
       }));
 
       return { success: true, payload: results };
-    }, 'Failed to search profiles');
+    }, 'errors.profile.fetch');
   }
 }
-

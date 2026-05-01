@@ -4,7 +4,7 @@ import {
   InternalServerErrorException,
   Logger
 } from '@nestjs/common';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 
 export interface ProductVariant {
   id: string;
@@ -50,56 +50,40 @@ export enum EmailTemplate {
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
-  constructor(private readonly mailerService: MailerService) {}
+  constructor(
+    private readonly mailerService: MailerService,
+    private readonly err: I18nErrorHandler
+  ) {}
 
-  /**
-   * Gửi email bằng template
-   * @param to Email người nhận
-   * @param subject Tiêu đề email
-    * @param template Template name (nằm trong src/infrastructure/domain/common/templates/emails/)
-   * @param context Data để fill vào template
-   */
   async sendTemplateEmail(
     to: string,
     subject: string,
     template: EmailTemplate | string,
     context: EmailTemplateData
   ) {
-    return await funcHandlerAsync(
-      async () => {
-        await this.mailerService.sendMail({
-          to,
-          subject,
-          template,
-          context
-        });
-        this.logger.log(
-          `Email sent to ${to} with subject "${subject}" using template "${template}"`
-        );
-        return { success: true, message: 'Email sent successfully' };
-      },
-      'Failed to send template email',
-      true
-    );
+    return await this.err.wrap(async () => {
+      await this.mailerService.sendMail({
+        to,
+        subject,
+        template,
+        context
+      });
+      this.logger.log(
+        `Email sent to ${to} with subject "${subject}" using template "${template}"`
+      );
+      return { success: true, message: 'Email sent successfully' };
+    }, 'errors.mail.send_template');
   }
 
-  /**
-   * Gửi email đơn giản (plain text/html)
-   * @deprecated Dùng sendTemplateEmail thay vì
-   */
   async sendEmail(to: string, subject: string, text: string) {
-    return await funcHandlerAsync(
-      async () => {
-        await this.mailerService.sendMail({
-          to,
-          subject,
-          text
-        });
-        this.logger.log(`Email sent to ${to} with subject "${subject}"`);
-        return { success: true, message: 'Email sent successfully' };
-      },
-      'Failed to send email',
-      true
-    );
+    return await this.err.wrap(async () => {
+      await this.mailerService.sendMail({
+        to,
+        subject,
+        text
+      });
+      this.logger.log(`Email sent to ${to} with subject "${subject}"`);
+      return { success: true, message: 'Email sent successfully' };
+    }, 'errors.mail.send');
   }
 }

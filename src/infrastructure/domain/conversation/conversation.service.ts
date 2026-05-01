@@ -3,7 +3,7 @@ import { Output, UIMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
 
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Conversation } from 'src/domain/entities/conversation.entity';
 import { Message } from 'src/domain/entities/message.entity';
@@ -54,7 +54,8 @@ export class ConversationService {
     private readonly analysisHelper: AIAnalysisHelper,
     private readonly personalizationHelper: AIPersonalizationHelper,
     private readonly searchExecutorHelper: AISearchExecutorHelper,
-    private readonly responseBuilder: ConversationResponseBuilder
+    private readonly responseBuilder: ConversationResponseBuilder,
+    private readonly err: I18nErrorHandler
   ) {}
 
   // ==========================================
@@ -63,23 +64,23 @@ export class ConversationService {
 
   /** Lấy cuộc hội thoại theo ID */
   async getConversationById(id: string): Promise<BaseResponse<ConversationResponse>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const conversation = await this.unitOfWork.AIConversationRepo.findOne(
         { id },
         { populate: ['messages'] }
       );
       
       if (!conversation) {
-        return { success: false, error: 'Conversation not found' };
+        return this.err.fail('errors.conversation.not_found');
       }
 
       return { success: true, data: ConversationResponse.fromEntity(conversation)! };
-    }, 'Failed to get conversation');
+    }, 'errors.conversation.get_by_id');
   }
 
   /** Lấy tất cả cuộc hội thoại (Admin) */
   async getAllConversations(): Promise<BaseResponse<ConversationResponse[]>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const conversations = await this.unitOfWork.AIConversationRepo.findAll({
         populate: ['messages'],
         orderBy: { updatedAt: 'DESC' }
@@ -87,14 +88,14 @@ export class ConversationService {
 
       const data = conversations.map(c => ConversationResponse.fromEntity(c)!);
       return { success: true, data };
-    }, 'Failed to get conversations');
+    }, 'errors.conversation.get_all');
   }
 
   /** Lấy danh sách hội thoại có phân trang */
   async getAllConversationsPaginated(
     request: PagedConversationRequest
   ): Promise<BaseResponse<PagedResult<ConversationResponse>>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const filter = request.userId ? { userId: request.userId } : {};
       
       const pagedResult = await this.unitOfWork.AIConversationRepo.getPaged(
@@ -110,7 +111,7 @@ export class ConversationService {
           items: pagedResult.items.map(c => ConversationResponse.fromEntity(c)!).reverse() // Đảo ngược thứ tự để hiển thị mới nhất trước
         })
       };
-    }, 'Failed to get paginated conversations');
+    }, 'errors.conversation.get_paginated');
   }
 
   /** Cập nhật tin nhắn vào hội thoại */
@@ -118,7 +119,7 @@ export class ConversationService {
     id: string,
     messageRequests: ChatMessageRequest[]
   ): Promise<BaseResponse<MessageResponse[]>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const messages = messageRequests.map(req => {
         const entity = new Message();
         entity.sender = req.sender;
@@ -141,7 +142,7 @@ export class ConversationService {
 
       const data = messages.map(m => MessageResponse.fromEntity(m)!);
       return { success: true, data };
-    }, 'Failed to update messages');
+    }, 'errors.conversation.update_messages');
   }
 
   /** Lưu hoặc cập nhật hội thoại trực tiếp */
@@ -335,7 +336,7 @@ export class ConversationService {
     );
 
     if (!aiResult.success || !aiResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to generate AI response', {
+      this.err.throw('errors.conversation.chat', InternalServerErrorWithDetailsException, {
         userId: context.userId,
         conversationId: context.conversationId
       });

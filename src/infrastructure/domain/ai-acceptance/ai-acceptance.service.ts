@@ -2,7 +2,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
 import { Injectable, Logger } from '@nestjs/common';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { v4 as uuid } from 'uuid';
 import { AIAcceptanceContextType, AI_ACCEPTANCE_DEFAULT_VISIBLE_HOURS } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.constants';
 
@@ -39,7 +39,7 @@ export interface AIAcceptanceMetrics {
 export class AIAcceptanceService {
   private readonly logger = new Logger(AIAcceptanceService.name);
 
-  constructor(private unitOfWork: UnitOfWork) { }
+  constructor(private unitOfWork: UnitOfWork, private readonly err: I18nErrorHandler) { }
 
   private resolveVisibleAfterAt(visibleInHours?: number): Date {
     const hours = Number.isFinite(visibleInHours)
@@ -92,21 +92,21 @@ export class AIAcceptanceService {
       this.logger.log(`[AIAcceptance] Successfully created pending record with id=${record.id}`);
       return { success: true, data: record };
     } catch (error) {
-      this.logger.error('[AIAcceptance] createPendingResponseAcceptance failed', error);
-      this.logger.error(`[AIAcceptance] Input details: context=${input.contextType}, productIds=${input.productIds?.length ?? 0}, sourceRefId=${input.sourceRefId}`);
-      return { success: false, error: 'Failed to create pending AI acceptance record', details: error instanceof Error ? error.message : String(error) };
+      this.err.log('errors.ai.acceptance_create');
+      this.err.logWithDetail('errors.ai.acceptance_create', `context=${input.contextType}, productIds=${input.productIds?.length ?? 0}, sourceRefId=${input.sourceRefId}`);
+      return this.err.fail('errors.ai.acceptance_create');
     }
   }
 
   async markAcceptedByAcceptanceId(
     aiAcceptanceId: string
   ): Promise<BaseResponse<AIAcceptance>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const where: any = { id: aiAcceptanceId };
 
       const record = await this.unitOfWork.AIAcceptanceRepo.findOne(where);
       if (!record) {
-        return { success: false, error: 'AIAcceptance record not found' };
+        return this.err.fail('errors.ai.acceptance_not_found');
       }
 
       this.logger.log(`[AIAcceptance] Marking record id=${aiAcceptanceId} as accepted`);
@@ -118,29 +118,28 @@ export class AIAcceptanceService {
       this.logger.log(`[AIAcceptance] Successfully marked record id=${aiAcceptanceId} as accepted`);
 
       return { success: true, data: record };
-    }, 'Failed to mark AI acceptance as accepted');
+    }, 'errors.common.internal');
   }
 
   async getAllAIAcceptanceStatus(): Promise<BaseResponse<AIAcceptance[] | null>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll({
           orderBy: { updatedAt: 'DESC' }
         });
         if (!aiAcceptance) {
-          return { success: false, error: 'AIAcceptance record not found' };
+          return this.err.fail('errors.ai.acceptance_not_found');
         }
         return { success: true, data: aiAcceptance };
       },
-      'Failed to retrieve AI acceptance records',
-      true
+      'errors.common.internal'
     );
   }
 
   async getAIAcceptanceMetrics(
     contextType?: AIAcceptanceContextType
   ): Promise<BaseResponse<AIAcceptanceMetrics>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const where: any = {};
       if (contextType) where.contextType = contextType;
 
@@ -161,7 +160,7 @@ export class AIAcceptanceService {
       };
 
       return { success: true, data: metrics };
-    }, 'Failed to get AI acceptance metrics');
+    }, 'errors.common.internal');
   }
 
   async createAndAttachAIAcceptanceToProducts<T extends Record<string, any>>(
@@ -201,7 +200,7 @@ export class AIAcceptanceService {
 
       return { aiAcceptanceId, products: enrichedProducts as T[] };
     } catch (error) {
-      this.logger.error('[AIAcceptance] createAndAttachAIAcceptanceToProducts failed', error);
+      this.err.log('errors.ai.acceptance_create');
       return { aiAcceptanceId: null, products: input.products ?? [] };
     }
   }
@@ -230,7 +229,7 @@ export class AIAcceptanceService {
       await this.unitOfWork.AIAcceptanceRepo.getEntityManager().flush();
       this.logger.log(`[AIAcceptance] Successfully updated record id=${id}`);
     } else {
-      return { success: false, error: 'AIAcceptance record not found' };
+      return this.err.fail('errors.ai.acceptance_not_found');
     }
 
     return {

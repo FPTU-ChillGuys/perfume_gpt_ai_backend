@@ -4,9 +4,10 @@ import { UnitOfWorkModule } from 'src/infrastructure/domain/common/unit-of-work.
 import { LogTool } from 'src/chatbot/tools/log.tool';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from 'src/application/constant/processor';
+import { ProviderModule } from 'src/infrastructure/domain/common/provider.module';
 
 @Module({
-  imports: [
+  imports: [ProviderModule,
     UnitOfWorkModule,
     BullModule.registerQueue({ name: QueueName.USER_LOG_SUMMARY_QUEUE })
   ],

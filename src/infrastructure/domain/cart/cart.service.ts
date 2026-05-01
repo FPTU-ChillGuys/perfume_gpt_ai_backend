@@ -1,17 +1,21 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AddToCartRequest } from 'src/application/dtos/request/cart/add-to-cart.request';
 import { UpdateCartItemRequest } from 'src/application/dtos/request/cart/update-cart-item.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
+import { NotFoundWithDetailsException, BadRequestWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class CartService {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly err: I18nErrorHandler
+    ) { }
 
     async getCart(userId: string): Promise<BaseResponse<any>> {
-        return await funcHandlerAsync(async () => {
+        return this.err.wrap(async () => {
             const cartItems = await this.prisma.cartItems.findMany({
                 where: { UserId: userId },
                 include: {
@@ -50,22 +54,22 @@ export class CartService {
                     totalAmount,
                 },
             };
-        }, 'Failed to retrieve cart');
+        }, 'errors.cart.get');
     }
 
     async addToCart(userId: string, request: AddToCartRequest): Promise<BaseResponse<string>> {
-        return await funcHandlerAsync(async () => {
+        return this.err.wrap(async () => {
             const variant = await this.prisma.productVariants.findFirst({
                 where: { Id: request.variantId, IsDeleted: false },
                 include: { Stocks: true },
             });
 
             if (!variant) {
-                throw new NotFoundException('Product variant not found');
+                this.err.throw('errors.cart.not_found', NotFoundWithDetailsException);
             }
 
             if (variant.Status !== 'Active') {
-                throw new BadRequestException('Product variant is not available');
+                this.err.throw('errors.cart.variant_unavailable', BadRequestWithDetailsException);
             }
 
             const existingItem = await this.prisma.cartItems.findFirst({
@@ -75,7 +79,7 @@ export class CartService {
             const totalQuantity = existingItem ? existingItem.Quantity + request.quantity : request.quantity;
 
             if (!variant.Stocks || variant.Stocks.TotalQuantity < totalQuantity) {
-                throw new BadRequestException('Insufficient stock for the requested quantity');
+                this.err.throw('errors.cart.insufficient_stock', BadRequestWithDetailsException);
             }
 
             if (existingItem) {
@@ -96,18 +100,18 @@ export class CartService {
             });
 
             return { success: true, data: newItem.Id };
-        }, 'Failed to add item to cart');
+        }, 'errors.cart.add_item');
     }
 
     async updateCartItem(userId: string, cartItemId: string, request: UpdateCartItemRequest): Promise<BaseResponse<string>> {
-        return await funcHandlerAsync(async () => {
+        return this.err.wrap(async () => {
             const cartItem = await this.prisma.cartItems.findFirst({
                 where: { Id: cartItemId, UserId: userId },
                 include: { ProductVariants: { include: { Stocks: true } } },
             });
 
             if (!cartItem) {
-                throw new NotFoundException('Cart item not found');
+                this.err.throw('errors.cart.not_found', NotFoundWithDetailsException);
             }
 
             if (request.quantity <= 0) {
@@ -116,7 +120,7 @@ export class CartService {
             }
 
             if (!cartItem.ProductVariants.Stocks || cartItem.ProductVariants.Stocks.TotalQuantity < request.quantity) {
-                throw new BadRequestException('Insufficient stock for the requested quantity');
+                this.err.throw('errors.cart.insufficient_stock', BadRequestWithDetailsException);
             }
 
             await this.prisma.cartItems.update({
@@ -125,31 +129,31 @@ export class CartService {
             });
 
             return { success: true, data: cartItemId };
-        }, 'Failed to update cart item');
+        }, 'errors.cart.update');
     }
 
     async removeFromCart(userId: string, cartItemId: string): Promise<BaseResponse<string>> {
-        return await funcHandlerAsync(async () => {
+        return this.err.wrap(async () => {
             const cartItem = await this.prisma.cartItems.findFirst({
                 where: { Id: cartItemId, UserId: userId },
             });
 
             if (!cartItem) {
-                throw new NotFoundException('Cart item not found');
+                this.err.throw('errors.cart.not_found', NotFoundWithDetailsException);
             }
 
             await this.prisma.cartItems.delete({ where: { Id: cartItemId } });
             return { success: true, data: cartItemId };
-        }, 'Failed to remove item from cart');
+        }, 'errors.cart.remove');
     }
 
     async clearCart(userId: string): Promise<BaseResponse<string>> {
-        return await funcHandlerAsync(async () => {
+        return this.err.wrap(async () => {
             await this.prisma.cartItems.deleteMany({
                 where: { UserId: userId },
             });
 
             return { success: true, message: 'Cart cleared successfully' };
-        }, 'Failed to clear cart');
+        }, 'errors.cart.clear');
     }
 }

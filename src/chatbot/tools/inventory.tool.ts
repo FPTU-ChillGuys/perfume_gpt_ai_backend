@@ -3,7 +3,7 @@ import { tool, Tool } from 'ai';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { SlowStockService } from 'src/infrastructure/domain/slow-stock/slow-stock.service';
 import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import * as z from 'zod';
 
@@ -16,7 +16,8 @@ export class InventoryTool {
   constructor(
     private readonly inventoryPrismaRepo: InventoryPrismaRepository,
     private readonly restockService: RestockService,
-    private readonly slowStockService: SlowStockService
+    private readonly slowStockService: SlowStockService,
+    private readonly err: I18nErrorHandler
   ) { }
 
   /**
@@ -32,7 +33,7 @@ export class InventoryTool {
     inputSchema: z.object({}),
     execute: async () => {
       this.logger.log(`[getInventoryStock] called`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const stocks = await this.inventoryPrismaRepo.findAllStocksForTool();
 
@@ -54,8 +55,7 @@ export class InventoryTool {
           const encodingResult = encodeToolOutput(items);
           return { success: true, encodedData: encodingResult.encoded };
         },
-        'Error occurred while fetching inventory stock.',
-        true
+        'errors.inventory.tool_stock'
       );
     }
   });
@@ -72,7 +72,7 @@ export class InventoryTool {
     inputSchema: z.object({}),
     execute: async () => {
       this.logger.log(`[getProductSalesAnalyticsForTrend] called`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const result = await this.restockService.getProductSalesAnalyticsForTrendCandidates(
             this.trendAnalyticsProductLimit
@@ -87,8 +87,7 @@ export class InventoryTool {
           const encodingResult = encodeToolOutput(result.payload);
           return { success: true, encodedData: encodingResult.encoded };
         },
-        'Error occurred while fetching trend sales analytics candidates.',
-        true
+        'errors.inventory.tool_trend'
       );
     }
   });
@@ -109,7 +108,7 @@ export class InventoryTool {
     inputSchema: z.object({}),
     execute: async () => {
       this.logger.log(`[getProductSalesAnalyticsForRestock] called`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const result = await this.restockService.getProductSalesAnalyticsForRestockCandidates(
             this.restockAnalyticsProductLimit
@@ -124,8 +123,7 @@ export class InventoryTool {
           const encodingResult = encodeToolOutput(result.payload);
           return { success: true, encodedData: encodingResult.encoded };
         },
-        'Error occurred while fetching restock sales analytics candidates.',
-        true
+        'errors.inventory.tool_restock'
       );
     }
   });
@@ -139,7 +137,7 @@ export class InventoryTool {
     inputSchema: z.object({}),
     execute: async () => {
       this.logger.log(`[getSlowStockCandidates] called`);
-      return await funcHandlerAsync(
+      return await this.err.wrap(
         async () => {
           const result = await this.slowStockService.getSlowStockCandidates();
           if (!result.success || !result.payload) {
@@ -152,8 +150,7 @@ export class InventoryTool {
           const encodingResult = encodeToolOutput(result.payload);
           return { success: true, encodedData: encodingResult.encoded };
         },
-        'Error occurred while fetching slow stock candidates.',
-        true
+        'errors.inventory.tool_slow_stock'
       );
     }
   });

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 
 export interface UserEmailInfo {
   email: string;
@@ -16,10 +16,13 @@ export interface ActiveDailyRecommendationRecipient {
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   async getEmailById(userId: string): Promise<BaseResponseAPI<string>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const user = await this.prisma.aspNetUsers.findUnique({
           where: { Id: userId },
@@ -27,18 +30,14 @@ export class UserService {
         });
         return { success: true, payload: user?.Email ?? null };
       },
-      'Failed to fetch user email',
-      true
+      'errors.user.fetch_email'
     );
   }
 
-  /**
-   * Lấy email và userName của user
-   */
   async getUserEmailInfo(
     userId: string
   ): Promise<BaseResponseAPI<UserEmailInfo>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const user = await this.prisma.aspNetUsers.findUnique({
           where: { Id: userId },
@@ -57,14 +56,12 @@ export class UserService {
           }
         };
       },
-      'Failed to fetch user email info',
-      true
+      'errors.user.fetch_email_info'
     );
   }
 
-  //Lay tat ca userIds tu tat ca nguoi dung
   async getAllUserIds(): Promise<BaseResponseAPI<string[]>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const users = await this.prisma.aspNetUsers.findMany({
           select: { Id: true }
@@ -72,18 +69,14 @@ export class UserService {
         const userIds = users.map((user) => user.Id);
         return { success: true, payload: userIds };
       },
-      'Failed to fetch all user IDs',
-      true
+      'errors.user.fetch_all_ids'
     );
   }
 
-  /**
-   * Lấy danh sách user active có email hợp lệ cho luồng gửi recommendation hằng ngày.
-   */
   async getActiveUsersForDailyRecommendationEmail(): Promise<
     BaseResponseAPI<ActiveDailyRecommendationRecipient[]>
   > {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const users = await this.prisma.aspNetUsers.findMany({
           where: {
@@ -113,14 +106,10 @@ export class UserService {
           payload: recipients
         };
       },
-      'Failed to fetch active users for daily recommendation email',
-      true
+      'errors.user.fetch_active'
     );
   }
 
-  /**
-   * Lấy thông tin user theo userId
-   */
   async getUserById(userId: string): Promise<
     BaseResponseAPI<{
       id: string;
@@ -129,7 +118,7 @@ export class UserService {
       phoneNumber?: string;
     }>
   > {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const user = await this.prisma.aspNetUsers.findUnique({
           where: { Id: userId },
@@ -143,7 +132,7 @@ export class UserService {
         });
 
         if (!user) {
-          return { success: false, error: `User with ID ${userId} not found` };
+          return this.err.fail('errors.user.not_found');
         }
 
         return {
@@ -156,15 +145,14 @@ export class UserService {
           }
         };
       },
-      'Failed to fetch user information',
-      true
+      'errors.user.fetch_info'
     );
   }
 
   async isUserExistedByUserId(
     userId: string
   ): Promise<BaseResponseAPI<boolean>> {
-    return await funcHandlerAsync(
+    return await this.err.wrap(
       async () => {
         const user = await this.prisma.aspNetUsers.findUnique({
           where: { Id: userId },
@@ -172,14 +160,10 @@ export class UserService {
         });
         return { success: true, payload: !!user };
       },
-      'Failed to check user existence by ID',
-      true
+      'errors.user.check_existence'
     );
   }
 
-  /**
-   * Helper để định dạng tên hiển thị thân thiện
-   */
   private formatDisplayName(fullName?: string | null, userName?: string | null): string {
     if (fullName && fullName.trim().length > 0) {
       return fullName.trim();
@@ -187,7 +171,6 @@ export class UserService {
 
     if (userName && userName.trim().length > 0) {
       const name = userName.trim();
-      // Nếu username là một địa chỉ email, chỉ lấy phần trước @ để trông thân thiện hơn
       if (name.includes('@')) {
         return name.split('@')[0];
       }

@@ -9,9 +9,10 @@ import { SlowStockModule } from 'src/infrastructure/domain/slow-stock/slow-stock
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { SourcingModule } from 'src/infrastructure/domain/sourcing/sourcing.module';
 import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
+import { ProviderModule } from 'src/infrastructure/domain/common/provider.module';
 
 @Module({
-  imports: [UnitOfWorkModule, AIModule, AdminInstructionModule, RestockModule, SlowStockModule, PrismaModule, SourcingModule],
+  imports: [UnitOfWorkModule, AIModule, AdminInstructionModule, RestockModule, SlowStockModule, PrismaModule, SourcingModule, ProviderModule],
   providers: [InventoryService, InventoryTool, InventoryPrismaRepository],
   exports: [InventoryService, InventoryTool]
 })

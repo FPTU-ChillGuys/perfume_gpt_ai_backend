@@ -9,7 +9,7 @@ import {
 } from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
@@ -142,13 +142,14 @@ function mapToReviewListItemResponse(
 export class ReviewService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly unitOfWork: UnitOfWork
+    private readonly unitOfWork: UnitOfWork,
+    private readonly err: I18nErrorHandler
   ) {}
   
   async getAllReviews(
     request: GetPagedReviewRequest
   ): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const skip = (request.PageNumber - 1) * request.PageSize;
         const take = request.PageSize;
@@ -189,15 +190,14 @@ export class ReviewService {
         });
         return { success: true, payload: result };
       },
-      'Failed to fetch reviews',
-      true
+      'errors.review.get_paginated'
     );
   }
 
   async getReviewsByVariantId(
     variantId: string
   ): Promise<BaseResponseAPI<ReviewResponse[]>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         if (!isUUID(variantId)) {
           return { success: true, payload: [] };
@@ -208,15 +208,14 @@ export class ReviewService {
         });
         return { success: true, payload: reviews.map(mapToReviewResponse) };
       },
-      'Failed to fetch reviews',
-      true
+      'errors.review.get_paginated'
     );
   }
 
   async getReviewStatisticByVariantId(
     variantId: string
   ): Promise<BaseResponseAPI<ReviewStatisticsResponse>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         if (!isUUID(variantId)) {
           return {
@@ -264,8 +263,7 @@ export class ReviewService {
         };
         return { success: true, payload: stats };
       },
-      'Failed to fetch review statistics',
-      true
+      'errors.review.statistics'
     );
   }
 
@@ -274,7 +272,7 @@ export class ReviewService {
     variantId: string | null,
     reviewLog: string
   ): Promise<BaseResponseAPI<ReviewLog>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const log = new ReviewLog({
           typeReview: type,
@@ -284,28 +282,26 @@ export class ReviewService {
         const result = await this.unitOfWork.ReviewLogRepo.insert(log);
         return { success: true, payload: result };
       },
-      'Failed to add review log',
-      true
+      'errors.review.add_log'
     );
   }
 
   async getReviewLogsByVariantId(
     variantId: string
   ): Promise<BaseResponseAPI<ReviewLog[]>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const logs = await this.unitOfWork.ReviewLogRepo.find({ variantId });
         return { success: true, payload: logs };
       },
-      'Failed to fetch review logs',
-      true
+      'errors.review.fetch_logs'
     );
   }
 
   async getLatestReviewLogByVariantId(
     variantId: string
   ): Promise<BaseResponseAPI<ReviewLog | null>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const log = await this.unitOfWork.ReviewLogRepo.findOne(
           { variantId },
@@ -316,33 +312,30 @@ export class ReviewService {
         }
         return { success: true, payload: log };
       },
-      'Failed to fetch latest review log',
-      true
+      'errors.review.latest_log'
     );
   }
 
   async getReviewLogById(id: string): Promise<BaseResponseAPI<ReviewLog>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const log = await this.unitOfWork.ReviewLogRepo.findOne({ id });
         if (!log) {
-          return { success: false, error: 'Review log not found' };
+          return this.err.fail('errors.review.not_found');
         }
         return { success: true, payload: log };
       },
-      'Failed to fetch review log',
-      true
+      'errors.review.fetch_log'
     );
   }
 
   async getAllReviewLogs(): Promise<BaseResponseAPI<ReviewLog[]>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const result = await this.unitOfWork.ReviewLogRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
         return { success: true, payload: result };
       },
-      'Failed to fetch review logs',
-      true
+      'errors.review.fetch_logs'
     );
   }
 

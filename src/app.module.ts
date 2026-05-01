@@ -19,12 +19,20 @@ import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import * as path from 'path';
 import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
+import { I18nModule } from 'nestjs-i18n';
 
 @Module({
   imports: [
     PrismaModule,
     RedisModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    I18nModule.forRoot({
+      fallbackLanguage: 'vi',
+      loaderOptions: {
+        path: path.join(__dirname, '/i18n/'),
+        watch: true
+      }
+    }),
     AutomapperModule.forRoot({
       strategyInitializer: mikro(),
       namingConventions: new CamelCaseNamingConvention()

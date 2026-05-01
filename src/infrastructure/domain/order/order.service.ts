@@ -10,7 +10,7 @@ import {
   OrderListItemResponse,
   OrderResponse
 } from 'src/application/dtos/response/order.response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import ApiUrl from 'src/infrastructure/domain/common/api/api_url';
@@ -175,13 +175,14 @@ function buildOrderWhere(
 export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly httpService: HttpService
+    private readonly httpService: HttpService,
+    private readonly err: I18nErrorHandler
   ) { }
 
   async getAllOrders(
     request: OrderRequest
   ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err.wrap(async () => {
       const where = buildOrderWhere(request);
       const skip = (request.PageNumber - 1) * request.PageSize;
       const take = request.PageSize;
@@ -204,27 +205,27 @@ export class OrderService {
         totalPages: Math.ceil(totalCount / request.PageSize)
       });
       return { success: true, payload: result };
-    }, 'Failed to fetch all orders');
+    }, 'errors.order.fetch_all');
   }
 
   async getOrderById(orderId: string): Promise<BaseResponseAPI<OrderResponse>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err.wrap(async () => {
       const order = await this.prisma.orders.findUnique({
         where: { Id: orderId },
         include: orderDetailInclude
       });
       if (!order) {
-        return { success: false, error: 'Order not found' };
+        return this.err.fail('errors.order.not_found');
       }
       return { success: true, payload: mapOrderFull(order) };
-    }, 'Failed to fetch order details');
+    }, 'errors.order.fetch_detail');
   }
 
   async getOrdersByUserId(
     userId: string,
     request: OrderRequest
   ): Promise<BaseResponseAPI<PagedResult<OrderListItemResponse>>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err.wrap(async () => {
       const where = buildOrderWhere(request, userId);
       const skip = (request.PageNumber - 1) * request.PageSize;
       const take = request.PageSize;
@@ -247,31 +248,31 @@ export class OrderService {
         totalPages: Math.ceil(totalCount / request.PageSize)
       });
       return { success: true, payload: result };
-    }, 'Failed to fetch orders by user id');
+    }, 'errors.order.fetch_by_user');
   }
 
   async getOrderDetailsWithOrdersByUserId(
     userId: string
   ): Promise<BaseResponse<OrderResponse[]>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err.wrap(async () => {
       const orders = await this.prisma.orders.findMany({
         where: { CustomerId: userId },
         include: orderDetailInclude
       });
       return { success: true, data: orders.map(mapOrderFull) };
-    }, 'Failed to fetch order details with orders by user id', true);
+    }, 'errors.order.fetch_details_with_orders');
   }
 
   async getOrderReportFromGetOrderDetailsWithOrdersByUserId(
     userId: string
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(async () => {
+    return await this.err.wrap(async () => {
       const orders = await this.prisma.orders.findMany({
         where: { CustomerId: userId },
         include: orderDetailInclude
       });
       if (orders.length === 0) {
-        return { success: false, error: 'No orders found for the user' };
+        return this.err.fail('errors.order.no_orders');
       }
       const report = orders
         .map((o) => {
@@ -280,6 +281,6 @@ export class OrderService {
         })
         .join('\n----------------\n');
       return { success: true, data: report };
-    }, 'Failed to create order report');
+    }, 'errors.order.create_report');
   }
 }

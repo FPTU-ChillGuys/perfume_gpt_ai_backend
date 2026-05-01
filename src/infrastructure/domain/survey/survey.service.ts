@@ -1,7 +1,7 @@
 import { InjectMapper } from '@automapper/nestjs';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { Mapper } from '@automapper/core';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { SurveyAnswerRequest } from 'src/application/dtos/request/survey-answer.request';
 import { CreateQuestionFromAttributeRequest } from 'src/infrastructure/domain/survey/survey-query.types';
@@ -64,21 +64,21 @@ export class SurveyService {
     private unitOfWork: UnitOfWork,
     // Helpers
     private readonly productHelper: SurveyProductHelper,
-    private readonly pipelineHelper: SurveyPipelineHelper
+    private readonly pipelineHelper: SurveyPipelineHelper,
+    private readonly err: I18nErrorHandler
   ) { }
 
 
   async addSurveyQues(
     question: SurveyQuestionRequest
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const surveyQuestion =
           await this.unitOfWork.AISurveyQuestionRepo.createWithAnswers(question);
         return { success: true, data: surveyQuestion.id };
       },
-      'Failed to add survey question and answers',
-      true
+      'errors.survey.add_question_answers'
     );
   }
 
@@ -96,10 +96,7 @@ export class SurveyService {
         const group = attrValues.subGroups.find(g => g.attributeName === body.attributeName);
         allValues = group?.values || [];
       } else {
-        throw new BadRequestWithDetailsException(
-          'attributeName is required when attributeType is "attribute"',
-          { attributeType: body.attributeType }
-        );
+        this.err.throw('errors.survey.invalid_attribute', BadRequestWithDetailsException, { attributeType: body.attributeType });
       }
     }
 
@@ -118,20 +115,14 @@ export class SurveyService {
     }
 
     if (allValues.length < 2) {
-      throw new BadRequestWithDetailsException(
-        'Cần ít nhất 2 giá trị để tạo câu hỏi',
-        { availableValues: allValues.length }
-      );
+      this.err.throw('errors.survey.min_values', BadRequestWithDetailsException, { availableValues: allValues.length });
     }
 
     // 4. Validate all query fragments
     for (const val of allValues) {
       const validation = this.pipelineHelper.validateQueryFragment(val.queryFragment);
       if (!validation.valid) {
-        throw new BadRequestWithDetailsException(
-          `Invalid query fragment for "${val.displayText}": ${validation.errors.join(', ')}`,
-          { displayText: val.displayText, errors: validation.errors }
-        );
+        this.err.throw('errors.survey.invalid_query_fragment', BadRequestWithDetailsException, { displayText: val.displayText, errors: validation.errors });
       }
     }
 
@@ -154,14 +145,14 @@ export class SurveyService {
     id: string,
     request: SurveyQuestionRequest
   ): Promise<BaseResponse<SurveyQuestionResponse>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const surveyQuestion = await this.unitOfWork.AISurveyQuestionRepo.findOne({
         id,
         isActive: true
       });
 
       if (!surveyQuestion) {
-        return { success: false, error: 'Survey question not found' };
+        return this.err.fail('errors.survey.not_found');
       }
 
       if (request.question !== undefined) {
@@ -182,13 +173,13 @@ export class SurveyService {
         success: true,
         data: SurveyQuestionMapper.toResponse(updatedSurveyQuestion)
       };
-    }, 'Failed to update survey answer', true);
+    }, 'errors.survey.update_answer');
   }
 
   async getSurveyQuesById(
     id: string
   ): Promise<BaseResponse<SurveyQuestionResponse>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const surveyQuestion = await this.unitOfWork.AISurveyQuestionRepo.findOne(
         {
           id,
@@ -197,19 +188,19 @@ export class SurveyService {
         { populate: ['answers'] }
       );
       if (!surveyQuestion) {
-        return { success: false, error: 'Survey question not found' };
+        return this.err.fail('errors.survey.not_found');
       }
 
       const surveyQuestionResponse = SurveyQuestionMapper.toResponse(surveyQuestion, true);
 
       return { success: true, data: surveyQuestionResponse };
-    }, 'Failed to get survey question by id');
+    }, 'errors.survey.get_by_id');
   }
 
   async getSurveyQuesByIdList(
     ids: string[]
   ): Promise<BaseResponse<SurveyQuestionResponse[]>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const surveyQuestions = await this.unitOfWork.AISurveyQuestionRepo.find(
         { id: { $in: ids }, isActive: true },
         { populate: ['answers'] }
@@ -217,11 +208,11 @@ export class SurveyService {
       const surveyQuestionsResponses =
         SurveyQuestionMapper.toResponseList(surveyQuestions, true);
       return { success: true, data: surveyQuestionsResponses };
-    }, 'Failed to get survey questions by id list');
+    }, 'errors.survey.get_by_id_list');
   }
 
   async getAllSurveyQues(): Promise<BaseResponse<SurveyQuestionResponse[]>> {
-    return await funcHandlerAsync(
+    return this.err.wrap(
       async () => {
         const surveyQuestions = await this.unitOfWork.AISurveyQuestionRepo.find(
           { isActive: true },
@@ -233,15 +224,14 @@ export class SurveyService {
 
         return { success: true, data: surveyQuestionsResponses };
       },
-      'Failed to get all survey questions',
-      true
+      'errors.survey.get_questions'
     );
   }
 
   async addSurveyQuesAnws(
     surveyQuesAnws: SurveyQuesAnwsRequest
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const quesAns = await this.mappingFromRequestToEntity(surveyQuesAnws);
 
       const surveyQuestionAnswer =
@@ -265,13 +255,13 @@ export class SurveyService {
       );
 
       return { success: true, data: savedQuesAns };
-    }, 'Failed to add survey question answer', true);
+    }, 'errors.survey.create_answer');
   }
 
   async getAllSurveyQuesAnws(): Promise<
     BaseResponse<SurveyQuestionAnswerResponse[]>
   > {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const surveyQuestionAnswers =
         await this.unitOfWork.AISurveyQuestionAnswerRepo.findAll({
           populate: ['details', 'details.question', 'details.answer'],
@@ -282,32 +272,32 @@ export class SurveyService {
         SurveyQuestionAnswerMapper.toResponseList(surveyQuestionAnswers, true);
 
       return { success: true, data: surveyQuestionAnswersResponses };
-    }, 'Failed to get all survey question answers');
+    }, 'errors.survey.get_all_answers');
   }
 
   async getSurveyQuesAnwsById(
     id: string
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const surveyQuestionAnswer =
         await this.unitOfWork.AISurveyQuestionAnswerRepo.findOne(
           { id },
           { populate: ['details', 'details.question', 'details.answer'] }
         );
       if (!surveyQuestionAnswer) {
-        return { success: false, error: 'Survey question answer not found' };
+        return this.err.fail('errors.survey.answer_not_found');
       }
       return {
         success: true,
         data: SurveyQuestionAnswerMapper.toResponse(surveyQuestionAnswer, true)
       };
-    }, 'Failed to get survey question answer by id');
+    }, 'errors.survey.get_answer_by_id');
   }
 
   async getSurveyQuesAnwsByUserId(
     userId: string, limit: number = 1
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const surveyQuestionAnswers =
         await this.unitOfWork.AISurveyQuestionAnswerRepo.find(
           { userId },
@@ -320,20 +310,20 @@ export class SurveyService {
 
       const surveyQuestionAnswer = surveyQuestionAnswers[0];
       if (!surveyQuestionAnswer) {
-        return { success: false, error: 'Survey question answer not found' };
+        return this.err.fail('errors.survey.answer_not_found');
       }
       return {
         success: true,
         data: SurveyQuestionAnswerMapper.toResponse(surveyQuestionAnswer, true)
       };
     }
-      , 'Failed to get survey question answer by user id');
+      , 'errors.survey.get_answer_by_user');
   }
 
   async getSurveyHistoryListByUserId(
     userId: string
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse[]>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const surveyQuestionAnswers =
         await this.unitOfWork.AISurveyQuestionAnswerRepo.find(
           { userId },
@@ -346,7 +336,7 @@ export class SurveyService {
 
       const responses = SurveyQuestionAnswerMapper.toResponseList(surveyQuestionAnswers, true);
       return { success: true, data: responses };
-    }, 'Failed to get survey history list by user id');
+    }, 'errors.survey.get_history');
   }
 
   async getLatestSurveyQuesAnwsByUserId(
@@ -362,18 +352,18 @@ export class SurveyService {
   }
 
   async reorderQuestions(orders: { id: string; order: number }[]): Promise<BaseResponse<void>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       for (const item of orders) {
         const question = await this.unitOfWork.AISurveyQuestionRepo.findOne({ id: item.id, isActive: true });
         if (!question) {
-          return { success: false, error: `Survey question with id ${item.id} not found` };
+          return this.err.fail('errors.survey.not_found_with_id', { id: item.id });
         }
         question.order = item.order;
       }
       await this.unitOfWork.AISurveyQuestionRepo.getEntityManager().flush();
       await this.unitOfWork.AISurveyQuestionRepo.rebuildOrder();
       return { success: true, data: undefined };
-    }, 'Failed to reorder survey questions', true);
+    }, 'errors.survey.reorder');
   }
 
   async mappingFromRequestToEntity(
@@ -386,7 +376,7 @@ export class SurveyService {
           { populate: ['answers'] }
         );
         if (!question) {
-          throw new Error(`Survey question with id ${item.questionId} not found`);
+          this.err.throw('errors.survey.not_found_with_id', InternalServerErrorWithDetailsException, { id: item.questionId });
         }
         const answer = question.answers.find(
           (ans) => ans.id === item.answerId
@@ -406,14 +396,14 @@ export class SurveyService {
 
   /** Soft delete câu hỏi survey và tất cả câu trả lời liên quan */
   async softDeleteQuestion(id: string): Promise<BaseResponse<void>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const deleted = await this.unitOfWork.AISurveyQuestionRepo.softDeleteQuestion(id);
       if (!deleted) {
-        return { success: false, error: 'Survey question not found or already deleted' };
+        return this.err.fail('errors.survey.not_found_or_deleted');
       }
       await this.unitOfWork.AISurveyQuestionRepo.rebuildOrder();
       return { success: true, data: undefined };
-    }, 'Failed to delete survey question', true);
+    }, 'errors.survey.delete_question');
   }
 
   /** Xử lý survey, lưu kết quả trực tiếp, và trả về gợi ý AI (V1 — legacy) */
@@ -425,7 +415,7 @@ export class SurveyService {
     const questionIds = surveyAnswers.map((qa) => qa.questionId);
     const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQueses.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get survey question', { questionIds });
+      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
     }
 
     const quesAnses = this.pipelineHelper.mapSurveyAnswersToQA(surveyAnswers, surveyQueses.data || []);
@@ -437,7 +427,7 @@ export class SurveyService {
     const aiResponsePayload = await this.pipelineHelper.generateV1Recommendation(quesAnses);
 
     if (!aiResponsePayload.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI response', { userId, service: 'AIHelper' });
+      this.err.throw('errors.survey.ai_response', InternalServerErrorWithDetailsException, { userId, service: 'AIHelper' });
     }
     if (!aiResponsePayload.data) {
       return Ok('');
@@ -471,7 +461,7 @@ export class SurveyService {
     const questionIds = surveyAnswers.map((qa) => qa.questionId);
     const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQueses.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get survey question', { questionIds });
+      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
     }
 
     const quesAnses = this.pipelineHelper.mapSurveyAnswersToQA(surveyAnswers, surveyQueses.data || []);
@@ -532,12 +522,12 @@ export class SurveyService {
     const questionIds = surveyAnswers.map((qa) => qa.questionId);
     const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQueses.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get survey question', { questionIds });
+      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
     }
 
     const quesAnses = this.pipelineHelper.mapSurveyAnswersToQAWithId(surveyAnswers, surveyQueses.data || []);
     if (quesAnses.length === 0) {
-      throw new InternalServerErrorWithDetailsException('No valid question-answer pairs found', { surveyAnswers });
+      this.err.throw('errors.survey.no_valid_qa', InternalServerErrorWithDetailsException, { surveyAnswers });
     }
 
     // Step 2: Save survey record
@@ -558,7 +548,7 @@ export class SurveyService {
           queryResults.push({ questionId: qa.questionId, products });
         }
       } catch (error) {
-        this.logger.error(`[SurveyPerQuestion] Error processing question "${qa.question.substring(0, 30)}...":`, error);
+        this.err.log('errors.survey.per_question');
         queryResults.push({ questionId: qa.questionId, products: [] });
       }
     }
@@ -601,7 +591,7 @@ export class SurveyService {
     const questionIds = [...new Set(surveyAnswers.map(qa => qa.questionId))];
     const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQueses.success || !surveyQueses.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to get survey questions', { questionIds });
+      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
     }
 
     // Step 2: Parse query fragments from answers
@@ -662,7 +652,7 @@ export class SurveyService {
     const questionIds = [...new Set(surveyAnswers.map(qa => qa.questionId))];
     const surveyQuesesResponse = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQuesesResponse.success || !surveyQuesesResponse.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to get survey questions', { questionIds });
+      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
     }
 
     // Step 2: Hybrid Answer Analysis (Parse JSON or Call AI)
@@ -718,7 +708,7 @@ export class SurveyService {
       new SurveyQuesAnwsRequest({ userId, details: surveyAnswers })
     );
     if (!savedResponse.success || !savedResponse.data?.id) {
-      throw new InternalServerErrorWithDetailsException('Failed to save survey question answers', { userId });
+      this.err.throw('errors.survey.save_answers', InternalServerErrorWithDetailsException, { userId });
     }
     await this.pipelineHelper.logSurveyRecord(userId, savedResponse.data.id);
     return savedResponse.data.id;
@@ -833,7 +823,7 @@ export class SurveyService {
           queryResults.push({ questionId, products });
         }
       } catch (error) {
-        this.logger.error(`[SurveyV4] Error processing question "${entry.question.substring(0, 30)}...":`, error);
+        this.err.log('errors.survey.per_question');
         queryResults.push({ questionId, products: [] });
       }
     }
@@ -979,7 +969,7 @@ export class SurveyService {
           queryResults.push({ questionId: item.questionId, products: [] });
         }
       } catch (error) {
-        this.logger.error(`[SurveyV5] Error processing question "${item.question.substring(0, 30)}...":`, error);
+        this.err.log('errors.survey.per_question');
         queryResults.push({ questionId: item.questionId, products: [] });
       }
     }

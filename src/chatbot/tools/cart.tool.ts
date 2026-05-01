@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tool, Tool } from 'ai';
 import { CartService } from 'src/infrastructure/domain/cart/cart.service';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import * as z from 'zod';
 
 @Injectable()
 export class CartTool {
     private readonly logger = new Logger(CartTool.name);
 
-    constructor(private readonly cartService: CartService) { }
+    constructor(private readonly cartService: CartService, private readonly err: I18nErrorHandler) { }
 
     addToCart: Tool = tool({
         description: 'Add one or more product variants to the user\'s shopping cart. ' +
@@ -23,7 +23,7 @@ export class CartTool {
         }),
         execute: async (input) => {
             this.logger.log(`[addToCart] called for user ${input.userId} with ${input.items.length} items`);
-            return await funcHandlerAsync(
+            return await this.err.wrap(
                 async () => {
                     const results: any[] = [];
                     for (const item of input.items) {
@@ -39,8 +39,7 @@ export class CartTool {
                     }
                     return { success: true, data: results };
                 },
-                'Error occurred while adding items to cart.',
-                true,
+                'errors.cart.tool_add'
             );
         },
     });
@@ -53,13 +52,12 @@ export class CartTool {
         }),
         execute: async (input) => {
             this.logger.log(`[getCart] called for user ${input.userId}`);
-            return await funcHandlerAsync(
+            return await this.err.wrap(
                 async () => {
                     const response = await this.cartService.getCart(input.userId);
                     return response;
                 },
-                'Error occurred while fetching cart items.',
-                true,
+                'errors.cart.tool_get'
             );
         },
     });
@@ -71,13 +69,12 @@ export class CartTool {
         }),
         execute: async (input) => {
             this.logger.log(`[clearCart] called for user ${input.userId}`);
-            return await funcHandlerAsync(
+            return await this.err.wrap(
                 async () => {
                     const response = await this.cartService.clearCart(input.userId);
                     return response;
                 },
-                'Error occurred while clearing cart.',
-                true,
+                'errors.cart.tool_clear'
             );
         },
     });

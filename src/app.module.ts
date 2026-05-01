@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { AutomapperModule } from '@automapper/nestjs';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import defineConfig from '../mikro-orm.config';
+import { I18nErrorHandlerModule } from './infrastructure/domain/common/i18n.module';
 import { ProviderModule } from './infrastructure/domain/common/provider.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -29,7 +30,7 @@ import { I18nModule } from 'nestjs-i18n';
     I18nModule.forRoot({
       fallbackLanguage: 'vi',
       loaderOptions: {
-        path: path.join(__dirname, '/i18n/'),
+        path: path.join(__dirname, '..', 'i18n'),
         watch: true
       }
     }),
@@ -37,6 +38,7 @@ import { I18nModule } from 'nestjs-i18n';
       strategyInitializer: mikro(),
       namingConventions: new CamelCaseNamingConvention()
     }),
+    I18nErrorHandlerModule,
     ProviderModule,
     MikroOrmModule.forRootAsync({
       imports: [ConfigModule],

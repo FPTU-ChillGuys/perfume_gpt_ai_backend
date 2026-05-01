@@ -15,11 +15,8 @@ import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/su
 import { SurveyInputHelper } from 'src/infrastructure/domain/survey/helpers/survey-input.helper';
 import { SurveyProductHelper } from 'src/infrastructure/domain/survey/helpers/survey-product.helper';
 import { SurveyPipelineHelper } from 'src/infrastructure/domain/survey/helpers/survey-pipeline.helper';
-import { ProviderModule } from 'src/infrastructure/domain/common/provider.module';
-
 @Module({
-  imports: [ProviderModule,
-    UnitOfWorkModule,
+  imports: [UnitOfWorkModule,
     AIModule,
     AdminInstructionModule,
     UserLogModule,

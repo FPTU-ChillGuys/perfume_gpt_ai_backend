@@ -3,10 +3,8 @@ import { ReviewAIService } from 'src/infrastructure/domain/review/review-ai.serv
 import { ReviewModule } from 'src/infrastructure/domain/review/review.module';
 import { AdminInstructionModule } from 'src/infrastructure/domain/admin-instruction/admin-instruction.module';
 import { AIModule } from 'src/infrastructure/domain/ai/ai.module';
-import { ProviderModule } from 'src/infrastructure/domain/common/provider.module';
-
 @Module({
-  imports: [ReviewModule, AdminInstructionModule, AIModule, ProviderModule],
+  imports: [ReviewModule, AdminInstructionModule, AIModule],
   providers: [ReviewAIService],
   exports: [ReviewAIService]
 })

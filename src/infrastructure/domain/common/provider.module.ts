@@ -19,8 +19,6 @@ import { CacheableMemory, Keyv } from 'cacheable';
 import KeyvRedis from '@keyv/redis';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { CacheableModule } from './cacheable/cacheable.module';
-import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
-
 const registerQueue = BullModule.registerQueue(
   ...Object.values(QueueName).map((value) => ({ name: value }))
 );
@@ -55,7 +53,7 @@ const registerQueue = BullModule.registerQueue(
     AIAcceptanceController,
     AdminInstructionController,
   ],
-  providers: [I18nErrorHandler],
-  exports: [I18nErrorHandler, ...modules]
+  providers: [],
+  exports: [...modules]
 })
 export class ProviderModule { }

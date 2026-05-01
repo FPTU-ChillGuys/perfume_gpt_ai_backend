@@ -14,8 +14,6 @@ import {
   aiModelForReview,
   aiModelForTrend
 } from 'src/chatbot/ai-model';
-import { ProviderModule } from 'src/infrastructure/domain/common/provider.module';
-
 export const AI_HELPER = 'AI_HELPER';
 export const AI_CONVERSATION_HELPER = 'AI_CONVERSATION_HELPER';
 export const AI_TREND_HELPER = 'AI_TREND_HELPER';
@@ -186,7 +184,7 @@ const aiInventoryReportProvider: Provider = {
 };
 
 @Module({
-  imports: [ProviderModule, UnitOfWorkModule, ToolModule, HttpModule],
+  imports: [UnitOfWorkModule, ToolModule, HttpModule],
   providers: [
     AiAnalysisService,
     RerankService,

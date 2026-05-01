@@ -1,15 +1,15 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DictionaryBuilderService } from './dictionary-builder.service';
 import { NaturalNlpService } from './natural-nlp.service';
 import { NlpEngineService } from './nlp-engine.service';
 import { MasterDataService } from './master-data.service';
 import { PrismaModule } from 'src/prisma/prisma.module';
-import { DictionaryController } from 'src/api/controllers/dictionary.controller';
 import { VocabularySnapshotService } from './vocabulary-snapshot.service';
 import { AliasPatternsHelper } from './helpers/alias-patterns.helper';
 import { AliasNgramHelper } from './helpers/alias-ngram.helper';
 import { AliasAiEnrichmentProcessor } from './alias-ai-enrichment.processor';
+import { VocabBm25SearchService } from './vocab-bm25.service';
 
 @Module({
   imports: [PrismaModule, ConfigModule],
@@ -21,22 +21,25 @@ import { AliasAiEnrichmentProcessor } from './alias-ai-enrichment.processor';
     VocabularySnapshotService,
     AliasPatternsHelper,
     AliasNgramHelper,
-    AliasAiEnrichmentProcessor
+    AliasAiEnrichmentProcessor,
+    VocabBm25SearchService
   ],
-  controllers: [DictionaryController],
   exports: [
     DictionaryBuilderService,
     NaturalNlpService,
     NlpEngineService,
+    VocabularySnapshotService,
     AliasPatternsHelper,
-    AliasNgramHelper
+    AliasNgramHelper,
+    VocabBm25SearchService
   ]
 })
 export class DictionaryModule implements OnModuleInit {
   constructor(
     private readonly dictionaryBuilderService: DictionaryBuilderService,
     private readonly nlpEngineService: NlpEngineService,
-    private readonly vocabularySnapshotService: VocabularySnapshotService
+    private readonly vocabularySnapshotService: VocabularySnapshotService,
+    @Optional() private readonly vocabBm25SearchService?: VocabBm25SearchService
   ) {}
 
   async onModuleInit() {
@@ -73,6 +76,14 @@ export class DictionaryModule implements OnModuleInit {
       console.log(
         '[DictionaryModule] NLP engine initialized and ready (natural)'
       );
+
+      if (this.vocabBm25SearchService) {
+        this.vocabBm25SearchService.refreshView().catch(() => {
+          console.warn(
+            '[DictionaryModule] Failed to refresh vocab_search view'
+          );
+        });
+      }
     } catch (error) {
       console.error(`[DictionaryModule] Failed to initialize: ${error}`);
     }

@@ -40,6 +40,7 @@ import { AIAnalysisHelper } from './helpers/ai-analysis.helper';
 import { AIPersonalizationHelper } from './helpers/ai-personalization.helper';
 import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
 import { ConversationResponseBuilder } from './helpers/conversation-response.builder';
+import { NlpQueryMapper } from './helpers/nlp-query-mapper.helper';
 
 /**
  * Service quản lý cuộc hội thoại giữa người dùng và AI.
@@ -61,6 +62,7 @@ export class ConversationService {
     private readonly personalizationHelper: AIPersonalizationHelper,
     private readonly searchExecutorHelper: AISearchExecutorHelper,
     private readonly responseBuilder: ConversationResponseBuilder,
+    private readonly nlpQueryMapper: NlpQueryMapper,
     private readonly err: I18nErrorHandler
   ) {}
 
@@ -381,14 +383,50 @@ export class ConversationService {
       'Task',
       'Other'
     ].includes(analysis.intent);
+
+    let effectiveQueries = analysis.queries;
+
+    // NLP fallback: if AI has no queries but intent is search-related, use NLP
     if (
       shouldQuery &&
-      Array.isArray(analysis.queries) &&
-      analysis.queries.length > 0
+      (!Array.isArray(effectiveQueries) || effectiveQueries.length === 0)
+    ) {
+      const nlpQueries = this.nlpQueryMapper.mapToQueries(
+        analysis.originalRequestVietnamese || '',
+        analysis.intent
+      );
+      if (nlpQueries && nlpQueries.length > 0) {
+        this.logger.log(
+          `[Conversation] AI queries empty for intent="${analysis.intent}", using NLP fallback`
+        );
+        effectiveQueries = nlpQueries;
+      }
+    } else if (
+      shouldQuery &&
+      Array.isArray(effectiveQueries) &&
+      effectiveQueries.length > 0
+    ) {
+      // OR-merge: combine AI queries with NLP results
+      const nlpQueries = this.nlpQueryMapper.mapToQueries(
+        analysis.originalRequestVietnamese || '',
+        analysis.intent
+      );
+      if (nlpQueries && nlpQueries.length > 0) {
+        effectiveQueries = this.nlpQueryMapper.mergeQueries(
+          effectiveQueries,
+          nlpQueries
+        );
+      }
+    }
+
+    if (
+      shouldQuery &&
+      Array.isArray(effectiveQueries) &&
+      effectiveQueries.length > 0
     ) {
       const { mergedProducts, taskResults } =
         await this.searchExecutorHelper.executeMultiQueries(
-          analysis.queries,
+          effectiveQueries,
           analysis,
           context.userId,
           context.isGuestUser,

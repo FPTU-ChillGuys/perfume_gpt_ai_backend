@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { WordTokenizer, JaroWinklerDistance, NGrams } from 'natural';
 import { DictionaryBuilderService } from './dictionary-builder.service';
 import {
@@ -8,6 +8,8 @@ import {
   ParserRuleSnapshot,
   PhraseRuleSnapshot
 } from 'src/domain/types/dictionary.types';
+import { VocabBm25SearchService } from './vocab-bm25.service';
+import { VocabBm25Result } from 'src/application/dtos/response/dictionary/vocab-bm25-result';
 
 type Mapping = { type: EntityType; canonical: string; confidence: number };
 
@@ -62,7 +64,8 @@ export class NaturalNlpService {
   private isInitialized = false;
 
   constructor(
-    private readonly dictionaryBuilderService: DictionaryBuilderService
+    private readonly dictionaryBuilderService: DictionaryBuilderService,
+    @Optional() private readonly vocabBm25SearchService?: VocabBm25SearchService
   ) {}
 
   async initializeWithDictionary(): Promise<void> {
@@ -79,6 +82,82 @@ export class NaturalNlpService {
 
   isReady(): boolean {
     return this.isInitialized;
+  }
+
+  private async findBm25Matches(
+    remainingText: string,
+    matchedValues: Set<string>,
+    reverseMap: Record<
+      string,
+      { type: EntityType; canonical: string; confidence: number }
+    >
+  ): Promise<Array<{ value: string; raw: string; mapping: Mapping }>> {
+    if (!this.vocabBm25SearchService) {
+      return [];
+    }
+
+    try {
+      const tokens = this.tokenizer.tokenize(remainingText);
+      const matches: Array<{ value: string; raw: string; mapping: Mapping }> =
+        [];
+      const seenCanonicals = new Set<string>();
+
+      for (const token of tokens) {
+        if (!token || token.length < 2) continue;
+        if (GENERIC_FUZZY_TOKENS.has(token)) continue;
+        if (reverseMap[token]) continue;
+
+        const results = await this.vocabBm25SearchService.search(token, 3);
+        for (const result of results) {
+          if (
+            matchedValues.has(result.canonical) ||
+            seenCanonicals.has(result.canonical)
+          ) {
+            continue;
+          }
+
+          const validEntityTypes: EntityType[] = [
+            'brand',
+            'category',
+            'concentration',
+            'olfactory_family',
+            'scent_note',
+            'attribute_category',
+            'attribute_value',
+            'product_name',
+            'gender',
+            'origin',
+            'variant_type'
+          ];
+
+          if (!validEntityTypes.includes(result.entityType)) {
+            continue;
+          }
+
+          seenCanonicals.add(result.canonical);
+          matches.push({
+            value: result.canonical,
+            raw: result.canonical,
+            mapping: {
+              type: result.entityType,
+              canonical: result.canonical,
+              confidence: Math.min(0.98, 0.9 + result.score)
+            }
+          });
+
+          if (seenCanonicals.size >= 5) break;
+        }
+
+        if (seenCanonicals.size >= 5) break;
+      }
+
+      return matches;
+    } catch (error) {
+      this.logger.warn(
+        `[NaturalNLP] BM25 search failed: ${(error as Error).message}`
+      );
+      return [];
+    }
   }
 
   extractEntities(text: string): string[] {
@@ -109,7 +188,7 @@ export class NaturalNlpService {
     return Array.from(found);
   }
 
-  parseAndNormalize(text: string): Record<string, any> {
+  async parseAndNormalize(text: string): Promise<Record<string, any>> {
     if (!this.isInitialized) {
       throw new Error('NaturalNlpService not initialized');
     }
@@ -164,6 +243,18 @@ export class NaturalNlpService {
       normalizedText,
       Array.from(matchedValues).concat(signals.consumedTerms)
     );
+
+    const bm25Matches = await this.findBm25Matches(
+      remainingText,
+      matchedValues,
+      reverseMap
+    );
+    for (const match of bm25Matches) {
+      if (!matchedValues.has(match.value)) {
+        matchedValues.add(match.value);
+        this.appendNormalizedResult(result, match.mapping, match.raw);
+      }
+    }
 
     const fuzzyMatches = this.findFuzzyNgramMatches(
       remainingText,

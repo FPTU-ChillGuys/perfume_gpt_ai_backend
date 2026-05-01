@@ -17,6 +17,7 @@ import { AIPersonalizationHelper } from './helpers/ai-personalization.helper';
 import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
 import { ConversationInputHelper } from './helpers/conversation-input.helper';
 import { ConversationResponseBuilder } from './helpers/conversation-response.builder';
+import { NlpQueryMapper } from './helpers/nlp-query-mapper.helper';
 @Module({
   imports: [
     UnitOfWorkModule,
@@ -38,14 +39,16 @@ import { ConversationResponseBuilder } from './helpers/conversation-response.bui
     AIPersonalizationHelper,
     AISearchExecutorHelper,
     ConversationInputHelper,
-    ConversationResponseBuilder
+    ConversationResponseBuilder,
+    NlpQueryMapper
   ],
   exports: [
     ConversationService,
     AIAnalysisHelper,
     AIPersonalizationHelper,
     AISearchExecutorHelper,
-    ConversationInputHelper
+    ConversationInputHelper,
+    NlpQueryMapper
   ]
 })
 export class ConversationModule {}

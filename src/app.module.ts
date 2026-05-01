@@ -21,6 +21,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import * as path from 'path';
 import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
 import { I18nModule } from 'nestjs-i18n';
+import { AdminMaintenanceModule } from './api/controllers/modules/admin-maintenance.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { I18nModule } from 'nestjs-i18n';
     }),
     I18nErrorHandlerModule,
     ProviderModule,
+    AdminMaintenanceModule,
     MikroOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

@@ -16,6 +16,7 @@ import { VocabDictionary } from 'src/domain/entities/vocab/vocab-dictionary.enti
 import { VocabParserRule } from 'src/domain/entities/vocab/vocab-parser-rule.entity';
 import { VocabPhraseRule } from 'src/domain/entities/vocab/vocab-phrase-rule.entity';
 import { VocabTerm } from 'src/domain/entities/vocab/vocab-term.entity';
+import parseRulesSeed from 'src/application/seeds/parse-rules.seed.json';
 
 type SerializedNumericPattern = Omit<NumericPattern, 'regex'> & {
   regex: { source: string; flags: string };
@@ -116,15 +117,15 @@ export class VocabularySnapshotService {
         }
       }
 
-      for (const phrase of this.buildPhraseRules()) {
+      for (const rule of this.buildPhraseRules()) {
         phraseRules.push(
           em.create(VocabPhraseRule, {
             dictionary: vocabDictionary,
-            phrase,
-            normalizedPhrase: this.normalizeText(phrase),
-            ruleType: 'consume',
-            scope: 'global',
-            confidence: 1
+            phrase: rule.phrase,
+            normalizedPhrase: this.normalizeText(rule.phrase),
+            ruleType: rule.ruleType,
+            scope: rule.scope,
+            confidence: rule.confidence
           } as any)
         );
       }
@@ -344,27 +345,103 @@ export class VocabularySnapshotService {
     return null;
   }
 
-  private buildPhraseRules(): string[] {
+  async addPhraseRule(
+    phrase: string,
+    ruleType: string,
+    scope: string = 'global',
+    confidence: number = 1
+  ): Promise<VocabPhraseRule> {
+    const em = this.orm.em.fork() as EntityManager;
+    const dictionary = await em.findOne(
+      VocabDictionary,
+      { isActive: true },
+      { orderBy: { builtAt: 'DESC' } }
+    );
+    if (!dictionary) throw new Error('No active dictionary found');
+
+    const rule = new VocabPhraseRule({
+      dictionary,
+      phrase,
+      normalizedPhrase: this.normalizeText(phrase),
+      ruleType,
+      scope,
+      confidence
+    });
+    await em.persistAndFlush(rule);
+    return rule;
+  }
+
+  async getAllPhraseRules(): Promise<PhraseRuleSnapshot[]> {
+    const em = this.orm.em.fork() as EntityManager;
+    const dictionary = await em.findOne(
+      VocabDictionary,
+      { isActive: true },
+      { orderBy: { builtAt: 'DESC' } }
+    );
+    if (!dictionary) return [];
+
+    const rules = await em.find(VocabPhraseRule, {
+      dictionary: dictionary.id,
+      isActive: true
+    });
+    return rules.map((rule) => ({
+      phrase: rule.phrase,
+      normalizedPhrase: rule.normalizedPhrase,
+      ruleType: rule.ruleType,
+      scope: rule.scope,
+      confidence: rule.confidence
+    }));
+  }
+
+  private buildPhraseRules(): Array<{
+    phrase: string;
+    ruleType: string;
+    scope: string;
+    confidence: number;
+  }> {
+    try {
+      return parseRulesSeed as Array<{
+        phrase: string;
+        ruleType: string;
+        scope: string;
+        confidence: number;
+      }>;
+    } catch {
+      return this.buildFallbackPhraseRules();
+    }
+  }
+
+  private buildFallbackPhraseRules(): Array<{
+    phrase: string;
+    ruleType: string;
+    scope: string;
+    confidence: number;
+  }> {
     return [
-      'co huong',
-      'mui huong',
-      'nuoc hoa',
-      'danh cho',
-      'nuoc hoa nam',
-      'nuoc hoa nu',
-      'nuoc hoa unisex',
-      'thuong hieu',
-      'hang hieu',
-      'san pham',
-      'gia re',
-      'gia cao',
-      'dat tien',
-      'tien nao',
-      'chat luong',
-      'tot nhat',
-      'pho bien',
-      'tron bo',
-      'bo suu tap'
+      {
+        phrase: 'có hương',
+        ruleType: 'consume',
+        scope: 'global',
+        confidence: 1
+      },
+      {
+        phrase: 'mùi hương',
+        ruleType: 'consume',
+        scope: 'global',
+        confidence: 1
+      },
+      {
+        phrase: 'nước hoa',
+        ruleType: 'consume',
+        scope: 'global',
+        confidence: 1
+      },
+      {
+        phrase: 'dành cho',
+        ruleType: 'consume',
+        scope: 'global',
+        confidence: 1
+      }
     ];
   }
 }

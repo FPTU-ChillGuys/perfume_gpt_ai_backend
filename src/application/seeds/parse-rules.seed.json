@@ -1,0 +1,21 @@
+[
+  { "phrase": "có hương", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "mùi hương", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "nước hoa", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "dành cho", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "nước hoa nam", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "nước hoa nữ", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "nước hoa unisex", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "thương hiệu", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "hàng hiệu", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "sản phẩm", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "giá rẻ", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "giá cao", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "đắt tiền", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "tiền nào", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "chất lượng", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "tốt nhất", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "phổ biến", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "trọn bộ", "ruleType": "consume", "scope": "global", "confidence": 1.0 },
+  { "phrase": "bộ sưu tập", "ruleType": "consume", "scope": "global", "confidence": 1.0 }
+]

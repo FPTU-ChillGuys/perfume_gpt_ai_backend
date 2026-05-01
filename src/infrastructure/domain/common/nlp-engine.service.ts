@@ -24,7 +24,7 @@ export class NlpEngineService {
     return this.naturalNlpService.extractEntities(text);
   }
 
-  parseAndNormalize(text: string): Record<string, any> {
-    return this.naturalNlpService.parseAndNormalize(text);
+  async parseAndNormalize(text: string): Promise<Record<string, any>> {
+    return await this.naturalNlpService.parseAndNormalize(text);
   }
 }

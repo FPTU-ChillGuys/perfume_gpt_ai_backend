@@ -1,6 +1,7 @@
 import { LanguageModel, Schema, ToolChoice, ToolSet, UIMessage } from 'ai';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
+import { PromptLoaderService } from 'src/infrastructure/domain/utils/prompt-loader.service';
 import {
   objectGenerationFromMessagesToResultWithErrorHandler,
   streamTextGenerationFromMessagesToResultWithErrorHandler,
@@ -85,7 +86,8 @@ export class AIHelper {
     private model?: LanguageModel,
     private promptOptimizationConfig?: PromptOptimizationConfig,
     private maxTokens?: number,
-    private readonly err?: I18nErrorHandler
+    private readonly err?: I18nErrorHandler,
+    private readonly promptLoader?: PromptLoaderService
   ) { }
 
   private get resolvedTools(): ToolSet | undefined {
@@ -117,7 +119,8 @@ export class AIHelper {
           prompt,
           this.promptOptimizationConfig,
           this.logger,
-          systemContext
+          systemContext,
+          this.promptLoader?.get('system.optimization_full')
         );
 
         const text = await textGenerationFromPromptToResultWithErrorHandler(

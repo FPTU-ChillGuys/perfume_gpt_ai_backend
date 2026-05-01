@@ -1,6 +1,5 @@
 import { Logger } from '@nestjs/common';
 import { UIMessage } from 'ai';
-import { PROMPT_OPTIMIZATION_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
 
@@ -41,7 +40,8 @@ export async function optimizePromptWithIntermediateModel(
   originalPrompt: string,
   optimizationConfig?: PromptOptimizationConfig,
   logger?: Logger,
-  systemContext?: string
+  systemContext?: string,
+  optimizationSystemPrompt?: string
 ): Promise<string> {
   if (!optimizationConfig?.enablePromptOptimization) {
     return originalPrompt;
@@ -59,7 +59,7 @@ export async function optimizePromptWithIntermediateModel(
         `Keep the SAME language as input.\n` +
         `Do NOT answer the request. Do NOT add new questions.\n` +
         `Only rewrite for clarity and brevity.\n\n${originalPrompt}`,
-      PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
+      optimizationSystemPrompt || '',
       undefined,
       undefined,
       10,
@@ -79,7 +79,8 @@ export async function optimizeUserMessageWithIntermediateModel(
   messages: UIMessage[],
   optimizationConfig?: PromptOptimizationConfig,
   logger?: Logger,
-  systemContext?: string
+  systemContext?: string,
+  optimizationSystemPrompt?: string
 ): Promise<UIMessage[]> {
   if (!optimizationConfig?.enablePromptOptimization || messages.length === 0) {
     return messages;
@@ -129,7 +130,7 @@ export async function optimizeUserMessageWithIntermediateModel(
         `Do NOT answer the user.\n` +
         `Do NOT add new questions or request extra information.\n` +
         `Only rewrite wording for clarity and keep length similar to original.\n\n${userText}`,
-      PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
+      optimizationSystemPrompt || '',
       undefined,
       undefined,
       10,

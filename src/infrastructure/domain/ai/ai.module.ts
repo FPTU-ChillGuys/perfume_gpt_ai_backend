@@ -8,6 +8,7 @@ import { Tools } from 'src/chatbot/tools';
 import { UnitOfWorkModule } from 'src/infrastructure/domain/common/unit-of-work.module';
 import { ToolModule } from 'src/infrastructure/domain/ai/tool.module';
 import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
+import { PromptLoaderService } from 'src/infrastructure/domain/utils/prompt-loader.service';
 import {
   aiModelForSurvey,
   aiModelForRestock,
@@ -34,14 +35,14 @@ export const AI_RESTOCK_SERVICE = AI_RESTOCK_HELPER;
 
 const aiProvider: Provider = {
   provide: AI_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
-    new AIHelper(SYSTEM_PROMPT, () => tools.getTools, 10, undefined, undefined, undefined, undefined, undefined, err),
-  inject: [Tools, I18nErrorHandler]
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+    new AIHelper(SYSTEM_PROMPT, () => tools.getTools, 10, undefined, undefined, undefined, undefined, undefined, err, promptLoader),
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiConversationProvider: Provider = {
   provide: AI_CONVERSATION_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForChatbot,
@@ -55,14 +56,15 @@ const aiConversationProvider: Provider = {
           'Use case: conversation tu van nuoc hoa. Giu nguyen intent cua nguoi dung, khong doi sang domain khac. Neu user dang yeu cau tim/goi y san pham thi giu cau truc de model chinh co the goi tool va tra ve dung format.'
       },
       undefined,
-      err
+      err,
+      promptLoader
     ),
-  inject: [Tools, I18nErrorHandler]
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiStaffConversationProvider: Provider = {
   provide: AI_STAFF_CONVERSATION_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForStaffChatbot,
@@ -76,14 +78,15 @@ const aiStaffConversationProvider: Provider = {
           'Use case: STAFF ASSISTANT conversation. Helping staff with quick counter consultations. Precise, fact-based, bullet points.'
       },
       undefined,
-      err
+      err,
+      promptLoader
     ),
-  inject: [Tools, I18nErrorHandler]
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiTrendProvider: Provider = {
   provide: AI_TREND_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForAnalysis,
@@ -93,14 +96,15 @@ const aiTrendProvider: Provider = {
       aiModelForTrend,
       undefined,
       undefined,
-      err
+      err,
+      promptLoader
     ),
-  inject: [Tools, I18nErrorHandler]
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiRecommendationProvider: Provider = {
   provide: AI_RECOMMENDATION_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       undefined,
@@ -110,14 +114,15 @@ const aiRecommendationProvider: Provider = {
       undefined,
       undefined,
       undefined,
-      err
+      err,
+      promptLoader
     ),
-  inject: [Tools, I18nErrorHandler]
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiRestockProvider: Provider = {
   provide: AI_RESTOCK_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForRestock,
@@ -127,14 +132,15 @@ const aiRestockProvider: Provider = {
       aiModelForRestock,
       undefined,
       300000,
-      err
+      err,
+      promptLoader
     ),
-  inject: [Tools, I18nErrorHandler]
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiSurveyProvider: Provider = {
   provide: AI_SURVEY_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForSurvey,
@@ -144,14 +150,15 @@ const aiSurveyProvider: Provider = {
       aiModelForSurvey,
       undefined,
       undefined,
-      err
+      err,
+      promptLoader
     ),
-  inject: [Tools, I18nErrorHandler]
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiReviewProvider: Provider = {
   provide: AI_REVIEW_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       undefined,
@@ -161,14 +168,15 @@ const aiReviewProvider: Provider = {
       aiModelForReview,
       undefined,
       undefined,
-      err
+      err,
+      promptLoader
     ),
-  inject: [Tools, I18nErrorHandler]
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiInventoryReportProvider: Provider = {
   provide: AI_INVENTORY_REPORT_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler) =>
+  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForInventoryReport,
@@ -178,9 +186,10 @@ const aiInventoryReportProvider: Provider = {
       undefined,
       undefined,
       undefined,
-      err
+      err,
+      promptLoader
     ),
-  inject: [Tools, I18nErrorHandler]
+  inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 @Module({

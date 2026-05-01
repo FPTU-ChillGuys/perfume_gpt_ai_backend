@@ -2,8 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Output } from 'ai';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
-import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT, SURVEY_ANALYSIS_SYSTEM_PROMPT, TREND_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
+import { CONVERSATION_ANALYSIS_SYSTEM_PROMPT, TREND_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT } from 'src/application/constant/prompts/survey-question.analysis.system';
+import { PromptLoaderService } from 'src/infrastructure/domain/utils/prompt-loader.service';
 import { Tools } from 'src/chatbot/tools';
 import { analysisOutput, AnalysisObject, intentOnlyOutput, IntentOnlyObject } from 'src/chatbot/output/analysis.output';
 import { surveyAnswerAnalysis, SurveyAnswerAnalysisObject } from 'src/chatbot/output/survey-question.analysis.output';
@@ -19,7 +20,7 @@ type AnalysisRuntimeContext = {
 export class AiAnalysisService {
     private readonly logger = new Logger(AiAnalysisService.name);
 
-    constructor(private readonly tools: Tools) { }
+    constructor(private readonly tools: Tools, private readonly promptLoader: PromptLoaderService) { }
 
     async analyze(
         currentMessage: string,
@@ -84,7 +85,7 @@ export class AiAnalysisService {
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
                 input,
-                INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT,
+                this.promptLoader.get('system.intent_only_full'),
                 undefined,
                 'Failed to analyze intent only',
                 10,
@@ -119,7 +120,7 @@ export class AiAnalysisService {
             const result = await textGenerationFromPromptToResultWithErrorHandler(
                 aiModelForOptimizePrompt,
                 input,
-                SURVEY_ANALYSIS_SYSTEM_PROMPT,
+                this.promptLoader.get('system.survey_analysis_full'),
                 this.tools.getToolsForAnalysis,
                 'Failed to analyze survey intent',
                 10,

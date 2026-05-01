@@ -5,13 +5,13 @@ import { encodeToolOutput } from '../utils/toon-encoder.util';
 import * as z from 'zod';
 import { aiModel, aiModelForConversationAnalysis } from 'src/chatbot/ai-model';
 import { objectGenerationFromMessagesToResultWithErrorHandler } from 'src/chatbot/chatbot';
-import { INTERNAL_NORMALIZATION_SYSTEM_PROMPT } from 'src/application/constant/prompts/system.prompt';
+import { PromptLoaderService } from 'src/infrastructure/domain/utils/prompt-loader.service';
 
 @Injectable()
 export class MasterDataTool {
     private readonly logger = new Logger(MasterDataTool.name);
 
-    constructor(private readonly masterDataService: MasterDataService) { }
+    constructor(private readonly masterDataService: MasterDataService, private readonly promptLoader: PromptLoaderService) { }
 
     searchMasterData: Tool = tool({
         description: 'Advanced search for Brands, Categories, Scent Notes, Olfactory Families, Attribute Values or Product Names. Supports per-keyword type targeting and automatic semantic normalization. Results are TOON-encoded.',
@@ -69,9 +69,10 @@ export class MasterDataTool {
                 this.logger.log(`[searchMasterData] Normalizing missing keywords: ${missingKeywords.join(', ')}`);
 
                 const context = await this.getNormalizationContext();
-                const prompt = INTERNAL_NORMALIZATION_SYSTEM_PROMPT
-                    .replace('{{CONTEXT}}', JSON.stringify(context, null, 2))
-                    .replace('{{KEYWORDS}}', missingKeywords.join(', '));
+                const prompt = this.promptLoader.get('system.internal_norm_full', {
+                    CONTEXT: JSON.stringify(context, null, 2),
+                    KEYWORDS: missingKeywords.join(', ')
+                });
 
                 const normalizationResult = await objectGenerationFromMessagesToResultWithErrorHandler<{ mappings: { original: string, corrected: string | string[] | null }[] }>(
                     aiModelForConversationAnalysis,

@@ -75,6 +75,10 @@ export class ConversationOutputDto {
   @ApiPropertyOptional({ type: [ProductTempItemDto], nullable: true })
   productTemp!: ProductTempItemDto[] | null;
 
-  @ApiProperty({ type: [String], description: 'Gợi ý 3-4 câu hỏi tiếp theo' })
-  suggestedQuestions!: string[];
+  @ApiProperty({
+    type: [String],
+    description: 'Gợi ý 3-4 câu hỏi tiếp theo',
+    nullable: true
+  })
+  suggestedQuestions?: string[];
 }

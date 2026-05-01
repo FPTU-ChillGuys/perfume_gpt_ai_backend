@@ -625,6 +625,7 @@ export class DictionaryBuilderService {
       this.entityDictionary || {}
     )) {
       const key = entityType as EntityType;
+      if (!breakdown[key]) continue;
       breakdown[key].canonicals = Object.keys(canonicalMap).length;
       breakdown[key].synonyms = Object.values(canonicalMap).reduce(
         (sum, syns) => sum + syns.length,

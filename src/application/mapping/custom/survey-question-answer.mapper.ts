@@ -55,11 +55,11 @@ export class SurveyQuestionAnswerMapper {
   }
 
   static toEntity({
-      userId,
-      details
+    userId,
+    details
   }: {
-      userId: string;
-      details: { question: SurveyQuestion; answer: SurveyAnswer }[];
+    userId: string;
+    details: { question: SurveyQuestion; answer: SurveyAnswer }[];
   }): SurveyQuestionAnswer {
     const quesAns = new SurveyQuestionAnswer({
       userId: userId
@@ -67,7 +67,7 @@ export class SurveyQuestionAnswerMapper {
 
     quesAns.details.set(
       SurveyQuestionAnswerDetailMapper.toEntityList(
-        details.map(item => ({
+        details.map((item) => ({
           question: item.question,
           answer: item.answer,
           surveyQuestionAnswer: quesAns

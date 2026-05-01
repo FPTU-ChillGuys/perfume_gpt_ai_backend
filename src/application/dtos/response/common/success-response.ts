@@ -1,6 +1,8 @@
 import { BaseResponse } from './base-response';
 
-export abstract class HttpCodeSuccessResponse<T = unknown> extends BaseResponse<T> {
+export abstract class HttpCodeSuccessResponse<
+  T = unknown
+> extends BaseResponse<T> {
   readonly __httpStatusCode: number;
 
   protected constructor(httpStatusCode: number, data?: T) {

@@ -105,18 +105,18 @@ function mapOrderFull(o: OrderFull): OrderResponse {
     voucherCode: o.UserVouchers?.Vouchers?.Code ?? null,
     recipientInfo: o.ContactAddresses
       ? {
-        fullName: o.ContactAddresses.ContactName,
-        phone: o.ContactAddresses.ContactPhoneNumber,
-        fullAddress: o.ContactAddresses.FullAddress
-      }
+          fullName: o.ContactAddresses.ContactName,
+          phone: o.ContactAddresses.ContactPhoneNumber,
+          fullAddress: o.ContactAddresses.FullAddress
+        }
       : null,
     shippingInfo: o.ShippingInfos
       ? {
-        carrierName: o.ShippingInfos.CarrierName,
-        trackingNumber: o.ShippingInfos.TrackingNumber,
-        shippingFee: Number(o.ShippingInfos.ShippingFee),
-        status: o.ShippingInfos.Status
-      }
+          carrierName: o.ShippingInfos.CarrierName,
+          trackingNumber: o.ShippingInfos.TrackingNumber,
+          shippingFee: Number(o.ShippingInfos.ShippingFee),
+          status: o.ShippingInfos.Status
+        }
       : null,
     orderDetails: o.OrderDetails.map(
       (d): OrderDetailResponse =>
@@ -146,27 +146,27 @@ function buildOrderWhere(
     ...(request.paymentStatus ? { PaymentStatus: request.paymentStatus } : {}),
     ...(request.fromDate || request.toDate
       ? {
-        CreatedAt: {
-          ...(request.fromDate ? { gte: new Date(request.fromDate) } : {}),
-          ...(request.toDate ? { lte: new Date(request.toDate) } : {})
+          CreatedAt: {
+            ...(request.fromDate ? { gte: new Date(request.fromDate) } : {}),
+            ...(request.toDate ? { lte: new Date(request.toDate) } : {})
+          }
         }
-      }
       : {}),
     ...(request.searchTerm
       ? {
-        OR: [
-          {
-            AspNetUsers_Orders_CustomerIdToAspNetUsers: {
-              FullName: { contains: request.searchTerm }
+          OR: [
+            {
+              AspNetUsers_Orders_CustomerIdToAspNetUsers: {
+                FullName: { contains: request.searchTerm }
+              }
+            },
+            {
+              AspNetUsers_Orders_StaffIdToAspNetUsers: {
+                FullName: { contains: request.searchTerm }
+              }
             }
-          },
-          {
-            AspNetUsers_Orders_StaffIdToAspNetUsers: {
-              FullName: { contains: request.searchTerm }
-            }
-          }
-        ]
-      }
+          ]
+        }
       : {})
   };
 }
@@ -177,7 +177,7 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
     private readonly err: I18nErrorHandler
-  ) { }
+  ) {}
 
   async getAllOrders(
     request: OrderRequest

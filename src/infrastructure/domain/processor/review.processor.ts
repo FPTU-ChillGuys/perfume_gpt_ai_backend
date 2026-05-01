@@ -8,7 +8,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
 
 @Processor({
-  name: QueueName.REVIEW_QUEUE,
+  name: QueueName.REVIEW_QUEUE
 })
 export class ReviewProcessor extends WorkerHost {
   private readonly logger = new Logger(ReviewProcessor.name);
@@ -16,14 +16,16 @@ export class ReviewProcessor extends WorkerHost {
   constructor(
     private readonly reviewService: ReviewService,
     private readonly reviewAIService: ReviewAIService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService
   ) {
     super();
   }
 
   async process(job: Job): Promise<any> {
     try {
-      this.logger.log(`Processing job ${job.name} (ID: ${job.id}) with data: ${JSON.stringify(job.data)}`);
+      this.logger.log(
+        `Processing job ${job.name} (ID: ${job.id}) with data: ${JSON.stringify(job.data)}`
+      );
 
       switch (job.name) {
         case ReviewJobName.PROCESS_REVIEW_SUMMARY:
@@ -33,7 +35,10 @@ export class ReviewProcessor extends WorkerHost {
           this.logger.warn(`Unknown job name: ${job.name}`);
       }
     } catch (error) {
-      this.logger.error(`Error processing job ${job.name} (ID: ${job.id}): ${error.message}`, error.stack);
+      this.logger.error(
+        `Error processing job ${job.name} (ID: ${job.id}): ${error.message}`,
+        error.stack
+      );
       throw error;
     }
   }
@@ -47,10 +52,13 @@ export class ReviewProcessor extends WorkerHost {
     this.logger.log(`Generating review summary for variantId: ${variantId}`);
 
     // 1. Generate AI summary for this variant
-    const summaryResponse = await this.reviewAIService.generateReviewSummaryByVariantId(variantId);
+    const summaryResponse =
+      await this.reviewAIService.generateReviewSummaryByVariantId(variantId);
 
     if (!summaryResponse.success || !summaryResponse.data) {
-      this.logger.error(`Failed to generate AI summary for variant ${variantId}: ${summaryResponse.error || 'Unknown error'}`);
+      this.logger.error(
+        `Failed to generate AI summary for variant ${variantId}: ${summaryResponse.error || 'Unknown error'}`
+      );
       return;
     }
 
@@ -62,9 +70,13 @@ export class ReviewProcessor extends WorkerHost {
     );
 
     if (logResult.success) {
-      this.logger.log(`Successfully updated review log for variant ${variantId}`);
+      this.logger.log(
+        `Successfully updated review log for variant ${variantId}`
+      );
     } else {
-      this.logger.error(`Failed to save review log for variant ${variantId}: ${logResult.error}`);
+      this.logger.error(
+        `Failed to save review log for variant ${variantId}: ${logResult.error}`
+      );
     }
   }
 }

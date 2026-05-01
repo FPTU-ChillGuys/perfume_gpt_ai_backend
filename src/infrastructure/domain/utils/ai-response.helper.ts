@@ -1,5 +1,8 @@
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { AIAnalysisResponse, AIResponseMetadata } from 'src/application/dtos/response/ai-structured.response';
+import {
+  AIAnalysisResponse,
+  AIResponseMetadata
+} from 'src/application/dtos/response/ai-structured.response';
 
 /**
  * Gọi hàm AI và bọc kết quả vào AIAnalysisResponse có cấu trúc, kèm metadata thời gian xử lý.

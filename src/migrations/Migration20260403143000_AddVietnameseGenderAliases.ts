@@ -1,7 +1,6 @@
 import { Migration } from '@mikro-orm/migrations';
 
 export class Migration20260403143000_AddVietnameseGenderAliases extends Migration {
-
   override async up(): Promise<void> {
     // 1) Seed Vietnamese aliases into vocab_alias for existing gender terms.
     this.addSql(`
@@ -112,5 +111,4 @@ export class Migration20260403143000_AddVietnameseGenderAliases extends Migratio
       end $$;
     `);
   }
-
 }

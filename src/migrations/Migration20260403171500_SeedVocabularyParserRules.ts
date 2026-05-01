@@ -1,9 +1,9 @@
 import { Migration } from '@mikro-orm/migrations';
 
 export class Migration20260403171500_SeedVocabularyParserRules extends Migration {
-
   override async up(): Promise<void> {
-    this.addSql(`insert into "vocab_parser_rule" ("id", "created_at", "updated_at", "is_active", "dictionary_id", "rule_group", "pattern", "is_regex", "priority")
+    this
+      .addSql(`insert into "vocab_parser_rule" ("id", "created_at", "updated_at", "is_active", "dictionary_id", "rule_group", "pattern", "is_regex", "priority")
       select gen_random_uuid(), now(), now(), true, d."id", 'age_attribute_value', '(tuoi|thanh nien|nguoi lon|trung nien|thieu nien|teen)', true, 100
       from "vocab_dictionary" d
       where not exists (
@@ -13,7 +13,8 @@ export class Migration20260403171500_SeedVocabularyParserRules extends Migration
           and r."pattern" = '(tuoi|thanh nien|nguoi lon|trung nien|thieu nien|teen)'
       );`);
 
-    this.addSql(`insert into "vocab_parser_rule" ("id", "created_at", "updated_at", "is_active", "dictionary_id", "rule_group", "pattern", "is_regex", "priority")
+    this
+      .addSql(`insert into "vocab_parser_rule" ("id", "created_at", "updated_at", "is_active", "dictionary_id", "rule_group", "pattern", "is_regex", "priority")
       select gen_random_uuid(), now(), now(), true, d."id", 'age_attribute_value', '(duoi|tren|tu)\\s*\\d{1,3}', true, 90
       from "vocab_dictionary" d
       where not exists (
@@ -23,7 +24,8 @@ export class Migration20260403171500_SeedVocabularyParserRules extends Migration
           and r."pattern" = '(duoi|tren|tu)\\s*\\d{1,3}'
       );`);
 
-    this.addSql(`insert into "vocab_parser_rule" ("id", "created_at", "updated_at", "is_active", "dictionary_id", "rule_group", "pattern", "is_regex", "priority")
+    this
+      .addSql(`insert into "vocab_parser_rule" ("id", "created_at", "updated_at", "is_active", "dictionary_id", "rule_group", "pattern", "is_regex", "priority")
       select gen_random_uuid(), now(), now(), true, d."id", 'age_attribute_value', '\\d{1,3}\\s*(?:-|den)\\s*\\d{1,3}', true, 80
       from "vocab_dictionary" d
       where not exists (
@@ -43,5 +45,4 @@ export class Migration20260403171500_SeedVocabularyParserRules extends Migration
           '\\d{1,3}\\s*(?:-|den)\\s*\\d{1,3}'
         );`);
   }
-
 }

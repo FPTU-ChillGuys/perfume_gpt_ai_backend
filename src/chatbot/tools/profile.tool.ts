@@ -33,7 +33,10 @@ export class ProfileTool {
   private orderService?: OrderService;
   private prismaService?: PrismaService;
 
-  constructor(private readonly moduleRef: ModuleRef, private readonly err: I18nErrorHandler) {}
+  constructor(
+    private readonly moduleRef: ModuleRef,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   private getPrismaService(): PrismaService {
     if (!this.prismaService) {
@@ -224,13 +227,18 @@ export class ProfileTool {
     };
   }
 
-  private async extractOrderAttributes(orders: OrderResponse[]): Promise<Record<string, any>> {
+  private async extractOrderAttributes(
+    orders: OrderResponse[]
+  ): Promise<Record<string, any>> {
     const variantQuantities = new Map<string, number>();
 
     for (const order of orders) {
       for (const item of order.orderDetails || []) {
         if (!item.variantId) continue;
-        variantQuantities.set(item.variantId, (variantQuantities.get(item.variantId) || 0) + item.quantity);
+        variantQuantities.set(
+          item.variantId,
+          (variantQuantities.get(item.variantId) || 0) + item.quantity
+        );
       }
     }
 
@@ -264,10 +272,15 @@ export class ProfileTool {
         attributes: new Map<string, number>()
       };
 
-      const addCount = (map: Map<string, number>, key: string | null | undefined, weight: number) => {
+      const addCount = (
+        map: Map<string, number>,
+        key: string | null | undefined,
+        weight: number
+      ) => {
         if (!key) return;
         const normalized = key.trim();
-        if (normalized) map.set(normalized, (map.get(normalized) || 0) + weight);
+        if (normalized)
+          map.set(normalized, (map.get(normalized) || 0) + weight);
       };
 
       for (const v of variants) {
@@ -280,13 +293,19 @@ export class ProfileTool {
         addCount(counters.origins, p.Origin, qty);
         addCount(counters.concentrations, v.Concentrations?.Name, qty);
 
-        for (const nm of p.ProductNoteMaps || []) addCount(counters.scentNotes, nm.ScentNotes?.Name, qty);
-        for (const fm of p.ProductFamilyMaps || []) addCount(counters.olfactoryFamilies, fm.OlfactoryFamilies?.Name, qty);
-        for (const attr of p.ProductAttributes || []) addCount(counters.attributes, attr.AttributeValues?.Value, qty);
+        for (const nm of p.ProductNoteMaps || [])
+          addCount(counters.scentNotes, nm.ScentNotes?.Name, qty);
+        for (const fm of p.ProductFamilyMaps || [])
+          addCount(counters.olfactoryFamilies, fm.OlfactoryFamilies?.Name, qty);
+        for (const attr of p.ProductAttributes || [])
+          addCount(counters.attributes, attr.AttributeValues?.Value, qty);
       }
 
       const getTop = (map: Map<string, number>, limit: number) =>
-        Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, count }));
+        Array.from(map.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, limit)
+          .map(([name, count]) => ({ name, count }));
 
       return {
         brands: getTop(counters.brands, 5),
@@ -298,7 +317,9 @@ export class ProfileTool {
         attributes: getTop(counters.attributes, 6)
       };
     } catch (e) {
-      this.logger.warn(`Failed to extract order attributes: ${e instanceof Error ? e.message : String(e)}`);
+      this.logger.warn(
+        `Failed to extract order attributes: ${e instanceof Error ? e.message : String(e)}`
+      );
       return {};
     }
   }
@@ -463,27 +484,24 @@ export class ProfileTool {
     }),
     execute: async (input) => {
       this.logger.log(`[getOwnProfile] called for userId: ${input.userId}`);
-      return await this.err.wrap(
-        async () => {
-          const response = await this.getProfileService().getOwnProfile(
-            input.userId
-          );
-          this.logger.debug(
-            `[getOwnProfile] response received for userId: ${input.userId}`
-          );
-          if (!response.success) {
-            return { success: false, error: 'Failed to fetch profile.' };
-          }
+      return await this.err.wrap(async () => {
+        const response = await this.getProfileService().getOwnProfile(
+          input.userId
+        );
+        this.logger.debug(
+          `[getOwnProfile] response received for userId: ${input.userId}`
+        );
+        if (!response.success) {
+          return { success: false, error: 'Failed to fetch profile.' };
+        }
 
-          const payload = response.payload || {};
-          this.logger.log(
-            `[getOwnProfile] mapped payload for AI: ${JSON.stringify(payload)}`
-          );
+        const payload = response.payload || {};
+        this.logger.log(
+          `[getOwnProfile] mapped payload for AI: ${JSON.stringify(payload)}`
+        );
 
-          return { success: true, data: response.payload || {} };
-        },
-        'errors.profile.tool_fetch'
-      );
+        return { success: true, data: response.payload || {} };
+      }, 'errors.profile.tool_fetch');
     }
   });
 
@@ -504,24 +522,21 @@ export class ProfileTool {
         `[getProfileRecommendationContext] called for userId: ${input.userId}, requestedComponents: ${input.requestedComponents?.join(',') || 'auto (order > profile)'}`
       );
 
-      return await this.err.wrap(
-        async () => {
-          const payload = await this.getProfileRecommendationContextPayload(
-            input.userId,
-            input.requestedComponents
-          );
+      return await this.err.wrap(async () => {
+        const payload = await this.getProfileRecommendationContextPayload(
+          input.userId,
+          input.requestedComponents
+        );
 
-          this.logger.log(
-            `[getProfileRecommendationContext] payload for AI: ${JSON.stringify(payload)}`
-          );
+        this.logger.log(
+          `[getProfileRecommendationContext] payload for AI: ${JSON.stringify(payload)}`
+        );
 
-          return {
-            success: true,
-            data: payload
-          };
-        },
-        'errors.profile.tool_context'
-      );
+        return {
+          success: true,
+          data: payload
+        };
+      }, 'errors.profile.tool_context');
     }
   });
 
@@ -540,22 +555,18 @@ export class ProfileTool {
     }),
     execute: async (input) => {
       this.logger.log(`[searchProfile] called with query: ${input.query}`);
-      return await this.err.wrap(
-        async () => {
-          const response = await this.getProfileService().searchProfile(
-            input.query
-          );
-          if (!response.success) {
-            return {
-              success: false,
-              error: 'Failed to search for customer profiles.'
-            };
-          }
-          return { success: true, data: response.payload || [] };
-        },
-        'errors.profile.tool_search'
-      );
+      return await this.err.wrap(async () => {
+        const response = await this.getProfileService().searchProfile(
+          input.query
+        );
+        if (!response.success) {
+          return {
+            success: false,
+            error: 'Failed to search for customer profiles.'
+          };
+        }
+        return { success: true, data: response.payload || [] };
+      }, 'errors.profile.tool_search');
     }
   });
-
 }

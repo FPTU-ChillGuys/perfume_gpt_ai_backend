@@ -7,7 +7,11 @@ import {
 import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { calculateSalesMetrics } from 'src/infrastructure/domain/utils/sales-metrics.util';
 import { RestockAnalyticsRepository } from 'src/infrastructure/domain/restock/restock-analytics.repository';
-import { CandidateMode, ProductVariantSalesCandidate, ProductSalesAnalyticsCandidate } from 'src/application/dtos/response/restock/sales-analytics.types';
+import {
+  CandidateMode,
+  ProductVariantSalesCandidate,
+  ProductSalesAnalyticsCandidate
+} from 'src/application/dtos/response/restock/sales-analytics.types';
 import { RESTOCK_CONFIG } from 'src/application/constant/inventory.constant';
 
 export type { ProductVariantSalesCandidate, ProductSalesAnalyticsCandidate };
@@ -19,7 +23,10 @@ export class RestockService {
     private readonly err: I18nErrorHandler
   ) {}
 
-  private inferAggregateTrend(last7DaysSales: number, last30DaysSales: number): 'INCREASING' | 'STABLE' | 'DECLINING' {
+  private inferAggregateTrend(
+    last7DaysSales: number,
+    last30DaysSales: number
+  ): 'INCREASING' | 'STABLE' | 'DECLINING' {
     if (last30DaysSales <= 0) {
       return 'STABLE';
     }
@@ -33,7 +40,9 @@ export class RestockService {
     return 'STABLE';
   }
 
-  private inferAggregateVolatility(values: Array<'LOW' | 'MEDIUM' | 'HIGH'>): 'LOW' | 'MEDIUM' | 'HIGH' {
+  private inferAggregateVolatility(
+    values: Array<'LOW' | 'MEDIUM' | 'HIGH'>
+  ): 'LOW' | 'MEDIUM' | 'HIGH' {
     if (values.includes('HIGH')) {
       return 'HIGH';
     }
@@ -49,7 +58,11 @@ export class RestockService {
     limit: number,
     criticalVariantIds: Set<string> = new Set<string>()
   ): ProductSalesAnalyticsCandidate[] {
-    const byProduct = this.groupVariantsByProduct(variants, mode, criticalVariantIds);
+    const byProduct = this.groupVariantsByProduct(
+      variants,
+      mode,
+      criticalVariantIds
+    );
     const candidates = this.aggregateAndSortCandidates(byProduct, mode, limit);
     return candidates;
   }
@@ -66,9 +79,10 @@ export class RestockService {
       const last30DaysSales = variant.salesMetrics?.last30DaysSales ?? 0;
       const totalQuantitySold = variant.totalQuantitySold ?? 0;
 
-      const shouldInclude = mode === 'trend'
-        ? (last30DaysSales > 0 || totalQuantitySold > 0)
-        : (totalQuantitySold > 0 || criticalVariantIds.has(variant.variantId));
+      const shouldInclude =
+        mode === 'trend'
+          ? last30DaysSales > 0 || totalQuantitySold > 0
+          : totalQuantitySold > 0 || criticalVariantIds.has(variant.variantId);
 
       if (!shouldInclude) {
         continue;
@@ -89,7 +103,8 @@ export class RestockService {
       };
 
       current.variantCount += 1;
-      current.hasCriticalStock = current.hasCriticalStock || criticalVariantIds.has(variant.variantId);
+      current.hasCriticalStock =
+        current.hasCriticalStock || criticalVariantIds.has(variant.variantId);
       current.totalQuantitySold += totalQuantitySold;
       current.averageDailySales += variant.averageDailySales ?? 0;
       current.last7DaysSales += last7DaysSales;
@@ -120,8 +135,13 @@ export class RestockService {
     limit: number
   ): ProductSalesAnalyticsCandidate[] {
     const candidates = Array.from(byProduct.values()).map((item) => {
-      item.salesTrend = this.inferAggregateTrend(item.last7DaysSales, item.last30DaysSales);
-      item.volatility = this.inferAggregateVolatility(item.variants.map((variant) => variant.volatility));
+      item.salesTrend = this.inferAggregateTrend(
+        item.last7DaysSales,
+        item.last30DaysSales
+      );
+      item.volatility = this.inferAggregateVolatility(
+        item.variants.map((variant) => variant.volatility)
+      );
       item.averageDailySales = Number(item.averageDailySales.toFixed(2));
       item.variants.sort((left, right) => {
         if (right.last30DaysSales !== left.last30DaysSales) {
@@ -138,8 +158,14 @@ export class RestockService {
     if (mode === 'trend') {
       return candidates
         .sort((left, right) => {
-          const leftScore = left.last30DaysSales * 2 + left.last7DaysSales * 3 + left.totalQuantitySold;
-          const rightScore = right.last30DaysSales * 2 + right.last7DaysSales * 3 + right.totalQuantitySold;
+          const leftScore =
+            left.last30DaysSales * 2 +
+            left.last7DaysSales * 3 +
+            left.totalQuantitySold;
+          const rightScore =
+            right.last30DaysSales * 2 +
+            right.last7DaysSales * 3 +
+            right.totalQuantitySold;
           return rightScore - leftScore;
         })
         .slice(0, limit);
@@ -155,7 +181,13 @@ export class RestockService {
         }
         return right.last30DaysSales - left.last30DaysSales;
       })
-      .slice(0, Math.max(limit, candidates.filter((item) => item.hasCriticalStock).length));
+      .slice(
+        0,
+        Math.max(
+          limit,
+          candidates.filter((item) => item.hasCriticalStock).length
+        )
+      );
   }
 
   private async getCriticalLowStockVariants(
@@ -165,7 +197,11 @@ export class RestockService {
     const ids = new Set<string>();
     const variants: VariantSalesAnalyticsResponse[] = [];
     const now = new Date();
-    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+    const twoMonthsAgo = new Date(
+      now.getFullYear(),
+      now.getMonth() - 2,
+      now.getDate()
+    );
 
     for (const stock of stocks) {
       const variantId = stock.VariantId;
@@ -214,7 +250,11 @@ export class RestockService {
 
     return {
       success: true,
-      payload: this.buildProductCandidates(analyticsResult.payload, 'trend', limit)
+      payload: this.buildProductCandidates(
+        analyticsResult.payload,
+        'trend',
+        limit
+      )
     };
   }
 
@@ -226,40 +266,64 @@ export class RestockService {
       return this.err.fail('errors.restock.fetch_candidates');
     }
 
-    const knownVariantIds = new Set(analyticsResult.payload.map((item) => item.variantId));
-    const criticalVariants = await this.getCriticalLowStockVariants(knownVariantIds);
-    const enrichedVariants = [...analyticsResult.payload, ...criticalVariants.variants];
+    const knownVariantIds = new Set(
+      analyticsResult.payload.map((item) => item.variantId)
+    );
+    const criticalVariants =
+      await this.getCriticalLowStockVariants(knownVariantIds);
+    const enrichedVariants = [
+      ...analyticsResult.payload,
+      ...criticalVariants.variants
+    ];
 
     return {
       success: true,
-      payload: this.buildProductCandidates(enrichedVariants, 'restock', limit, criticalVariants.ids)
+      payload: this.buildProductCandidates(
+        enrichedVariants,
+        'restock',
+        limit,
+        criticalVariants.ids
+      )
     };
   }
 
   async getProductSalesAnalyticsForRestock(): Promise<
     BaseResponseAPI<VariantSalesAnalyticsResponse[]>
   > {
-    return this.err.wrap(
-      async () => {
-        const now = new Date();
-        const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    return this.err.wrap(async () => {
+      const now = new Date();
+      const twoMonthsAgo = new Date(
+        now.getFullYear(),
+        now.getMonth() - 1,
+        now.getDate()
+      );
 
-        const [variants, orderDetails] = await Promise.all([
-          this.restockAnalyticsRepo.findAllActiveVariants(),
-          this.restockAnalyticsRepo.findOrderDetailsInDateRange(twoMonthsAgo)
-        ]);
+      const [variants, orderDetails] = await Promise.all([
+        this.restockAnalyticsRepo.findAllActiveVariants(),
+        this.restockAnalyticsRepo.findOrderDetailsInDateRange(twoMonthsAgo)
+      ]);
 
-        const salesDataByVariant = this.groupOrderDetailsByVariant(orderDetails);
-        const results = this.buildVariantAnalyticsResponses(variants, salesDataByVariant, twoMonthsAgo, now);
+      const salesDataByVariant = this.groupOrderDetailsByVariant(orderDetails);
+      const results = this.buildVariantAnalyticsResponses(
+        variants,
+        salesDataByVariant,
+        twoMonthsAgo,
+        now
+      );
 
-        return { success: true, payload: results };
-      },
-      'errors.inventory.fetch_sales_analytics'
-    );
+      return { success: true, payload: results };
+    }, 'errors.inventory.fetch_sales_analytics');
   }
 
-  private groupOrderDetailsByVariant(orderDetails: Awaited<ReturnType<RestockAnalyticsRepository['findOrderDetailsInDateRange']>>): Map<string, { date: string; quantity: number; unitPrice: number }[]> {
-    const salesDataByVariant = new Map<string, { date: string; quantity: number; unitPrice: number }[]>();
+  private groupOrderDetailsByVariant(
+    orderDetails: Awaited<
+      ReturnType<RestockAnalyticsRepository['findOrderDetailsInDateRange']>
+    >
+  ): Map<string, { date: string; quantity: number; unitPrice: number }[]> {
+    const salesDataByVariant = new Map<
+      string,
+      { date: string; quantity: number; unitPrice: number }[]
+    >();
     orderDetails.forEach((detail) => {
       const variantId = detail.VariantId;
       if (!salesDataByVariant.has(variantId)) {
@@ -276,15 +340,25 @@ export class RestockService {
   }
 
   private buildVariantAnalyticsResponses(
-    variants: Awaited<ReturnType<RestockAnalyticsRepository['findAllActiveVariants']>>,
-    salesDataByVariant: Map<string, { date: string; quantity: number; unitPrice: number }[]>,
+    variants: Awaited<
+      ReturnType<RestockAnalyticsRepository['findAllActiveVariants']>
+    >,
+    salesDataByVariant: Map<
+      string,
+      { date: string; quantity: number; unitPrice: number }[]
+    >,
     twoMonthsAgo: Date,
     now: Date
   ): VariantSalesAnalyticsResponse[] {
     return variants.map((variant) => {
       const salesData = salesDataByVariant.get(variant.Id) || [];
       const dailySalesData = this.buildDailySalesRecords(salesData);
-      const { totalQuantitySold, totalRevenue, daysWithSalesCount, averageDailySales } = this.computeSalesTotals(dailySalesData);
+      const {
+        totalQuantitySold,
+        totalRevenue,
+        daysWithSalesCount,
+        averageDailySales
+      } = this.computeSalesTotals(dailySalesData);
       const salesMetrics = calculateSalesMetrics(dailySalesData);
 
       return new VariantSalesAnalyticsResponse({
@@ -308,7 +382,9 @@ export class RestockService {
     });
   }
 
-  private buildDailySalesRecords(salesData: { date: string; quantity: number; unitPrice: number }[]): DailySalesRecord[] {
+  private buildDailySalesRecords(
+    salesData: { date: string; quantity: number; unitPrice: number }[]
+  ): DailySalesRecord[] {
     const dailyMap = new Map<string, { quantity: number; revenue: number }>();
     salesData.forEach((record) => {
       const existing = dailyMap.get(record.date) || { quantity: 0, revenue: 0 };
@@ -333,59 +409,85 @@ export class RestockService {
     daysWithSalesCount: number;
     averageDailySales: number;
   } {
-    const totalQuantitySold = dailySalesData.reduce((sum, record) => sum + record.quantitySold, 0);
-    const totalRevenue = dailySalesData.reduce((sum, record) => sum + record.revenue, 0);
+    const totalQuantitySold = dailySalesData.reduce(
+      (sum, record) => sum + record.quantitySold,
+      0
+    );
+    const totalRevenue = dailySalesData.reduce(
+      (sum, record) => sum + record.revenue,
+      0
+    );
     const daysWithSalesCount = dailySalesData.length;
-    const averageDailySales = daysWithSalesCount > 0 ? totalQuantitySold / daysWithSalesCount : 0;
-    return { totalQuantitySold, totalRevenue, daysWithSalesCount, averageDailySales };
+    const averageDailySales =
+      daysWithSalesCount > 0 ? totalQuantitySold / daysWithSalesCount : 0;
+    return {
+      totalQuantitySold,
+      totalRevenue,
+      daysWithSalesCount,
+      averageDailySales
+    };
   }
 
   async getVariantSalesAnalyticsById(
     variantId: string
   ): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse>> {
-    return this.err.wrap(
-      async () => {
-        const now = new Date();
-        const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+    return this.err.wrap(async () => {
+      const now = new Date();
+      const twoMonthsAgo = new Date(
+        now.getFullYear(),
+        now.getMonth() - 2,
+        now.getDate()
+      );
 
-        const variant = await this.restockAnalyticsRepo.findVariantById(variantId);
-        if (!variant) {
-          return this.err.fail('errors.restock.not_found');
-        }
+      const variant =
+        await this.restockAnalyticsRepo.findVariantById(variantId);
+      if (!variant) {
+        return this.err.fail('errors.restock.not_found');
+      }
 
-        const orderDetails = await this.restockAnalyticsRepo.findOrderDetailsByVariantId(variantId, twoMonthsAgo);
-        const dailySalesData = this.buildDailySalesRecordsFromDetails(orderDetails);
-        const { totalQuantitySold, totalRevenue, daysWithSalesCount, averageDailySales } = this.computeSalesTotals(dailySalesData);
-        const salesMetrics = calculateSalesMetrics(dailySalesData);
+      const orderDetails =
+        await this.restockAnalyticsRepo.findOrderDetailsByVariantId(
+          variantId,
+          twoMonthsAgo
+        );
+      const dailySalesData =
+        this.buildDailySalesRecordsFromDetails(orderDetails);
+      const {
+        totalQuantitySold,
+        totalRevenue,
+        daysWithSalesCount,
+        averageDailySales
+      } = this.computeSalesTotals(dailySalesData);
+      const salesMetrics = calculateSalesMetrics(dailySalesData);
 
-        return {
-          success: true,
-          payload: new VariantSalesAnalyticsResponse({
-            variantId: variant.Id,
-            sku: variant.Sku,
-            productName: variant.Products.Name,
-            volumeMl: variant.VolumeMl,
-            type: variant.Type,
-            basePrice: Number(variant.BasePrice),
-            status: variant.Status,
-            concentrationName: variant.Concentrations.Name,
-            dailySalesData,
-            totalQuantitySold,
-            totalRevenue,
-            averageDailySales: Number(averageDailySales.toFixed(2)),
-            periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
-            periodEndDate: now.toISOString().split('T')[0],
-            daysWithSalesCount,
-            salesMetrics
-          })
-        };
-      },
-      'errors.restock.fetch_candidates'
-    );
+      return {
+        success: true,
+        payload: new VariantSalesAnalyticsResponse({
+          variantId: variant.Id,
+          sku: variant.Sku,
+          productName: variant.Products.Name,
+          volumeMl: variant.VolumeMl,
+          type: variant.Type,
+          basePrice: Number(variant.BasePrice),
+          status: variant.Status,
+          concentrationName: variant.Concentrations.Name,
+          dailySalesData,
+          totalQuantitySold,
+          totalRevenue,
+          averageDailySales: Number(averageDailySales.toFixed(2)),
+          periodStartDate: twoMonthsAgo.toISOString().split('T')[0],
+          periodEndDate: now.toISOString().split('T')[0],
+          daysWithSalesCount,
+          salesMetrics
+        })
+      };
+    }, 'errors.restock.fetch_candidates');
   }
 
   private buildDailySalesRecordsFromDetails(
-    orderDetails: Awaited<ReturnType<RestockAnalyticsRepository['findOrderDetailsByVariantId']>>
+    orderDetails: Awaited<
+      ReturnType<RestockAnalyticsRepository['findOrderDetailsByVariantId']>
+    >
   ): DailySalesRecord[] {
     const dailyMap = new Map<string, { quantity: number; revenue: number }>();
     orderDetails.forEach((detail) => {

@@ -7,4 +7,4 @@ import { PrismaModule } from 'src/prisma/prisma.module';
   providers: [RestockService, RestockAnalyticsRepository],
   exports: [RestockService]
 })
-export class RestockModule { }
+export class RestockModule {}

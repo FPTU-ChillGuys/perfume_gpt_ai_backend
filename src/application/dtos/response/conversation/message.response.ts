@@ -6,7 +6,11 @@ import { ConversationOutputDto } from '../../common/conversation-output.dto';
 /** DTO phản hồi tin nhắn trong cuộc hội thoại */
 export class MessageResponse {
   /** Người gửi tin nhắn */
-  @ApiProperty({ description: 'Người gửi tin nhắn (user hoặc assistant)', required: true, enum: Sender })
+  @ApiProperty({
+    description: 'Người gửi tin nhắn (user hoặc assistant)',
+    required: true,
+    enum: Sender
+  })
   sender!: Sender;
 
   /** Nội dung tin nhắn */
@@ -30,12 +34,12 @@ export class MessageResponse {
    */
   static fromEntity(entity: Message): MessageResponse | null {
     if (!entity) return null;
-    
+
     const response = new MessageResponse();
     response.sender = entity.sender;
     response.message = entity.message; // Mặc định là string từ DB, controller sẽ parse nếu cần
     response.createdAt = entity.createdAt;
-    
+
     return response;
   }
 }

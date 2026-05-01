@@ -8,7 +8,7 @@ import { execSync } from 'child_process';
 import { HttpExceptionFilter } from './application/filters/http-exception.filter';
 import { SuccessResponseInterceptor } from './application/common/interceptors/success-response.interceptor';
 import { ValidationPipe, Logger } from '@nestjs/common';
-import { PrismaService } from './prisma/prisma.service'; 
+import { PrismaService } from './prisma/prisma.service';
 import { createClient } from '@keyv/redis';
 
 const logger = new Logger('Bootstrap');
@@ -28,16 +28,24 @@ async function displayDatabaseStatus(app: any): Promise<void> {
     bright: '\x1b[1m'
   };
 
-  const statusLine = (name: string, connected: boolean, message: string = '') => {
+  const statusLine = (
+    name: string,
+    connected: boolean,
+    message: string = ''
+  ) => {
     const symbol = connected ? '✓' : '✗';
     const color = connected ? colors.green : colors.red;
     const msg = message ? ` - ${message}` : '';
     console.log(`${color}${symbol}${colors.reset} ${name}${msg}`);
   };
 
-  console.log(`\n${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════`);
+  console.log(
+    `\n${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════`
+  );
   console.log(`  Database Connection Status`);
-  console.log(`════════════════════════════════════════════════════════════${colors.reset}`);
+  console.log(
+    `════════════════════════════════════════════════════════════${colors.reset}`
+  );
 
   // PostgreSQL (MikroORM)
   try {
@@ -68,7 +76,9 @@ async function displayDatabaseStatus(app: any): Promise<void> {
     statusLine('Redis (BullMQ)', false, error.message);
   }
 
-  console.log(`${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════${colors.reset}\n`);
+  console.log(
+    `${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════${colors.reset}\n`
+  );
 }
 
 async function bootstrap() {
@@ -87,22 +97,22 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
-      skipMissingProperties: false, // Bắt buộc properties nếu dùng validation decorator
-    }),
+      skipMissingProperties: false // Bắt buộc properties nếu dùng validation decorator
+    })
   );
 
   const config = new DocumentBuilder()
     .setTitle('PerfumeGPT AI Backend')
     .setDescription(
       `API backend cho hệ thống PerfumeGPT AI.\n\n` +
-      `## Xác thực (Authentication)\n` +
-      `- Các endpoint **không có biểu tượng 🔒** là **public**, không cần token.\n` +
-      `- Các endpoint **có biểu tượng 🔒** yêu cầu **Bearer JWT token** trong header \`Authorization\`.\n` +
-      `- Một số endpoint yêu cầu role **admin** — sẽ trả về **403 Forbidden** nếu không đủ quyền.\n\n` +
-      `## Cách xác thực trong Scalar\n` +
-      `1. Tìm phần **Authentication** ở đầu trang hoặc click biểu tượng 🔒 cạnh endpoint.\n` +
-      `2. Chọn scheme **Bearer Token** và nhập JWT token vào ô **Token**.\n` +
-      `3. Các request sẽ tự động gửi kèm header \`Authorization: Bearer <token>\`.`
+        `## Xác thực (Authentication)\n` +
+        `- Các endpoint **không có biểu tượng 🔒** là **public**, không cần token.\n` +
+        `- Các endpoint **có biểu tượng 🔒** yêu cầu **Bearer JWT token** trong header \`Authorization\`.\n` +
+        `- Một số endpoint yêu cầu role **admin** — sẽ trả về **403 Forbidden** nếu không đủ quyền.\n\n` +
+        `## Cách xác thực trong Scalar\n` +
+        `1. Tìm phần **Authentication** ở đầu trang hoặc click biểu tượng 🔒 cạnh endpoint.\n` +
+        `2. Chọn scheme **Bearer Token** và nhập JWT token vào ô **Token**.\n` +
+        `3. Các request sẽ tự động gửi kèm header \`Authorization: Bearer <token>\`.`
     )
     .setVersion('1.0.0')
     .addBearerAuth(

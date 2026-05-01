@@ -54,9 +54,17 @@ export class SurveyProductHelper {
    * Search products by structured analysis query.
    * Wraps ProductService.getProductsByStructuredQuery() và map sang MinimalProductDto[].
    */
-  async searchProducts(analysis: Record<string, unknown>, limit: number = 15): Promise<MinimalProductDto[]> {
-    const searchResponse = await this.productService.getProductsByStructuredQuery(analysis);
-    if (!searchResponse.success || !searchResponse.data || searchResponse.data.items.length === 0) {
+  async searchProducts(
+    analysis: Record<string, unknown>,
+    limit: number = 15
+  ): Promise<MinimalProductDto[]> {
+    const searchResponse =
+      await this.productService.getProductsByStructuredQuery(analysis);
+    if (
+      !searchResponse.success ||
+      !searchResponse.data ||
+      searchResponse.data.items.length === 0
+    ) {
       return [];
     }
     return this.mapToMinimalProducts(searchResponse.data.items.slice(0, limit));
@@ -66,13 +74,23 @@ export class SurveyProductHelper {
    * Search products và enrich variants với concentration info (dùng cho V5).
    * Wraps ProductService.getProductsByStructuredQuery() + map + enrich concentration.
    */
-  async searchProductsWithConcentration(analysis: Record<string, unknown>, limit: number = 20): Promise<MinimalProductDto[]> {
-    const searchResponse = await this.productService.getProductsByStructuredQuery(analysis);
-    if (!searchResponse.success || !searchResponse.data || searchResponse.data.items.length === 0) {
+  async searchProductsWithConcentration(
+    analysis: Record<string, unknown>,
+    limit: number = 20
+  ): Promise<MinimalProductDto[]> {
+    const searchResponse =
+      await this.productService.getProductsByStructuredQuery(analysis);
+    if (
+      !searchResponse.success ||
+      !searchResponse.data ||
+      searchResponse.data.items.length === 0
+    ) {
       return [];
     }
 
-    const products = this.mapToMinimalProducts(searchResponse.data.items.slice(0, limit));
+    const products = this.mapToMinimalProducts(
+      searchResponse.data.items.slice(0, limit)
+    );
     // Enrich concentration info from original response
     products.forEach((p, idx) => {
       const original = searchResponse.data?.items[idx];
@@ -82,7 +100,7 @@ export class SurveyProductHelper {
           id: v.id,
           volume: v.volumeMl,
           price: v.basePrice,
-          concentration: v.concentration?.name,
+          concentration: v.concentration?.name
         }));
       }
     });
@@ -105,16 +123,18 @@ export class SurveyProductHelper {
       image: product.primaryImage,
       category: product.categoryName,
       description: product.description,
-      attributes: (product.attributes || []).map((a: any) => `${a.attribute}: ${a.value}`),
+      attributes: (product.attributes || []).map(
+        (a: any) => `${a.attribute}: ${a.value}`
+      ),
       scentNotes: product.scentNotes,
       olfactoryFamilies: product.olfactoryFamilies,
       variants: (product.variants || []).map((v: any) => ({
         id: v.id,
         volume: v.volumeMl,
         price: v.basePrice,
-        concentration: v.concentration?.name,
+        concentration: v.concentration?.name
       })),
-      source: source || product.source,
+      source: source || product.source
     };
   }
 
@@ -122,7 +142,7 @@ export class SurveyProductHelper {
    * Map danh sách products sang MinimalProductDto[].
    */
   mapToMinimalProducts(products: any[], source?: string): MinimalProductDto[] {
-    return products.map(p => this.mapToMinimalProduct(p, source));
+    return products.map((p) => this.mapToMinimalProduct(p, source));
   }
 
   // ==========================================
@@ -141,7 +161,11 @@ export class SurveyProductHelper {
     productTemp: any[],
     budget?: BudgetConstraint
   ): Promise<any[]> {
-    if (!productTemp || !Array.isArray(productTemp) || productTemp.length === 0) {
+    if (
+      !productTemp ||
+      !Array.isArray(productTemp) ||
+      productTemp.length === 0
+    ) {
       return [];
     }
 
@@ -152,7 +176,8 @@ export class SurveyProductHelper {
 
     if (ids.length === 0) return [];
 
-    const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+    const productResponse =
+      await this.productService.getProductsByIdsForOutput(ids);
     if (!productResponse.success || !productResponse.data) {
       return [];
     }
@@ -162,22 +187,28 @@ export class SurveyProductHelper {
       productTemp.map((item: any) => [item.id, item])
     );
 
-    let hydratedProducts = productResponse.data.map((product: any) => {
-      const aiItem = aiRecMap.get(product.id);
+    let hydratedProducts = productResponse.data
+      .map((product: any) => {
+        const aiItem = aiRecMap.get(product.id);
 
-      // Filter variants by AI recommendation
-      if (aiItem?.variants && Array.isArray(aiItem.variants)) {
-        const variantIdsSet = new Set(aiItem.variants.map((v: any) => v.id));
-        return {
-          ...product,
-          reasoning: aiItem.reasoning || product.reasoning,
-          source: aiItem.source || product.source,
-          variants: (product.variants || []).filter((v: any) => variantIdsSet.has(v.id)),
-        };
-      }
+        // Filter variants by AI recommendation
+        if (aiItem?.variants && Array.isArray(aiItem.variants)) {
+          const variantIdsSet = new Set(aiItem.variants.map((v: any) => v.id));
+          return {
+            ...product,
+            reasoning: aiItem.reasoning || product.reasoning,
+            source: aiItem.source || product.source,
+            variants: (product.variants || []).filter((v: any) =>
+              variantIdsSet.has(v.id)
+            )
+          };
+        }
 
-      return product;
-    }).filter((product: any) => product.variants && product.variants.length > 0);
+        return product;
+      })
+      .filter(
+        (product: any) => product.variants && product.variants.length > 0
+      );
 
     // Apply budget filter on variants
     hydratedProducts = this.filterVariantsByBudget(hydratedProducts, budget);
@@ -201,17 +232,19 @@ export class SurveyProductHelper {
     const min = budget.min ? Number(budget.min) : 0;
     const max = budget.max ? Number(budget.max) : Infinity;
 
-    const filtered = products.map((product: any) => {
-      const filteredVariants = (product.variants || []).filter((v: any) => {
-        const price = Number(v.basePrice || v.price);
-        return price >= min && price <= max;
-      });
-      return { ...product, variants: filteredVariants };
-    }).filter((product: any) => product.variants.length > 0);
+    const filtered = products
+      .map((product: any) => {
+        const filteredVariants = (product.variants || []).filter((v: any) => {
+          const price = Number(v.basePrice || v.price);
+          return price >= min && price <= max;
+        });
+        return { ...product, variants: filteredVariants };
+      })
+      .filter((product: any) => product.variants.length > 0);
 
     this.logger.log(
       `[BudgetFilter] Applied: ${min}-${max === Infinity ? '∞' : max}. ` +
-      `Products: ${products.length} → ${filtered.length}`
+        `Products: ${products.length} → ${filtered.length}`
     );
 
     return filtered;
@@ -245,7 +278,10 @@ export class SurveyProductHelper {
           const variantC = v.concentration.toLowerCase();
           let matched = false;
           for (const requestedC of concentrations) {
-            if (variantC.includes(requestedC) || requestedC.includes(variantC)) {
+            if (
+              variantC.includes(requestedC) ||
+              requestedC.includes(variantC)
+            ) {
               matched = true;
               break;
             }
@@ -282,21 +318,22 @@ export class SurveyProductHelper {
       return { products: [], aiAcceptanceId: null };
     }
 
-    const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-      contextType: context.contextType as any,
-      sourceRefId: context.sourceRefId,
-      products,
-      metadata: {
-        flow: context.flow,
-        questionCount: context.questionCount,
-        productCount: context.productCount ?? products.length,
-        ...context.extra,
-      },
-    });
+    const attachResult =
+      await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        contextType: context.contextType as any,
+        sourceRefId: context.sourceRefId,
+        products,
+        metadata: {
+          flow: context.flow,
+          questionCount: context.questionCount,
+          productCount: context.productCount ?? products.length,
+          ...context.extra
+        }
+      });
 
     return {
       products: attachResult.products,
-      aiAcceptanceId: attachResult.aiAcceptanceId,
+      aiAcceptanceId: attachResult.aiAcceptanceId
     };
   }
 
@@ -309,7 +346,10 @@ export class SurveyProductHelper {
    */
   async getBestSellerFallback(): Promise<MinimalProductDto[]> {
     const fallbackResponse = await this.productService.getBestSellingProducts({
-      PageNumber: 1, PageSize: 5, SortOrder: 'desc', IsDescending: true
+      PageNumber: 1,
+      PageSize: 5,
+      SortOrder: 'desc',
+      IsDescending: true
     });
 
     if (fallbackResponse.success && fallbackResponse.data) {

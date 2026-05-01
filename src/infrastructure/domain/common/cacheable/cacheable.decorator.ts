@@ -14,7 +14,7 @@ let loggerInstance: Logger;
  * Hàm này được gọi nội bộ bởi CacheableModule.
  */
 export function setCacheInstance(cache: Cache): void {
-    cacheInstance = cache;
+  cacheInstance = cache;
 }
 
 /**
@@ -22,7 +22,7 @@ export function setCacheInstance(cache: Cache): void {
  * Hàm này được gọi nội bộ bởi CacheableModule.
  */
 export function setLoggerInstance(logger: Logger): void {
-    loggerInstance = logger;
+  loggerInstance = logger;
 }
 
 /**
@@ -49,58 +49,56 @@ export function setLoggerInstance(logger: Logger): void {
  * async getProductById(id: string) { ... }
  */
 export const Cacheable = (
-    keyGenerator: (args: any[]) => string = (args) =>
-        args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join('_'),
-    ttl: number = CACHE_TTL_1HOUR,
+  keyGenerator: (args: any[]) => string = (args) =>
+    args
+      .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+      .join('_'),
+  ttl: number = CACHE_TTL_1HOUR
 ) => {
-    return (
-        target: any,
-        propertyKey: string,
-        descriptor: PropertyDescriptor,
-    ) => {
-        const originalMethod = descriptor.value;
-        const className = target.constructor.name;
-        const methodName = propertyKey;
+  return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+    const originalMethod = descriptor.value;
+    const className = target.constructor.name;
+    const methodName = propertyKey;
 
-        descriptor.value = async function (...args: any[]) {
-            // Nếu chưa khởi tạo (module chưa được import), chạy method gốc
-            if (!cacheInstance) {
-                return originalMethod.apply(this, args);
-            }
+    descriptor.value = async function (...args: any[]) {
+      // Nếu chưa khởi tạo (module chưa được import), chạy method gốc
+      if (!cacheInstance) {
+        return originalMethod.apply(this, args);
+      }
 
-            const cacheKey = `${className}:${methodName}:${keyGenerator(args)}`;
+      const cacheKey = `${className}:${methodName}:${keyGenerator(args)}`;
 
-            try {
-                const cachedData = await cacheInstance.get(cacheKey);
+      try {
+        const cachedData = await cacheInstance.get(cacheKey);
 
-                if (cachedData !== null && cachedData !== undefined) {
-                    loggerInstance?.debug(
-                        `[Cache HIT] key="${cacheKey}"`,
-                        'CacheableDecorator',
-                    );
-                    return cachedData;
-                }
+        if (cachedData !== null && cachedData !== undefined) {
+          loggerInstance?.debug(
+            `[Cache HIT] key="${cacheKey}"`,
+            'CacheableDecorator'
+          );
+          return cachedData;
+        }
 
-                const result = await originalMethod.apply(this, args);
+        const result = await originalMethod.apply(this, args);
 
-                await cacheInstance.set(cacheKey, result, ttl * 1000); // cache-manager v5 dùng ms
-                loggerInstance?.debug(
-                    `[Cache SET] key="${cacheKey}", ttl=${ttl}s`,
-                    'CacheableDecorator',
-                );
+        await cacheInstance.set(cacheKey, result, ttl * 1000); // cache-manager v5 dùng ms
+        loggerInstance?.debug(
+          `[Cache SET] key="${cacheKey}", ttl=${ttl}s`,
+          'CacheableDecorator'
+        );
 
-                return result;
-            } catch (error) {
-                loggerInstance?.error(
-                    `[Cache ERROR] key="${cacheKey}" - ${(error as Error)?.message}`,
-                    (error as Error)?.stack,
-                    'CacheableDecorator',
-                );
-                // Fallback: trả về kết quả gốc, không crash
-                return originalMethod.apply(this, args);
-            }
-        };
-
-        return descriptor;
+        return result;
+      } catch (error) {
+        loggerInstance?.error(
+          `[Cache ERROR] key="${cacheKey}" - ${(error as Error)?.message}`,
+          (error as Error)?.stack,
+          'CacheableDecorator'
+        );
+        // Fallback: trả về kết quả gốc, không crash
+        return originalMethod.apply(this, args);
+      }
     };
+
+    return descriptor;
+  };
 };

@@ -31,10 +31,10 @@ export class VocabTerm extends Common {
   @Property({ default: 1 })
   confidence: number = 1;
 
-  @OneToMany(() => VocabAlias, alias => alias.term)
+  @OneToMany(() => VocabAlias, (alias) => alias.term)
   aliases = new Array<VocabAlias>();
 
-  @OneToMany(() => VocabAgeBucket, bucket => bucket.term)
+  @OneToMany(() => VocabAgeBucket, (bucket) => bucket.term)
   ageBuckets = new Array<VocabAgeBucket>();
 
   constructor(init?: Partial<VocabTerm>) {

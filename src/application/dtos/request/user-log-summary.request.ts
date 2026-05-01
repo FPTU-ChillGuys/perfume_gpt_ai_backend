@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsDate,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID
+} from 'class-validator';
 
 /** Request tạo bản tóm tắt log người dùng */
 export class UserLogSummaryRequest {
@@ -30,21 +36,32 @@ export class UserLogSummaryRequest {
   logSummary: string = '';
 
   /** Snapshot feature dạng JSON */
-  @ApiProperty({ description: 'Feature snapshot dạng JSON', required: false, type: Object })
+  @ApiProperty({
+    description: 'Feature snapshot dạng JSON',
+    required: false,
+    type: Object
+  })
   @IsOptional()
   @IsObject()
   featureSnapshot?: Record<string, unknown>;
 
   /** Bản tóm tắt log theo ngày */
-  @ApiProperty({ description: 'Bản tóm tắt log theo ngày', required: false, type: Object })
+  @ApiProperty({
+    description: 'Bản tóm tắt log theo ngày',
+    required: false,
+    type: Object
+  })
   @IsOptional()
   @IsObject()
   dailyLogSummary?: Record<string, string>;
 
   /** Snapshot feature theo ngày */
-  @ApiProperty({ description: 'Feature snapshot theo ngày', required: false, type: Object })
+  @ApiProperty({
+    description: 'Feature snapshot theo ngày',
+    required: false,
+    type: Object
+  })
   @IsOptional()
   @IsObject()
   dailyFeatureSnapshot?: Record<string, unknown>;
-
 }

@@ -7,7 +7,11 @@ export class BaseResponseAPI<T = undefined> {
   success!: boolean;
 
   /** Thông báo lỗi (nếu có) */
-  @ApiProperty({ description: 'Thông báo lỗi', nullable: true, required: false })
+  @ApiProperty({
+    description: 'Thông báo lỗi',
+    nullable: true,
+    required: false
+  })
   error?: string | null;
 
   /** Dữ liệu trả về */

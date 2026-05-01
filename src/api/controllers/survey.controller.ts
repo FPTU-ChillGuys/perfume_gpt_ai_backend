@@ -22,7 +22,10 @@ import {
   ApiExtraModels
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
-import { ApiAdminErrors, ApiSharedValidationErrors } from 'src/application/decorators/swagger-error.decorator';
+import {
+  ApiAdminErrors,
+  ApiSharedValidationErrors
+} from 'src/application/decorators/swagger-error.decorator';
 import { SurveyQuesAnsDetailRequest } from 'src/application/dtos/request/survey-ques-ans-detail.request';
 import { SurveyQuesAnwsRequest } from 'src/application/dtos/request/survey-ques-ans.request';
 import { SurveyQuestionRequest } from 'src/application/dtos/request/survey-question.request';
@@ -33,7 +36,10 @@ import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-de
 import { SurveyQuestionAnswerResponse } from 'src/application/dtos/response/survey-question-answer.response';
 import { ReorderQuestionsRequest } from 'src/application/dtos/request/reorder-questions.request';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { BadRequestWithDetailsException, InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import {
+  BadRequestWithDetailsException,
+  InternalServerErrorWithDetailsException
+} from 'src/application/common/exceptions/http-with-details.exception';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { Request } from 'express';
 import { SurveyAttributeService } from 'src/infrastructure/domain/survey/survey-attribute.service';
@@ -57,7 +63,7 @@ export class SurveyController {
     private surveyService: SurveyService,
     private surveyAttributeService: SurveyAttributeService,
     private inputHelper: SurveyInputHelper
-  ) { }
+  ) {}
 
   /** Lấy tất cả câu hỏi survey */
   @Public()
@@ -136,7 +142,9 @@ export class SurveyController {
   /** Cập nhật câu hỏi survey (nội dung, loại và/hoặc câu trả lời) */
   @Role(['admin'])
   @Put('questions/:id')
-  @ApiOperation({ summary: 'Cập nhật câu hỏi survey (questionType và/hoặc answers)' })
+  @ApiOperation({
+    summary: 'Cập nhật câu hỏi survey (questionType và/hoặc answers)'
+  })
   @ApiParam({ name: 'id', description: 'ID câu hỏi' })
   @ApiBody({ type: SurveyQuestionRequest })
   @ApiBaseResponse(SurveyQuestionResponse)
@@ -150,8 +158,16 @@ export class SurveyController {
   /** Trả lời survey và nhận gợi ý nước hoa từ AI (v5 - Hybrid AI + Query fragments + Ranking score) */
   @Public()
   @Post('user/v5')
-  @ApiOperation({ summary: 'Trả lời survey V5 — Hybrid (AI phân tích + Query-based + Ranking score)' })
-  @ApiQuery({ name: 'userId', type: String, required: false, description: 'ID của người dùng' })
+  @ApiOperation({
+    summary:
+      'Trả lời survey V5 — Hybrid (AI phân tích + Query-based + Ranking score)'
+  })
+  @ApiQuery({
+    name: 'userId',
+    type: String,
+    required: false,
+    description: 'ID của người dùng'
+  })
   @ApiBaseResponse(String)
   @ApiBody({ type: [SurveyQuesAnsDetailRequest] })
   async chatSurveyV5(
@@ -160,7 +176,10 @@ export class SurveyController {
     @Body() surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
     const resolvedUserId = this.inputHelper.resolveUserId(req, userId);
-    return this.surveyService.processSurveyV5Hybrid(resolvedUserId, surveyAnswers);
+    return this.surveyService.processSurveyV5Hybrid(
+      resolvedUserId,
+      surveyAnswers
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -180,7 +199,11 @@ export class SurveyController {
   @Public()
   @Get('attributes/:type/values')
   @ApiOperation({ summary: 'Lấy giá trị của 1 loại thuộc tính' })
-  @ApiParam({ name: 'type', description: 'Loại thuộc tính (gender, brand, category, origin, concentration, note, family, attribute, budget)' })
+  @ApiParam({
+    name: 'type',
+    description:
+      'Loại thuộc tính (gender, brand, category, origin, concentration, note, family, attribute, budget)'
+  })
   @ApiBaseResponse(SurveyAttributeValuesResponse, true)
   async getAttributeValues(
     @Param('type') type: SurveyAttributeType
@@ -199,7 +222,9 @@ export class SurveyController {
   /** Tạo câu hỏi survey từ thuộc tính (tự động sinh câu trả lời query-based) */
   @Role(['admin'])
   @Post('questions/from-attribute')
-  @ApiOperation({ summary: 'Tạo câu hỏi survey từ thuộc tính (auto-generate query answers)' })
+  @ApiOperation({
+    summary: 'Tạo câu hỏi survey từ thuộc tính (auto-generate query answers)'
+  })
   @ApiBaseResponse(String)
   async createQuestionFromAttribute(
     @Body() body: CreateQuestionFromAttributeRequest
@@ -225,7 +250,8 @@ export class SurveyController {
   @Public()
   @Get('user/:userId/history')
   @ApiOperation({
-    summary: 'Lấy danh sách lịch sử tất cả các lần trả lời survey của người dùng'
+    summary:
+      'Lấy danh sách lịch sử tất cả các lần trả lời survey của người dùng'
   })
   @ApiParam({ name: 'userId', description: 'ID của người dùng' })
   @ApiBaseResponse(SurveyQuestionAnswerResponse, true)
@@ -263,6 +289,8 @@ export class SurveyController {
   async reorderQuestions(
     @Body() body: ReorderQuestionsRequest
   ): Promise<BaseResponse<void>> {
-    return this.surveyService.reorderQuestions(body.orders.map(o => ({ id: o.id, order: o.order })));
+    return this.surveyService.reorderQuestions(
+      body.orders.map((o) => ({ id: o.id, order: o.order }))
+    );
   }
 }

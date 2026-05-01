@@ -5,7 +5,7 @@ import {
   ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
-  ApiTags,
+  ApiTags
 } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
 import { ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
@@ -28,7 +28,7 @@ export class DictionaryController {
   constructor(
     private readonly dictionarybuilderService: DictionaryBuilderService,
     private readonly nlpEngineService: NlpEngineService,
-    private readonly vocabularySnapshotService: VocabularySnapshotService,
+    private readonly vocabularySnapshotService: VocabularySnapshotService
   ) {}
 
   /**
@@ -38,7 +38,8 @@ export class DictionaryController {
   @Get('snapshot')
   @ApiOperation({
     summary: 'Get dictionary snapshot',
-    description: 'Return the current in-memory dictionary statistics and entity breakdown.',
+    description:
+      'Return the current in-memory dictionary statistics and entity breakdown.'
   })
   @ApiOkResponse({
     description: 'Dictionary snapshot returned successfully',
@@ -48,16 +49,16 @@ export class DictionaryController {
           totalCanonicals: 120,
           totalSynonyms: 340,
           entityBreakdown: {
-            brand: { canonicals: 15, synonyms: 40 },
+            brand: { canonicals: 15, synonyms: 40 }
           },
-          timestamp: '2026-04-02T10:00:00.000Z',
+          timestamp: '2026-04-02T10:00:00.000Z'
         },
         entityBreakdown: {
-          brand: { canonicals: 15, synonyms: 40 },
+          brand: { canonicals: 15, synonyms: 40 }
         },
-        message: 'Dictionary snapshot',
-      },
-    },
+        message: 'Dictionary snapshot'
+      }
+    }
   })
   @ApiBadRequestResponse({ description: 'Dictionary is not initialized' })
   getSnapshot() {
@@ -69,7 +70,7 @@ export class DictionaryController {
     return {
       stats: snapshot.stats,
       entityBreakdown: snapshot.stats.entityBreakdown,
-      message: 'Dictionary snapshot',
+      message: 'Dictionary snapshot'
     };
   }
 
@@ -80,24 +81,25 @@ export class DictionaryController {
   @Get('ready')
   @ApiOperation({
     summary: 'Check dictionary readiness',
-    description: 'Returns whether the dictionary builder and winkNLP services are initialized.',
+    description:
+      'Returns whether the dictionary builder and NLP services are initialized.'
   })
   @ApiOkResponse({
     description: 'Readiness information returned successfully',
     schema: {
       example: {
         dictionaryReady: true,
-        winkNlpReady: true,
-        timestamp: '2026-04-02T10:00:00.000Z',
-      },
-    },
+        nlpReady: true,
+        timestamp: '2026-04-02T10:00:00.000Z'
+      }
+    }
   })
   checkReady() {
     return {
       dictionaryReady: this.dictionarybuilderService.getSnapshot() !== null,
-      winkNlpReady: this.nlpEngineService.isReady(),
+      nlpReady: this.nlpEngineService.isReady(),
       activeNlpEngine: this.nlpEngineService.getActiveEngine(),
-      timestamp: new Date(),
+      timestamp: new Date()
     };
   }
 
@@ -109,14 +111,15 @@ export class DictionaryController {
   @Post('parse')
   @ApiOperation({
     summary: 'Parse and normalize text',
-    description: 'Extract raw entities with winkNLP and normalize them to canonical values.',
+    description:
+      'Extract raw entities with winkNLP and normalize them to canonical values.'
   })
   @ApiBody({
     schema: {
       example: {
-        text: 'mua giày nike air màu đen',
-      },
-    },
+        text: 'mua giày nike air màu đen'
+      }
+    }
   })
   @ApiOkResponse({
     description: 'Text parsed successfully',
@@ -125,7 +128,7 @@ export class DictionaryController {
         input: 'mua giày nike air màu đen',
         rawEntities: [
           { value: 'giày', type: 'product_name' },
-          { value: 'nike air', type: 'brand' },
+          { value: 'nike air', type: 'brand' }
         ],
         normalized: {
           product_name: [
@@ -133,27 +136,29 @@ export class DictionaryController {
               raw: 'giày',
               canonical: 'giày',
               confidence: 1,
-              type: 'product_name',
-            },
+              type: 'product_name'
+            }
           ],
           brand: [
             {
               raw: 'nike air',
               canonical: 'nike',
               confidence: 0.95,
-              type: 'brand',
-            },
-          ],
+              type: 'brand'
+            }
+          ]
         },
         byType: {
           product_name: ['giày'],
-          brand: ['nike'],
+          brand: ['nike']
         },
-        message: 'Parse successful',
-      },
-    },
+        message: 'Parse successful'
+      }
+    }
   })
-  @ApiBadRequestResponse({ description: 'Missing text field or parsing failed' })
+  @ApiBadRequestResponse({
+    description: 'Missing text field or parsing failed'
+  })
   parseText(@Body() body: { text: string }) {
     if (!body.text) {
       return { error: 'text field is required' };
@@ -164,12 +169,12 @@ export class DictionaryController {
       return {
         input: body.text,
         ...result,
-        message: 'Parse successful',
+        message: 'Parse successful'
       };
     } catch (error) {
       this.logger.error(`Parse failed: ${error}`);
       return {
-        error: `Parse failed: ${error}`,
+        error: `Parse failed: ${error}`
       };
     }
   }
@@ -182,14 +187,15 @@ export class DictionaryController {
   @Post('extract-entities')
   @ApiOperation({
     summary: 'Extract raw entities',
-    description: 'Extract custom entities using winkNLP without canonical normalization.',
+    description:
+      'Extract custom entities using winkNLP without canonical normalization.'
   })
   @ApiBody({
     schema: {
       example: {
-        text: 'mua giày nike air màu đen',
-      },
-    },
+        text: 'mua giày nike air màu đen'
+      }
+    }
   })
   @ApiOkResponse({
     description: 'Entities extracted successfully',
@@ -198,14 +204,16 @@ export class DictionaryController {
         input: 'mua giày nike air màu đen',
         rawEntities: [
           { value: 'giày', type: 'product_name' },
-          { value: 'nike air', type: 'brand' },
+          { value: 'nike air', type: 'brand' }
         ],
         count: 2,
-        message: 'Entity extraction successful',
-      },
-    },
+        message: 'Entity extraction successful'
+      }
+    }
   })
-  @ApiBadRequestResponse({ description: 'Missing text field or extraction failed' })
+  @ApiBadRequestResponse({
+    description: 'Missing text field or extraction failed'
+  })
   extractEntities(@Body() body: { text: string }) {
     if (!body.text) {
       return { error: 'text field is required' };
@@ -217,12 +225,12 @@ export class DictionaryController {
         input: body.text,
         rawEntities: entities,
         count: entities.length,
-        message: 'Entity extraction successful',
+        message: 'Entity extraction successful'
       };
     } catch (error) {
       this.logger.error(`Entity extraction failed: ${error}`);
       return {
-        error: `Entity extraction failed: ${error}`,
+        error: `Entity extraction failed: ${error}`
       };
     }
   }
@@ -234,7 +242,8 @@ export class DictionaryController {
   @Get('entity-types')
   @ApiOperation({
     summary: 'List dictionary entity types',
-    description: 'Return all entity types currently registered in the dictionary.',
+    description:
+      'Return all entity types currently registered in the dictionary.'
   })
   @ApiOkResponse({
     description: 'Entity types returned successfully',
@@ -251,12 +260,11 @@ export class DictionaryController {
           'product_name',
           'gender',
           'origin',
-          'variant_type',
-          'note_type',
+          'variant_type'
         ],
-        count: 12,
-      },
-    },
+        count: 11
+      }
+    }
   })
   getEntityTypes() {
     const snapshot = this.dictionarybuilderService.getSnapshot();
@@ -267,7 +275,7 @@ export class DictionaryController {
     const types = Object.keys(snapshot.stats.entityBreakdown);
     return {
       entityTypes: types,
-      count: types.length,
+      count: types.length
     };
   }
 
@@ -278,7 +286,8 @@ export class DictionaryController {
   @Post('rebuild')
   @ApiOperation({
     summary: 'Rebuild dictionary',
-    description: 'Force rebuild the dictionary from master data and reinitialize winkNLP.',
+    description:
+      'Force rebuild the dictionary from master data and reinitialize winkNLP.'
   })
   @ApiOkResponse({
     description: 'Dictionary rebuilt successfully',
@@ -289,20 +298,24 @@ export class DictionaryController {
           totalCanonicals: 120,
           totalSynonyms: 340,
           entityBreakdown: {
-            brand: { canonicals: 15, synonyms: 40 },
+            brand: { canonicals: 15, synonyms: 40 }
           },
-          timestamp: '2026-04-02T10:00:00.000Z',
+          timestamp: '2026-04-02T10:00:00.000Z'
         },
-        message: 'Dictionary rebuilt successfully',
-      },
-    },
+        message: 'Dictionary rebuilt successfully'
+      }
+    }
   })
   @ApiBadRequestResponse({ description: 'Dictionary rebuild failed' })
   async rebuildDictionary() {
     try {
       const snapshot = await this.dictionarybuilderService.buildDictionary();
-      await this.vocabularySnapshotService.persistSnapshot(snapshot, 'manual-rebuild');
-      const reloadedSnapshot = await this.vocabularySnapshotService.loadActiveSnapshot();
+      await this.vocabularySnapshotService.persistSnapshot(
+        snapshot,
+        'manual-rebuild'
+      );
+      const reloadedSnapshot =
+        await this.vocabularySnapshotService.loadActiveSnapshot();
       if (reloadedSnapshot) {
         this.dictionarybuilderService.hydrateSnapshot(reloadedSnapshot);
       }
@@ -310,13 +323,13 @@ export class DictionaryController {
       return {
         success: true,
         stats: reloadedSnapshot?.stats ?? snapshot.stats,
-        message: `Dictionary rebuilt successfully (engine: ${this.nlpEngineService.getActiveEngine()})`,
+        message: `Dictionary rebuilt successfully (engine: ${this.nlpEngineService.getActiveEngine()})`
       };
     } catch (error) {
       this.logger.error(`Rebuild failed: ${error}`);
       return {
         success: false,
-        error: `Rebuild failed: ${error}`,
+        error: `Rebuild failed: ${error}`
       };
     }
   }

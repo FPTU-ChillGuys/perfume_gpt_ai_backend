@@ -1,4 +1,7 @@
-import { DailySalesRecord, SalesMetrics } from 'src/application/dtos/response/variant-sales-analytics.response';
+import {
+  DailySalesRecord,
+  SalesMetrics
+} from 'src/application/dtos/response/variant-sales-analytics.response';
 import { encode } from '@toon-format/toon';
 
 /**
@@ -8,7 +11,9 @@ import { encode } from '@toon-format/toon';
  * @param dailySalesData Mảng dữ liệu bán hàng theo ngày
  * @returns SalesMetrics chứa: last7Days, last30Days, trend, volatility, encodedData
  */
-export function calculateSalesMetrics(dailySalesData: DailySalesRecord[]): SalesMetrics {
+export function calculateSalesMetrics(
+  dailySalesData: DailySalesRecord[]
+): SalesMetrics {
   if (dailySalesData.length === 0) {
     return {
       last7DaysSales: 0,
@@ -25,7 +30,10 @@ export function calculateSalesMetrics(dailySalesData: DailySalesRecord[]): Sales
 
   // Tính sales of last 30 days
   const last30Days = dailySalesData.slice(-30);
-  const last30DaysSales = last30Days.reduce((sum, r) => sum + r.quantitySold, 0);
+  const last30DaysSales = last30Days.reduce(
+    (sum, r) => sum + r.quantitySold,
+    0
+  );
 
   // Tính trend: so sánh first 15 days vs last 15 days
   const midpoint = Math.floor(dailySalesData.length / 2);
@@ -38,7 +46,8 @@ export function calculateSalesMetrics(dailySalesData: DailySalesRecord[]): Sales
       : 0;
   const secondHalfAvg =
     secondHalf.length > 0
-      ? secondHalf.reduce((sum, r) => sum + r.quantitySold, 0) / secondHalf.length
+      ? secondHalf.reduce((sum, r) => sum + r.quantitySold, 0) /
+        secondHalf.length
       : 0;
 
   let trend: 'INCREASING' | 'STABLE' | 'DECLINING' = 'STABLE';
@@ -53,8 +62,10 @@ export function calculateSalesMetrics(dailySalesData: DailySalesRecord[]): Sales
   if (last7Days.length > 1) {
     const mean = last7DaysSales / last7Days.length;
     const variance =
-      last7Days.reduce((sum, r) => sum + Math.pow(r.quantitySold - mean, 2), 0) /
-      last7Days.length;
+      last7Days.reduce(
+        (sum, r) => sum + Math.pow(r.quantitySold - mean, 2),
+        0
+      ) / last7Days.length;
     const stdDev = Math.sqrt(variance);
     const cv = mean > 0 ? stdDev / mean : 0;
 
@@ -81,7 +92,9 @@ export function calculateSalesMetrics(dailySalesData: DailySalesRecord[]): Sales
  * @param dailySalesData Mảng dữ liệu bán hàng theo ngày
  * @returns Encoded string hoặc null nếu encode fail
  */
-export function encodeSalesData(dailySalesData: DailySalesRecord[]): string | null {
+export function encodeSalesData(
+  dailySalesData: DailySalesRecord[]
+): string | null {
   try {
     // Chuyển đổi sang format nhẹ hơn trước khi encode
     const lightData = dailySalesData.map((r) => ({

@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsNotEmpty, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  Min
+} from 'class-validator';
 import { Sentiment } from 'src/domain/enum/sentiment.enum';
 
 /** Request tạo bản tóm tắt đánh giá sản phẩm */

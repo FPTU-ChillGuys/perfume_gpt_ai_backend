@@ -35,12 +35,18 @@ export class RerankService {
   ): Promise<(T & { rerankScore: number })[]> {
     if (!documents || documents.length === 0) return [];
     if (!this.apiKey) {
-      this.logger.warn('[RerankService] OPENROUTER_API_KEY is not set. Skipping rerank.');
-      return documents.slice(0, topN).map(doc => ({ ...doc, rerankScore: 1 }));
+      this.logger.warn(
+        '[RerankService] OPENROUTER_API_KEY is not set. Skipping rerank.'
+      );
+      return documents
+        .slice(0, topN)
+        .map((doc) => ({ ...doc, rerankScore: 1 }));
     }
 
     try {
-      this.logger.log(`[RerankService] Reranking ${documents.length} candidates for query: "${query}"`);
+      this.logger.log(
+        `[RerankService] Reranking ${documents.length} candidates for query: "${query}"`
+      );
 
       // Prepare request for OpenRouter using HttpService
       const response = await firstValueFrom(
@@ -49,38 +55,46 @@ export class RerankService {
           {
             model: 'cohere/rerank-v3.5',
             query: query,
-            documents: documents.map(doc => doc.text),
-            top_n: topN,
+            documents: documents.map((doc) => doc.text),
+            top_n: topN
           },
           {
             headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
-              'Content-Type': 'application/json',
-            },
+              Authorization: `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json'
+            }
           }
         )
       );
 
       const results: RerankResult[] = response.data.results;
-      
+
       // Map results back to original documents
-      const reranked = results.map(res => {
+      const reranked = results.map((res) => {
         const originalDoc = documents[res.index];
         return {
           ...originalDoc,
-          rerankScore: res.relevance_score,
+          rerankScore: res.relevance_score
         };
       });
 
-      this.logger.log(`[RerankService] Rerank completed. Top score: ${reranked[0]?.rerankScore || 0}`);
-      
+      this.logger.log(
+        `[RerankService] Rerank completed. Top score: ${reranked[0]?.rerankScore || 0}`
+      );
+
       return reranked;
     } catch (error) {
-      const errorMessage = error.response?.data?.error?.message || error.message;
-      this.logger.error(`[RerankService] Rerank failed: ${errorMessage}`, error.stack);
-      
+      const errorMessage =
+        error.response?.data?.error?.message || error.message;
+      this.logger.error(
+        `[RerankService] Rerank failed: ${errorMessage}`,
+        error.stack
+      );
+
       // Fallback: return top documents without rerank scores
-      return documents.slice(0, topN).map(doc => ({ ...doc, rerankScore: 0 }));
+      return documents
+        .slice(0, topN)
+        .map((doc) => ({ ...doc, rerankScore: 0 }));
     }
   }
 }

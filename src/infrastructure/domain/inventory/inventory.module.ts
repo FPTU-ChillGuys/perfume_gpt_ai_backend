@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module } from '@nestjs/common';
 import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
 import { UnitOfWorkModule } from 'src/infrastructure/domain/common/unit-of-work.module';
 import { AIModule } from 'src/infrastructure/domain/ai/ai.module';
@@ -10,8 +10,16 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { SourcingModule } from 'src/infrastructure/domain/sourcing/sourcing.module';
 import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
 @Module({
-  imports: [UnitOfWorkModule, AIModule, AdminInstructionModule, RestockModule, SlowStockModule, PrismaModule, SourcingModule],
+  imports: [
+    UnitOfWorkModule,
+    AIModule,
+    AdminInstructionModule,
+    RestockModule,
+    SlowStockModule,
+    PrismaModule,
+    SourcingModule
+  ],
   providers: [InventoryService, InventoryTool, InventoryPrismaRepository],
   exports: [InventoryService, InventoryTool]
 })
-export class InventoryModule { }
+export class InventoryModule {}

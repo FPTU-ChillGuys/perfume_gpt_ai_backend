@@ -1,6 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min
+} from 'class-validator';
 
 /** Request cơ sở cho phân trang và sắp xếp */
 export class PagedAndSortedRequest {
@@ -28,7 +36,11 @@ export class PagedAndSortedRequest {
   // SortBy: string = '';
 
   /** Thứ tự sắp xếp */
-  @ApiProperty({ description: 'Thứ tự sắp xếp', enum: ['asc', 'desc'], default: 'asc' })
+  @ApiProperty({
+    description: 'Thứ tự sắp xếp',
+    enum: ['asc', 'desc'],
+    default: 'asc'
+  })
   @IsOptional()
   @IsEnum(['asc', 'desc'])
   SortOrder: 'asc' | 'desc' = 'asc';

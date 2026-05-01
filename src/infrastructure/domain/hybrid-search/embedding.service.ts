@@ -4,7 +4,10 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { FptEmbeddingService } from './fpt-embedding.service';
 import { ProductEmbedding } from './entities/product-embedding.entity';
 import { TextNormalizer } from './utils/text-normalizer';
-import { VectorSearchResult, EmbeddingStats } from 'src/application/dtos/response/hybrid-search/hybrid-search.types';
+import {
+  VectorSearchResult,
+  EmbeddingStats
+} from 'src/application/dtos/response/hybrid-search/hybrid-search.types';
 import { HYBRID_SEARCH_CONFIG } from 'src/application/constant/hybrid-search.config';
 
 interface ProductData {
@@ -65,10 +68,12 @@ export class EmbeddingService {
     concentrationName: string,
     variants: ProductData['ProductVariants']
   ): string {
-    const variantWithStats = variants.find(v => v.Longevity > 0 || v.Sillage > 0);
+    const variantWithStats = variants.find(
+      (v) => v.Longevity > 0 || v.Sillage > 0
+    );
     const longevity = variantWithStats?.Longevity || 0;
     const sillage = variantWithStats?.Sillage || 0;
-    const minPrice = Math.min(...variants.map(v => v.BasePrice || 0));
+    const minPrice = Math.min(...variants.map((v) => v.BasePrice || 0));
     const priceText = this.formatPriceToVietnamese(minPrice);
 
     const descriptionText = `
@@ -97,17 +102,24 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
     const cleanName = TextNormalizer.clean(product.Name);
     const cleanBrand = TextNormalizer.clean(brandName);
     const cleanCategory = TextNormalizer.clean(categoryName);
-    const cleanGender = TextNormalizer.clean(this.localizeGender(product.Gender));
+    const cleanGender = TextNormalizer.clean(
+      this.localizeGender(product.Gender)
+    );
     const cleanOrigin = TextNormalizer.clean(product.Origin);
-    const cleanNotes = scentNotes.map(n => TextNormalizer.clean(n)).join(', ');
-    const cleanFamilies = olfactoryFamilies.map(f => TextNormalizer.clean(f)).join(', ');
+    const cleanNotes = scentNotes
+      .map((n) => TextNormalizer.clean(n))
+      .join(', ');
+    const cleanFamilies = olfactoryFamilies
+      .map((f) => TextNormalizer.clean(f))
+      .join(', ');
     const cleanDesc = TextNormalizer.clean(product.Description ?? '');
 
-    const minPrice = Math.min(...variants.map(v => v.BasePrice || 0));
+    const minPrice = Math.min(...variants.map((v) => v.BasePrice || 0));
     const priceText = this.formatPriceToVietnamese(minPrice);
     const cleanPriceText = TextNormalizer.clean(priceText);
 
-    const keywords = `${cleanName} ${cleanBrand} ${cleanGender} ${cleanOrigin} ${cleanPriceText} nuoc hoa ${cleanName} ${cleanBrand}`.trim();
+    const keywords =
+      `${cleanName} ${cleanBrand} ${cleanGender} ${cleanOrigin} ${cleanPriceText} nuoc hoa ${cleanName} ${cleanBrand}`.trim();
 
     const lines = [
       `name: ${product.Name}`,
@@ -172,7 +184,9 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
     }
   }
 
-  private async fetchProductForEmbedding(productId: string): Promise<ProductData | null> {
+  private async fetchProductForEmbedding(
+    productId: string
+  ): Promise<ProductData | null> {
     const product = await this.prisma.products.findFirst({
       where: { Id: productId, IsDeleted: false },
       include: {
@@ -184,7 +198,9 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
           where: { IsDeleted: false },
           include: {
             Concentrations: true,
-            ProductAttributes: { include: { Attributes: true, AttributeValues: true } }
+            ProductAttributes: {
+              include: { Attributes: true, AttributeValues: true }
+            }
           }
         },
         Media: { where: { IsPrimary: true } }
@@ -195,19 +211,36 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
     return product as unknown as ProductData;
   }
 
-  private buildEmbeddingTexts(product: ProductData): { description: string; searchText: string } {
-    const scentNotes = product.ProductNoteMaps.map(pnm => pnm.ScentNotes.Name);
-    const olfactoryFamilies = product.ProductFamilyMaps.map(pfm => pfm.OlfactoryFamilies.Name);
-    const concentrationName = product.ProductVariants[0]?.Concentrations.Name || 'N/A';
+  private buildEmbeddingTexts(product: ProductData): {
+    description: string;
+    searchText: string;
+  } {
+    const scentNotes = product.ProductNoteMaps.map(
+      (pnm) => pnm.ScentNotes.Name
+    );
+    const olfactoryFamilies = product.ProductFamilyMaps.map(
+      (pfm) => pfm.OlfactoryFamilies.Name
+    );
+    const concentrationName =
+      product.ProductVariants[0]?.Concentrations.Name || 'N/A';
 
     const description = this.buildProductDescription(
-      product, product.Brands.Name, product.Categories.Name,
-      scentNotes, olfactoryFamilies, concentrationName, product.ProductVariants
+      product,
+      product.Brands.Name,
+      product.Categories.Name,
+      scentNotes,
+      olfactoryFamilies,
+      concentrationName,
+      product.ProductVariants
     );
 
     const searchText = this.buildStructuredSearchText(
-      product, product.Brands.Name, product.Categories.Name,
-      scentNotes, olfactoryFamilies, product.ProductVariants
+      product,
+      product.Brands.Name,
+      product.Categories.Name,
+      scentNotes,
+      olfactoryFamilies,
+      product.ProductVariants
     );
 
     return { description, searchText };
@@ -225,8 +258,14 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
 
       for (const product of products) {
         const result = await this.rebuildProductEmbedding(product.Id);
-        if (result) { success++; } else { failed++; }
-        await new Promise(resolve => setTimeout(resolve, HYBRID_SEARCH_CONFIG.REBUILD_BATCH_DELAY_MS));
+        if (result) {
+          success++;
+        } else {
+          failed++;
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, HYBRID_SEARCH_CONFIG.REBUILD_BATCH_DELAY_MS)
+        );
       }
 
       this.logger.log(`Rebuilt ${success} embeddings, ${failed} failed`);
@@ -237,16 +276,21 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
     }
   }
 
-  async vectorSearch(queryEmbedding: number[], limit: number): Promise<VectorSearchResult[]> {
+  async vectorSearch(
+    queryEmbedding: number[],
+    limit: number
+  ): Promise<VectorSearchResult[]> {
     try {
       const embStr = JSON.stringify(queryEmbedding);
-      const result = await this.em.getConnection().execute(
-        `SELECT product_id, 1 - (vector <=> ?::vector(1024)) AS similarity FROM "product_embeddings" WHERE is_active = true ORDER BY vector <=> ?::vector(1024) LIMIT ?`,
-        [embStr, embStr, limit]
-      );
+      const result = await this.em
+        .getConnection()
+        .execute(
+          `SELECT product_id, 1 - (vector <=> ?::vector(1024)) AS similarity FROM "product_embeddings" WHERE is_active = true ORDER BY vector <=> ?::vector(1024) LIMIT ?`,
+          [embStr, embStr, limit]
+        );
 
       const rows = this.extractRows(result);
-      return rows.map(row => ({
+      return rows.map((row) => ({
         productId: row.product_id as string,
         similarity: parseFloat(row.similarity as string)
       }));
@@ -258,15 +302,19 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
 
   async getEmbeddingsStats(): Promise<EmbeddingStats> {
     try {
-      const result = await this.em.getConnection().execute(
-        `SELECT COUNT(*) as total, MAX(updated_at) as lastRebuild FROM "product_embeddings"`
-      );
+      const result = await this.em
+        .getConnection()
+        .execute(
+          `SELECT COUNT(*) as total, MAX(updated_at) as lastRebuild FROM "product_embeddings"`
+        );
 
       const rows = this.extractRows(result);
       const row = rows[0] ?? { total: '0', lastRebuild: null };
       return {
         total: parseInt(row.total as string),
-        lastRebuild: row.lastRebuild ? new Date(row.lastRebuild as string).toISOString() : undefined
+        lastRebuild: row.lastRebuild
+          ? new Date(row.lastRebuild as string).toISOString()
+          : undefined
       };
     } catch (error) {
       this.logger.error('Get stats error', error);
@@ -277,7 +325,8 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
   private extractRows(result: unknown): Record<string, unknown>[] {
     if (Array.isArray(result)) return result as Record<string, unknown>[];
     const obj = result as Record<string, unknown>;
-    if (obj?.rows && Array.isArray(obj.rows)) return obj.rows as Record<string, unknown>[];
+    if (obj?.rows && Array.isArray(obj.rows))
+      return obj.rows as Record<string, unknown>[];
     return [];
   }
 }

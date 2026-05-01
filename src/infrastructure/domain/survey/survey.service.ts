@@ -14,16 +14,33 @@ import {
 } from 'src/application/mapping';
 import { SurveyQuesAnwsRequest } from 'src/application/dtos/request/survey-ques-ans.request';
 import { SurveyQuestionAnswerResponse } from 'src/application/dtos/response/survey-question-answer.response';
-import { InternalServerErrorWithDetailsException, BadRequestWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
+import {
+  InternalServerErrorWithDetailsException,
+  BadRequestWithDetailsException
+} from 'src/application/common/exceptions/http-with-details.exception';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { SurveyQuestionAnswer } from 'src/domain/entities/survey-question-answer.entity';
 import { v4 as uuidv4 } from 'uuid';
-import { QueryFragment, QueryAnswerPayload, QueryFragmentMatch, QueryFragmentAttribute, QueryFragmentBudget } from 'src/infrastructure/domain/survey/survey-query.types';
+import {
+  QueryFragment,
+  QueryAnswerPayload,
+  QueryFragmentMatch,
+  QueryFragmentAttribute,
+  QueryFragmentBudget
+} from 'src/infrastructure/domain/survey/survey-query.types';
 import { SurveyJobName } from 'src/application/constant/processor';
-import { mergeSurveyQueryResults, SurveyQueryResult } from 'src/infrastructure/domain/survey/survey-merge.util';
+import {
+  mergeSurveyQueryResults,
+  SurveyQueryResult
+} from 'src/infrastructure/domain/survey/survey-merge.util';
 
 // Helpers
-import { SurveyProductHelper, MinimalProductDto, MinimalVariantDto, BudgetConstraint } from './helpers/survey-product.helper';
+import {
+  SurveyProductHelper,
+  MinimalProductDto,
+  MinimalVariantDto,
+  BudgetConstraint
+} from './helpers/survey-product.helper';
 import { SurveyPipelineHelper } from './helpers/survey-pipeline.helper';
 
 /** Analysis result từ AI hoặc query fragments — dùng cho V4/V5 survey pipeline */
@@ -54,10 +71,8 @@ interface SurveyAIResponse {
   [key: string]: unknown;
 }
 
-
 @Injectable()
 export class SurveyService {
-
   private readonly logger = new Logger(SurveyService.name);
 
   constructor(
@@ -66,26 +81,26 @@ export class SurveyService {
     private readonly productHelper: SurveyProductHelper,
     private readonly pipelineHelper: SurveyPipelineHelper,
     private readonly err: I18nErrorHandler
-  ) { }
-
+  ) {}
 
   async addSurveyQues(
     question: SurveyQuestionRequest
   ): Promise<BaseResponse<string>> {
-    return this.err.wrap(
-      async () => {
-        const surveyQuestion =
-          await this.unitOfWork.AISurveyQuestionRepo.createWithAnswers(question);
-        return { success: true, data: surveyQuestion.id };
-      },
-      'errors.survey.add_question_answers'
-    );
+    return this.err.wrap(async () => {
+      const surveyQuestion =
+        await this.unitOfWork.AISurveyQuestionRepo.createWithAnswers(question);
+      return { success: true, data: surveyQuestion.id };
+    }, 'errors.survey.add_question_answers');
   }
 
   /** Tạo câu hỏi survey từ thuộc tính (tự động sinh câu trả lời query-based) */
-  async createQuestionFromAttribute(body: CreateQuestionFromAttributeRequest): Promise<BaseResponse<string>> {
+  async createQuestionFromAttribute(
+    body: CreateQuestionFromAttributeRequest
+  ): Promise<BaseResponse<string>> {
     // 1. Get values for the attribute type
-    const attrValues = await this.pipelineHelper.getAttributeValues(body.attributeType);
+    const attrValues = await this.pipelineHelper.getAttributeValues(
+      body.attributeType
+    );
 
     // 2. Collect all value items
     let allValues = attrValues.values || [];
@@ -93,36 +108,56 @@ export class SurveyService {
     // Handle subGroups for 'attribute' type
     if (body.attributeType === 'attribute' && attrValues.subGroups) {
       if (body.attributeName) {
-        const group = attrValues.subGroups.find(g => g.attributeName === body.attributeName);
+        const group = attrValues.subGroups.find(
+          (g) => g.attributeName === body.attributeName
+        );
         allValues = group?.values || [];
       } else {
-        this.err.throw('errors.survey.invalid_attribute', BadRequestWithDetailsException, { attributeType: body.attributeType });
+        this.err.throw(
+          'errors.survey.invalid_attribute',
+          BadRequestWithDetailsException,
+          { attributeType: body.attributeType }
+        );
       }
     }
 
     // Handle budget type with custom ranges
-    if (body.attributeType === 'budget' && body.budgetRanges && body.budgetRanges.length > 0) {
-      allValues = body.budgetRanges.map(r => ({
+    if (
+      body.attributeType === 'budget' &&
+      body.budgetRanges &&
+      body.budgetRanges.length > 0
+    ) {
+      allValues = body.budgetRanges.map((r) => ({
         displayText: r.label,
-        queryFragment: { type: 'budget' as const, min: r.min, max: r.max },
+        queryFragment: { type: 'budget' as const, min: r.min, max: r.max }
       }));
     }
 
     // 3. Filter selected values if specified
     if (body.selectedValues && body.selectedValues.length > 0) {
       const selectedSet = new Set(body.selectedValues);
-      allValues = allValues.filter(v => selectedSet.has(v.displayText));
+      allValues = allValues.filter((v) => selectedSet.has(v.displayText));
     }
 
     if (allValues.length < 2) {
-      this.err.throw('errors.survey.min_values', BadRequestWithDetailsException, { availableValues: allValues.length });
+      this.err.throw(
+        'errors.survey.min_values',
+        BadRequestWithDetailsException,
+        { availableValues: allValues.length }
+      );
     }
 
     // 4. Validate all query fragments
     for (const val of allValues) {
-      const validation = this.pipelineHelper.validateQueryFragment(val.queryFragment);
+      const validation = this.pipelineHelper.validateQueryFragment(
+        val.queryFragment
+      );
       if (!validation.valid) {
-        this.err.throw('errors.survey.invalid_query_fragment', BadRequestWithDetailsException, { displayText: val.displayText, errors: validation.errors });
+        this.err.throw(
+          'errors.survey.invalid_query_fragment',
+          BadRequestWithDetailsException,
+          { displayText: val.displayText, errors: validation.errors }
+        );
       }
     }
 
@@ -130,12 +165,15 @@ export class SurveyService {
     const surveyQuestionReq: SurveyQuestionRequest = {
       question: body.question,
       questionType: body.questionType as any,
-      answers: allValues.map(val => new SurveyAnswerRequest({
-        answer: JSON.stringify({
-          displayText: val.displayText,
-          queryFragment: val.queryFragment,
-        }),
-      })),
+      answers: allValues.map(
+        (val) =>
+          new SurveyAnswerRequest({
+            answer: JSON.stringify({
+              displayText: val.displayText,
+              queryFragment: val.queryFragment
+            })
+          })
+      )
     };
 
     return this.addSurveyQues(surveyQuestionReq);
@@ -146,10 +184,12 @@ export class SurveyService {
     request: SurveyQuestionRequest
   ): Promise<BaseResponse<SurveyQuestionResponse>> {
     return this.err.wrap(async () => {
-      const surveyQuestion = await this.unitOfWork.AISurveyQuestionRepo.findOne({
-        id,
-        isActive: true
-      });
+      const surveyQuestion = await this.unitOfWork.AISurveyQuestionRepo.findOne(
+        {
+          id,
+          isActive: true
+        }
+      );
 
       if (!surveyQuestion) {
         return this.err.fail('errors.survey.not_found');
@@ -191,7 +231,10 @@ export class SurveyService {
         return this.err.fail('errors.survey.not_found');
       }
 
-      const surveyQuestionResponse = SurveyQuestionMapper.toResponse(surveyQuestion, true);
+      const surveyQuestionResponse = SurveyQuestionMapper.toResponse(
+        surveyQuestion,
+        true
+      );
 
       return { success: true, data: surveyQuestionResponse };
     }, 'errors.survey.get_by_id');
@@ -205,27 +248,28 @@ export class SurveyService {
         { id: { $in: ids }, isActive: true },
         { populate: ['answers'] }
       );
-      const surveyQuestionsResponses =
-        SurveyQuestionMapper.toResponseList(surveyQuestions, true);
+      const surveyQuestionsResponses = SurveyQuestionMapper.toResponseList(
+        surveyQuestions,
+        true
+      );
       return { success: true, data: surveyQuestionsResponses };
     }, 'errors.survey.get_by_id_list');
   }
 
   async getAllSurveyQues(): Promise<BaseResponse<SurveyQuestionResponse[]>> {
-    return this.err.wrap(
-      async () => {
-        const surveyQuestions = await this.unitOfWork.AISurveyQuestionRepo.find(
-          { isActive: true },
-          { populate: ['answers'], orderBy: { order: 'ASC' } }
-        );
+    return this.err.wrap(async () => {
+      const surveyQuestions = await this.unitOfWork.AISurveyQuestionRepo.find(
+        { isActive: true },
+        { populate: ['answers'], orderBy: { order: 'ASC' } }
+      );
 
-        const surveyQuestionsResponses =
-          SurveyQuestionMapper.toResponseList(surveyQuestions, true);
+      const surveyQuestionsResponses = SurveyQuestionMapper.toResponseList(
+        surveyQuestions,
+        true
+      );
 
-        return { success: true, data: surveyQuestionsResponses };
-      },
-      'errors.survey.get_questions'
-    );
+      return { success: true, data: surveyQuestionsResponses };
+    }, 'errors.survey.get_questions');
   }
 
   async addSurveyQuesAnws(
@@ -240,10 +284,11 @@ export class SurveyService {
       const logUserId = surveyQuesAnws.userId ?? uuidv4();
 
       //Log last survey question answer
-      const surveyEventIds = await this.unitOfWork.EventLogRepo.createSurveyEventsFromDetails(
-        logUserId,
-        surveyQuestionAnswer.details.getItems()
-      );
+      const surveyEventIds =
+        await this.unitOfWork.EventLogRepo.createSurveyEventsFromDetails(
+          logUserId,
+          surveyQuestionAnswer.details.getItems()
+        );
 
       if (surveyEventIds.length) {
         await this.pipelineHelper.enqueueRollingSummaryUpdate(logUserId);
@@ -295,7 +340,8 @@ export class SurveyService {
   }
 
   async getSurveyQuesAnwsByUserId(
-    userId: string, limit: number = 1
+    userId: string,
+    limit: number = 1
   ): Promise<BaseResponse<SurveyQuestionAnswerResponse>> {
     return this.err.wrap(async () => {
       const surveyQuestionAnswers =
@@ -316,8 +362,7 @@ export class SurveyService {
         success: true,
         data: SurveyQuestionAnswerMapper.toResponse(surveyQuestionAnswer, true)
       };
-    }
-      , 'errors.survey.get_answer_by_user');
+    }, 'errors.survey.get_answer_by_user');
   }
 
   async getSurveyHistoryListByUserId(
@@ -334,7 +379,10 @@ export class SurveyService {
           }
         );
 
-      const responses = SurveyQuestionAnswerMapper.toResponseList(surveyQuestionAnswers, true);
+      const responses = SurveyQuestionAnswerMapper.toResponseList(
+        surveyQuestionAnswers,
+        true
+      );
       return { success: true, data: responses };
     }, 'errors.survey.get_history');
   }
@@ -351,12 +399,19 @@ export class SurveyService {
     return surveyQuestionAnswer !== null;
   }
 
-  async reorderQuestions(orders: { id: string; order: number }[]): Promise<BaseResponse<void>> {
+  async reorderQuestions(
+    orders: { id: string; order: number }[]
+  ): Promise<BaseResponse<void>> {
     return this.err.wrap(async () => {
       for (const item of orders) {
-        const question = await this.unitOfWork.AISurveyQuestionRepo.findOne({ id: item.id, isActive: true });
+        const question = await this.unitOfWork.AISurveyQuestionRepo.findOne({
+          id: item.id,
+          isActive: true
+        });
         if (!question) {
-          return this.err.fail('errors.survey.not_found_with_id', { id: item.id });
+          return this.err.fail('errors.survey.not_found_with_id', {
+            id: item.id
+          });
         }
         question.order = item.order;
       }
@@ -376,11 +431,13 @@ export class SurveyService {
           { populate: ['answers'] }
         );
         if (!question) {
-          this.err.throw('errors.survey.not_found_with_id', InternalServerErrorWithDetailsException, { id: item.questionId });
+          this.err.throw(
+            'errors.survey.not_found_with_id',
+            InternalServerErrorWithDetailsException,
+            { id: item.questionId }
+          );
         }
-        const answer = question.answers.find(
-          (ans) => ans.id === item.answerId
-        );
+        const answer = question.answers.find((ans) => ans.id === item.answerId);
         return {
           question,
           answer: answer!
@@ -397,7 +454,8 @@ export class SurveyService {
   /** Soft delete câu hỏi survey và tất cả câu trả lời liên quan */
   async softDeleteQuestion(id: string): Promise<BaseResponse<void>> {
     return this.err.wrap(async () => {
-      const deleted = await this.unitOfWork.AISurveyQuestionRepo.softDeleteQuestion(id);
+      const deleted =
+        await this.unitOfWork.AISurveyQuestionRepo.softDeleteQuestion(id);
       if (!deleted) {
         return this.err.fail('errors.survey.not_found_or_deleted');
       }
@@ -415,38 +473,58 @@ export class SurveyService {
     const questionIds = surveyAnswers.map((qa) => qa.questionId);
     const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQueses.success) {
-      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
+      this.err.throw(
+        'errors.survey.get_question',
+        InternalServerErrorWithDetailsException,
+        { questionIds }
+      );
     }
 
-    const quesAnses = this.pipelineHelper.mapSurveyAnswersToQA(surveyAnswers, surveyQueses.data || []);
+    const quesAnses = this.pipelineHelper.mapSurveyAnswersToQA(
+      surveyAnswers,
+      surveyQueses.data || []
+    );
 
     // Step 2: Save survey record
     const savedId = await this.saveSurveyAndLog(userId, surveyAnswers);
 
     // Step 3: Generate AI recommendation
-    const aiResponsePayload = await this.pipelineHelper.generateV1Recommendation(quesAnses);
+    const aiResponsePayload =
+      await this.pipelineHelper.generateV1Recommendation(quesAnses);
 
     if (!aiResponsePayload.success) {
-      this.err.throw('errors.survey.ai_response', InternalServerErrorWithDetailsException, { userId, service: 'AIHelper' });
+      this.err.throw(
+        'errors.survey.ai_response',
+        InternalServerErrorWithDetailsException,
+        { userId, service: 'AIHelper' }
+      );
     }
     if (!aiResponsePayload.data) {
       return Ok('');
     }
 
     // Step 4: Parse & attach AI acceptance
-    const parsedResponse = typeof aiResponsePayload.data === 'string'
-      ? JSON.parse(aiResponsePayload.data)
-      : aiResponsePayload.data;
+    const parsedResponse =
+      typeof aiResponsePayload.data === 'string'
+        ? JSON.parse(aiResponsePayload.data)
+        : aiResponsePayload.data;
 
-    if (Array.isArray(parsedResponse?.products) && parsedResponse.products.length > 0) {
-      const attachResult = await this.productHelper.attachAIAcceptance(parsedResponse.products, {
-        contextType: 'survey',
-        sourceRefId: savedId,
-        flow: 'survey-v1',
-        questionCount: surveyAnswers.length,
-      });
+    if (
+      Array.isArray(parsedResponse?.products) &&
+      parsedResponse.products.length > 0
+    ) {
+      const attachResult = await this.productHelper.attachAIAcceptance(
+        parsedResponse.products,
+        {
+          contextType: 'survey',
+          sourceRefId: savedId,
+          flow: 'survey-v1',
+          questionCount: surveyAnswers.length
+        }
+      );
       parsedResponse.products = attachResult.products;
-      if (attachResult.aiAcceptanceId) parsedResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+      if (attachResult.aiAcceptanceId)
+        parsedResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
     }
 
     return Ok(JSON.stringify(parsedResponse));
@@ -461,13 +539,23 @@ export class SurveyService {
     const questionIds = surveyAnswers.map((qa) => qa.questionId);
     const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQueses.success) {
-      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
+      this.err.throw(
+        'errors.survey.get_question',
+        InternalServerErrorWithDetailsException,
+        { questionIds }
+      );
     }
 
-    const quesAnses = this.pipelineHelper.mapSurveyAnswersToQA(surveyAnswers, surveyQueses.data || []);
+    const quesAnses = this.pipelineHelper.mapSurveyAnswersToQA(
+      surveyAnswers,
+      surveyQueses.data || []
+    );
 
     // Step 2: Queue save record
-    await this.pipelineHelper.enqueueSurveySave(SurveyJobName.ADD_SURVEY_QUESTION_AND_ANSWER, { userId, details: surveyAnswers });
+    await this.pipelineHelper.enqueueSurveySave(
+      SurveyJobName.ADD_SURVEY_QUESTION_AND_ANSWER,
+      { userId, details: surveyAnswers }
+    );
 
     // Step 3: Analyze & Search
     const analysis = await this.pipelineHelper.analyzeSurveyQA(quesAnses);
@@ -495,14 +583,18 @@ export class SurveyService {
 
     // Step 6: Attach AI acceptance
     if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
-      const attachResult = await this.productHelper.attachAIAcceptance(aiResponse.products, {
-        contextType: 'survey',
-        sourceRefId: `survey-v2-${userId}-${Date.now()}`,
-        flow: 'survey-v2',
-        questionCount: surveyAnswers.length,
-      });
+      const attachResult = await this.productHelper.attachAIAcceptance(
+        aiResponse.products,
+        {
+          contextType: 'survey',
+          sourceRefId: `survey-v2-${userId}-${Date.now()}`,
+          flow: 'survey-v2',
+          questionCount: surveyAnswers.length
+        }
+      );
       aiResponse.products = attachResult.products;
-      if (attachResult.aiAcceptanceId) aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+      if (attachResult.aiAcceptanceId)
+        aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
     }
 
     return Ok(JSON.stringify(aiResponse));
@@ -516,18 +608,31 @@ export class SurveyService {
     userId: string,
     surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    this.logger.log(`[SurveyPerQuestion] Starting for userId=${userId}, ${surveyAnswers.length} questions`);
+    this.logger.log(
+      `[SurveyPerQuestion] Starting for userId=${userId}, ${surveyAnswers.length} questions`
+    );
 
     // Step 1: Load Q&A
     const questionIds = surveyAnswers.map((qa) => qa.questionId);
     const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQueses.success) {
-      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
+      this.err.throw(
+        'errors.survey.get_question',
+        InternalServerErrorWithDetailsException,
+        { questionIds }
+      );
     }
 
-    const quesAnses = this.pipelineHelper.mapSurveyAnswersToQAWithId(surveyAnswers, surveyQueses.data || []);
+    const quesAnses = this.pipelineHelper.mapSurveyAnswersToQAWithId(
+      surveyAnswers,
+      surveyQueses.data || []
+    );
     if (quesAnses.length === 0) {
-      this.err.throw('errors.survey.no_valid_qa', InternalServerErrorWithDetailsException, { surveyAnswers });
+      this.err.throw(
+        'errors.survey.no_valid_qa',
+        InternalServerErrorWithDetailsException,
+        { surveyAnswers }
+      );
     }
 
     // Step 2: Save survey record
@@ -537,7 +642,10 @@ export class SurveyService {
     const queryResults: SurveyQueryResult[] = [];
     for (const qa of quesAnses) {
       try {
-        const analysis = await this.pipelineHelper.analyzeSingleAnswer({ question: qa.question, answer: qa.answer });
+        const analysis = await this.pipelineHelper.analyzeSingleAnswer({
+          question: qa.question,
+          answer: qa.answer
+        });
         if (!analysis) {
           queryResults.push({ questionId: qa.questionId, products: [] });
           continue;
@@ -557,17 +665,31 @@ export class SurveyService {
     const mergedProducts = await this.mergeWithFallback(queryResults);
 
     // Step 5: AI Recommendation
-    const quesAnsesSimple = quesAnses.map(q => ({ question: q.question, answer: q.answer }));
+    const quesAnsesSimple = quesAnses.map((q) => ({
+      question: q.question,
+      answer: q.answer
+    }));
     const aiResponse = await this.pipelineHelper.generateAIRecommendation(
       quesAnsesSimple,
-      mergedProducts.length > 0 ? JSON.stringify(mergedProducts) : 'Không tìm thấy sản phẩm phù hợp từ các câu hỏi khảo sát.'
+      mergedProducts.length > 0
+        ? JSON.stringify(mergedProducts)
+        : 'Không tìm thấy sản phẩm phù hợp từ các câu hỏi khảo sát.'
     );
 
     // Step 6: Hydrate & AI acceptance
-    await this.hydrateAndAttachAcceptance(aiResponse, userId, surveyAnswers.length, 'survey-per-question');
+    await this.hydrateAndAttachAcceptance(
+      aiResponse,
+      userId,
+      surveyAnswers.length,
+      'survey-per-question'
+    );
 
-    const queriesWithProducts = queryResults.filter(r => r.products.length > 0);
-    this.logger.log(`[SurveyPerQuestion] Completed. Queries with results: ${queriesWithProducts.length}, Final products: ${(aiResponse.products as Record<string, unknown>[])?.length || 0}`);
+    const queriesWithProducts = queryResults.filter(
+      (r) => r.products.length > 0
+    );
+    this.logger.log(
+      `[SurveyPerQuestion] Completed. Queries with results: ${queriesWithProducts.length}, Final products: ${(aiResponse.products as Record<string, unknown>[])?.length || 0}`
+    );
 
     await this.saveAIResult(savedId, JSON.stringify(aiResponse));
     return Ok(JSON.stringify(aiResponse));
@@ -585,17 +707,24 @@ export class SurveyService {
     userId: string,
     surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    this.logger.log(`[SurveyV4] Starting query-based processing for userId=${userId}, ${surveyAnswers.length} answers`);
+    this.logger.log(
+      `[SurveyV4] Starting query-based processing for userId=${userId}, ${surveyAnswers.length} answers`
+    );
 
     // Step 1: Load Q&A
-    const questionIds = [...new Set(surveyAnswers.map(qa => qa.questionId))];
+    const questionIds = [...new Set(surveyAnswers.map((qa) => qa.questionId))];
     const surveyQueses = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQueses.success || !surveyQueses.data) {
-      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
+      this.err.throw(
+        'errors.survey.get_question',
+        InternalServerErrorWithDetailsException,
+        { questionIds }
+      );
     }
 
     // Step 2: Parse query fragments from answers
-    const { questionQueryMap, quesAnsesForContext } = this.parseV4QueryFragments(surveyAnswers, surveyQueses.data);
+    const { questionQueryMap, quesAnsesForContext } =
+      this.parseV4QueryFragments(surveyAnswers, surveyQueses.data);
 
     // Step 3: Save survey record
     const savedId = await this.saveSurveyAndLog(userId, surveyAnswers);
@@ -610,27 +739,41 @@ export class SurveyService {
     const top5Products = mergedProducts.slice(0, 5);
     const aiResponse = await this.pipelineHelper.generateAIRecommendation(
       quesAnsesForContext,
-      top5Products.length > 0 ? JSON.stringify(top5Products) : 'Không tìm thấy sản phẩm phù hợp từ các câu hỏi khảo sát.'
+      top5Products.length > 0
+        ? JSON.stringify(top5Products)
+        : 'Không tìm thấy sản phẩm phù hợp từ các câu hỏi khảo sát.'
     );
 
     // Step 7: Build final products with budget filter
     const budget = this.extractBudgetFromFragments(questionQueryMap);
-    aiResponse.products = this.buildV4ProductList(top5Products, (aiResponse.productTemp as Record<string, unknown>[]) || [], budget);
+    aiResponse.products = this.buildV4ProductList(
+      top5Products,
+      (aiResponse.productTemp as Record<string, unknown>[]) || [],
+      budget
+    );
 
     // Step 8: Attach AI acceptance
     if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
-      const attachResult = await this.productHelper.attachAIAcceptance(aiResponse.products, {
-        contextType: 'survey',
-        sourceRefId: `survey-v4-${userId}-${Date.now()}`,
-        flow: 'survey-v4-query',
-        questionCount: surveyAnswers.length,
-        extra: { queryCount: queryResults.filter(r => r.products.length > 0).length },
-      });
+      const attachResult = await this.productHelper.attachAIAcceptance(
+        aiResponse.products,
+        {
+          contextType: 'survey',
+          sourceRefId: `survey-v4-${userId}-${Date.now()}`,
+          flow: 'survey-v4-query',
+          questionCount: surveyAnswers.length,
+          extra: {
+            queryCount: queryResults.filter((r) => r.products.length > 0).length
+          }
+        }
+      );
       aiResponse.products = attachResult.products;
-      if (attachResult.aiAcceptanceId) aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+      if (attachResult.aiAcceptanceId)
+        aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
     }
 
-    this.logger.log(`[SurveyV4] Completed. Final products: ${(aiResponse.products as Record<string, unknown>[])?.length || 0}`);
+    this.logger.log(
+      `[SurveyV4] Completed. Final products: ${(aiResponse.products as Record<string, unknown>[])?.length || 0}`
+    );
 
     await this.saveAIResult(savedId, JSON.stringify(aiResponse));
     return Ok(JSON.stringify(aiResponse));
@@ -646,49 +789,76 @@ export class SurveyService {
     userId: string,
     surveyAnswers: { questionId: string; answerId: string }[]
   ): Promise<BaseResponse<string>> {
-    this.logger.log(`[SurveyV5] Starting hybrid processing for userId=${userId}, ${surveyAnswers.length} answers`);
+    this.logger.log(
+      `[SurveyV5] Starting hybrid processing for userId=${userId}, ${surveyAnswers.length} answers`
+    );
 
     // Step 1: Load Q&A
-    const questionIds = [...new Set(surveyAnswers.map(qa => qa.questionId))];
+    const questionIds = [...new Set(surveyAnswers.map((qa) => qa.questionId))];
     const surveyQuesesResponse = await this.getSurveyQuesByIdList(questionIds);
     if (!surveyQuesesResponse.success || !surveyQuesesResponse.data) {
-      this.err.throw('errors.survey.get_question', InternalServerErrorWithDetailsException, { questionIds });
+      this.err.throw(
+        'errors.survey.get_question',
+        InternalServerErrorWithDetailsException,
+        { questionIds }
+      );
     }
 
     // Step 2: Hybrid Answer Analysis (Parse JSON or Call AI)
-    const { perQuestionAnalysis, quesAnsesForContext } = await this.analyzeV5HybridAnswers(surveyAnswers, surveyQuesesResponse.data);
+    const { perQuestionAnalysis, quesAnsesForContext } =
+      await this.analyzeV5HybridAnswers(
+        surveyAnswers,
+        surveyQuesesResponse.data
+      );
 
     // Step 3: Save survey record
     const savedId = await this.saveSurveyAndLog(userId, surveyAnswers);
 
     // Step 4: Extract Global Budget & Concentration
-    const { budget, concentrations } = this.extractV5GlobalConstraints(perQuestionAnalysis);
+    const { budget, concentrations } =
+      this.extractV5GlobalConstraints(perQuestionAnalysis);
 
     // Step 5: Execute Queries (excluding Budget & Concentration for ranking)
     const queryResults = await this.executeV5Queries(perQuestionAnalysis);
 
     // Step 6: Merge & Filter
     let mergedProducts = mergeSurveyQueryResults(queryResults, 50);
-    mergedProducts = this.productHelper.filterVariantsByBudgetAndConcentration(mergedProducts, budget, concentrations);
+    mergedProducts = this.productHelper.filterVariantsByBudgetAndConcentration(
+      mergedProducts,
+      budget,
+      concentrations
+    );
 
     // Step 7: AI Recommendation
     const topProducts = mergedProducts.slice(0, 10);
-    const aiResponse = await this.pipelineHelper.generateAIRecommendationV5(quesAnsesForContext, topProducts);
+    const aiResponse = await this.pipelineHelper.generateAIRecommendationV5(
+      quesAnsesForContext,
+      topProducts
+    );
 
     // Step 8: Build final products with budget/concentration filter
-    aiResponse.products = this.buildV5ProductList(topProducts, (aiResponse.productTemp as Record<string, unknown>[]) || [], budget, concentrations);
+    aiResponse.products = this.buildV5ProductList(
+      topProducts,
+      (aiResponse.productTemp as Record<string, unknown>[]) || [],
+      budget,
+      concentrations
+    );
 
     // Step 9: Attach AI acceptance
     if ((aiResponse.products as Record<string, unknown>[])?.length > 0) {
-      const attachResult = await this.productHelper.attachAIAcceptance(aiResponse.products as Record<string, unknown>[], {
-        contextType: 'survey',
-        sourceRefId: `survey-v5-${userId}-${Date.now()}`,
-        flow: 'survey-v5-hybrid',
-        questionCount: surveyAnswers.length,
-        extra: { minPrice: budget?.min, maxPrice: budget?.max },
-      });
+      const attachResult = await this.productHelper.attachAIAcceptance(
+        aiResponse.products as Record<string, unknown>[],
+        {
+          contextType: 'survey',
+          sourceRefId: `survey-v5-${userId}-${Date.now()}`,
+          flow: 'survey-v5-hybrid',
+          questionCount: surveyAnswers.length,
+          extra: { minPrice: budget?.min, maxPrice: budget?.max }
+        }
+      );
       aiResponse.products = attachResult.products;
-      if (attachResult.aiAcceptanceId) aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+      if (attachResult.aiAcceptanceId)
+        aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
     }
 
     await this.saveAIResult(savedId, JSON.stringify(aiResponse));
@@ -708,14 +878,24 @@ export class SurveyService {
       new SurveyQuesAnwsRequest({ userId, details: surveyAnswers })
     );
     if (!savedResponse.success || !savedResponse.data?.id) {
-      this.err.throw('errors.survey.save_answers', InternalServerErrorWithDetailsException, { userId });
+      this.err.throw(
+        'errors.survey.save_answers',
+        InternalServerErrorWithDetailsException,
+        { userId }
+      );
     }
     await this.pipelineHelper.logSurveyRecord(userId, savedResponse.data.id);
     return savedResponse.data.id;
   }
 
-  private async saveAIResult(surveyAnswerId: string, aiResult: string): Promise<void> {
-    const surveyAnswer = await this.unitOfWork.AISurveyQuestionAnswerRepo.findOne({ id: surveyAnswerId });
+  private async saveAIResult(
+    surveyAnswerId: string,
+    aiResult: string
+  ): Promise<void> {
+    const surveyAnswer =
+      await this.unitOfWork.AISurveyQuestionAnswerRepo.findOne({
+        id: surveyAnswerId
+      });
     if (surveyAnswer) {
       surveyAnswer.aiResult = aiResult;
       await this.unitOfWork.AISurveyQuestionAnswerRepo.getEntityManager().flush();
@@ -723,11 +903,15 @@ export class SurveyService {
   }
 
   /** Merge query results + fallback to bestsellers. Dùng chung cho V3, V4. */
-  private async mergeWithFallback(queryResults: SurveyQueryResult[]): Promise<any[]> {
+  private async mergeWithFallback(
+    queryResults: SurveyQueryResult[]
+  ): Promise<any[]> {
     const mergedProducts = mergeSurveyQueryResults(queryResults, 20);
 
     if (mergedProducts.length === 0) {
-      this.logger.warn('[SurveyMerge] No products found, falling back to bestsellers');
+      this.logger.warn(
+        '[SurveyMerge] No products found, falling back to bestsellers'
+      );
       const fallbackProducts = await this.productHelper.getBestSellerFallback();
       mergedProducts.push(...fallbackProducts);
     }
@@ -737,24 +921,34 @@ export class SurveyService {
 
   /** Hydrate products from AI response + attach AI acceptance. Dùng chung cho V3. */
   private async hydrateAndAttachAcceptance(
-    aiResponse: { productTemp?: unknown[]; products?: unknown[]; aiAcceptanceId?: string },
+    aiResponse: {
+      productTemp?: unknown[];
+      products?: unknown[];
+      aiAcceptanceId?: string;
+    },
     userId: string,
     questionCount: number,
     flow: string
   ): Promise<void> {
     if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
-      aiResponse.products = await this.productHelper.hydrateAndFilterProducts(aiResponse.productTemp);
+      aiResponse.products = await this.productHelper.hydrateAndFilterProducts(
+        aiResponse.productTemp
+      );
     }
 
     if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
-      const attachResult = await this.productHelper.attachAIAcceptance(aiResponse.products, {
-        contextType: 'survey',
-        sourceRefId: `${flow}-${userId}-${Date.now()}`,
-        flow,
-        questionCount,
-      });
+      const attachResult = await this.productHelper.attachAIAcceptance(
+        aiResponse.products,
+        {
+          contextType: 'survey',
+          sourceRefId: `${flow}-${userId}-${Date.now()}`,
+          flow,
+          questionCount
+        }
+      );
       aiResponse.products = attachResult.products;
-      if (attachResult.aiAcceptanceId) aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
+      if (attachResult.aiAcceptanceId)
+        aiResponse.aiAcceptanceId = attachResult.aiAcceptanceId;
     }
   }
 
@@ -763,17 +957,27 @@ export class SurveyService {
     surveyAnswers: { questionId: string; answerId: string }[],
     surveyQueses: SurveyQuestionResponse[]
   ): {
-    questionQueryMap: Map<string, { question: string; fragments: QueryFragment[]; displayAnswers: string[] }>;
+    questionQueryMap: Map<
+      string,
+      { question: string; fragments: QueryFragment[]; displayAnswers: string[] }
+    >;
     quesAnsesForContext: Array<{ question: string; answer: string }>;
   } {
-    const questionQueryMap = new Map<string, { question: string; fragments: QueryFragment[]; displayAnswers: string[] }>();
+    const questionQueryMap = new Map<
+      string,
+      { question: string; fragments: QueryFragment[]; displayAnswers: string[] }
+    >();
     const quesAnsesForContext: Array<{ question: string; answer: string }> = [];
 
     for (const surveyAnswer of surveyAnswers) {
-      const surveyQues = surveyQueses.find(q => q.id === surveyAnswer.questionId);
+      const surveyQues = surveyQueses.find(
+        (q) => q.id === surveyAnswer.questionId
+      );
       if (!surveyQues?.answers || !surveyQues.question) continue;
 
-      const answer = surveyQues.answers.find(ans => ans.id === surveyAnswer.answerId);
+      const answer = surveyQues.answers.find(
+        (ans) => ans.id === surveyAnswer.answerId
+      );
       if (!answer?.answer) continue;
 
       const parsed = this.pipelineHelper.tryParseAnswerAsQuery(answer.answer);
@@ -782,7 +986,7 @@ export class SurveyService {
         questionQueryMap.set(surveyAnswer.questionId, {
           question: surveyQues.question,
           fragments: [],
-          displayAnswers: [],
+          displayAnswers: []
         });
       }
 
@@ -796,7 +1000,10 @@ export class SurveyService {
     }
 
     for (const [, entry] of questionQueryMap) {
-      quesAnsesForContext.push({ question: entry.question, answer: entry.displayAnswers.join(', ') });
+      quesAnsesForContext.push({
+        question: entry.question,
+        answer: entry.displayAnswers.join(', ')
+      });
     }
 
     return { questionQueryMap, quesAnsesForContext };
@@ -804,13 +1011,18 @@ export class SurveyService {
 
   /** Execute product queries cho từng question trong V4. */
   private async executeV4Queries(
-    questionQueryMap: Map<string, { question: string; fragments: QueryFragment[]; displayAnswers: string[] }>
+    questionQueryMap: Map<
+      string,
+      { question: string; fragments: QueryFragment[]; displayAnswers: string[] }
+    >
   ): Promise<SurveyQueryResult[]> {
     const queryResults: SurveyQueryResult[] = [];
 
     for (const [questionId, entry] of questionQueryMap) {
       if (entry.fragments.length === 0) {
-        this.logger.warn(`[SurveyV4] Question "${entry.question.substring(0, 30)}..." has no query fragments, skipping`);
+        this.logger.warn(
+          `[SurveyV4] Question "${entry.question.substring(0, 30)}..." has no query fragments, skipping`
+        );
         queryResults.push({ questionId, products: [] });
         continue;
       }
@@ -833,13 +1045,18 @@ export class SurveyService {
 
   /** Extract budget constraint từ query fragments (V4). */
   private extractBudgetFromFragments(
-    questionQueryMap: Map<string, { question: string; fragments: QueryFragment[]; displayAnswers: string[] }>
+    questionQueryMap: Map<
+      string,
+      { question: string; fragments: QueryFragment[]; displayAnswers: string[] }
+    >
   ): BudgetConstraint | undefined {
     for (const [, entry] of questionQueryMap.entries()) {
       for (const frag of entry.fragments) {
         if (frag.type === 'budget') {
           const bFrag = frag as QueryFragmentBudget;
-          this.logger.log(`[SurveyV4] Budget constraint detected: min=${bFrag.min}, max=${bFrag.max}`);
+          this.logger.log(
+            `[SurveyV4] Budget constraint detected: min=${bFrag.min}, max=${bFrag.max}`
+          );
           return { min: bFrag.min, max: bFrag.max };
         }
       }
@@ -853,34 +1070,48 @@ export class SurveyService {
     productTemp: Record<string, unknown>[],
     budget?: BudgetConstraint
   ): Record<string, unknown>[] {
-    const aiRecMap = new Map<string, Record<string, unknown>>(productTemp.map((item) => [item.id as string, item]));
+    const aiRecMap = new Map<string, Record<string, unknown>>(
+      productTemp.map((item) => [item.id as string, item])
+    );
 
-    const products = top5Products.map(p => {
-      const aiItem = aiRecMap.get(p.id);
-      let variants = (p.variants || []).map((v) => ({
-        id: v.id,
-        sku: `SKU-${v.id.substring(0, 8)}`,
-        volumeMl: v.volume || 0,
-        basePrice: v.price || 0,
-      }));
+    const products = top5Products
+      .map((p) => {
+        const aiItem = aiRecMap.get(p.id);
+        let variants = (p.variants || []).map((v) => ({
+          id: v.id,
+          sku: `SKU-${v.id.substring(0, 8)}`,
+          volumeMl: v.volume || 0,
+          basePrice: v.price || 0
+        }));
 
-      if (budget) {
-        variants = this.productHelper.filterVariantsByBudget([{ ...p, variants }], budget)[0]?.variants || [];
-        this.logger.log(`[SurveyV4] Product ${p.name}: budget filter applied, ${variants.length} variants remaining`);
-      }
+        if (budget) {
+          variants =
+            this.productHelper.filterVariantsByBudget(
+              [{ ...p, variants }],
+              budget
+            )[0]?.variants || [];
+          this.logger.log(
+            `[SurveyV4] Product ${p.name}: budget filter applied, ${variants.length} variants remaining`
+          );
+        }
 
-      return {
-        id: p.id,
-        name: p.name,
-        brandName: p.brand,
-        primaryImage: p.image,
-        reasoning: (aiItem?.reasoning as string) || 'Sản phẩm phù hợp nhất với nhu cầu của bạn.',
-        source: p.source || (aiItem?.source as string) || 'SURVEY_V4_QUERY',
-        variants,
-      };
-    }).filter(p => (p as { variants: unknown[] }).variants.length > 0);
+        return {
+          id: p.id,
+          name: p.name,
+          brandName: p.brand,
+          primaryImage: p.image,
+          reasoning:
+            (aiItem?.reasoning as string) ||
+            'Sản phẩm phù hợp nhất với nhu cầu của bạn.',
+          source: p.source || (aiItem?.source as string) || 'SURVEY_V4_QUERY',
+          variants
+        };
+      })
+      .filter((p) => (p as { variants: unknown[] }).variants.length > 0);
 
-    this.logger.log(`[SurveyV4] Assigned ${products.length} products (after budget variant filtering).`);
+    this.logger.log(
+      `[SurveyV4] Assigned ${products.length} products (after budget variant filtering).`
+    );
     return products;
   }
 
@@ -896,10 +1127,14 @@ export class SurveyService {
     const quesAnsesForContext: Array<{ question: string; answer: string }> = [];
 
     for (const surveyAnswer of surveyAnswers) {
-      const surveyQues = surveyQueses.find(q => q.id === surveyAnswer.questionId);
+      const surveyQues = surveyQueses.find(
+        (q) => q.id === surveyAnswer.questionId
+      );
       if (!surveyQues?.answers || !surveyQues.question) continue;
 
-      const answer = surveyQues.answers.find(ans => ans.id === surveyAnswer.answerId);
+      const answer = surveyQues.answers.find(
+        (ans) => ans.id === surveyAnswer.answerId
+      );
       if (!answer?.answer) continue;
 
       let analysis: SurveyAnalysis | null = null;
@@ -910,13 +1145,26 @@ export class SurveyService {
         analysis = this.queryFragmentsToAnalysis([parsed.queryFragment]);
         displayAnswer = parsed.displayText;
       } else {
-        this.logger.log(`[SurveyV5] Manual text detected for question "${surveyQues.question.substring(0, 30)}...", analyzing with AI...`);
-        analysis = await this.pipelineHelper.analyzeSingleAnswer({ question: surveyQues.question, answer: answer.answer });
+        this.logger.log(
+          `[SurveyV5] Manual text detected for question "${surveyQues.question.substring(0, 30)}...", analyzing with AI...`
+        );
+        analysis = await this.pipelineHelper.analyzeSingleAnswer({
+          question: surveyQues.question,
+          answer: answer.answer
+        });
       }
 
       if (analysis) {
-        perQuestionAnalysis.push({ questionId: surveyAnswer.questionId, question: surveyQues.question, answer: displayAnswer, analysis });
-        quesAnsesForContext.push({ question: surveyQues.question, answer: displayAnswer });
+        perQuestionAnalysis.push({
+          questionId: surveyAnswer.questionId,
+          question: surveyQues.question,
+          answer: displayAnswer,
+          analysis
+        });
+        quesAnsesForContext.push({
+          question: surveyQues.question,
+          answer: displayAnswer
+        });
       }
     }
 
@@ -935,17 +1183,31 @@ export class SurveyService {
       if (!item.analysis) continue;
       const b = item.analysis.budget;
       if (b) {
-        if (b.min != null) minPrice = minPrice !== undefined ? Math.max(minPrice, b.min!) : b.min!;
-        if (b.max != null) maxPrice = maxPrice !== undefined ? Math.min(maxPrice, b.max!) : b.max!;
+        if (b.min != null)
+          minPrice =
+            minPrice !== undefined ? Math.max(minPrice, b.min!) : b.min!;
+        if (b.max != null)
+          maxPrice =
+            maxPrice !== undefined ? Math.min(maxPrice, b.max!) : b.max!;
       }
-      if (item.analysis.concentrationValues && Array.isArray(item.analysis.concentrationValues)) {
-        item.analysis.concentrationValues.forEach((c: string) => concentrations.add(c.toLowerCase()));
+      if (
+        item.analysis.concentrationValues &&
+        Array.isArray(item.analysis.concentrationValues)
+      ) {
+        item.analysis.concentrationValues.forEach((c: string) =>
+          concentrations.add(c.toLowerCase())
+        );
       }
     }
 
-    this.logger.log(`[SurveyV5] Global Constraints: Budget[${minPrice}-${maxPrice}], Concentrations[${Array.from(concentrations).join(', ')}]`);
+    this.logger.log(
+      `[SurveyV5] Global Constraints: Budget[${minPrice}-${maxPrice}], Concentrations[${Array.from(concentrations).join(', ')}]`
+    );
 
-    const budget = (minPrice !== undefined || maxPrice !== undefined) ? { min: minPrice, max: maxPrice } : undefined;
+    const budget =
+      minPrice !== undefined || maxPrice !== undefined
+        ? { min: minPrice, max: maxPrice }
+        : undefined;
     return { budget, concentrations };
   }
 
@@ -962,7 +1224,10 @@ export class SurveyService {
       analysisCopy.pagination = { pageNumber: 1, pageSize: 20 };
 
       try {
-        const products = await this.productHelper.searchProductsWithConcentration(analysisCopy);
+        const products =
+          await this.productHelper.searchProductsWithConcentration(
+            analysisCopy
+          );
         if (products.length > 0) {
           queryResults.push({ questionId: item.questionId, products });
         } else {
@@ -984,17 +1249,19 @@ export class SurveyService {
     budget: BudgetConstraint | undefined,
     concentrations: Set<string>
   ): Record<string, unknown>[] {
-    const aiRecMap = new Map<string, Record<string, unknown>>(productTemp.map((item) => [item.id as string, item]));
+    const aiRecMap = new Map<string, Record<string, unknown>>(
+      productTemp.map((item) => [item.id as string, item])
+    );
 
     return topProducts
-      .filter(p => aiRecMap.has(p.id))
-      .map(p => {
+      .filter((p) => aiRecMap.has(p.id))
+      .map((p) => {
         const aiItem = aiRecMap.get(p.id);
         let variants = (p.variants || []).map((v) => ({
           id: v.id,
           sku: `SKU-${v.id.substring(0, 8)}`,
           volumeMl: v.volume || 0,
-          basePrice: v.price || 0,
+          basePrice: v.price || 0
         }));
 
         // Filter variants theo budget & concentration
@@ -1008,15 +1275,18 @@ export class SurveyService {
         }
 
         return {
-          id: p.id, name: p.name,
+          id: p.id,
+          name: p.name,
           brandName: p.brand,
           primaryImage: p.image,
-          reasoning: (aiItem?.reasoning as string) || 'Sản phẩm đạt điểm tương xứng cao nhất với sở thích của bạn.',
+          reasoning:
+            (aiItem?.reasoning as string) ||
+            'Sản phẩm đạt điểm tương xứng cao nhất với sở thích của bạn.',
           source: p.source || (aiItem?.source as string) || 'SURVEY_V5_HYBRID',
-          variants,
+          variants
         };
       })
-      .filter(p => (p as { variants: unknown[] }).variants.length > 0)
+      .filter((p) => (p as { variants: unknown[] }).variants.length > 0)
       .slice(0, 5);
   }
 
@@ -1065,7 +1335,7 @@ export class SurveyService {
       concentrationValues,
       budget,
       pagination: { pageNumber: 1, pageSize: 15 },
-      sorting: { field: 'Newest', isDescending: true },
+      sorting: { field: 'Newest', isDescending: true }
     };
   }
 }

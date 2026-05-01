@@ -13,7 +13,11 @@ export class ConversationResponse {
   userId!: string;
 
   /** Danh sách tin nhắn */
-  @ApiProperty({ description: 'Danh sách tin nhắn', type: [MessageResponse], required: true })
+  @ApiProperty({
+    description: 'Danh sách tin nhắn',
+    type: [MessageResponse],
+    required: true
+  })
   messages: MessageResponse[] = [];
 
   /** Ngày cập nhật cuối cùng */
@@ -21,7 +25,11 @@ export class ConversationResponse {
   updatedAt!: Date;
 
   /** Đánh dấu response được xử lý cho Mobile */
-  @ApiProperty({ description: 'Đánh dấu response cho Mobile', required: false, default: false })
+  @ApiProperty({
+    description: 'Đánh dấu response cho Mobile',
+    required: false,
+    default: false
+  })
   isMobile?: boolean;
 
   /**
@@ -43,7 +51,9 @@ export class ConversationResponse {
         const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return timeA - timeB;
       });
-      response.messages = messages.map(msg => MessageResponse.fromEntity(msg)!);
+      response.messages = messages.map(
+        (msg) => MessageResponse.fromEntity(msg)!
+      );
     }
 
     return response;

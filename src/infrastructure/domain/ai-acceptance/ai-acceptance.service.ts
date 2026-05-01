@@ -4,7 +4,10 @@ import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
 import { Injectable, Logger } from '@nestjs/common';
 import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { v4 as uuid } from 'uuid';
-import { AIAcceptanceContextType, AI_ACCEPTANCE_DEFAULT_VISIBLE_HOURS } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.constants';
+import {
+  AIAcceptanceContextType,
+  AI_ACCEPTANCE_DEFAULT_VISIBLE_HOURS
+} from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.constants';
 
 export interface CreatePendingAIAcceptanceInput {
   contextType: AIAcceptanceContextType;
@@ -39,7 +42,10 @@ export interface AIAcceptanceMetrics {
 export class AIAcceptanceService {
   private readonly logger = new Logger(AIAcceptanceService.name);
 
-  constructor(private unitOfWork: UnitOfWork, private readonly err: I18nErrorHandler) { }
+  constructor(
+    private unitOfWork: UnitOfWork,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   private resolveVisibleAfterAt(visibleInHours?: number): Date {
     const hours = Number.isFinite(visibleInHours)
@@ -48,7 +54,10 @@ export class AIAcceptanceService {
     return new Date(Date.now() + hours * 60 * 60 * 1000);
   }
 
-  private isVisibleRecord(record: AIAcceptance, now: Date = new Date()): boolean {
+  private isVisibleRecord(
+    record: AIAcceptance,
+    now: Date = new Date()
+  ): boolean {
     if (record.isAccepted) return true;
     if (!record.visibleAfterAt) return false;
     return new Date(record.visibleAfterAt).getTime() <= now.getTime();
@@ -56,7 +65,13 @@ export class AIAcceptanceService {
 
   private normalizeProductIds(productIds?: string[]): string[] {
     if (!Array.isArray(productIds)) return [];
-    return Array.from(new Set(productIds.filter((id) => typeof id === 'string' && id.trim().length > 0)));
+    return Array.from(
+      new Set(
+        productIds.filter(
+          (id) => typeof id === 'string' && id.trim().length > 0
+        )
+      )
+    );
   }
 
   private extractProductIdsFromPayload(products: any[]): string[] {
@@ -81,19 +96,29 @@ export class AIAcceptanceService {
         contextType: input.contextType,
         responseId: uuid(),
         sourceRefId: input.sourceRefId ?? null,
-        productIdsJson: normalizedProductIds.length > 0 ? JSON.stringify(normalizedProductIds) : null,
+        productIdsJson:
+          normalizedProductIds.length > 0
+            ? JSON.stringify(normalizedProductIds)
+            : null,
         metadataJson: input.metadata ? JSON.stringify(input.metadata) : null,
         visibleAfterAt: this.resolveVisibleAfterAt(input.visibleInHours),
         clickedAt: null
       });
 
-      this.logger.log(`[AIAcceptance] Creating pending record for context=${input.contextType}, productIds=${normalizedProductIds.length}, sourceRefId=${input.sourceRefId}`);
+      this.logger.log(
+        `[AIAcceptance] Creating pending record for context=${input.contextType}, productIds=${normalizedProductIds.length}, sourceRefId=${input.sourceRefId}`
+      );
       await this.unitOfWork.AIAcceptanceRepo.insert(record);
-      this.logger.log(`[AIAcceptance] Successfully created pending record with id=${record.id}`);
+      this.logger.log(
+        `[AIAcceptance] Successfully created pending record with id=${record.id}`
+      );
       return { success: true, data: record };
     } catch (error) {
       this.err.log('errors.ai.acceptance_create');
-      this.err.logWithDetail('errors.ai.acceptance_create', `context=${input.contextType}, productIds=${input.productIds?.length ?? 0}, sourceRefId=${input.sourceRefId}`);
+      this.err.logWithDetail(
+        'errors.ai.acceptance_create',
+        `context=${input.contextType}, productIds=${input.productIds?.length ?? 0}, sourceRefId=${input.sourceRefId}`
+      );
       return this.err.fail('errors.ai.acceptance_create');
     }
   }
@@ -109,31 +134,34 @@ export class AIAcceptanceService {
         return this.err.fail('errors.ai.acceptance_not_found');
       }
 
-      this.logger.log(`[AIAcceptance] Marking record id=${aiAcceptanceId} as accepted`);
+      this.logger.log(
+        `[AIAcceptance] Marking record id=${aiAcceptanceId} as accepted`
+      );
       await this.unitOfWork.AIAcceptanceRepo.assign(record, {
         isAccepted: true,
         clickedAt: new Date()
       });
       await this.unitOfWork.AIAcceptanceRepo.getEntityManager().flush();
-      this.logger.log(`[AIAcceptance] Successfully marked record id=${aiAcceptanceId} as accepted`);
+      this.logger.log(
+        `[AIAcceptance] Successfully marked record id=${aiAcceptanceId} as accepted`
+      );
 
       return { success: true, data: record };
     }, 'errors.common.internal');
   }
 
-  async getAllAIAcceptanceStatus(): Promise<BaseResponse<AIAcceptance[] | null>> {
-    return this.err.wrap(
-      async () => {
-        const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll({
-          orderBy: { updatedAt: 'DESC' }
-        });
-        if (!aiAcceptance) {
-          return this.err.fail('errors.ai.acceptance_not_found');
-        }
-        return { success: true, data: aiAcceptance };
-      },
-      'errors.common.internal'
-    );
+  async getAllAIAcceptanceStatus(): Promise<
+    BaseResponse<AIAcceptance[] | null>
+  > {
+    return this.err.wrap(async () => {
+      const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll({
+        orderBy: { updatedAt: 'DESC' }
+      });
+      if (!aiAcceptance) {
+        return this.err.fail('errors.ai.acceptance_not_found');
+      }
+      return { success: true, data: aiAcceptance };
+    }, 'errors.common.internal');
   }
 
   async getAIAcceptanceMetrics(
@@ -147,8 +175,12 @@ export class AIAcceptanceService {
       const records = await this.unitOfWork.AIAcceptanceRepo.find(where);
 
       const accepted = records.filter((record) => record.isAccepted).length;
-      const pending = records.filter((record) => !record.isAccepted && !this.isVisibleRecord(record, now)).length;
-      const noClick = records.filter((record) => !record.isAccepted && this.isVisibleRecord(record, now)).length;
+      const pending = records.filter(
+        (record) => !record.isAccepted && !this.isVisibleRecord(record, now)
+      ).length;
+      const noClick = records.filter(
+        (record) => !record.isAccepted && this.isVisibleRecord(record, now)
+      ).length;
       const totalForRate = accepted + noClick;
 
       const metrics: AIAcceptanceMetrics = {
@@ -168,13 +200,19 @@ export class AIAcceptanceService {
   ): Promise<AttachAIAcceptanceToProductsResult<T>> {
     try {
       if (!Array.isArray(input.products) || input.products.length === 0) {
-        this.logger.warn(`[AIAcceptance] No products to attach acceptance for context=${input.contextType}`);
+        this.logger.warn(
+          `[AIAcceptance] No products to attach acceptance for context=${input.contextType}`
+        );
         return { aiAcceptanceId: null, products: input.products ?? [] };
       }
 
-      const productIds = this.extractProductIdsFromPayload(input.products as any[]);
-      this.logger.log(`[AIAcceptance] Attaching acceptance for context=${input.contextType}, productCount=${productIds.length}, sourceRefId=${input.sourceRefId}`);
-      
+      const productIds = this.extractProductIdsFromPayload(
+        input.products as any[]
+      );
+      this.logger.log(
+        `[AIAcceptance] Attaching acceptance for context=${input.contextType}, productCount=${productIds.length}, sourceRefId=${input.sourceRefId}`
+      );
+
       const createResult = await this.createPendingResponseAcceptance({
         contextType: input.contextType,
         sourceRefId: input.sourceRefId,
@@ -191,8 +229,10 @@ export class AIAcceptanceService {
       }
 
       const aiAcceptanceId = createResult.data.id;
-      this.logger.log(`[AIAcceptance] Successfully created acceptance id=${aiAcceptanceId} for context=${input.contextType}`);
-      
+      this.logger.log(
+        `[AIAcceptance] Successfully created acceptance id=${aiAcceptanceId} for context=${input.contextType}`
+      );
+
       const enrichedProducts = input.products.map((product) => ({
         ...product,
         aiAcceptanceId
@@ -207,7 +247,7 @@ export class AIAcceptanceService {
 
   async updateAIAcceptanceStatusById(
     id: string,
-    isAccepted: boolean = false,
+    isAccepted: boolean = false
   ): Promise<BaseResponse<AIAcceptance>> {
     const userAIAcceptance = await this.unitOfWork.AIAcceptanceRepo.findOne({
       id
@@ -221,7 +261,9 @@ export class AIAcceptanceService {
       if (!isAccepted && !userAIAcceptance.visibleAfterAt) {
         updateData.visibleAfterAt = this.resolveVisibleAfterAt();
       }
-      this.logger.log(`[AIAcceptance] Updating record id=${id} to isAccepted=${isAccepted}`);
+      this.logger.log(
+        `[AIAcceptance] Updating record id=${id} to isAccepted=${isAccepted}`
+      );
       await this.unitOfWork.AIAcceptanceRepo.assign(
         userAIAcceptance,
         updateData
@@ -247,12 +289,16 @@ export class AIAcceptanceService {
 
     const now = new Date();
     const records = await this.unitOfWork.AIAcceptanceRepo.find(where);
-    const visibleRecords = records.filter((record) => record.isAccepted || this.isVisibleRecord(record, now));
+    const visibleRecords = records.filter(
+      (record) => record.isAccepted || this.isVisibleRecord(record, now)
+    );
 
     const totalCount = visibleRecords.length;
     if (totalCount === 0) return { success: true, data: 0 };
 
-    const matchingCount = visibleRecords.filter((record) => record.isAccepted === isAccepted).length;
+    const matchingCount = visibleRecords.filter(
+      (record) => record.isAccepted === isAccepted
+    ).length;
     const acceptanceRate = (matchingCount / totalCount) * 100;
     return { success: true, data: acceptanceRate };
   }

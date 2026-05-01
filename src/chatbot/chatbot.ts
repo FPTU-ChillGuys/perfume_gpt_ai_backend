@@ -28,7 +28,9 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
   while (retries >= 0) {
     try {
       if (!prompt) {
-        console.error(`[chatbot] textGenerationFromPrompt: prompt is empty or undefined`);
+        console.error(
+          `[chatbot] textGenerationFromPrompt: prompt is empty or undefined`
+        );
         return errorMessage || 'Prompt is required';
       }
       const result = await generateText({
@@ -44,7 +46,10 @@ export async function textGenerationFromPromptToResultWithErrorHandler(
       });
       return result.text;
     } catch (error) {
-      console.error(`Error in TextGenerationFromPrompt (Remaining retries: ${retries}):`, error);
+      console.error(
+        `Error in TextGenerationFromPrompt (Remaining retries: ${retries}):`,
+        error
+      );
       if (retries === 0) {
         if (output) {
           throw error;
@@ -87,7 +92,10 @@ export async function textGenerationFromMessagesToResultWithErrorHandler(
       });
       return result.text;
     } catch (error) {
-      console.error(`Error in TextGenerationFromMessages (Remaining retries: ${retries}):`, error);
+      console.error(
+        `Error in TextGenerationFromMessages (Remaining retries: ${retries}):`,
+        error
+      );
       if (retries === 0) {
         if (output) {
           throw error;
@@ -124,7 +132,10 @@ export async function objectGenerationFromMessagesToResultWithErrorHandler<T>(
       });
       return result.object as T;
     } catch (error) {
-      console.error(`Error in ObjectGenerationFromMessages (Remaining retries: ${retries}):`, error);
+      console.error(
+        `Error in ObjectGenerationFromMessages (Remaining retries: ${retries}):`,
+        error
+      );
       if (retries === 0) {
         return null;
       }

@@ -35,14 +35,33 @@ export const AI_RESTOCK_SERVICE = AI_RESTOCK_HELPER;
 
 const aiProvider: Provider = {
   provide: AI_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
-    new AIHelper(SYSTEM_PROMPT, () => tools.getTools, 10, undefined, undefined, undefined, undefined, undefined, err, promptLoader),
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
+    new AIHelper(
+      SYSTEM_PROMPT,
+      () => tools.getTools,
+      10,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      err,
+      promptLoader
+    ),
   inject: [Tools, I18nErrorHandler, PromptLoaderService]
 };
 
 const aiConversationProvider: Provider = {
   provide: AI_CONVERSATION_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForChatbot,
@@ -64,7 +83,11 @@ const aiConversationProvider: Provider = {
 
 const aiStaffConversationProvider: Provider = {
   provide: AI_STAFF_CONVERSATION_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForStaffChatbot,
@@ -86,7 +109,11 @@ const aiStaffConversationProvider: Provider = {
 
 const aiTrendProvider: Provider = {
   provide: AI_TREND_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForAnalysis,
@@ -104,7 +131,11 @@ const aiTrendProvider: Provider = {
 
 const aiRecommendationProvider: Provider = {
   provide: AI_RECOMMENDATION_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
     new AIHelper(
       SYSTEM_PROMPT,
       undefined,
@@ -122,7 +153,11 @@ const aiRecommendationProvider: Provider = {
 
 const aiRestockProvider: Provider = {
   provide: AI_RESTOCK_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForRestock,
@@ -140,7 +175,11 @@ const aiRestockProvider: Provider = {
 
 const aiSurveyProvider: Provider = {
   provide: AI_SURVEY_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForSurvey,
@@ -158,7 +197,11 @@ const aiSurveyProvider: Provider = {
 
 const aiReviewProvider: Provider = {
   provide: AI_REVIEW_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
     new AIHelper(
       SYSTEM_PROMPT,
       undefined,
@@ -176,7 +219,11 @@ const aiReviewProvider: Provider = {
 
 const aiInventoryReportProvider: Provider = {
   provide: AI_INVENTORY_REPORT_HELPER,
-  useFactory: (tools: Tools, err: I18nErrorHandler, promptLoader: PromptLoaderService) =>
+  useFactory: (
+    tools: Tools,
+    err: I18nErrorHandler,
+    promptLoader: PromptLoaderService
+  ) =>
     new AIHelper(
       SYSTEM_PROMPT,
       () => tools.getToolsForInventoryReport,
@@ -221,4 +268,4 @@ const aiInventoryReportProvider: Provider = {
     aiStaffConversationProvider
   ]
 })
-export class AIModule { }
+export class AIModule {}

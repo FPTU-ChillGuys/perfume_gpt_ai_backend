@@ -23,9 +23,12 @@ export class UserLogSummaryProcessor extends WorkerHost {
         throw new Error(`Unknown job name: ${job.name}`);
       }
 
-      const userId = typeof job.data?.userId === 'string' ? job.data.userId : '';
+      const userId =
+        typeof job.data?.userId === 'string' ? job.data.userId : '';
       if (!userId) {
-        this.logger.warn(`Skip summary job because userId is missing. jobId=${job.id}`);
+        this.logger.warn(
+          `Skip summary job because userId is missing. jobId=${job.id}`
+        );
         return;
       }
 

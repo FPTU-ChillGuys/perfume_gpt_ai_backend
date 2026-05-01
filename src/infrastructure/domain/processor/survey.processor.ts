@@ -29,7 +29,10 @@ export class SurveyProcessor extends WorkerHost {
           const savedSurveyQuesAnsResponse =
             await this.surveyService.addSurveyQuesAnws(surveyQuesAnsDetail);
 
-          if (!savedSurveyQuesAnsResponse.success || !savedSurveyQuesAnsResponse.data?.id) {
+          if (
+            !savedSurveyQuesAnsResponse.success ||
+            !savedSurveyQuesAnsResponse.data?.id
+          ) {
             console.error(
               'Failed to add survey question and answer for job:',
               job.id

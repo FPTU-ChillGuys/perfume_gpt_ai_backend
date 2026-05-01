@@ -5,11 +5,11 @@ import { LogTool } from 'src/chatbot/tools/log.tool';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from 'src/application/constant/processor';
 @Module({
-  imports: [UnitOfWorkModule,
+  imports: [
+    UnitOfWorkModule,
     BullModule.registerQueue({ name: QueueName.USER_LOG_SUMMARY_QUEUE })
   ],
   providers: [UserLogService, LogTool],
   exports: [UserLogService, LogTool]
 })
-export class UserLogModule { }
-
+export class UserLogModule {}

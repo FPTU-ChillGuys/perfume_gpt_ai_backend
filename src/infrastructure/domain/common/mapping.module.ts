@@ -10,4 +10,4 @@ import { PrismaModule } from 'src/prisma/prisma.module';
   providers: [ChatProfile, MasterDataTool, MasterDataService],
   exports: [ChatProfile, MasterDataTool, MasterDataService]
 })
-export class MappingModule { }
+export class MappingModule {}

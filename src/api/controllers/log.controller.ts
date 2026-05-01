@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Logger, Param, Post, Query, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Param,
+  Post,
+  Query,
+  UseInterceptors
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -17,7 +26,10 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { UserLogAIService } from 'src/infrastructure/domain/user-log/user-log-ai.service';
-import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
+import {
+  ApiBaseResponse,
+  ExtendApiBaseResponse
+} from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
@@ -44,7 +56,7 @@ export class LogController {
   constructor(
     protected userLogService: UserLogService,
     protected userLogAIService: UserLogAIService
-  ) { }
+  ) {}
 
   /** Lấy báo cáo tất cả log hoạt động người dùng */
   @CacheTTL(1)
@@ -166,9 +178,11 @@ export class LogController {
     return this.userLogService.getEventLogsWithPeriod(allUserLogRequest);
   }
 
-
   @Get('summaries')
-  @ApiOperation({ summary: 'Xem chi tiết tất cả các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
+  @ApiOperation({
+    summary:
+      'Xem chi tiết tất cả các bản tóm tắt log người dùng, gồm overall và daily breakdown'
+  })
   @ApiQuery({ name: 'period', required: false })
   @ApiQuery({ name: 'startDate', required: false, type: Date })
   @ApiQuery({ name: 'endDate', required: false, type: Date })
@@ -189,13 +203,20 @@ export class LogController {
     return { success: response.success, data: response.data ?? [] };
   }
 
-
   /** Xem chi tiết các bản tóm tắt log người dùng */
   @Get('summaries/:userId')
-  @ApiOperation({ summary: 'Xem chi tiết các bản tóm tắt log người dùng, gồm overall và daily breakdown' })
+  @ApiOperation({
+    summary:
+      'Xem chi tiết các bản tóm tắt log người dùng, gồm overall và daily breakdown'
+  })
   @ApiQuery({ name: 'period', required: false, enum: PeriodEnum })
   @ApiQuery({ name: 'startDate', required: false, type: Date })
-  @ApiQuery({ name: 'endDate', required: false, type: Date, example: new Date() })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: Date,
+    example: new Date()
+  })
   @ApiBaseResponse(UserLogSummaryResponse, true)
   async getUserLogsSummariesById(
     @Param('userId') userId: string,
@@ -240,7 +261,8 @@ export class LogController {
   /** Xem báo cáo tổng hợp summary của nhiều người dùng (không lưu DB) */
   @Get('report/summary/aggregate')
   @ApiOperation({
-    summary: 'Tổng hợp summary của nhiều người dùng (runtime only), gồm overall và daily breakdown'
+    summary:
+      'Tổng hợp summary của nhiều người dùng (runtime only), gồm overall và daily breakdown'
   })
   @ApiQuery({ name: 'period', required: false })
   @ApiQuery({ name: 'startDate', required: false, type: Date })
@@ -248,9 +270,7 @@ export class LogController {
   @ApiBaseResponse(UserLogSummaryResponse)
   async getAggregatedUserSummaryReport(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<
-    BaseResponse<UserLogSummaryResponse>
-  > {
+  ): Promise<BaseResponse<UserLogSummaryResponse>> {
     const hasTimeFilter =
       Boolean(allUserLogRequest.startDate) ||
       Boolean(allUserLogRequest.endDate) ||
@@ -325,14 +345,17 @@ export class LogController {
           successCount++;
         } catch (error) {
           failedUserIds.push(userId);
-          this.logger.error(`Failed to rebuild summary for user ${userId}: ${error}`);
+          this.logger.error(
+            `Failed to rebuild summary for user ${userId}: ${error}`
+          );
         }
       }
 
       const summary = `Rebuilt summaries for ${successCount}/${userIds.length} users`;
-      const message = failedUserIds.length > 0
-        ? `${summary}. Failed users: ${failedUserIds.join(', ')}`
-        : summary;
+      const message =
+        failedUserIds.length > 0
+          ? `${summary}. Failed users: ${failedUserIds.join(', ')}`
+          : summary;
 
       return Ok(message);
     } catch (error) {

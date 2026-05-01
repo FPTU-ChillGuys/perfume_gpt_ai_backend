@@ -23,7 +23,10 @@ import {
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
 import { ApiAdminErrors } from 'src/application/decorators/swagger-error.decorator';
-import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
+import {
+  createBackgroundJob,
+  checkBackgroundJobResult
+} from 'src/api/controllers/helper/background-job.helper';
 import { CACHE_TTL_1HOUR } from 'src/infrastructure/domain/common/cacheable/cacheable.constants';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
@@ -33,10 +36,11 @@ import { BaseResponseAPI } from 'src/application/dtos/response/common/base-respo
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
 import { InventoryService } from 'src/infrastructure/domain/inventory/inventory.service';
-import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import {
-  AIInventoryReportStructuredResponse
-} from 'src/application/dtos/response/ai-structured.response';
+  ApiBaseResponse,
+  ExtendApiBaseResponse
+} from 'src/infrastructure/domain/utils/api-response-decorator';
+import { AIInventoryReportStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { InventoryLog } from 'src/domain/entities/inventory-log.entity';
 import { InventoryLogType } from 'src/domain/enum/inventory-log-type.enum';
@@ -53,8 +57,8 @@ export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
     private readonly restockService: RestockService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) { }
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
+  ) {}
 
   @Get('stock')
   @ApiOperation({ summary: 'Lấy thông tin tồn kho' })
@@ -112,7 +116,8 @@ export class InventoryController {
     @Req() request: Request,
     @Query('forceRefresh') forceRefresh?: boolean | string
   ): Promise<BaseResponse<{ jobId: string }>> {
-    const forceRefreshEnabled = forceRefresh === true || String(forceRefresh) === 'true';
+    const forceRefreshEnabled =
+      forceRefresh === true || String(forceRefresh) === 'true';
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIInventoryReport(),
@@ -129,7 +134,9 @@ export class InventoryController {
 
   @Public()
   @Get('report/ai/job/result/:jobId')
-  @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job báo cáo tồn kho' })
+  @ApiOperation({
+    summary: 'Kiểm tra trạng thái hoàn thành của job báo cáo tồn kho'
+  })
   @ApiBaseResponse(Object)
   @ApiParam({ name: 'jobId', description: 'ID của job' })
   async getInventoryReportJobResult(
@@ -148,17 +155,23 @@ export class InventoryController {
   async getInventoryReportLogs(): Promise<
     BaseResponseAPI<PagedResult<InventoryLog>>
   > {
-    const result = await this.inventoryService.getInventoryLogsPaged(InventoryLogType.REPORT);
+    const result = await this.inventoryService.getInventoryLogsPaged(
+      InventoryLogType.REPORT
+    );
     return Ok(result);
   }
 
   @Get('restock/logs')
-  @ApiOperation({ summary: 'Lấy lịch sử phân tích nhu cầu nhập hàng (restock)' })
+  @ApiOperation({
+    summary: 'Lấy lịch sử phân tích nhu cầu nhập hàng (restock)'
+  })
   @ExtendApiBaseResponse(PagedResult, String)
   async getInventoryRestockLogs(): Promise<
     BaseResponseAPI<PagedResult<InventoryLog>>
   > {
-    const result = await this.inventoryService.getInventoryLogsPaged(InventoryLogType.RESTOCK);
+    const result = await this.inventoryService.getInventoryLogsPaged(
+      InventoryLogType.RESTOCK
+    );
     return Ok(result);
   }
 
@@ -172,16 +185,22 @@ export class InventoryController {
   }
 
   @Get('report/logs/:id/pdf')
-  @ApiOperation({ summary: 'Convert markdown report theo ID sang PDF (không dùng AI)' })
+  @ApiOperation({
+    summary: 'Convert markdown report theo ID sang PDF (không dùng AI)'
+  })
   @ApiParam({ name: 'id', description: 'ID của inventory log cần convert' })
   async convertInventoryLogToPdf(
     @Param('id') id: string,
     @Res({ passthrough: true }) response: Response
   ): Promise<StreamableFile> {
     try {
-      const { fileBuffer, fileName } = await this.inventoryService.readInventoryLogPdf(id);
+      const { fileBuffer, fileName } =
+        await this.inventoryService.readInventoryLogPdf(id);
       response.setHeader('Content-Type', 'application/pdf');
-      response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      response.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${fileName}"`
+      );
       return new StreamableFile(fileBuffer);
     } catch (err) {
       if (err instanceof Error && err.message === 'Inventory log not found') {
@@ -194,7 +213,9 @@ export class InventoryController {
   }
 
   @Get('restock/logs/:id/pdf')
-  @ApiOperation({ summary: 'Convert log restock theo ID sang PDF (không dùng AI)' })
+  @ApiOperation({
+    summary: 'Convert log restock theo ID sang PDF (không dùng AI)'
+  })
   @ApiParam({ name: 'id', description: 'ID của restock log cần convert' })
   async convertRestockLogToPdf(
     @Param('id') id: string,
@@ -204,15 +225,21 @@ export class InventoryController {
   }
 
   @Get('restock/ai')
-  @ApiOperation({ summary: 'Phân tích nhu cầu nhập hàng dựa trên xu hướng (AI)' })
+  @ApiOperation({
+    summary: 'Phân tích nhu cầu nhập hàng dựa trên xu hướng (AI)'
+  })
   @ApiBaseResponse(Object)
-  async getAIRestockingNeeds(): Promise<BaseResponse<{ variants: RestockVariantResult[] }>> {
+  async getAIRestockingNeeds(): Promise<
+    BaseResponse<{ variants: RestockVariantResult[] }>
+  > {
     return this.inventoryService.analyzeRestockNeeds();
   }
 
   @Public()
   @Get('restock/job')
-  @ApiOperation({ summary: 'Khởi tạo job để phân tích nhu cầu nhập hàng (restock)' })
+  @ApiOperation({
+    summary: 'Khởi tạo job để phân tích nhu cầu nhập hàng (restock)'
+  })
   @ApiQuery({
     name: 'forceRefresh',
     required: false,
@@ -224,7 +251,8 @@ export class InventoryController {
     @Req() request: Request,
     @Query('forceRefresh') forceRefresh?: boolean | string
   ): Promise<BaseResponse<{ jobId: string }>> {
-    const forceRefreshEnabled = forceRefresh === true || String(forceRefresh) === 'true';
+    const forceRefreshEnabled =
+      forceRefresh === true || String(forceRefresh) === 'true';
     return createBackgroundJob(
       this.cacheManager,
       () => this.getAIRestockingNeeds(),
@@ -241,7 +269,10 @@ export class InventoryController {
 
   @Public()
   @Get('restock/job/result/:jobId')
-  @ApiOperation({ summary: 'Kiểm tra trạng thái hoàn thành của job phân tích nhu cầu nhập hàng (restock)' })
+  @ApiOperation({
+    summary:
+      'Kiểm tra trạng thái hoàn thành của job phân tích nhu cầu nhập hàng (restock)'
+  })
   @ApiBaseResponse(Object)
   @ApiParam({ name: 'jobId', description: 'ID của job' })
   async getRestockJobResult(
@@ -258,10 +289,13 @@ export class InventoryController {
   @Get('restock/sales-analytics')
   @ApiOperation({
     summary: 'Lấy dữ liệu phân tích bán hàng tất cả variant',
-    description: 'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất, sử dụng cho tool dự đoán tái cấp hàng'
+    description:
+      'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất, sử dụng cho tool dự đoán tái cấp hàng'
   })
   @ExtendApiBaseResponse(VariantSalesAnalyticsResponse, undefined, true)
-  async getProductSalesAnalyticsForRestock(): Promise<BaseResponseAPI<VariantSalesAnalyticsResponse[]>> {
+  async getProductSalesAnalyticsForRestock(): Promise<
+    BaseResponseAPI<VariantSalesAnalyticsResponse[]>
+  > {
     return this.restockService.getProductSalesAnalyticsForRestock();
   }
 
@@ -269,7 +303,8 @@ export class InventoryController {
   @Get('restock/sales-analytics/:id')
   @ApiOperation({
     summary: 'Lấy dữ liệu phân tích bán hàng một variant',
-    description: 'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất'
+    description:
+      'Lấy thông tin variant kèm dữ liệu bán hàng theo ngày từ 2 tháng gần nhất'
   })
   @ApiParam({ name: 'id', description: 'UUID của variant', format: 'uuid' })
   @ExtendApiBaseResponse(VariantSalesAnalyticsResponse)

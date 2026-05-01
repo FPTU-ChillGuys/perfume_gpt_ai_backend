@@ -26,7 +26,10 @@ export class AIAnalysisResponse {
   generatedAt: Date;
 
   /** Metadata bổ sung */
-  @ApiPropertyOptional({ description: 'Thông tin bổ sung', type: AIResponseMetadata })
+  @ApiPropertyOptional({
+    description: 'Thông tin bổ sung',
+    type: AIResponseMetadata
+  })
   metadata?: AIResponseMetadata;
 
   constructor(init?: Partial<AIAnalysisResponse>) {
@@ -53,7 +56,10 @@ export class AIReviewSummaryStructuredResponse {
   generatedAt: Date;
 
   /** Metadata bổ sung */
-  @ApiPropertyOptional({ description: 'Thông tin bổ sung', type: AIResponseMetadata })
+  @ApiPropertyOptional({
+    description: 'Thông tin bổ sung',
+    type: AIResponseMetadata
+  })
   metadata?: AIResponseMetadata;
 
   constructor(init?: Partial<AIReviewSummaryStructuredResponse>) {
@@ -80,7 +86,10 @@ export class AITrendForecastStructuredResponse {
   generatedAt: Date;
 
   /** Metadata bổ sung */
-  @ApiPropertyOptional({ description: 'Thông tin bổ sung', type: AIResponseMetadata })
+  @ApiPropertyOptional({
+    description: 'Thông tin bổ sung',
+    type: AIResponseMetadata
+  })
   metadata?: AIResponseMetadata;
 
   constructor(init?: Partial<AITrendForecastStructuredResponse>) {
@@ -103,7 +112,10 @@ export class AIOrderSummaryStructuredResponse {
   generatedAt: Date;
 
   /** Metadata bổ sung */
-  @ApiPropertyOptional({ description: 'Thông tin bổ sung', type: AIResponseMetadata })
+  @ApiPropertyOptional({
+    description: 'Thông tin bổ sung',
+    type: AIResponseMetadata
+  })
   metadata?: AIResponseMetadata;
 
   constructor(init?: Partial<AIOrderSummaryStructuredResponse>) {
@@ -122,7 +134,10 @@ export class AIInventoryReportStructuredResponse {
   generatedAt: Date;
 
   /** Metadata bổ sung */
-  @ApiPropertyOptional({ description: 'Thông tin bổ sung', type: AIResponseMetadata })
+  @ApiPropertyOptional({
+    description: 'Thông tin bổ sung',
+    type: AIResponseMetadata
+  })
   metadata?: AIResponseMetadata;
 
   constructor(init?: Partial<AIInventoryReportStructuredResponse>) {
@@ -149,7 +164,10 @@ export class AIRecommendationStructuredResponse {
   generatedAt: Date;
 
   /** Metadata bổ sung */
-  @ApiPropertyOptional({ description: 'Thông tin bổ sung', type: AIResponseMetadata })
+  @ApiPropertyOptional({
+    description: 'Thông tin bổ sung',
+    type: AIResponseMetadata
+  })
   metadata?: AIResponseMetadata;
 
   constructor(init?: Partial<AIRecommendationStructuredResponse>) {

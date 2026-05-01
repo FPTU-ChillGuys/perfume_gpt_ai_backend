@@ -24,12 +24,18 @@ export class Migration20260101000000 extends Migration {
     `);
 
     // Tạo index cho productId
-    this.addSql('CREATE INDEX IF NOT EXISTS "IDX_product_embeddings_product_id" ON product_embeddings (product_id);');
+    this.addSql(
+      'CREATE INDEX IF NOT EXISTS "IDX_product_embeddings_product_id" ON product_embeddings (product_id);'
+    );
 
     // Tạo index cho vector search (hnsw index cho cosine similarity)
-    this.addSql('CREATE INDEX IF NOT EXISTS "IDX_product_embeddings_vector" ON product_embeddings USING hnsw ("vector" vector_cosine_ops);');
+    this.addSql(
+      'CREATE INDEX IF NOT EXISTS "IDX_product_embeddings_vector" ON product_embeddings USING hnsw ("vector" vector_cosine_ops);'
+    );
 
-    console.log('Added pgvector extension and created product_embeddings table');
+    console.log(
+      'Added pgvector extension and created product_embeddings table'
+    );
   }
 
   async down(): Promise<void> {

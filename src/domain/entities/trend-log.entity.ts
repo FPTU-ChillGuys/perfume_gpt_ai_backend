@@ -5,13 +5,14 @@ import { TrendLogRepository } from 'src/infrastructure/domain/repositories/trend
 
 @Entity({ repository: () => TrendLogRepository })
 export class TrendLog extends Common {
+  @ApiProperty({
+    description: 'Dữ liệu xu hướng (JSON string) từ AI trend response'
+  })
+  @Property({ type: 'text' })
+  trendData!: string;
 
-    @ApiProperty({ description: 'Dữ liệu xu hướng (JSON string) từ AI trend response' })
-    @Property({ type: 'text' })
-    trendData!: string;
-
-    constructor(init?: Partial<TrendLog>) {
-        super();
-        Object.assign(this, init);
-    }
+  constructor(init?: Partial<TrendLog>) {
+    super();
+    Object.assign(this, init);
+  }
 }

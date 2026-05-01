@@ -18,33 +18,34 @@ import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
 import { ConversationInputHelper } from './helpers/conversation-input.helper';
 import { ConversationResponseBuilder } from './helpers/conversation-response.builder';
 @Module({
-    imports: [UnitOfWorkModule,
-        AIModule,
-        UserLogModule,
-        ProductModule,
-        CartModule,
-        SurveyModule,
-        OrderModule,
-        ProfileModule,
-        AIAcceptanceModule,
-        AdminInstructionModule,
-        DictionaryModule,
-        forwardRef(() => RecommendationModule),
-    ],
-    providers: [
-        ConversationService, 
-        AIAnalysisHelper,
-        AIPersonalizationHelper,
-        AISearchExecutorHelper,
-        ConversationInputHelper,
-        ConversationResponseBuilder
-    ],
-    exports: [
-        ConversationService, 
-        AIAnalysisHelper,
-        AIPersonalizationHelper,
-        AISearchExecutorHelper,
-        ConversationInputHelper
-    ],
+  imports: [
+    UnitOfWorkModule,
+    AIModule,
+    UserLogModule,
+    ProductModule,
+    CartModule,
+    SurveyModule,
+    OrderModule,
+    ProfileModule,
+    AIAcceptanceModule,
+    AdminInstructionModule,
+    DictionaryModule,
+    forwardRef(() => RecommendationModule)
+  ],
+  providers: [
+    ConversationService,
+    AIAnalysisHelper,
+    AIPersonalizationHelper,
+    AISearchExecutorHelper,
+    ConversationInputHelper,
+    ConversationResponseBuilder
+  ],
+  exports: [
+    ConversationService,
+    AIAnalysisHelper,
+    AIPersonalizationHelper,
+    AISearchExecutorHelper,
+    ConversationInputHelper
+  ]
 })
-export class ConversationModule { }
+export class ConversationModule {}

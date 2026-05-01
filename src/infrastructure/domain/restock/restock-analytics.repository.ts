@@ -22,9 +22,10 @@ export class RestockAnalyticsRepository {
     });
   }
 
-  async findOrderDetailsInDateRange(from: Date, to?: Date): Promise<
-    Prisma.OrderDetailsGetPayload<{ include: { Orders: true } }>[]
-  > {
+  async findOrderDetailsInDateRange(
+    from: Date,
+    to?: Date
+  ): Promise<Prisma.OrderDetailsGetPayload<{ include: { Orders: true } }>[]> {
     const where: Prisma.OrderDetailsWhereInput = {
       Orders: {
         CreatedAt: { gte: from },
@@ -44,9 +45,9 @@ export class RestockAnalyticsRepository {
     Prisma.StocksGetPayload<{
       include: {
         ProductVariants: {
-          include: { Products: true; Concentrations: true }
-        }
-      }
+          include: { Products: true; Concentrations: true };
+        };
+      };
     }>[]
   > {
     return this.prisma.stocks.findMany({
@@ -76,9 +77,7 @@ export class RestockAnalyticsRepository {
     variantId: string,
     from: Date,
     to?: Date
-  ): Promise<
-    Prisma.OrderDetailsGetPayload<{ include: { Orders: true } }>[]
-  > {
+  ): Promise<Prisma.OrderDetailsGetPayload<{ include: { Orders: true } }>[]> {
     const createdAtFilter: Prisma.DateTimeFilter = to
       ? { gte: from, lte: to }
       : { gte: from };

@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { jwtDecode } from "jwt-decode";
+import { jwtDecode } from 'jwt-decode';
 import { createHash } from 'crypto';
 
 export interface TokenPayload {
@@ -17,7 +17,9 @@ export function extractTokenFromHeader(request: Request): string | undefined {
   return type === 'Bearer' && token ? token : undefined;
 }
 
-export function getTokenPayloadFromRequest(request: Request): TokenPayload | null {
+export function getTokenPayloadFromRequest(
+  request: Request
+): TokenPayload | null {
   const token = extractTokenFromHeader(request);
   if (!token) {
     return null;
@@ -54,13 +56,17 @@ function buildAnonymousUserIdFromRequest(request: Request): string {
   const userAgent = toHeaderValue(request.headers['user-agent']);
   const acceptLanguage = toHeaderValue(request.headers['accept-language']);
   const fingerprint = `${clientIp}|${userAgent}|${acceptLanguage}`;
-  const digest = createHash('sha256').update(fingerprint).digest('hex').slice(0, 24);
+  const digest = createHash('sha256')
+    .update(fingerprint)
+    .digest('hex')
+    .slice(0, 24);
 
   return `anonymous:${digest}`;
 }
 
 export function resolveLogUserIdFromRequest(request: Request): string {
-  return getTokenPayloadFromRequest(request)?.id ?? buildAnonymousUserIdFromRequest(request);
+  return (
+    getTokenPayloadFromRequest(request)?.id ??
+    buildAnonymousUserIdFromRequest(request)
+  );
 }
-
-

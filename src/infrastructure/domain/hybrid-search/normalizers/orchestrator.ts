@@ -41,7 +41,7 @@ export class QueryNormalizerOrchestrator {
       this.priceNormalizer.normalize(searchText),
       this.genderNormalizer.normalize(searchText),
       this.yearNormalizer.normalize(searchText),
-      this.originNormalizer.normalize(searchText),
+      this.originNormalizer.normalize(searchText)
     ]);
 
     const filters: NormalizedQueryFilters = {};

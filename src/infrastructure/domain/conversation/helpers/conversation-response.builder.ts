@@ -7,7 +7,10 @@ import { MessageResponse } from 'src/application/dtos/response/conversation/mess
 import { ChatRequest } from 'src/application/dtos/request/conversation/chat.request';
 import { ChatMessageRequest } from 'src/application/dtos/request/conversation/chat-message.request';
 import { Sender } from 'src/domain/enum/sender.enum';
-import { addMessageToMessages, overrideMessagesToConversation } from 'src/infrastructure/domain/utils/message-helper';
+import {
+  addMessageToMessages,
+  overrideMessagesToConversation
+} from 'src/infrastructure/domain/utils/message-helper';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 
@@ -17,7 +20,6 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
  */
 @Injectable()
 export class ConversationResponseBuilder {
-
   /**
    * Xây dựng context tin nhắn cuối cùng để lưu vào queue.
    * Gộp AI response vào danh sách tin nhắn hiện có.
@@ -28,9 +30,10 @@ export class ConversationResponseBuilder {
     aiResponseData: any,
     originalMessages: ChatMessageRequest[]
   ): ChatRequest {
-    const finalMessageData = typeof aiResponseData === 'string'
-      ? aiResponseData
-      : JSON.stringify(aiResponseData);
+    const finalMessageData =
+      typeof aiResponseData === 'string'
+        ? aiResponseData
+        : JSON.stringify(aiResponseData);
 
     const responseConversation = overrideMessagesToConversation(
       conversationId,
@@ -54,7 +57,7 @@ export class ConversationResponseBuilder {
     response.id = responseConversation.id || conversationId;
     response.userId = responseConversation.userId || userId;
     response.updatedAt = new Date();
-    response.messages = (responseConversation.messages || []).map(m => {
+    response.messages = (responseConversation.messages || []).map((m) => {
       const res = new MessageResponse();
       res.sender = m.sender as Sender;
       res.message = m.message;

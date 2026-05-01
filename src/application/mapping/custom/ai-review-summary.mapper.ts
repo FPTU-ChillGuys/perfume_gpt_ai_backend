@@ -15,11 +15,13 @@ export class ReviewSummaryLogMapper {
     });
   }
 
-  static toResponseList(entities: ReviewSummaryLog[]): AIReviewSummaryResponse[] {
+  static toResponseList(
+    entities: ReviewSummaryLog[]
+  ): AIReviewSummaryResponse[] {
     return entities.map((entity) => this.toResponse(entity));
   }
 
-    static toEntity(request: ReviewSumaryRequest): ReviewSummaryLog {
+  static toEntity(request: ReviewSumaryRequest): ReviewSummaryLog {
     return new ReviewSummaryLog({
       productId: request.productId,
       summary: request.summary,

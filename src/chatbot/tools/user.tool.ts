@@ -8,27 +8,32 @@ import * as z from 'zod';
 export class UserTool {
   private readonly logger = new Logger(UserTool.name);
 
-  constructor(private readonly userService: UserService, private readonly err: I18nErrorHandler) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   getUserById: Tool = tool({
     description:
       'Retrieve user information by user ID, including email, username, and phone number.',
     inputSchema: z.object({
-      userId: z.string().describe('The ID of the user'),
+      userId: z.string().describe('The ID of the user')
     }),
     execute: async (input) => {
       this.logger.log(`[getUserById] called for userId: ${input.userId}`);
-      return await this.err.wrap(
-        async () => {
-          const response = await this.userService.getUserById(input.userId);
-          this.logger.debug(`[getUserById] response received for userId: ${input.userId}`);
-          if (!response.success) {
-            return { success: false, error: response.error || 'Failed to fetch user information.' };
-          }
-          return { success: true, data: response.payload || {} };
-        },
-        'errors.user.tool_fetch'
-      );
+      return await this.err.wrap(async () => {
+        const response = await this.userService.getUserById(input.userId);
+        this.logger.debug(
+          `[getUserById] response received for userId: ${input.userId}`
+        );
+        if (!response.success) {
+          return {
+            success: false,
+            error: response.error || 'Failed to fetch user information.'
+          };
+        }
+        return { success: true, data: response.payload || {} };
+      }, 'errors.user.tool_fetch');
     }
   });
 }

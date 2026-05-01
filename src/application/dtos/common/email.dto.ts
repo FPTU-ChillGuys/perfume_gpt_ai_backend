@@ -7,12 +7,18 @@ export class SendEmailRequestDto {
   @IsNotEmpty()
   to!: string;
 
-  @ApiProperty({ description: 'Tiêu đề email', example: 'Welcome to PerfumeGPT' })
+  @ApiProperty({
+    description: 'Tiêu đề email',
+    example: 'Welcome to PerfumeGPT'
+  })
   @IsString()
   @IsNotEmpty()
   subject!: string;
 
-  @ApiProperty({ description: 'Nội dung email dạng text', example: 'Xin chào bạn!' })
+  @ApiProperty({
+    description: 'Nội dung email dạng text',
+    example: 'Xin chào bạn!'
+  })
   @IsString()
   @IsNotEmpty()
   text!: string;

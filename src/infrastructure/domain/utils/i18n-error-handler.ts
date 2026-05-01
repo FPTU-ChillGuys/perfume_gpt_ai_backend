@@ -45,7 +45,11 @@ export class I18nErrorHandler {
     }
   }
 
-  throw(key: string, exceptionClass: ExceptionClass, args?: Record<string, unknown>): never {
+  throw(
+    key: string,
+    exceptionClass: ExceptionClass,
+    args?: Record<string, unknown>
+  ): never {
     throw new exceptionClass(this.t(key, args));
   }
 
@@ -53,7 +57,11 @@ export class I18nErrorHandler {
     this.logger.error(this.t(key, args));
   }
 
-  logWithDetail(key: string, detail: string, args?: Record<string, unknown>): void {
+  logWithDetail(
+    key: string,
+    detail: string,
+    args?: Record<string, unknown>
+  ): void {
     this.logger.error(`${this.t(key, args)}: ${detail}`);
   }
 }

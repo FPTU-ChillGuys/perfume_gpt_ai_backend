@@ -10,15 +10,17 @@ import {
   Query,
   UseInterceptors
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiTags
+} from '@nestjs/swagger';
 import { Role } from 'src/application/common/Metadata';
 import { ApiAdminErrors } from 'src/application/decorators/swagger-error.decorator';
-import {
-  CreateAdminInstructionRequest
-} from 'src/application/dtos/request/admin-instruction/create-admin-instruction.request';
-import {
-  UpdateAdminInstructionRequest
-} from 'src/application/dtos/request/admin-instruction/update-admin-instruction.request';
+import { CreateAdminInstructionRequest } from 'src/application/dtos/request/admin-instruction/create-admin-instruction.request';
+import { UpdateAdminInstructionRequest } from 'src/application/dtos/request/admin-instruction/update-admin-instruction.request';
 import { AdminInstructionResponse } from 'src/application/dtos/response/admin-instruction/admin-instruction.response';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
@@ -35,14 +37,16 @@ import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-de
 export class AdminInstructionController {
   constructor(
     private readonly adminInstructionService: AdminInstructionService
-  ) { }
+  ) {}
 
   /** Lấy tất cả chỉ thị admin */
   @Get()
   @Role(['admin', 'user'])
   @ApiOperation({ summary: 'Lấy tất cả chỉ thị admin' })
   @ApiBaseResponse(AdminInstructionResponse, true)
-  async getAllInstructions(): Promise<BaseResponse<AdminInstructionResponse[]>> {
+  async getAllInstructions(): Promise<
+    BaseResponse<AdminInstructionResponse[]>
+  > {
     return await this.adminInstructionService.getAllInstructions();
   }
 

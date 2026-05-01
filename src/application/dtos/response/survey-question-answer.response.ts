@@ -8,11 +8,17 @@ export class SurveyQuestionAnswerResponse extends CommonResponse {
   @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   userId!: string;
 
-  @ApiProperty({ description: 'Kết quả AI recommendation (JSON string)', required: false })
+  @ApiProperty({
+    description: 'Kết quả AI recommendation (JSON string)',
+    required: false
+  })
   aiResult?: string;
 
   /** Danh sách chi tiết câu hỏi - câu trả lời */
-  @ApiProperty({ description: 'Danh sách chi tiết câu hỏi - câu trả lời', type: [GroupedSurveyQuestionAnswerDetailResponse] })
+  @ApiProperty({
+    description: 'Danh sách chi tiết câu hỏi - câu trả lời',
+    type: [GroupedSurveyQuestionAnswerDetailResponse]
+  })
   details!: GroupedSurveyQuestionAnswerDetailResponse[];
 
   constructor(init?: Partial<SurveyQuestionAnswerResponse>) {

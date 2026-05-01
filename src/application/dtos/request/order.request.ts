@@ -8,43 +8,61 @@ enum OrderStatus {
   Shipped = 'Shipped',
   Delivered = 'Delivered',
   Canceled = 'Canceled',
-  Returned = 'Returned',
+  Returned = 'Returned'
 }
 
 enum OrderType {
   Online = 'Online',
   Offline = 'Offline',
-  Shoppe = 'Shoppe',
+  Shoppe = 'Shoppe'
 }
 
 enum PaymentStatus {
   Unpaid = 'Unpaid',
   Paid = 'Paid',
-  Refunded = 'Refunded',
+  Refunded = 'Refunded'
 }
 
 export class OrderRequest extends PagedAndSortedRequest {
-  @ApiPropertyOptional({ enum: OrderStatus, description: 'Trạng thái đơn hàng', example: OrderStatus.Pending })
+  @ApiPropertyOptional({
+    enum: OrderStatus,
+    description: 'Trạng thái đơn hàng',
+    example: OrderStatus.Pending
+  })
   @IsOptional()
   @IsEnum(OrderStatus)
   status?: OrderStatus;
 
-  @ApiPropertyOptional({ enum: OrderType, description: 'Loại đơn hàng', example: OrderType.Online })
+  @ApiPropertyOptional({
+    enum: OrderType,
+    description: 'Loại đơn hàng',
+    example: OrderType.Online
+  })
   @IsOptional()
   @IsEnum(OrderType)
   type?: OrderType;
 
-  @ApiPropertyOptional({ enum: PaymentStatus, description: 'Trạng thái thanh toán', example: PaymentStatus.Unpaid })
+  @ApiPropertyOptional({
+    enum: PaymentStatus,
+    description: 'Trạng thái thanh toán',
+    example: PaymentStatus.Unpaid
+  })
   @IsOptional()
   @IsEnum(PaymentStatus)
   paymentStatus?: PaymentStatus;
 
-  @ApiPropertyOptional({ description: 'Ngày bắt đầu (ISO 8601)', example: '2024-01-01' })
+  @ApiPropertyOptional({
+    description: 'Ngày bắt đầu (ISO 8601)',
+    example: '2024-01-01'
+  })
   @IsOptional()
   @IsISO8601()
   fromDate?: string;
 
-  @ApiPropertyOptional({ description: 'Ngày kết thúc (ISO 8601)', example: '2024-12-31' })
+  @ApiPropertyOptional({
+    description: 'Ngày kết thúc (ISO 8601)',
+    example: '2024-12-31'
+  })
   @IsOptional()
   @IsISO8601()
   toDate?: string;

@@ -17,9 +17,7 @@ import { ProductEmbedding } from 'src/infrastructure/domain/hybrid-search/entiti
 export class RebuildEmbeddingsController {
   private readonly logger = new Logger(RebuildEmbeddingsController.name);
 
-  constructor(
-    private embeddingService: EmbeddingService
-  ) {}
+  constructor(private embeddingService: EmbeddingService) {}
 
   /**
    * Rebuild tất cả embeddings
@@ -27,13 +25,19 @@ export class RebuildEmbeddingsController {
    */
   @Post('rebuild')
   @ApiOperation({ summary: 'Rebuild tất cả embeddings' })
-  async rebuildAll(): Promise<{ success: number; failed: number; total: number }> {
+  async rebuildAll(): Promise<{
+    success: number;
+    failed: number;
+    total: number;
+  }> {
     this.logger.log('[RebuildEmbeddings] Starting rebuild all embeddings...');
-    
+
     const stats = await this.embeddingService.rebuildAllEmbeddings();
-    
-    this.logger.log(`[RebuildEmbeddings] Completed: ${stats.success} success, ${stats.failed} failed`);
-    
+
+    this.logger.log(
+      `[RebuildEmbeddings] Completed: ${stats.success} success, ${stats.failed} failed`
+    );
+
     return {
       success: stats.success,
       failed: stats.failed,
@@ -47,13 +51,20 @@ export class RebuildEmbeddingsController {
    */
   @Post('rebuild/:productId')
   @ApiOperation({ summary: 'Rebuild embedding cho 1 product cụ thể' })
-  async rebuildOne(@Param('productId') productId: string): Promise<{ success: boolean; productId: string }> {
-    this.logger.log(`[RebuildEmbeddings] Rebuilding embedding for product: ${productId}`);
-    
-    const success = await this.embeddingService.rebuildProductEmbedding(productId);
-    
-    this.logger.log(`[RebuildEmbeddings] Completed for ${productId}: ${success ? 'success' : 'failed'}`);
-    
+  async rebuildOne(
+    @Param('productId') productId: string
+  ): Promise<{ success: boolean; productId: string }> {
+    this.logger.log(
+      `[RebuildEmbeddings] Rebuilding embedding for product: ${productId}`
+    );
+
+    const success =
+      await this.embeddingService.rebuildProductEmbedding(productId);
+
+    this.logger.log(
+      `[RebuildEmbeddings] Completed for ${productId}: ${success ? 'success' : 'failed'}`
+    );
+
     return {
       success,
       productId
@@ -66,18 +77,27 @@ export class RebuildEmbeddingsController {
    */
   @Delete(':productId')
   @ApiOperation({ summary: 'Xóa embedding của 1 product' })
-  async deleteEmbedding(@Param('productId') productId: string): Promise<{ success: boolean; productId: string }> {
+  async deleteEmbedding(
+    @Param('productId') productId: string
+  ): Promise<{ success: boolean; productId: string }> {
     try {
-      await this.embeddingService.em.nativeDelete(ProductEmbedding, { productId });
-      
-      this.logger.log(`[RebuildEmbeddings] Deleted embedding for product: ${productId}`);
-      
+      await this.embeddingService.em.nativeDelete(ProductEmbedding, {
+        productId
+      });
+
+      this.logger.log(
+        `[RebuildEmbeddings] Deleted embedding for product: ${productId}`
+      );
+
       return {
         success: true,
         productId
       };
     } catch (error) {
-      this.logger.error(`[RebuildEmbeddings] Error deleting embedding for ${productId}:`, error);
+      this.logger.error(
+        `[RebuildEmbeddings] Error deleting embedding for ${productId}:`,
+        error
+      );
       return {
         success: false,
         productId
@@ -93,7 +113,7 @@ export class RebuildEmbeddingsController {
   @ApiOperation({ summary: 'Get stats về embeddings' })
   async getStats(): Promise<{ total: number; lastRebuild?: string }> {
     const stats = await this.embeddingService.getEmbeddingsStats();
-    
+
     return stats;
   }
 }

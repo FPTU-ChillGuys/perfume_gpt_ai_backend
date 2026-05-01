@@ -1,5 +1,10 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, OnApplicationBootstrap, OnApplicationShutdown, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnApplicationBootstrap,
+  OnApplicationShutdown,
+  Logger
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
@@ -10,7 +15,9 @@ const ORDER_CREATED_CHANNEL = 'order_created';
 const REVIEW_CREATED_CHANNEL = 'review_created';
 
 @Injectable()
-export class RedisSubscriberService implements OnApplicationBootstrap, OnApplicationShutdown {
+export class RedisSubscriberService
+  implements OnApplicationBootstrap, OnApplicationShutdown
+{
   private readonly logger = new Logger(RedisSubscriberService.name);
   private subscriber: Redis;
 
@@ -18,7 +25,7 @@ export class RedisSubscriberService implements OnApplicationBootstrap, OnApplica
     private readonly configService: ConfigService,
     private readonly recommendationService: RecommendationService,
     @InjectQueue(QueueName.REVIEW_QUEUE) private readonly reviewQueue: Queue
-  ) { }
+  ) {}
 
   // ─── Lifecycle Hooks ───────────────────────────────────────────────────────
 
@@ -35,8 +42,13 @@ export class RedisSubscriberService implements OnApplicationBootstrap, OnApplica
 
     try {
       await this.subscriber.connect();
-      await this.subscriber.subscribe(ORDER_CREATED_CHANNEL, REVIEW_CREATED_CHANNEL);
-      this.logger.log(`[RedisSubscriber] Subscribed to channels: ${ORDER_CREATED_CHANNEL}, ${REVIEW_CREATED_CHANNEL}`);
+      await this.subscriber.subscribe(
+        ORDER_CREATED_CHANNEL,
+        REVIEW_CREATED_CHANNEL
+      );
+      this.logger.log(
+        `[RedisSubscriber] Subscribed to channels: ${ORDER_CREATED_CHANNEL}, ${REVIEW_CREATED_CHANNEL}`
+      );
 
       this.subscriber.on('message', (channel: string, message: string) => {
         if (channel === ORDER_CREATED_CHANNEL) {
@@ -47,19 +59,26 @@ export class RedisSubscriberService implements OnApplicationBootstrap, OnApplica
       });
     } catch (err) {
       // Redis failure must NEVER crash the app — log and continue
-      this.logger.warn(`[RedisSubscriber] Could not connect to Redis. Subscriber disabled: ${err?.message}`);
+      this.logger.warn(
+        `[RedisSubscriber] Could not connect to Redis. Subscriber disabled: ${err?.message}`
+      );
     }
   }
 
   async onApplicationShutdown(): Promise<void> {
     try {
       if (this.subscriber) {
-        await this.subscriber.unsubscribe(ORDER_CREATED_CHANNEL, REVIEW_CREATED_CHANNEL);
+        await this.subscriber.unsubscribe(
+          ORDER_CREATED_CHANNEL,
+          REVIEW_CREATED_CHANNEL
+        );
         await this.subscriber.quit();
         this.logger.log('[RedisSubscriber] Disconnected from Redis.');
       }
     } catch (err) {
-      this.logger.warn(`[RedisSubscriber] Error during shutdown: ${err?.message}`);
+      this.logger.warn(
+        `[RedisSubscriber] Error during shutdown: ${err?.message}`
+      );
     }
   }
 
@@ -72,24 +91,36 @@ export class RedisSubscriberService implements OnApplicationBootstrap, OnApplica
    */
   private handleOrderCreated(message: string): void {
     try {
-      const payload = JSON.parse(message) as { orderId?: string; userId?: string };
+      const payload = JSON.parse(message) as {
+        orderId?: string;
+        userId?: string;
+      };
       const { orderId, userId } = payload;
 
       if (!orderId || !userId) {
-        this.logger.warn(`[RedisSubscriber][ORDER_CREATED] Invalid payload: ${message}`);
+        this.logger.warn(
+          `[RedisSubscriber][ORDER_CREATED] Invalid payload: ${message}`
+        );
         return;
       }
 
-      this.logger.log(`[RedisSubscriber][ORDER_CREATED] userId=${userId} orderId=${orderId}`);
+      this.logger.log(
+        `[RedisSubscriber][ORDER_CREATED] userId=${userId} orderId=${orderId}`
+      );
 
       // Fire-and-forget so the Redis message loop is never blocked
-      this.recommendationService.sendRepurchase(userId, orderId).catch((err) => {
-        this.logger.error(
-          `[RedisSubscriber][ORDER_CREATED] sendRepurchase failed userId=${userId} orderId=${orderId}: ${err?.message}`
-        );
-      });
+      this.recommendationService
+        .sendRepurchase(userId, orderId)
+        .catch((err) => {
+          this.logger.error(
+            `[RedisSubscriber][ORDER_CREATED] sendRepurchase failed userId=${userId} orderId=${orderId}: ${err?.message}`
+          );
+        });
     } catch (err) {
-      this.logger.error(`[RedisSubscriber][ORDER_CREATED] Failed to parse message: ${message}`, err);
+      this.logger.error(
+        `[RedisSubscriber][ORDER_CREATED] Failed to parse message: ${message}`,
+        err
+      );
     }
   }
 
@@ -103,36 +134,47 @@ export class RedisSubscriberService implements OnApplicationBootstrap, OnApplica
       let variantId: string;
       try {
         const payload = JSON.parse(message);
-        variantId = payload.variantId || payload.reviewId || (typeof payload === 'string' ? payload : null);
+        variantId =
+          payload.variantId ||
+          payload.reviewId ||
+          (typeof payload === 'string' ? payload : null);
       } catch {
         variantId = message; // Fallback to raw string if not JSON
       }
 
       if (!variantId) {
-        this.logger.warn(`[RedisSubscriber][REVIEW_CREATED] Invalid payload: ${message}`);
+        this.logger.warn(
+          `[RedisSubscriber][REVIEW_CREATED] Invalid payload: ${message}`
+        );
         return;
       }
 
-      this.logger.log(`[RedisSubscriber][REVIEW_CREATED] variantId=${variantId}`);
+      this.logger.log(
+        `[RedisSubscriber][REVIEW_CREATED] variantId=${variantId}`
+      );
 
       // Add to BullMQ queue
-      this.reviewQueue.add(
-        ReviewJobName.PROCESS_REVIEW_SUMMARY,
-        { variantId },
-        {
-          removeOnComplete: true,
-          removeOnFail: false,
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 5000 },
-        }
-      ).catch((err) => {
-        this.logger.error(
-          `[RedisSubscriber][REVIEW_CREATED] Failed to add job to review_queue: ${err?.message}`
-        );
-      });
+      this.reviewQueue
+        .add(
+          ReviewJobName.PROCESS_REVIEW_SUMMARY,
+          { variantId },
+          {
+            removeOnComplete: true,
+            removeOnFail: false,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 }
+          }
+        )
+        .catch((err) => {
+          this.logger.error(
+            `[RedisSubscriber][REVIEW_CREATED] Failed to add job to review_queue: ${err?.message}`
+          );
+        });
     } catch (err) {
-      this.logger.error(`[RedisSubscriber][REVIEW_CREATED] Failed to process message: ${message}`, err);
+      this.logger.error(
+        `[RedisSubscriber][REVIEW_CREATED] Failed to process message: ${message}`,
+        err
+      );
     }
   }
 }
-

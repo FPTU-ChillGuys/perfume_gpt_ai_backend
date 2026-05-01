@@ -28,27 +28,35 @@ export class RedisRequestResponseService implements OnApplicationShutdown {
         }
         return false;
       },
-      keepAlive: 10000, // 10 seconds heartbeat
+      keepAlive: 10000 // 10 seconds heartbeat
     };
 
     this.publisher = new Redis(redisOptions);
     this.subscriber = new Redis(redisOptions);
 
     // Logging for subscriber
-    this.subscriber.on('connect', () => this.logger.log('[RedisSub] Connecting to Redis...'));
-    this.subscriber.on('ready', () => this.logger.log('[RedisSub] Connected and ready'));
+    this.subscriber.on('connect', () =>
+      this.logger.log('[RedisSub] Connecting to Redis...')
+    );
+    this.subscriber.on('ready', () =>
+      this.logger.log('[RedisSub] Connected and ready')
+    );
     this.subscriber.on('reconnecting', (delay) =>
-      this.logger.warn(`[RedisSub] Lost connection. Reconnecting in ${delay}ms`),
+      this.logger.warn(`[RedisSub] Lost connection. Reconnecting in ${delay}ms`)
     );
     this.subscriber.on('error', (err) => {
       this.logger.error(`[RedisSub] Connection error: ${err.message}`);
     });
 
     // Logging for publisher
-    this.publisher.on('connect', () => this.logger.log('[RedisPub] Connecting to Redis...'));
-    this.publisher.on('ready', () => this.logger.log('[RedisPub] Connected and ready'));
+    this.publisher.on('connect', () =>
+      this.logger.log('[RedisPub] Connecting to Redis...')
+    );
+    this.publisher.on('ready', () =>
+      this.logger.log('[RedisPub] Connected and ready')
+    );
     this.publisher.on('reconnecting', (delay) =>
-      this.logger.warn(`[RedisPub] Lost connection. Reconnecting in ${delay}ms`),
+      this.logger.warn(`[RedisPub] Lost connection. Reconnecting in ${delay}ms`)
     );
     this.publisher.on('error', (err) => {
       this.logger.error(`[RedisPub] Connection error: ${err.message}`);
@@ -66,14 +74,22 @@ export class RedisRequestResponseService implements OnApplicationShutdown {
    * @param payload The payload to send.
    * @param timeoutMs Maximum time to wait for the response.
    */
-  async sendRequest<T>(channel: string, payload: any, timeoutMs: number = 10000): Promise<T> {
+  async sendRequest<T>(
+    channel: string,
+    payload: any,
+    timeoutMs: number = 10000
+  ): Promise<T> {
     const correlationId = uuidv4();
     const replyChannel = `reply:${correlationId}`;
 
     return new Promise<T>(async (resolve, reject) => {
       const timeout = setTimeout(() => {
         this.subscriber.unsubscribe(replyChannel).catch(() => {});
-        reject(new Error(`Redis request timed out after ${timeoutMs}ms on channel ${channel}`));
+        reject(
+          new Error(
+            `Redis request timed out after ${timeoutMs}ms on channel ${channel}`
+          )
+        );
       }, timeoutMs);
 
       const handleMessage = (chan: string, message: string) => {
@@ -97,11 +113,13 @@ export class RedisRequestResponseService implements OnApplicationShutdown {
 
         const requestPayload = JSON.stringify({
           ...payload,
-          replyChannel,
+          replyChannel
         });
 
         await this.publisher.publish(channel, requestPayload);
-        this.logger.log(`[RedisReq] Published request to ${channel}, waiting on ${replyChannel}`);
+        this.logger.log(
+          `[RedisReq] Published request to ${channel}, waiting on ${replyChannel}`
+        );
       } catch (err) {
         clearTimeout(timeout);
         this.subscriber.unsubscribe(replyChannel).catch(() => {});

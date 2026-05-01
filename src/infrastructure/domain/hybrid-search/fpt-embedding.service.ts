@@ -12,11 +12,15 @@ export class FptEmbeddingService {
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService
   ) {
     this.apiKey = this.configService.get<string>('FPTCLOUD_API_KEY') || '';
-    this.endpoint = this.configService.get<string>('FPTCLOUD_EMBEDDING_ENDPOINT') || 'https://mkp-api.fptcloud.com/v1/embeddings';
-    this.model = this.configService.get<string>('FPTCLOUD_EMBEDDING_MODEL') || 'Vietnamese_Embedding';
+    this.endpoint =
+      this.configService.get<string>('FPTCLOUD_EMBEDDING_ENDPOINT') ||
+      'https://mkp-api.fptcloud.com/v1/embeddings';
+    this.model =
+      this.configService.get<string>('FPTCLOUD_EMBEDDING_MODEL') ||
+      'Vietnamese_Embedding';
   }
 
   /**
@@ -24,8 +28,10 @@ export class FptEmbeddingService {
    */
   async generateEmbedding(text: string): Promise<number[]> {
     try {
-      this.logger.log(`Generating FPT embedding for text (length: ${text.length})...`);
-      
+      this.logger.log(
+        `Generating FPT embedding for text (length: ${text.length})...`
+      );
+
       const response = await firstValueFrom(
         this.httpService.post(
           this.endpoint,
@@ -36,7 +42,7 @@ export class FptEmbeddingService {
           },
           {
             headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
+              Authorization: `Bearer ${this.apiKey}`,
               'Content-Type': 'application/json'
             }
           }
@@ -45,16 +51,24 @@ export class FptEmbeddingService {
 
       // Theo format OpenAI-compatible mà FPT Cloud thường dùng: response.data.data[0].embedding
       const embedding = response.data?.data?.[0]?.embedding;
-      
+
       if (!embedding || !Array.isArray(embedding)) {
-        this.logger.error('Invalid embedding format from FPT Cloud', response.data);
+        this.logger.error(
+          'Invalid embedding format from FPT Cloud',
+          response.data
+        );
         throw new Error('Invalid embedding response');
       }
 
-      this.logger.log(`Successfully generated FPT embedding (${embedding.length} dimensions)`);
+      this.logger.log(
+        `Successfully generated FPT embedding (${embedding.length} dimensions)`
+      );
       return embedding;
     } catch (error) {
-      this.logger.error(`Error generating FPT embedding: ${error.message}`, error.response?.data);
+      this.logger.error(
+        `Error generating FPT embedding: ${error.message}`,
+        error.response?.data
+      );
       throw error;
     }
   }

@@ -10,9 +10,6 @@ export class TrendLogRepository extends BaseRepository<TrendLog> {
   }
 
   async getLatestLogs(limit: number): Promise<TrendLog[]> {
-    return this.find(
-      {},
-      { orderBy: { createdAt: 'DESC' }, limit }
-    );
+    return this.find({}, { orderBy: { createdAt: 'DESC' }, limit });
   }
 }

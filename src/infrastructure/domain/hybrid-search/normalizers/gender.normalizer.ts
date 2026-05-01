@@ -7,11 +7,17 @@ import { z } from 'zod';
  * Phân tích giới tính từ search text
  */
 export const GenderNormalizerSchema = z.object({
-  value: z.enum(['Nam', 'Nữ', 'Unisex']).optional().describe('Giới tính nước hoa'),
+  value: z
+    .enum(['Nam', 'Nữ', 'Unisex'])
+    .optional()
+    .describe('Giới tính nước hoa')
 });
 
 export class GenderNormalizerOutput {
-  @ApiPropertyOptional({ description: 'Giới tính nước hoa', enum: ['Nam', 'Nữ', 'Unisex'] })
+  @ApiPropertyOptional({
+    description: 'Giới tính nước hoa',
+    enum: ['Nam', 'Nữ', 'Unisex']
+  })
   value?: 'Nam' | 'Nữ' | 'Unisex';
 }
 
@@ -23,9 +29,18 @@ export class GenderNormalizer {
   private readonly logger = new Logger(GenderNormalizer.name);
 
   private readonly genderTerms = [
-    { value: 'Nam' as const, terms: ['nam', 'nam tính', 'cho nam', 'male', 'men'] },
-    { value: 'Nữ' as const, terms: ['nữ', 'nữ tính', 'cho nữ', 'female', 'women', 'lady'] },
-    { value: 'Unisex' as const, terms: ['unisex', 'cả nam và nữ', 'cho mọi người', 'genderless'] }
+    {
+      value: 'Nam' as const,
+      terms: ['nam', 'nam tính', 'cho nam', 'male', 'men']
+    },
+    {
+      value: 'Nữ' as const,
+      terms: ['nữ', 'nữ tính', 'cho nữ', 'female', 'women', 'lady']
+    },
+    {
+      value: 'Unisex' as const,
+      terms: ['unisex', 'cả nam và nữ', 'cho mọi người', 'genderless']
+    }
   ];
 
   async normalize(searchText: string): Promise<GenderNormalizerOutput | null> {
@@ -33,7 +48,7 @@ export class GenderNormalizer {
       const normalizedText = searchText.toLowerCase();
 
       for (const item of this.genderTerms) {
-        if (item.terms.some(term => normalizedText.includes(term))) {
+        if (item.terms.some((term) => normalizedText.includes(term))) {
           return { value: item.value };
         }
       }

@@ -9,7 +9,7 @@ import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.serv
 export class AIAnalysisHelper {
   private readonly logger = new Logger(AIAnalysisHelper.name);
 
-  constructor(private readonly analysisService: AiAnalysisService) { }
+  constructor(private readonly analysisService: AiAnalysisService) {}
 
   /**
    * Phân tích tin nhắn người dùng.
@@ -19,9 +19,15 @@ export class AIAnalysisHelper {
     previousContext: string,
     options: { userId: string; isGuestUser: boolean; isStaff: boolean }
   ): Promise<AnalysisObject> {
-    this.logger.log(`[AIAnalysisHelper] Running analysis for: "${messageText.substring(0, 50)}..."`);
+    this.logger.log(
+      `[AIAnalysisHelper] Running analysis for: "${messageText.substring(0, 50)}..."`
+    );
 
-    const rawAnalysis = await this.analysisService.analyze(messageText, previousContext, options);
+    const rawAnalysis = await this.analysisService.analyze(
+      messageText,
+      previousContext,
+      options
+    );
 
     if (!rawAnalysis) {
       this.logger.warn('[AIAnalysisHelper] Analysis failed, using fallback.');
@@ -53,7 +59,10 @@ export class AIAnalysisHelper {
     let queries = Array.isArray(analysis.queries) ? analysis.queries : [];
 
     // Fallback 1: Nếu không có queries nhưng có legacy logic/productNames (Search Intent)
-    if (queries.length === 0 && ['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)) {
+    if (
+      queries.length === 0 &&
+      ['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)
+    ) {
       queries.push({
         purpose: 'search',
         logic: analysis.logic || [],
@@ -67,7 +76,9 @@ export class AIAnalysisHelper {
 
     // Fallback 2: Nếu không có queries nhưng có legacy functionCall (Task/Function Intent)
     if (queries.length === 0 && analysis.functionCall) {
-      this.logger.log(`[AIAnalysisHelper] Migrating legacy functionCall to queries: ${analysis.functionCall.name}`);
+      this.logger.log(
+        `[AIAnalysisHelper] Migrating legacy functionCall to queries: ${analysis.functionCall.name}`
+      );
       queries.push({
         purpose: 'function',
         logic: analysis.logic || [],
@@ -88,7 +99,8 @@ export class AIAnalysisHelper {
       queries: queries.length > 0 ? queries : null,
       functionCall: analysis.functionCall || null,
       logic: Array.isArray(analysis.logic) ? analysis.logic : [],
-      productNames: normalizedProductNames.length > 0 ? normalizedProductNames : null,
+      productNames:
+        normalizedProductNames.length > 0 ? normalizedProductNames : null,
       pagination: analysis.pagination || { pageNumber: 1, pageSize: 5 }
     };
   }

@@ -54,14 +54,14 @@ export const productDetailTabsContent = {
 
 - Quy trình trả hàng, hoàn tiền:
 • Sau khi bạn đáp ứng được các điều kiện về trả lại hàng hóa của chúng tôi, hãy liên hệ với chúng tôi để được hỗ trợ
-• Sau khi tiếp nhận thông tin và check kiểm các điều kiện, nếu bạn đáp ứng đủ điều kiện, chúng tôi sẽ hỗ trợ ngay và nhanh nhất cho bạn.`,
+• Sau khi tiếp nhận thông tin và check kiểm các điều kiện, nếu bạn đáp ứng đủ điều kiện, chúng tôi sẽ hỗ trợ ngay và nhanh nhất cho bạn.`
 };
 
 export const normalizeProductDetailTabContent = (
-  content: ProductDetailTabContent,
+  content: ProductDetailTabContent
 ) => {
   if (Array.isArray(content)) {
-    return content.join("\n").trim();
+    return content.join('\n').trim();
   }
 
   return content.trim();

@@ -28,7 +28,9 @@ export class AdminInstructionResponse {
   }
 
   /** Chuyển đổi từ Entity sang Response DTO */
-  static fromEntity(entity: AdminInstruction | null | undefined): AdminInstructionResponse | null {
+  static fromEntity(
+    entity: AdminInstruction | null | undefined
+  ): AdminInstructionResponse | null {
     if (!entity) return null;
     return new AdminInstructionResponse({
       id: entity.id,

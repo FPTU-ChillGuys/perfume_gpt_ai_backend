@@ -14,11 +14,16 @@ const primitiveSchemaMap: Record<string, SchemaDefinition> = {
   Object: { type: 'object', additionalProperties: true }
 };
 
-const isPrimitive = (cls: Type<unknown> | PrimitiveClass): cls is PrimitiveClass =>
-  cls === String || cls === Number || cls === Boolean;
+const isPrimitive = (
+  cls: Type<unknown> | PrimitiveClass
+): cls is PrimitiveClass => cls === String || cls === Number || cls === Boolean;
 
-const resolveSchema = (cls: Type<unknown> | PrimitiveClass): SchemaDefinition =>
-  isPrimitive(cls) ? primitiveSchemaMap[cls.name] : { $ref: getSchemaPath(cls) };
+const resolveSchema = (
+  cls: Type<unknown> | PrimitiveClass
+): SchemaDefinition =>
+  isPrimitive(cls)
+    ? primitiveSchemaMap[cls.name]
+    : { $ref: getSchemaPath(cls) };
 
 interface PropertyOverrides {
   data?: SchemaDefinition;
@@ -31,7 +36,9 @@ export const ApiBaseResponse = <T>(
   overrides?: PropertyOverrides
 ) => {
   const schemaData = resolveSchema(dataClass);
-  const extraModels = isPrimitive(dataClass) ? [] : [dataClass as Type<unknown>];
+  const extraModels = isPrimitive(dataClass)
+    ? []
+    : [dataClass as Type<unknown>];
 
   return applyDecorators(
     ApiExtraModels(BaseResponse, ...extraModels),
@@ -41,9 +48,19 @@ export const ApiBaseResponse = <T>(
         type: 'object',
         properties: {
           success: { type: 'boolean', description: 'Kết quả xử lý' },
-          error: { type: 'string', nullable: true, description: 'Thông báo lỗi' },
-          details: { type: 'string', nullable: true, description: 'Chi tiết lỗi' },
-          data: overrides?.data ?? (isArray ? { type: 'array', items: schemaData } : schemaData)
+          error: {
+            type: 'string',
+            nullable: true,
+            description: 'Thông báo lỗi'
+          },
+          details: {
+            type: 'string',
+            nullable: true,
+            description: 'Chi tiết lỗi'
+          },
+          data:
+            overrides?.data ??
+            (isArray ? { type: 'array', items: schemaData } : schemaData)
         }
       }
     })
@@ -57,13 +74,19 @@ export const ExtendApiBaseResponse = <T, I>(
   overrides?: PropertyOverrides
 ) => {
   const secondArgIsBoolean = typeof itemTypeOrIsArray === 'boolean';
-  const isArray = secondArgIsBoolean ? (itemTypeOrIsArray as boolean) : fallbackIsArray;
-  const itemClass = secondArgIsBoolean ? undefined : (itemTypeOrIsArray as Type<I> | PrimitiveClass | undefined);
+  const isArray = secondArgIsBoolean
+    ? (itemTypeOrIsArray as boolean)
+    : fallbackIsArray;
+  const itemClass = secondArgIsBoolean
+    ? undefined
+    : (itemTypeOrIsArray as Type<I> | PrimitiveClass | undefined);
 
   const schemaData = resolveSchema(dataClass);
   const itemSchema = itemClass ? resolveSchema(itemClass) : null;
 
-  let payloadSchema: SchemaDefinition = isArray ? { type: 'array', items: schemaData } : schemaData;
+  let payloadSchema: SchemaDefinition = isArray
+    ? { type: 'array', items: schemaData }
+    : schemaData;
 
   if (itemClass && dataClass.name === 'PagedResult') {
     payloadSchema = {
@@ -76,7 +99,8 @@ export const ExtendApiBaseResponse = <T, I>(
 
   const extraModels: Type<unknown>[] = [];
   if (!isPrimitive(dataClass)) extraModels.push(dataClass as Type<unknown>);
-  if (itemClass && !isPrimitive(itemClass)) extraModels.push(itemClass as Type<unknown>);
+  if (itemClass && !isPrimitive(itemClass))
+    extraModels.push(itemClass as Type<unknown>);
 
   return applyDecorators(
     ApiExtraModels(BaseResponseAPI, ...extraModels),
@@ -86,7 +110,11 @@ export const ExtendApiBaseResponse = <T, I>(
         type: 'object',
         properties: {
           success: { type: 'boolean', description: 'Kết quả xử lý' },
-          error: { type: 'string', nullable: true, description: 'Thông báo lỗi' },
+          error: {
+            type: 'string',
+            nullable: true,
+            description: 'Thông báo lỗi'
+          },
           payload: overrides?.payload ?? payloadSchema
         }
       }

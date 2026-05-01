@@ -4,8 +4,8 @@ import { SlowStockRepository } from 'src/infrastructure/domain/slow-stock/slow-s
 import { RestockModule } from 'src/infrastructure/domain/restock/restock.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 @Module({
-    imports: [PrismaModule, RestockModule],
-    providers: [SlowStockService, SlowStockRepository],
-    exports: [SlowStockService]
+  imports: [PrismaModule, RestockModule],
+  providers: [SlowStockService, SlowStockRepository],
+  exports: [SlowStockService]
 })
 export class SlowStockModule {}

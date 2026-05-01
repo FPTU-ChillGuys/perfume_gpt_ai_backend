@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Ok } from 'src/application/dtos/response/common/success-response';
-import { AllUserLogRequest, UserLogRequest } from 'src/application/dtos/request/user-log.request';
+import {
+  AllUserLogRequest,
+  UserLogRequest
+} from 'src/application/dtos/request/user-log.request';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 
@@ -9,14 +12,16 @@ import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.serv
 export class UserLogAIService {
   private readonly logger = new Logger(UserLogAIService.name);
 
-  constructor(
-    private readonly userLogService: UserLogService
-  ) {}
+  constructor(private readonly userLogService: UserLogService) {}
 
   /** Tong hop log 1 user theo rolling summary khong dung AI */
-  async summarizeUserLogs(request: UserLogRequest): Promise<BaseResponse<string>> {
+  async summarizeUserLogs(
+    request: UserLogRequest
+  ): Promise<BaseResponse<string>> {
     await this.userLogService.rebuildRollingSummaryForUser(request.userId);
-    const summaryResponse = await this.userLogService.getUserLogSummaryByUserId(request.userId);
+    const summaryResponse = await this.userLogService.getUserLogSummaryByUserId(
+      request.userId
+    );
     if (!summaryResponse.success || !summaryResponse.data) {
       return { success: false, error: 'User rolling summary not found' };
     }
@@ -42,7 +47,10 @@ export class UserLogAIService {
   }
 
   /** Build rolling summary va luu vao DB */
-  async summarizeAndSaveForUser(userId: string, period: PeriodEnum): Promise<void> {
+  async summarizeAndSaveForUser(
+    userId: string,
+    period: PeriodEnum
+  ): Promise<void> {
     await this.userLogService.rebuildRollingSummaryForUser(userId);
   }
 
@@ -53,7 +61,9 @@ export class UserLogAIService {
     for (const userId of userIds) {
       await this.summarizeAndSaveForUser(userId, period);
     }
-    this.logger.log('Scheduled task completed: User logs summarized and saved.');
+    this.logger.log(
+      'Scheduled task completed: User logs summarized and saved.'
+    );
   }
 
   async summarizePerWeek(): Promise<void> {

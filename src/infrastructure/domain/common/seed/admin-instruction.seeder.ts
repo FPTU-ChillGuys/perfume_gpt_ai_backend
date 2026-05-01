@@ -18,16 +18,22 @@ export async function seedAdminInstructions(orm: MikroORM): Promise<void> {
     try {
       await em.count(AdminInstruction);
     } catch {
-      console.warn('[Seeder] Bảng admin_instruction chưa tồn tại. Hãy chạy migration trước: npx mikro-orm migration:up');
+      console.warn(
+        '[Seeder] Bảng admin_instruction chưa tồn tại. Hãy chạy migration trước: npx mikro-orm migration:up'
+      );
       return;
     }
 
     // Kiểm tra từng domain type - chỉ seed nếu domain đó chưa có instruction nào
     for (const domainType of ALL_INSTRUCTION_TYPES) {
-      const existingCount = await em.count(AdminInstruction, { instructionType: domainType });
+      const existingCount = await em.count(AdminInstruction, {
+        instructionType: domainType
+      });
 
       if (existingCount > 0) {
-        console.log(`[Seeder] Domain "${domainType}" đã có ${existingCount} instruction(s), bỏ qua.`);
+        console.log(
+          `[Seeder] Domain "${domainType}" đã có ${existingCount} instruction(s), bỏ qua.`
+        );
         continue;
       }
 
@@ -37,7 +43,9 @@ export async function seedAdminInstructions(orm: MikroORM): Promise<void> {
       );
 
       if (seedItems.length === 0) {
-        console.log(`[Seeder] Không có seed data cho domain "${domainType}", bỏ qua.`);
+        console.log(
+          `[Seeder] Không có seed data cho domain "${domainType}", bỏ qua.`
+        );
         continue;
       }
 
@@ -50,7 +58,9 @@ export async function seedAdminInstructions(orm: MikroORM): Promise<void> {
         em.persist(instruction);
       }
 
-      console.log(`[Seeder] Đã seed ${seedItems.length} instruction(s) cho domain "${domainType}".`);
+      console.log(
+        `[Seeder] Đã seed ${seedItems.length} instruction(s) cho domain "${domainType}".`
+      );
     }
 
     await em.flush();

@@ -20,7 +20,7 @@ export const INSUFFICIENT_DATA_MESSAGES = {
   REPURCHASE:
     'Chưa đủ dữ liệu để gợi ý mua lại. Người dùng cần có lịch sử mua hàng.',
   LOG_SUMMARIZE:
-    'Chưa đủ dữ liệu log để tóm tắt. Người dùng chưa có hoạt động nào trong khoảng thời gian này.',
+    'Chưa đủ dữ liệu log để tóm tắt. Người dùng chưa có hoạt động nào trong khoảng thời gian này.'
 } as const;
 
 /**

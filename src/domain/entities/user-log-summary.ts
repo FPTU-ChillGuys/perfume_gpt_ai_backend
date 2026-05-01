@@ -4,10 +4,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { UserLogSummaryRepository } from 'src/infrastructure/domain/repositories/user-log-summary.repository';
 
 /** Entity lưu bản tóm tắt hành vi người dùng dạng rolling theo user */
-@Entity({repository: () => UserLogSummaryRepository})
+@Entity({ repository: () => UserLogSummaryRepository })
 @Index({ properties: ['userId'] })
 export class UserLogSummary extends Common {
-  
   /** ID người dùng */
   @ApiProperty({ description: 'ID người dùng', format: 'uuid' })
   @Property({ type: 'text' })
@@ -24,12 +23,20 @@ export class UserLogSummary extends Common {
   featureSnapshot?: Record<string, unknown>;
 
   /** Bản tóm tắt log theo ngày */
-  @ApiProperty({ description: 'Bản tóm tắt log theo ngày', required: false, type: Object })
+  @ApiProperty({
+    description: 'Bản tóm tắt log theo ngày',
+    required: false,
+    type: Object
+  })
   @Property({ type: 'json', columnType: 'jsonb', nullable: true })
   dailyLogSummary?: Record<string, string>;
 
   /** Snapshot feature theo ngày */
-  @ApiProperty({ description: 'Feature snapshot theo ngày', required: false, type: Object })
+  @ApiProperty({
+    description: 'Feature snapshot theo ngày',
+    required: false,
+    type: Object
+  })
   @Property({ type: 'json', columnType: 'jsonb', nullable: true })
   dailyFeatureSnapshot?: Record<string, unknown>;
 

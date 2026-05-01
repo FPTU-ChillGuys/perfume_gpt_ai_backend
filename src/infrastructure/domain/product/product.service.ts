@@ -94,8 +94,13 @@ function mapProductWithVariants(
     primaryImage: p.Media[0]?.Url ?? null,
     createdAt: p.CreatedAt.toISOString(),
     updatedAt: p.UpdatedAt?.toISOString() ?? null,
-    scentNotes: p.ProductNoteMaps?.map((n: any) => n.ScentNotes?.Name).filter(Boolean) || [],
-    olfactoryFamilies: p.ProductFamilyMaps?.map((f: any) => f.OlfactoryFamilies?.Name).filter(Boolean) || [],
+    scentNotes:
+      p.ProductNoteMaps?.map((n: any) => n.ScentNotes?.Name).filter(Boolean) ||
+      [],
+    olfactoryFamilies:
+      p.ProductFamilyMaps?.map((f: any) => f.OlfactoryFamilies?.Name).filter(
+        Boolean
+      ) || [],
     attributes: (p.ProductAttributes ?? []).map(
       (attr): ProductAttributeResponse => ({
         id: attr.Id,
@@ -119,17 +124,17 @@ function mapProductWithVariants(
         concentrationId: v.ConcentrationId,
         concentration: v.Concentrations
           ? ({
-            id: v.Concentrations.Id,
-            name: v.Concentrations.Name
-          } satisfies ConcentrationResponse)
+              id: v.Concentrations.Id,
+              name: v.Concentrations.Name
+            } satisfies ConcentrationResponse)
           : null,
         stock: v.Stocks
           ? ({
-            id: v.Stocks.Id,
-            totalQuantity: v.Stocks.TotalQuantity,
-            reservedQuantity: v.Stocks.ReservedQuantity,
-            lowStockThreshold: v.Stocks.LowStockThreshold
-          } satisfies VariantStockResponse)
+              id: v.Stocks.Id,
+              totalQuantity: v.Stocks.TotalQuantity,
+              reservedQuantity: v.Stocks.ReservedQuantity,
+              lowStockThreshold: v.Stocks.LowStockThreshold
+            } satisfies VariantStockResponse)
           : null,
         media: (v.Media ?? []).map(
           (m): VariantMediaResponse => ({
@@ -154,7 +159,10 @@ function mapProductWithVariants(
         sillage: v.Sillage,
         createdAt: v.CreatedAt.toISOString(),
         updatedAt: v.UpdatedAt?.toISOString() ?? null,
-        url: v.Media?.find((m: any) => m.IsPrimary)?.Url || v.Media?.[0]?.Url || null
+        url:
+          v.Media?.find((m: any) => m.IsPrimary)?.Url ||
+          v.Media?.[0]?.Url ||
+          null
       })
     )
   };
@@ -188,8 +196,22 @@ export class ProductService {
   private readonly logger = new Logger(ProductService.name);
   // Fallback generic keywords to filter out when filtering logic (until vocabular parser rules are seeded)
   private readonly GENERIC_FILTER_KEYWORDS_FALLBACK = [
-    'nước hoa', 'nước', 'hoa', 'perfume', 'dầu thơm', 'price', 'budget', 'gian hàng', 'giá',
-    'sản phẩm', 'product', 'tìm', 'find', 'search', 'gợi ý', 'recommend'
+    'nước hoa',
+    'nước',
+    'hoa',
+    'perfume',
+    'dầu thơm',
+    'price',
+    'budget',
+    'gian hàng',
+    'giá',
+    'sản phẩm',
+    'product',
+    'tìm',
+    'find',
+    'search',
+    'gợi ý',
+    'recommend'
   ];
 
   constructor(
@@ -199,8 +221,8 @@ export class ProductService {
     private readonly dictionaryBuilder: DictionaryBuilderService,
     private readonly configService: ConfigService,
     private readonly masterDataService: MasterDataService,
-    private readonly err: I18nErrorHandler,
-  ) { }
+    private readonly err: I18nErrorHandler
+  ) {}
 
   /**
    * Load generic filter keywords from VocabParserRule or fallback to hardcoded list
@@ -214,11 +236,14 @@ export class ProductService {
       //   where: { ruleGroup: 'filler_keyword' }
       // });
       // return rules.map(r => r.pattern.toLowerCase()).filter(Boolean);
-      
+
       // For now, use fallback hardcoded list
       return this.GENERIC_FILTER_KEYWORDS_FALLBACK;
     } catch (error) {
-      this.logger.warn('[SEARCH] Failed to load generic keywords from DB, using fallback', error);
+      this.logger.warn(
+        '[SEARCH] Failed to load generic keywords from DB, using fallback',
+        error
+      );
       return this.GENERIC_FILTER_KEYWORDS_FALLBACK;
     }
   }
@@ -227,27 +252,43 @@ export class ProductService {
    * Type-to-DB-field mapping for count validation queries.
    * Maps a keyword type to the corresponding Prisma WHERE clause on Products table.
    */
-  private readonly TYPE_FIELD_MAP: Record<string, (keyword: string) => Prisma.ProductsWhereInput> = {
-    brand:     (kw) => ({ Brands: { Name: { contains: kw } } }),
-    category:  (kw) => ({ Categories: { Name: { contains: kw } } }),
-    note:      (kw) => ({ ProductNoteMaps: { some: { ScentNotes: { Name: { contains: kw } } } } }),
-    family:    (kw) => ({ ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains: kw } } } } }),
-    attribute: (kw) => ({ ProductAttributes: { some: { AttributeValues: { Value: { contains: kw } } } } }),
-    product:   (kw) => ({ Name: { contains: kw } }),
-    gender:    (kw) => ({ Gender: { equals: kw } }),
+  private readonly TYPE_FIELD_MAP: Record<
+    string,
+    (keyword: string) => Prisma.ProductsWhereInput
+  > = {
+    brand: (kw) => ({ Brands: { Name: { contains: kw } } }),
+    category: (kw) => ({ Categories: { Name: { contains: kw } } }),
+    note: (kw) => ({
+      ProductNoteMaps: { some: { ScentNotes: { Name: { contains: kw } } } }
+    }),
+    family: (kw) => ({
+      ProductFamilyMaps: {
+        some: { OlfactoryFamilies: { Name: { contains: kw } } }
+      }
+    }),
+    attribute: (kw) => ({
+      ProductAttributes: {
+        some: { AttributeValues: { Value: { contains: kw } } }
+      }
+    }),
+    product: (kw) => ({ Name: { contains: kw } }),
+    gender: (kw) => ({ Gender: { equals: kw } })
   };
 
   /**
    * Type-to-MasterData-search mapping for re-normalization.
    * Used when a keyword has count=0 to find alternative labels.
    */
-  private readonly TYPE_SEARCH_MAP: Record<string, (keyword: string) => Promise<any[]>> = {
-    brand:     (kw) => this.masterDataService.searchBrands(kw),
-    category:  (kw) => this.masterDataService.searchCategories(kw),
-    note:      (kw) => this.masterDataService.searchScentNotes(kw),
-    family:    (kw) => this.masterDataService.searchOlfactoryFamilies(kw),
+  private readonly TYPE_SEARCH_MAP: Record<
+    string,
+    (keyword: string) => Promise<any[]>
+  > = {
+    brand: (kw) => this.masterDataService.searchBrands(kw),
+    category: (kw) => this.masterDataService.searchCategories(kw),
+    note: (kw) => this.masterDataService.searchScentNotes(kw),
+    family: (kw) => this.masterDataService.searchOlfactoryFamilies(kw),
     attribute: (kw) => this.masterDataService.searchAttributeValues(kw),
-    product:   (kw) => this.masterDataService.searchProducts(kw),
+    product: (kw) => this.masterDataService.searchProducts(kw)
   };
 
   /**
@@ -258,98 +299,122 @@ export class ProductService {
   private async validateAndRenormalizeKeywords(
     logic: any[],
     normalizationMetadata: any[] | null
-  ): Promise<{ validatedLogic: any[]; removedKeywords: string[]; renormalizedKeywords: string[] }> {
+  ): Promise<{
+    validatedLogic: any[];
+    removedKeywords: string[];
+    renormalizedKeywords: string[];
+  }> {
     const genericFilterKeywords = await this.getGenericFilterKeywords();
     const removedKeywords: string[] = [];
     const renormalizedKeywords: string[] = [];
 
-    const validatedLogic = await Promise.all(logic.map(async (group: any) => {
-      const items = Array.isArray(group) ? group : [group];
-      const validatedItems: string[] = [];
+    const validatedLogic = await Promise.all(
+      logic.map(async (group: any) => {
+        const items = Array.isArray(group) ? group : [group];
+        const validatedItems: string[] = [];
 
-      for (const item of items) {
-        const lower = item.toLowerCase();
+        for (const item of items) {
+          const lower = item.toLowerCase();
 
-        // Skip exceptions: generic, price, short/long, unknown type
-        if (genericFilterKeywords.includes(lower) ||
-            lower.includes('price<') || lower.includes('price>') ||
-            item.length < 3 || item.length > 100) {
-          validatedItems.push(item);
-          continue;
-        }
-
-        // Find type from normalizationMetadata
-        const meta = Array.isArray(normalizationMetadata)
-          ? normalizationMetadata.find(m => m.original?.toLowerCase() === lower || m.corrected?.toLowerCase() === lower)
-          : null;
-        const type = meta?.type || 'unknown';
-
-        if (type === 'unknown') {
-          validatedItems.push(item);
-          continue;
-        }
-
-        // Step 1: Count query
-        const fieldWhere = this.TYPE_FIELD_MAP[type]?.(item);
-        if (!fieldWhere) {
-          validatedItems.push(item);
-          continue;
-        }
-
-        try {
-          const count = await this.prisma.products.count({
-            where: { IsDeleted: false, ...fieldWhere }
-          });
-
-          if (count > 0) {
+          // Skip exceptions: generic, price, short/long, unknown type
+          if (
+            genericFilterKeywords.includes(lower) ||
+            lower.includes('price<') ||
+            lower.includes('price>') ||
+            item.length < 3 ||
+            item.length > 100
+          ) {
             validatedItems.push(item);
             continue;
           }
 
-          // Step 2: Count = 0 → try re-normalization
-          const searchFn = this.TYPE_SEARCH_MAP[type];
-          if (!searchFn) {
-            removedKeywords.push(item);
+          // Find type from normalizationMetadata
+          const meta = Array.isArray(normalizationMetadata)
+            ? normalizationMetadata.find(
+                (m) =>
+                  m.original?.toLowerCase() === lower ||
+                  m.corrected?.toLowerCase() === lower
+              )
+            : null;
+          const type = meta?.type || 'unknown';
+
+          if (type === 'unknown') {
+            validatedItems.push(item);
             continue;
           }
 
-          const searchResults = await searchFn(item);
-          if (searchResults.length > 0) {
-            // Find the best match label
-            const bestMatch = searchResults[0];
-            const newKeyword = bestMatch.Name || bestMatch.Value || bestMatch.id || bestMatch.Id;
-            if (newKeyword && newKeyword.toLowerCase() !== lower) {
-              // Verify new keyword with count query
-              const newFieldWhere = this.TYPE_FIELD_MAP[type]?.(newKeyword);
-              if (newFieldWhere) {
-                const newCount = await this.prisma.products.count({
-                  where: { IsDeleted: false, ...newFieldWhere }
-                });
-                if (newCount > 0) {
-                  validatedItems.push(newKeyword);
-                  renormalizedKeywords.push(`${item}->${newKeyword}`);
-                  this.logger.log(`[VALIDATE] Re-normalized: "${item}" -> "${newKeyword}" (count=${newCount})`);
-                  continue;
+          // Step 1: Count query
+          const fieldWhere = this.TYPE_FIELD_MAP[type]?.(item);
+          if (!fieldWhere) {
+            validatedItems.push(item);
+            continue;
+          }
+
+          try {
+            const count = await this.prisma.products.count({
+              where: { IsDeleted: false, ...fieldWhere }
+            });
+
+            if (count > 0) {
+              validatedItems.push(item);
+              continue;
+            }
+
+            // Step 2: Count = 0 → try re-normalization
+            const searchFn = this.TYPE_SEARCH_MAP[type];
+            if (!searchFn) {
+              removedKeywords.push(item);
+              continue;
+            }
+
+            const searchResults = await searchFn(item);
+            if (searchResults.length > 0) {
+              // Find the best match label
+              const bestMatch = searchResults[0];
+              const newKeyword =
+                bestMatch.Name ||
+                bestMatch.Value ||
+                bestMatch.id ||
+                bestMatch.Id;
+              if (newKeyword && newKeyword.toLowerCase() !== lower) {
+                // Verify new keyword with count query
+                const newFieldWhere = this.TYPE_FIELD_MAP[type]?.(newKeyword);
+                if (newFieldWhere) {
+                  const newCount = await this.prisma.products.count({
+                    where: { IsDeleted: false, ...newFieldWhere }
+                  });
+                  if (newCount > 0) {
+                    validatedItems.push(newKeyword);
+                    renormalizedKeywords.push(`${item}->${newKeyword}`);
+                    this.logger.log(
+                      `[VALIDATE] Re-normalized: "${item}" -> "${newKeyword}" (count=${newCount})`
+                    );
+                    continue;
+                  }
                 }
               }
             }
+
+            // Step 3: Still no match → remove
+            removedKeywords.push(item);
+            this.logger.log(
+              `[VALIDATE] Removed keyword: "${item}" (count=0 after re-normalization)`
+            );
+          } catch (error) {
+            // Fail-safe: keep the keyword if validation errors
+            this.logger.warn(
+              `[VALIDATE] Error validating "${item}", keeping it.`
+            );
+            validatedItems.push(item);
           }
-
-          // Step 3: Still no match → remove
-          removedKeywords.push(item);
-          this.logger.log(`[VALIDATE] Removed keyword: "${item}" (count=0 after re-normalization)`);
-        } catch (error) {
-          // Fail-safe: keep the keyword if validation errors
-          this.logger.warn(`[VALIDATE] Error validating "${item}", keeping it.`);
-          validatedItems.push(item);
         }
-      }
 
-      return validatedItems.length > 0 ? validatedItems : null;
-    }));
+        return validatedItems.length > 0 ? validatedItems : null;
+      })
+    );
 
     return {
-      validatedLogic: validatedLogic.filter(g => g !== null),
+      validatedLogic: validatedLogic.filter((g) => g !== null),
       removedKeywords,
       renormalizedKeywords
     };
@@ -386,10 +451,12 @@ export class ProductService {
     // Build WHERE condition for gender filter
     const where: Prisma.ProductsWhereInput = {
       IsDeleted: false,
-      Gender: { equals : genderKeyword }
+      Gender: { equals: genderKeyword }
     };
 
-    this.logger.debug(`[GENDER_TEST] Testing filter for keyword: "${genderKeyword}"`);
+    this.logger.debug(
+      `[GENDER_TEST] Testing filter for keyword: "${genderKeyword}"`
+    );
     this.logger.debug(`[GENDER_TEST] WHERE clause: ${JSON.stringify(where)}`);
 
     const [totalCount, products] = await Promise.all([
@@ -403,15 +470,19 @@ export class ProductService {
       })
     ]);
 
-    this.logger.debug(`[GENDER_TEST] Total found: ${totalCount}, Returned: ${products.length}`);
+    this.logger.debug(
+      `[GENDER_TEST] Total found: ${totalCount}, Returned: ${products.length}`
+    );
     products.forEach((p, idx) => {
-      this.logger.debug(`[GENDER_TEST] [${idx}] ${p.Name} - Gender: "${p.Gender}"`);
+      this.logger.debug(
+        `[GENDER_TEST] [${idx}] ${p.Name} - Gender: "${p.Gender}"`
+      );
     });
 
     return {
       query: where,
       totalCount,
-      results: products.map(p => ({
+      results: products.map((p) => ({
         id: p.Id,
         name: p.Name,
         gender: p.Gender
@@ -424,8 +495,12 @@ export class ProductService {
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
     const parsedResult = this.nlpEngine.parseAndNormalize(searchText);
-    const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
-    const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
+    const extractedObject = this.mapParsedToStructuredAnalysis(
+      parsedResult,
+      request
+    );
+    const structuredResult =
+      await this.getProductsByStructuredQuery(extractedObject);
 
     if (!structuredResult.success || !structuredResult.data) {
       return this.err.fail(structuredResult.error || 'errors.product.search');
@@ -440,48 +515,47 @@ export class ProductService {
   async getAllProducts(
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
-    return await this.err.wrap(
-      async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
+    return await this.err.wrap(async () => {
+      const skip = (request.PageNumber - 1) * request.PageSize;
+      const take = request.PageSize;
 
-        const [products, totalCount] = await Promise.all([
-          this.prisma.products.findMany({
-            skip,
-            take,
-            include: productInclude
-          }),
-          this.prisma.products.count()
-        ]);
+      const [products, totalCount] = await Promise.all([
+        this.prisma.products.findMany({
+          skip,
+          take,
+          include: productInclude
+        }),
+        this.prisma.products.count()
+      ]);
 
-        const result = new PagedResult<ProductResponse>({
-          items: products.map(mapProduct),
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        });
-        return { success: true, payload: result };
-      },
-      'errors.product.fetch'
-    );
+      const result = new PagedResult<ProductResponse>({
+        items: products.map(mapProduct),
+        pageNumber: request.PageNumber,
+        pageSize: request.PageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / request.PageSize)
+      });
+      return { success: true, payload: result };
+    }, 'errors.product.fetch');
   }
 
   async getProductsUsingSemanticSearch(
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
-    return await this.err.wrap(
-      async () => {
-        if (!searchText?.trim()) {
-          return { success: true, payload: this.createEmptyPagedProducts(request) };
-        }
+    return await this.err.wrap(async () => {
+      if (!searchText?.trim()) {
+        return {
+          success: true,
+          payload: this.createEmptyPagedProducts(request)
+        };
+      }
 
-        this.logger.log('[SEARCH][QUERY_ONLY] getProductsUsingSemanticSearch -> parsed query path');
-        return await this.runParsedQuerySearch(searchText, request);
-      },
-      'errors.product.search'
-    );
+      this.logger.log(
+        '[SEARCH][QUERY_ONLY] getProductsUsingSemanticSearch -> parsed query path'
+      );
+      return await this.runParsedQuerySearch(searchText, request);
+    }, 'errors.product.search');
   }
 
   /**
@@ -491,65 +565,98 @@ export class ProductService {
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
-    return await this.err.wrap(
-      async () => {
-        if (!searchText?.trim()) {
-          return { success: true, payload: this.createEmptyPagedProducts(request) };
-        }
+    return await this.err.wrap(async () => {
+      if (!searchText?.trim()) {
+        return {
+          success: true,
+          payload: this.createEmptyPagedProducts(request)
+        };
+      }
 
-        this.logger.log('[SEARCH][NLP_ONLY] getProductsUsingAiSearch -> parsed query path');
-        return await this.runParsedQuerySearch(searchText, request);
-      },
-      'errors.product.search'
-    );
+      this.logger.log(
+        '[SEARCH][NLP_ONLY] getProductsUsingAiSearch -> parsed query path'
+      );
+      return await this.runParsedQuerySearch(searchText, request);
+    }, 'errors.product.search');
   }
 
   /**
-    * Search sản phẩm dùng parser (winkNLP) -> map sang structured analysis -> chạy `getProductsByStructuredQuery`.
-    * Không dùng Elasticsearch path, phục vụ kiểm chứng parse -> query DB hiện tại.
+   * Search sản phẩm dùng parser (winkNLP) -> map sang structured analysis -> chạy `getProductsByStructuredQuery`.
+   * Không dùng Elasticsearch path, phục vụ kiểm chứng parse -> query DB hiện tại.
    */
   async getProductsUsingParsedSearch(
     searchText: string,
     request: PagedAndSortedRequest
   ): Promise<BaseResponseAPI<any>> {
-    return await this.err.wrap(
-      async () => {
-        const parsedResult = this.nlpEngine.parseAndNormalize(searchText);
-        const extractedObject = this.mapParsedToStructuredAnalysis(parsedResult, request);
+    return await this.err.wrap(async () => {
+      const parsedResult = this.nlpEngine.parseAndNormalize(searchText);
+      const extractedObject = this.mapParsedToStructuredAnalysis(
+        parsedResult,
+        request
+      );
 
-        const structuredResult = await this.getProductsByStructuredQuery(extractedObject);
-        const result = structuredResult.data;
+      const structuredResult =
+        await this.getProductsByStructuredQuery(extractedObject);
+      const result = structuredResult.data;
 
-        return {
-          success: structuredResult.success,
-          payload: {
-            ...result,
-            parsedResult,
-            extractedObject,
-            queryLogicUsed: extractedObject.logic ?? [],
-          },
-        };
-      },
-      'errors.product.search'
-    );
+      return {
+        success: structuredResult.success,
+        payload: {
+          ...result,
+          parsedResult,
+          extractedObject,
+          queryLogicUsed: extractedObject.logic ?? []
+        }
+      };
+    }, 'errors.product.search');
   }
 
-  private mapParsedToStructuredAnalysis(parsed: Record<string, any>, request: PagedAndSortedRequest): any {
-    const byType = parsed?.byType && typeof parsed.byType === 'object' ? parsed.byType : {};
-    const signals = parsed?.signals && typeof parsed.signals === 'object' ? parsed.signals : {};
-    const entityDictionary = this.dictionaryBuilder.getSnapshot()?.entityDictionary;
-    const searchText = [parsed?.input, parsed?.normalizedInput].find((value): value is string => typeof value === 'string' && value.trim().length > 0) ?? '';
+  private mapParsedToStructuredAnalysis(
+    parsed: Record<string, any>,
+    request: PagedAndSortedRequest
+  ): any {
+    const byType =
+      parsed?.byType && typeof parsed.byType === 'object' ? parsed.byType : {};
+    const signals =
+      parsed?.signals && typeof parsed.signals === 'object'
+        ? parsed.signals
+        : {};
+    const entityDictionary =
+      this.dictionaryBuilder.getSnapshot()?.entityDictionary;
+    const searchText =
+      [parsed?.input, parsed?.normalizedInput].find(
+        (value): value is string =>
+          typeof value === 'string' && value.trim().length > 0
+      ) ?? '';
 
-    const productNames = this.expandTermsForStructuredQuery(this.asStringArray(byType.product_name), entityDictionary);
-    const genderValues = this.expandTermsForStructuredQuery(this.asStringArray(byType.gender), entityDictionary);
-    const originValues = this.expandTermsForStructuredQuery(this.asStringArray(byType.origin), entityDictionary);
-    const concentrationValues = this.expandTermsForStructuredQuery(this.asStringArray(byType.concentration), entityDictionary);
-    const variantTypeValues = this.expandTermsForStructuredQuery(this.asStringArray(byType.variant_type), entityDictionary);
+    const productNames = this.expandTermsForStructuredQuery(
+      this.asStringArray(byType.product_name),
+      entityDictionary
+    );
+    const genderValues = this.expandTermsForStructuredQuery(
+      this.asStringArray(byType.gender),
+      entityDictionary
+    );
+    const originValues = this.expandTermsForStructuredQuery(
+      this.asStringArray(byType.origin),
+      entityDictionary
+    );
+    const concentrationValues = this.expandTermsForStructuredQuery(
+      this.asStringArray(byType.concentration),
+      entityDictionary
+    );
+    const variantTypeValues = this.expandTermsForStructuredQuery(
+      this.asStringArray(byType.variant_type),
+      entityDictionary
+    );
 
     const logicGroups: string[][] = [];
     const pushGroup = (values: unknown) => {
       const baseTerms = this.asStringArray(values);
-      const group = this.expandTermsForStructuredQuery(baseTerms, entityDictionary);
+      const group = this.expandTermsForStructuredQuery(
+        baseTerms,
+        entityDictionary
+      );
       if (group.length > 0) {
         logicGroups.push(group);
       }
@@ -560,28 +667,55 @@ export class ProductService {
     pushGroup(byType.olfactory_family);
     pushGroup(byType.scent_note);
     const attributeValues = this.asStringArray(byType.attribute_value);
-    const nonAgeAttributeValues = attributeValues.filter(value => !this.isAgeBucketValue(value));
-    const ageAttributeValues = attributeValues.filter(value => this.isAgeBucketValue(value));
+    const nonAgeAttributeValues = attributeValues.filter(
+      (value) => !this.isAgeBucketValue(value)
+    );
+    const ageAttributeValues = attributeValues.filter((value) =>
+      this.isAgeBucketValue(value)
+    );
     pushGroup(nonAgeAttributeValues);
 
     const releaseYear = this.extractReleaseYear(searchText);
     const volumeValues = this.extractVolumeValues(searchText);
-    const minLongevity = this.extractThreshold(searchText, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i);
-    const minSillage = this.extractThreshold(searchText, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i'));
+    const minLongevity = this.extractThreshold(
+      searchText,
+      /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i
+    );
+    const minSillage = this.extractThreshold(
+      searchText,
+      new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i')
+    );
 
-    const priceRange = signals?.priceRange && typeof signals.priceRange === 'object' ? signals.priceRange : {};
-    const ageRange = signals?.ageRange && typeof signals.ageRange === 'object' ? signals.ageRange : {};
+    const priceRange =
+      signals?.priceRange && typeof signals.priceRange === 'object'
+        ? signals.priceRange
+        : {};
+    const ageRange =
+      signals?.ageRange && typeof signals.ageRange === 'object'
+        ? signals.ageRange
+        : {};
     const budget = {
-      min: typeof priceRange.minPriceVnd === 'number' ? priceRange.minPriceVnd : undefined,
-      max: typeof priceRange.maxPriceVnd === 'number' ? priceRange.maxPriceVnd : undefined,
+      min:
+        typeof priceRange.minPriceVnd === 'number'
+          ? priceRange.minPriceVnd
+          : undefined,
+      max:
+        typeof priceRange.maxPriceVnd === 'number'
+          ? priceRange.maxPriceVnd
+          : undefined
     };
-    const minAge = typeof ageRange.minAge === 'number' ? ageRange.minAge : undefined;
-    const maxAge = typeof ageRange.maxAge === 'number' ? ageRange.maxAge : undefined;
+    const minAge =
+      typeof ageRange.minAge === 'number' ? ageRange.minAge : undefined;
+    const maxAge =
+      typeof ageRange.maxAge === 'number' ? ageRange.maxAge : undefined;
 
     return {
       logic: logicGroups,
       productNames,
-      ageAttributeValues: this.expandTermsForStructuredQuery(ageAttributeValues, entityDictionary),
+      ageAttributeValues: this.expandTermsForStructuredQuery(
+        ageAttributeValues,
+        entityDictionary
+      ),
       genderValues,
       originValues,
       concentrationValues,
@@ -595,12 +729,12 @@ export class ProductService {
       budget,
       sorting: {
         field: 'Newest',
-        isDescending: request.SortOrder !== 'asc',
+        isDescending: request.SortOrder !== 'asc'
       },
       pagination: {
         pageNumber: request.PageNumber || 1,
-        pageSize: request.PageSize || 10,
-      },
+        pageSize: request.PageSize || 10
+      }
     };
   }
 
@@ -608,7 +742,14 @@ export class ProductService {
     if (!Array.isArray(value)) {
       return [];
     }
-    return Array.from(new Set(value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)));
+    return Array.from(
+      new Set(
+        value.filter(
+          (item): item is string =>
+            typeof item === 'string' && item.trim().length > 0
+        )
+      )
+    );
   }
 
   private asNumberArray(value: unknown): number[] {
@@ -619,8 +760,8 @@ export class ProductService {
     return Array.from(
       new Set(
         value
-          .map(item => Number(item))
-          .filter(item => Number.isFinite(item) && item > 0)
+          .map((item) => Number(item))
+          .filter((item) => Number.isFinite(item) && item > 0)
       )
     );
   }
@@ -645,7 +786,13 @@ export class ProductService {
 
   private extractVolumeValues(text: string): number[] {
     const matches = Array.from(text.matchAll(/\b(\d+(?:\.\d+)?)\s*ml\b/gi));
-    return Array.from(new Set(matches.map(match => Number(match[1])).filter(value => Number.isFinite(value) && value > 0)));
+    return Array.from(
+      new Set(
+        matches
+          .map((match) => Number(match[1]))
+          .filter((value) => Number.isFinite(value) && value > 0)
+      )
+    );
   }
 
   private extractThreshold(text: string, pattern: RegExp): number | undefined {
@@ -664,7 +811,9 @@ export class ProductService {
       return false;
     }
 
-    return /(tuoi|thanh nien|nguoi lon|trung nien|thieu nien|teen)/i.test(normalized);
+    return /(tuoi|thanh nien|nguoi lon|trung nien|thieu nien|teen)/i.test(
+      normalized
+    );
   }
 
   private inferAgeTermsFromRange(minAge?: number, maxAge?: number): string[] {
@@ -705,7 +854,10 @@ export class ProductService {
     return Array.from(terms);
   }
 
-  private expandTermsForStructuredQuery(terms: string[], entityDictionary?: EntityDictionary): string[] {
+  private expandTermsForStructuredQuery(
+    terms: string[],
+    entityDictionary?: EntityDictionary
+  ): string[] {
     const expanded = new Set<string>();
 
     for (const term of terms) {
@@ -725,7 +877,9 @@ export class ProductService {
         expanded.add(escaped);
       }
 
-      const normalizedKey = this.normalizeForLookup(unescaped || normalizedTerm);
+      const normalizedKey = this.normalizeForLookup(
+        unescaped || normalizedTerm
+      );
       if (!entityDictionary || !normalizedKey) continue;
 
       for (const canonicalMap of Object.values(entityDictionary)) {
@@ -788,7 +942,10 @@ export class ProductService {
     request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
     // Reuse the semantic query path and return the same paged payload contract.
-    const result = await this.getProductsUsingSemanticSearch(searchText, request);
+    const result = await this.getProductsUsingSemanticSearch(
+      searchText,
+      request
+    );
     return {
       success: result.success,
       data: result.payload
@@ -902,126 +1059,223 @@ export class ProductService {
   async getProductWithVariants(
     @Query('id') id: string
   ): Promise<BaseResponse<ProductWithVariantsResponse>> {
-    return await this.err.wrap(
-      async () => {
-        const product = await this.prisma.products.findFirst({
-          where: { Id: id, IsDeleted: false },
-          include: productWithVariantsInclude
-        });
+    return await this.err.wrap(async () => {
+      const product = await this.prisma.products.findFirst({
+        where: { Id: id, IsDeleted: false },
+        include: productWithVariantsInclude
+      });
 
-        if (!product) {
-          throw new NotFoundException(`Không tìm thấy sản phẩm với id: ${id}`);
-        }
+      if (!product) {
+        throw new NotFoundException(`Không tìm thấy sản phẩm với id: ${id}`);
+      }
 
-        return { success: true, data: mapProductWithVariants(product) };
-      },
-      'errors.product.fetch_variants'
-    );
+      return { success: true, data: mapProductWithVariants(product) };
+    }, 'errors.product.fetch_variants');
   }
 
   /** Lấy chi tiết một sản phẩm kèm toàn bộ variants */
   async getAllProductsWithVariants(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    return await this.err.wrap(
-      async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
+    return await this.err.wrap(async () => {
+      const skip = (request.PageNumber - 1) * request.PageSize;
+      const take = request.PageSize;
 
-        const [products, totalCount] = await Promise.all([
-          this.prisma.products.findMany({
-            where: { IsDeleted: false },
-            include: productWithVariantsInclude,
-            skip,
-            take,
-            orderBy: {
-              CreatedAt: request.SortOrder === 'asc' ? 'asc' : 'desc'
-            }
-          }),
-          this.prisma.products.count({
-            where: { IsDeleted: false }
-          })
-        ]);
+      const [products, totalCount] = await Promise.all([
+        this.prisma.products.findMany({
+          where: { IsDeleted: false },
+          include: productWithVariantsInclude,
+          skip,
+          take,
+          orderBy: {
+            CreatedAt: request.SortOrder === 'asc' ? 'asc' : 'desc'
+          }
+        }),
+        this.prisma.products.count({
+          where: { IsDeleted: false }
+        })
+      ]);
 
-        if (!products) {
-          throw new NotFoundException(`Không tìm thấy sản phẩm`);
-        }
+      if (!products) {
+        throw new NotFoundException(`Không tìm thấy sản phẩm`);
+      }
 
-        return {
-          success: true,
-          data: new PagedResult<ProductWithVariantsResponse>({
-            items: products.map(mapProductWithVariants),
-            pageNumber: request.PageNumber,
-            pageSize: request.PageSize,
-            totalCount,
-            totalPages: Math.ceil(totalCount / request.PageSize)
-          })
-        };
-      },
-      'errors.product.fetch_all_with_variants'
-    );
+      return {
+        success: true,
+        data: new PagedResult<ProductWithVariantsResponse>({
+          items: products.map(mapProductWithVariants),
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / request.PageSize)
+        })
+      };
+    }, 'errors.product.fetch_all_with_variants');
   }
 
   async getNewestProductsWithVariants(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    return await this.err.wrap(
-      async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
+    return await this.err.wrap(async () => {
+      const skip = (request.PageNumber - 1) * request.PageSize;
+      const take = request.PageSize;
 
-        const [products, totalCount] = await Promise.all([
-          this.prisma.products.findMany({
-            where: { IsDeleted: false },
-            include: productWithVariantsInclude,
-            skip,
-            take,
-            orderBy: { CreatedAt: 'desc' }
-          }),
-          this.prisma.products.count({ where: { IsDeleted: false } })
-        ]);
+      const [products, totalCount] = await Promise.all([
+        this.prisma.products.findMany({
+          where: { IsDeleted: false },
+          include: productWithVariantsInclude,
+          skip,
+          take,
+          orderBy: { CreatedAt: 'desc' }
+        }),
+        this.prisma.products.count({ where: { IsDeleted: false } })
+      ]);
 
+      return {
+        success: true,
+        data: new PagedResult<ProductWithVariantsResponse>({
+          items: products.map(mapProductWithVariants),
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / request.PageSize)
+        })
+      };
+    }, 'errors.product.fetch_newest');
+  }
+
+  async getBestSellingProducts(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
+    return await this.err.wrap(async () => {
+      const skip = (request.PageNumber - 1) * request.PageSize;
+      const take = request.PageSize;
+
+      const groupedByVariant = await this.prisma.orderDetails.groupBy({
+        by: ['VariantId'],
+        _sum: { Quantity: true }
+      });
+
+      if (groupedByVariant.length === 0) {
         return {
           success: true,
-          data: new PagedResult<ProductWithVariantsResponse>({
-            items: products.map(mapProductWithVariants),
+          data: new PagedResult<BestSellingProductResponse>({
+            items: [],
+            pageNumber: request.PageNumber,
+            pageSize: request.PageSize,
+            totalCount: 0,
+            totalPages: 0
+          })
+        };
+      }
+
+      const variantIds = groupedByVariant.map((item) => item.VariantId);
+      const variants = await this.prisma.productVariants.findMany({
+        where: {
+          Id: { in: variantIds },
+          IsDeleted: false,
+          Products: { IsDeleted: false }
+        },
+        select: {
+          Id: true,
+          ProductId: true
+        }
+      });
+
+      const variantToProductMap = new Map(
+        variants.map((item) => [item.Id, item.ProductId])
+      );
+
+      const productSoldMap = new Map<string, number>();
+      for (const row of groupedByVariant) {
+        const productId = variantToProductMap.get(row.VariantId);
+        if (!productId) {
+          continue;
+        }
+
+        const soldQty = row._sum.Quantity ?? 0;
+        const current = productSoldMap.get(productId) ?? 0;
+        productSoldMap.set(productId, current + soldQty);
+      }
+
+      const sortedProductSales = Array.from(productSoldMap.entries()).sort(
+        (a, b) => b[1] - a[1]
+      );
+
+      const totalCount = sortedProductSales.length;
+      const pagedProductSales = sortedProductSales.slice(skip, skip + take);
+      const pagedProductIds = pagedProductSales.map(([productId]) => productId);
+
+      if (pagedProductIds.length === 0) {
+        return {
+          success: true,
+          data: new PagedResult<BestSellingProductResponse>({
+            items: [],
             pageNumber: request.PageNumber,
             pageSize: request.PageSize,
             totalCount,
             totalPages: Math.ceil(totalCount / request.PageSize)
           })
         };
-      },
-      'errors.product.fetch_newest'
-    );
+      }
+
+      const products = await this.prisma.products.findMany({
+        where: { Id: { in: pagedProductIds }, IsDeleted: false },
+        include: productWithVariantsInclude
+      });
+
+      const productMap = new Map(products.map((item) => [item.Id, item]));
+      const items: BestSellingProductResponse[] = pagedProductIds
+        .map((productId) => {
+          const product = productMap.get(productId);
+          const totalSoldQuantity = productSoldMap.get(productId) || 0;
+          if (!product) {
+            return null;
+          }
+
+          return {
+            product: mapProductWithVariants(product),
+            totalSoldQuantity
+          };
+        })
+        .filter((item): item is BestSellingProductResponse => item !== null);
+
+      return {
+        success: true,
+        data: new PagedResult<BestSellingProductResponse>({
+          items,
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / request.PageSize)
+        })
+      };
+    }, 'errors.product.fetch_best_selling');
   }
 
-  async getBestSellingProducts(
+  async getLeastSellingProducts(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
-    return await this.err.wrap(
-      async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
+    return await this.err.wrap(async () => {
+      const skip = (request.PageNumber - 1) * request.PageSize;
+      const take = request.PageSize;
 
-        const groupedByVariant = await this.prisma.orderDetails.groupBy({
-          by: ['VariantId'],
-          _sum: { Quantity: true }
-        });
+      const groupedByVariant = await this.prisma.orderDetails.groupBy({
+        by: ['VariantId'],
+        _sum: { Quantity: true }
+      });
 
-        if (groupedByVariant.length === 0) {
-          return {
-            success: true,
-            data: new PagedResult<BestSellingProductResponse>({
-              items: [],
-              pageNumber: request.PageNumber,
-              pageSize: request.PageSize,
-              totalCount: 0,
-              totalPages: 0
-            })
-          };
-        }
+      // For least selling, we also want to consider products that have NEVER been sold (Quantity = 0)
+      const allProducts = await this.prisma.products.findMany({
+        where: { IsDeleted: false },
+        select: { Id: true }
+      });
 
+      const productSoldMap = new Map<string, number>(
+        allProducts.map((p) => [p.Id, 0])
+      );
+
+      if (groupedByVariant.length > 0) {
         const variantIds = groupedByVariant.map((item) => item.VariantId);
         const variants = await this.prisma.productVariants.findMany({
           where: {
@@ -1029,178 +1283,72 @@ export class ProductService {
             IsDeleted: false,
             Products: { IsDeleted: false }
           },
-          select: {
-            Id: true,
-            ProductId: true
-          }
+          select: { Id: true, ProductId: true }
         });
 
         const variantToProductMap = new Map(
           variants.map((item) => [item.Id, item.ProductId])
         );
 
-        const productSoldMap = new Map<string, number>();
         for (const row of groupedByVariant) {
           const productId = variantToProductMap.get(row.VariantId);
-          if (!productId) {
-            continue;
-          }
-
+          if (!productId) continue;
           const soldQty = row._sum.Quantity ?? 0;
           const current = productSoldMap.get(productId) ?? 0;
           productSoldMap.set(productId, current + soldQty);
         }
+      }
 
-        const sortedProductSales = Array.from(productSoldMap.entries()).sort(
-          (a, b) => b[1] - a[1]
-        );
+      const sortedProductSales = Array.from(productSoldMap.entries()).sort(
+        (a, b) => a[1] - b[1] // Ascending order for least selling
+      );
 
-        const totalCount = sortedProductSales.length;
-        const pagedProductSales = sortedProductSales.slice(skip, skip + take);
-        const pagedProductIds = pagedProductSales.map(
-          ([productId]) => productId
-        );
+      const totalCount = sortedProductSales.length;
+      const pagedProductSales = sortedProductSales.slice(skip, skip + take);
+      const pagedProductIds = pagedProductSales.map(([productId]) => productId);
 
-        if (pagedProductIds.length === 0) {
-          return {
-            success: true,
-            data: new PagedResult<BestSellingProductResponse>({
-              items: [],
-              pageNumber: request.PageNumber,
-              pageSize: request.PageSize,
-              totalCount,
-              totalPages: Math.ceil(totalCount / request.PageSize)
-            })
-          };
-        }
-
-        const products = await this.prisma.products.findMany({
-          where: { Id: { in: pagedProductIds }, IsDeleted: false },
-          include: productWithVariantsInclude
-        });
-
-        const productMap = new Map(products.map((item) => [item.Id, item]));
-        const items: BestSellingProductResponse[] = pagedProductIds
-          .map((productId) => {
-            const product = productMap.get(productId);
-            const totalSoldQuantity = productSoldMap.get(productId) || 0;
-            if (!product) {
-              return null;
-            }
-
-            return {
-              product: mapProductWithVariants(product),
-              totalSoldQuantity
-            };
-          })
-          .filter((item): item is BestSellingProductResponse => item !== null);
-
+      if (pagedProductIds.length === 0) {
         return {
           success: true,
           data: new PagedResult<BestSellingProductResponse>({
-            items,
+            items: [],
             pageNumber: request.PageNumber,
             pageSize: request.PageSize,
             totalCount,
-            totalPages: Math.ceil(totalCount / request.PageSize)
+            totalPages: 1
           })
         };
-      },
-      'errors.product.fetch_best_selling'
-    );
-  }
+      }
 
-  async getLeastSellingProducts(
-    @Query() request: PagedAndSortedRequest
-  ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
-    return await this.err.wrap(
-      async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
+      const products = await this.prisma.products.findMany({
+        where: { Id: { in: pagedProductIds }, IsDeleted: false },
+        include: productWithVariantsInclude
+      });
 
-        const groupedByVariant = await this.prisma.orderDetails.groupBy({
-          by: ['VariantId'],
-          _sum: { Quantity: true }
-        });
-
-        // For least selling, we also want to consider products that have NEVER been sold (Quantity = 0)
-        const allProducts = await this.prisma.products.findMany({
-          where: { IsDeleted: false },
-          select: { Id: true }
-        });
-
-        const productSoldMap = new Map<string, number>(allProducts.map(p => [p.Id, 0]));
-
-        if (groupedByVariant.length > 0) {
-          const variantIds = groupedByVariant.map((item) => item.VariantId);
-          const variants = await this.prisma.productVariants.findMany({
-            where: { Id: { in: variantIds }, IsDeleted: false, Products: { IsDeleted: false } },
-            select: { Id: true, ProductId: true }
-          });
-
-          const variantToProductMap = new Map(variants.map((item) => [item.Id, item.ProductId]));
-
-          for (const row of groupedByVariant) {
-            const productId = variantToProductMap.get(row.VariantId);
-            if (!productId) continue;
-            const soldQty = row._sum.Quantity ?? 0;
-            const current = productSoldMap.get(productId) ?? 0;
-            productSoldMap.set(productId, current + soldQty);
-          }
-        }
-
-        const sortedProductSales = Array.from(productSoldMap.entries()).sort(
-          (a, b) => a[1] - b[1] // Ascending order for least selling
-        );
-
-        const totalCount = sortedProductSales.length;
-        const pagedProductSales = sortedProductSales.slice(skip, skip + take);
-        const pagedProductIds = pagedProductSales.map(([productId]) => productId);
-
-        if (pagedProductIds.length === 0) {
+      const productMap = new Map(products.map((item) => [item.Id, item]));
+      const items: BestSellingProductResponse[] = pagedProductIds
+        .map((productId) => {
+          const product = productMap.get(productId);
+          const totalSoldQuantity = productSoldMap.get(productId) || 0;
+          if (!product) return null;
           return {
-            success: true,
-            data: new PagedResult<BestSellingProductResponse>({
-              items: [],
-              pageNumber: request.PageNumber,
-              pageSize: request.PageSize,
-              totalCount,
-              totalPages: 1
-            })
+            product: mapProductWithVariants(product),
+            totalSoldQuantity
           };
-        }
+        })
+        .filter((item): item is BestSellingProductResponse => item !== null);
 
-        const products = await this.prisma.products.findMany({
-          where: { Id: { in: pagedProductIds }, IsDeleted: false },
-          include: productWithVariantsInclude
-        });
-
-        const productMap = new Map(products.map((item) => [item.Id, item]));
-        const items: BestSellingProductResponse[] = pagedProductIds
-          .map((productId) => {
-            const product = productMap.get(productId);
-            const totalSoldQuantity = productSoldMap.get(productId) || 0;
-            if (!product) return null;
-            return {
-              product: mapProductWithVariants(product),
-              totalSoldQuantity
-            };
-          })
-          .filter((item): item is BestSellingProductResponse => item !== null);
-
-        return {
-          success: true,
-          data: new PagedResult<BestSellingProductResponse>({
-            items,
-            pageNumber: request.PageNumber,
-            pageSize: request.PageSize,
-            totalCount,
-            totalPages: Math.ceil(totalCount / request.PageSize)
-          })
-        };
-      },
-      'errors.product.fetch_least_selling'
-    );
+      return {
+        success: true,
+        data: new PagedResult<BestSellingProductResponse>({
+          items,
+          pageNumber: request.PageNumber,
+          pageSize: request.PageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / request.PageSize)
+        })
+      };
+    }, 'errors.product.fetch_least_selling');
   }
 
   async getProductsByStructuredQuery(
@@ -1209,52 +1357,85 @@ export class ProductService {
     return await this.err.wrap(async () => {
       const { logic, sorting, budget, pagination, productNames } = analysis;
       const genericFilterKeywords = await this.getGenericFilterKeywords();
-      
-      const genderValues = this.asStringArray(analysis.genderValues ?? analysis.gender);
-      const originValues = this.asStringArray(analysis.originValues ?? analysis.origin);
-      const concentrationValues = this.asStringArray(analysis.concentrationValues ?? analysis.concentration);
-      const variantTypeValues = this.asStringArray(analysis.variantTypeValues ?? analysis.variantType);
-      const ageAttributeValues = this.asStringArray(analysis.ageAttributeValues);
-      const volumeValues = this.asNumberArray(analysis.volumeValues ?? analysis.volume);
+
+      const genderValues = this.asStringArray(
+        analysis.genderValues ?? analysis.gender
+      );
+      const originValues = this.asStringArray(
+        analysis.originValues ?? analysis.origin
+      );
+      const concentrationValues = this.asStringArray(
+        analysis.concentrationValues ?? analysis.concentration
+      );
+      const variantTypeValues = this.asStringArray(
+        analysis.variantTypeValues ?? analysis.variantType
+      );
+      const ageAttributeValues = this.asStringArray(
+        analysis.ageAttributeValues
+      );
+      const volumeValues = this.asNumberArray(
+        analysis.volumeValues ?? analysis.volume
+      );
       const releaseYear = this.asOptionalNumber(analysis.releaseYear);
       const minAge = this.asOptionalNumber(analysis.minAge);
       const maxAge = this.asOptionalNumber(analysis.maxAge);
       const inferredAgeTerms = this.inferAgeTermsFromRange(minAge, maxAge);
-      const ageTerms = Array.from(new Set([...ageAttributeValues, ...inferredAgeTerms]));
+      const ageTerms = Array.from(
+        new Set([...ageAttributeValues, ...inferredAgeTerms])
+      );
       const minLongevity = this.asOptionalNumber(analysis.minLongevity);
       const minSillage = this.asOptionalNumber(analysis.minSillage);
-      const skip = ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 5);
+      const skip =
+        ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 5);
       const take = pagination?.pageSize || 5;
 
       // ======== DEBUG: Log gender filter info ========
-      this.logger.debug(`[SEARCH][GENDER] Extracted genderValues: ${JSON.stringify(genderValues)}`);
-      this.logger.debug(`[SEARCH][GENDER] Analysis input - genderValues: ${JSON.stringify(analysis.genderValues)}, gender: ${JSON.stringify(analysis.gender)}`);
+      this.logger.debug(
+        `[SEARCH][GENDER] Extracted genderValues: ${JSON.stringify(genderValues)}`
+      );
+      this.logger.debug(
+        `[SEARCH][GENDER] Analysis input - genderValues: ${JSON.stringify(analysis.genderValues)}, gender: ${JSON.stringify(analysis.gender)}`
+      );
 
       // Build Name-specific conditions
-      const nameConditions: Prisma.ProductsWhereInput[] = (productNames || []).map((name: string) => ({
-        Name: { contains : name }
+      const nameConditions: Prisma.ProductsWhereInput[] = (
+        productNames || []
+      ).map((name: string) => ({
+        Name: { contains: name }
       }));
 
       // Filter out generic keywords that don't help with specific search
-      const purifiedLogic = (logic || []).map((group: any) => {
-        const andItems = Array.isArray(group) ? group : [group];
-        const filtered = andItems.filter((item: string) => {
-          const lower = item.toLowerCase();
-          return !genericFilterKeywords.includes(lower) &&
-            !lower.includes('price<') && !lower.includes('price>');
-        });
-        return filtered.length > 0 ? filtered : null;
-      }).filter(group => group !== null);
+      const purifiedLogic = (logic || [])
+        .map((group: any) => {
+          const andItems = Array.isArray(group) ? group : [group];
+          const filtered = andItems.filter((item: string) => {
+            const lower = item.toLowerCase();
+            return (
+              !genericFilterKeywords.includes(lower) &&
+              !lower.includes('price<') &&
+              !lower.includes('price>')
+            );
+          });
+          return filtered.length > 0 ? filtered : null;
+        })
+        .filter((group) => group !== null);
 
       // Layer 2 safety net: Validate + re-normalize keywords via count queries
-      const { validatedLogic, removedKeywords, renormalizedKeywords } = 
-        await this.validateAndRenormalizeKeywords(purifiedLogic, analysis.normalizationMetadata || null);
+      const { validatedLogic, removedKeywords, renormalizedKeywords } =
+        await this.validateAndRenormalizeKeywords(
+          purifiedLogic,
+          analysis.normalizationMetadata || null
+        );
 
       if (removedKeywords.length > 0) {
-        this.logger.log(`[SEARCH] Removed invalid keywords: ${removedKeywords.join(', ')}`);
+        this.logger.log(
+          `[SEARCH] Removed invalid keywords: ${removedKeywords.join(', ')}`
+        );
       }
       if (renormalizedKeywords.length > 0) {
-        this.logger.log(`[SEARCH] Re-normalized keywords: ${renormalizedKeywords.join(', ')}`);
+        this.logger.log(
+          `[SEARCH] Re-normalized keywords: ${renormalizedKeywords.join(', ')}`
+        );
       }
 
       // Use validatedLogic instead of purifiedLogic for building conditions
@@ -1264,54 +1445,132 @@ export class ProductService {
       // Uses type-aware field mapping: if normalizationMetadata has type info,
       // only search the corresponding field. Otherwise fallback to OR all fields.
       const normalizationMetadata = analysis.normalizationMetadata || null;
-      const groupConditions: Prisma.ProductsWhereInput[] = effectiveLogic.map((group: any) => {
-        const orItems = group;
-        const flattenedOrConditions: Prisma.ProductsWhereInput[] = [];
-        
-        for (const item of orItems) {
-          // Find type from normalizationMetadata
-          const lower = item.toLowerCase();
-          const meta = Array.isArray(normalizationMetadata)
-            ? normalizationMetadata.find(
-                m => m.original?.toLowerCase() === lower || m.corrected?.toLowerCase() === lower
-              )
-            : null;
-          const type = meta?.type || 'unknown';
+      const groupConditions: Prisma.ProductsWhereInput[] = effectiveLogic.map(
+        (group: any) => {
+          const orItems = group;
+          const flattenedOrConditions: Prisma.ProductsWhereInput[] = [];
 
-          if (type !== 'unknown' && this.TYPE_FIELD_MAP[type]) {
-            // Type-aware: only search the corresponding field
-            const fieldWhere = this.TYPE_FIELD_MAP[type](item);
-            if (fieldWhere) {
-              flattenedOrConditions.push(fieldWhere);
+          for (const item of orItems) {
+            // Find type from normalizationMetadata
+            const lower = item.toLowerCase();
+            const meta = Array.isArray(normalizationMetadata)
+              ? normalizationMetadata.find(
+                  (m) =>
+                    m.original?.toLowerCase() === lower ||
+                    m.corrected?.toLowerCase() === lower
+                )
+              : null;
+            const type = meta?.type || 'unknown';
+
+            if (type !== 'unknown' && this.TYPE_FIELD_MAP[type]) {
+              // Type-aware: only search the corresponding field
+              const fieldWhere = this.TYPE_FIELD_MAP[type](item);
+              if (fieldWhere) {
+                flattenedOrConditions.push(fieldWhere);
+              }
+            } else {
+              // Fallback: OR across all fields (backward compatible)
+              flattenedOrConditions.push(
+                { Name: { contains: item } },
+                { Brands: { Name: { contains: item } } },
+                { Categories: { Name: { contains: item } } },
+                { Gender: { equals: item } },
+                { Origin: { contains: item } },
+                {
+                  ProductNoteMaps: {
+                    some: { ScentNotes: { Name: { contains: item } } }
+                  }
+                },
+                {
+                  ProductFamilyMaps: {
+                    some: { OlfactoryFamilies: { Name: { contains: item } } }
+                  }
+                },
+                {
+                  ProductAttributes: {
+                    some: { AttributeValues: { Value: { contains: item } } }
+                  }
+                },
+                { ProductVariants: { some: { Type: { contains: item } } } },
+                {
+                  ProductVariants: {
+                    some: { Concentrations: { Name: { contains: item } } }
+                  }
+                },
+                {
+                  ProductVariants: {
+                    some: {
+                      ProductAttributes: {
+                        some: { AttributeValues: { Value: { contains: item } } }
+                      }
+                    }
+                  }
+                },
+                ...(this.extractReleaseYear(item)
+                  ? [{ ReleaseYear: this.extractReleaseYear(item)! }]
+                  : []),
+                ...(this.extractVolumeValues(item).length > 0
+                  ? [
+                      {
+                        ProductVariants: {
+                          some: {
+                            VolumeMl: { in: this.extractVolumeValues(item) }
+                          }
+                        }
+                      }
+                    ]
+                  : []),
+                ...(this.extractThreshold(
+                  item,
+                  /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i
+                ) !== undefined
+                  ? [
+                      {
+                        ProductVariants: {
+                          some: {
+                            Longevity: {
+                              gte: this.extractThreshold(
+                                item,
+                                /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i
+                              )!
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  : []),
+                ...(this.extractThreshold(
+                  item,
+                  new RegExp(
+                    '(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b',
+                    'i'
+                  )
+                ) !== undefined
+                  ? [
+                      {
+                        ProductVariants: {
+                          some: {
+                            Sillage: {
+                              gte: this.extractThreshold(
+                                item,
+                                new RegExp(
+                                  '(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b',
+                                  'i'
+                                )
+                              )!
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  : [])
+              );
             }
-          } else {
-            // Fallback: OR across all fields (backward compatible)
-            flattenedOrConditions.push(
-              { Name: { contains : item } },
-              { Brands: { Name: { contains : item } } },
-              { Categories: { Name: { contains : item } } },
-              { Gender: { equals : item } },
-              { Origin: { contains : item } },
-              { ProductNoteMaps: { some: { ScentNotes: { Name: { contains : item } } } } },
-              { ProductFamilyMaps: { some: { OlfactoryFamilies: { Name: { contains : item } } } } },
-              { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } },
-              { ProductVariants: { some: { Type: { contains : item } } } },
-              { ProductVariants: { some: { Concentrations: { Name: { contains : item } } } } },
-              { ProductVariants: { some: { ProductAttributes: { some: { AttributeValues: { Value: { contains : item } } } } } } },
-              ...(this.extractReleaseYear(item) ? [{ ReleaseYear: this.extractReleaseYear(item)! }] : []),
-              ...(this.extractVolumeValues(item).length > 0 ? [{ ProductVariants: { some: { VolumeMl: { in: this.extractVolumeValues(item) } } } }] : []),
-              ...(this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i) !== undefined
-                ? [{ ProductVariants: { some: { Longevity: { gte: this.extractThreshold(item, /(\d+(?:\.\d+)?)\s*(?:h|gi[oờ]?)\b/i)! } } } }]
-                : []),
-              ...(this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i')) !== undefined
-                ? [{ ProductVariants: { some: { Sillage: { gte: this.extractThreshold(item, new RegExp('(\\d+(?:\\.\\d+)?)\\s*(?:/10|điểm|points?)\\b', 'i'))! } } } }]
-                : [])
-            );
           }
+
+          return { OR: flattenedOrConditions };
         }
-        
-        return { OR: flattenedOrConditions };
-      });
+      );
 
       const andConditionsForWhere: Prisma.ProductsWhereInput[] = [];
 
@@ -1327,7 +1586,7 @@ export class ProductService {
         andConditionsForWhere.push({
           ProductAttributes: {
             some: {
-              OR: ageTerms.map(value => ({
+              OR: ageTerms.map((value) => ({
                 AttributeValues: {
                   Value: { contains: value }
                 }
@@ -1339,17 +1598,19 @@ export class ProductService {
 
       if (genderValues.length > 0) {
         const genderCondition = {
-          OR: genderValues.map(value => ({
+          OR: genderValues.map((value) => ({
             Gender: { equals: value }
           }))
         };
-        this.logger.debug(`[SEARCH][GENDER] Building gender filter with ${genderValues.length} values: ${JSON.stringify(genderValues)}`);
+        this.logger.debug(
+          `[SEARCH][GENDER] Building gender filter with ${genderValues.length} values: ${JSON.stringify(genderValues)}`
+        );
         andConditionsForWhere.push(genderCondition);
       }
 
       if (originValues.length > 0) {
         andConditionsForWhere.push({
-          OR: originValues.map(value => ({
+          OR: originValues.map((value) => ({
             Origin: { contains: value }
           }))
         });
@@ -1375,7 +1636,7 @@ export class ProductService {
           ProductVariants: {
             some: {
               IsDeleted: false,
-              OR: concentrationValues.map(value => ({
+              OR: concentrationValues.map((value) => ({
                 Concentrations: {
                   Name: { contains: value }
                 }
@@ -1390,7 +1651,7 @@ export class ProductService {
           ProductVariants: {
             some: {
               IsDeleted: false,
-              OR: variantTypeValues.map(value => ({
+              OR: variantTypeValues.map((value) => ({
                 Type: { contains: value }
               }))
             }
@@ -1436,14 +1697,20 @@ export class ProductService {
 
       const where: Prisma.ProductsWhereInput = {
         IsDeleted: false,
-        ...(andConditionsForWhere.length > 0 ? { AND: andConditionsForWhere } : {})
+        ...(andConditionsForWhere.length > 0
+          ? { AND: andConditionsForWhere }
+          : {})
       };
 
       // ======== DEBUG: Log complete WHERE clause ========
-      this.logger.debug(`[SEARCH][WHERE] Number of AND conditions: ${andConditionsForWhere.length}`);
+      this.logger.debug(
+        `[SEARCH][WHERE] Number of AND conditions: ${andConditionsForWhere.length}`
+      );
 
       // Sorting logic
-      let orderBy: Prisma.ProductsOrderByWithRelationInput = { CreatedAt: 'desc' };
+      let orderBy: Prisma.ProductsOrderByWithRelationInput = {
+        CreatedAt: 'desc'
+      };
       const isPriceSorting = sorting && sorting.field === 'Price';
 
       if (sorting && !isPriceSorting) {
@@ -1465,7 +1732,9 @@ export class ProductService {
       let products: ProductWithVariantsRelations[] = [];
       let totalCount = 0;
 
-      this.logger.log("Where clause for structured query: " + JSON.stringify(where));
+      this.logger.log(
+        'Where clause for structured query: ' + JSON.stringify(where)
+      );
 
       if (!isPriceSorting) {
         // Fallback or Normal Sorting behavior
@@ -1476,21 +1745,29 @@ export class ProductService {
             skip,
             take,
             orderBy
-          }), 
+          }),
           this.prisma.products.count({ where })
         ]);
 
         // ======== DEBUG: Log result details ========
-        this.logger.debug(`[SEARCH][RESULTS] Total matched by WHERE: ${totalCount}, Returned on page: ${products.length}`);
+        this.logger.debug(
+          `[SEARCH][RESULTS] Total matched by WHERE: ${totalCount}, Returned on page: ${products.length}`
+        );
         if (genderValues.length > 0) {
-          const productsByGender = products.map(p => ({
+          const productsByGender = products.map((p) => ({
             name: p.Name,
             gender: p.Gender || '(null)',
-            matches: genderValues.some(g => p.Gender?.toLowerCase().includes(g.toLowerCase()))
+            matches: genderValues.some((g) =>
+              p.Gender?.toLowerCase().includes(g.toLowerCase())
+            )
           }));
-          this.logger.debug(`[SEARCH][RESULTS] Product gender check for filter [${genderValues.join(', ')}]:`);
+          this.logger.debug(
+            `[SEARCH][RESULTS] Product gender check for filter [${genderValues.join(', ')}]:`
+          );
           productsByGender.forEach((p, idx) => {
-            this.logger.debug(`  [${idx}] "${p.name}" - Gender: "${p.gender}" - Matches filter: ${p.matches}`);
+            this.logger.debug(
+              `  [${idx}] "${p.name}" - Gender: "${p.gender}" - Matches filter: ${p.matches}`
+            );
           });
         }
       } else {
@@ -1501,7 +1778,7 @@ export class ProductService {
           where,
           select: { Id: true }
         });
-        const matchedIds = matchedProducts.map(p => p.Id);
+        const matchedIds = matchedProducts.map((p) => p.Id);
         totalCount = matchedIds.length;
 
         if (totalCount > 0) {
@@ -1523,14 +1800,16 @@ export class ProductService {
 
           // Compute max/min price for each Product among matching variants
           const priceMap = new Map<string, number>();
-          variants.forEach(v => {
+          variants.forEach((v) => {
             const price = Number(v.BasePrice);
             const current = priceMap.get(v.ProductId);
 
             if (sorting.isDescending) {
-              if (current === undefined || price > current) priceMap.set(v.ProductId, price);
+              if (current === undefined || price > current)
+                priceMap.set(v.ProductId, price);
             } else {
-              if (current === undefined || price < current) priceMap.set(v.ProductId, price);
+              if (current === undefined || price < current)
+                priceMap.set(v.ProductId, price);
             }
           });
 
@@ -1538,8 +1817,10 @@ export class ProductService {
           // Products that completely lost their variants (e.g., due to budget mismatch) will be sorted to the bottom/top depending on logic,
           // but they shouldn't exist because `matchedProducts` implies they passed the global `where` budget filter.
           matchedIds.sort((a, b) => {
-            const priceA = priceMap.get(a) ?? (sorting.isDescending ? 0 : Infinity);
-            const priceB = priceMap.get(b) ?? (sorting.isDescending ? 0 : Infinity);
+            const priceA =
+              priceMap.get(a) ?? (sorting.isDescending ? 0 : Infinity);
+            const priceB =
+              priceMap.get(b) ?? (sorting.isDescending ? 0 : Infinity);
             return sorting.isDescending ? priceB - priceA : priceA - priceB;
           });
 
@@ -1554,39 +1835,45 @@ export class ProductService {
 
           // Restore original sorted order since DB doesn't retain IN () order
           products = finalProductIds
-            .map(id => dbProducts.find(p => p.Id === id)!)
+            .map((id) => dbProducts.find((p) => p.Id === id)!)
             .filter(Boolean);
         }
       }
 
-      const mappedItems = products.map(mapProductWithVariants).map(item => {
-        let filteredVariants = item.variants || [];
-        
-        // Filter variants based on budget if present
-        if (budget && (budget.min !== undefined || budget.max !== undefined)) {
-          const min = budget.min ? Number(budget.min) : 0;
-          const max = budget.max ? Number(budget.max) : Infinity;
-          
-          filteredVariants = filteredVariants.filter(v => {
-            const price = v.basePrice;
-            return price >= min && price <= max;
-          });
-        }
+      const mappedItems = products
+        .map(mapProductWithVariants)
+        .map((item) => {
+          let filteredVariants = item.variants || [];
 
-        // Sort by price ascending as per user request to show cheapest first
-        filteredVariants.sort((a, b) => a.basePrice - b.basePrice);
+          // Filter variants based on budget if present
+          if (
+            budget &&
+            (budget.min !== undefined || budget.max !== undefined)
+          ) {
+            const min = budget.min ? Number(budget.min) : 0;
+            const max = budget.max ? Number(budget.max) : Infinity;
 
-        return {
-          ...item,
-          variants: filteredVariants
-        };
-      }).filter(item => item.variants.length > 0); // Only return products that still have variants after filtering
+            filteredVariants = filteredVariants.filter((v) => {
+              const price = v.basePrice;
+              return price >= min && price <= max;
+            });
+          }
+
+          // Sort by price ascending as per user request to show cheapest first
+          filteredVariants.sort((a, b) => a.basePrice - b.basePrice);
+
+          return {
+            ...item,
+            variants: filteredVariants
+          };
+        })
+        .filter((item) => item.variants.length > 0); // Only return products that still have variants after filtering
 
       return {
         success: true,
         data: new PagedResult<ProductWithVariantsResponse>({
           items: mappedItems,
-          pageNumber: (pagination?.pageNumber || 1),
+          pageNumber: pagination?.pageNumber || 1,
           pageSize: take,
           totalCount,
           totalPages: Math.ceil(totalCount / take)
@@ -1595,7 +1882,9 @@ export class ProductService {
     }, 'errors.product.structured_query');
   }
 
-  async getProductsByIdsForOutput(ids: string[]): Promise<BaseResponse<ProductCardOutputItem[]>> {
+  async getProductsByIdsForOutput(
+    ids: string[]
+  ): Promise<BaseResponse<ProductCardOutputItem[]>> {
     return await this.err.wrap(async () => {
       if (!ids || ids.length === 0) return { success: true, data: [] };
 
@@ -1620,15 +1909,19 @@ export class ProductService {
       });
 
       // Maintain order of IDs passed by the AI
-      const productMap = new Map(products.map(p => [p.Id, p]));
+      const productMap = new Map(products.map((p) => [p.Id, p]));
 
       const mappedProducts: ProductCardOutputItem[] = ids
-        .map(id => productMap.get(id))
+        .map((id) => productMap.get(id))
         .filter((p): p is NonNullable<typeof p> => !!p)
-        .map(p => {
+        .map((p) => {
           // Fallback logic for primary image
           let primaryImage = p.Media[0]?.Url || null;
-          if (!primaryImage && p.ProductVariants && p.ProductVariants.length > 0) {
+          if (
+            !primaryImage &&
+            p.ProductVariants &&
+            p.ProductVariants.length > 0
+          ) {
             // Try to find any variant that has an image
             for (const v of p.ProductVariants) {
               if (v.Media && v.Media.length > 0) {
@@ -1645,7 +1938,7 @@ export class ProductService {
             primaryImage,
             reasoning: null,
             source: null,
-            variants: (p.ProductVariants || []).map(v => ({
+            variants: (p.ProductVariants || []).map((v) => ({
               id: v.Id,
               sku: v.Sku,
               volumeMl: v.VolumeMl,

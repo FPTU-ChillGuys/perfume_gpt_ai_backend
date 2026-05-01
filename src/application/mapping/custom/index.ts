@@ -4,4 +4,3 @@ export * from './survey-question.mapper';
 export * from './survey-answer.mapper';
 export * from './survey-question-answer.mapper';
 export * from './survey-question-answer-detail.mapper';
-

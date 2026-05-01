@@ -6,31 +6,54 @@ import { Common } from './common/common.entities';
 /** Entity lưu trạng thái chấp nhận đề xuất AI của người dùng */
 @Entity({ repository: () => AIAcceptanceRepository })
 export class AIAcceptance extends Common {
-  @ApiProperty({ description: 'ID acceptance cho một response (dùng để nhóm theo lần phản hồi)', nullable: true })
+  @ApiProperty({
+    description:
+      'ID acceptance cho một response (dùng để nhóm theo lần phản hồi)',
+    nullable: true
+  })
   @Property({ nullable: true })
   responseId?: string | null;
 
-  @ApiProperty({ description: 'Ngữ cảnh phát sinh acceptance (chatbot/survey/trend/recommendation/repurchase/cart_legacy)', nullable: true })
+  @ApiProperty({
+    description:
+      'Ngữ cảnh phát sinh acceptance (chatbot/survey/trend/recommendation/repurchase/cart_legacy)',
+    nullable: true
+  })
   @Property({ nullable: true })
   contextType?: string | null;
 
-  @ApiProperty({ description: 'Mã tham chiếu nguồn (conversationId, surveyId, ...) nếu có', nullable: true })
+  @ApiProperty({
+    description: 'Mã tham chiếu nguồn (conversationId, surveyId, ...) nếu có',
+    nullable: true
+  })
   @Property({ nullable: true })
   sourceRefId?: string | null;
 
-  @ApiProperty({ description: 'Danh sách product id dưới dạng JSON string', nullable: true })
+  @ApiProperty({
+    description: 'Danh sách product id dưới dạng JSON string',
+    nullable: true
+  })
   @Property({ type: 'text', nullable: true })
   productIdsJson?: string | null;
 
-  @ApiProperty({ description: 'Metadata mở rộng dưới dạng JSON string', nullable: true })
+  @ApiProperty({
+    description: 'Metadata mở rộng dưới dạng JSON string',
+    nullable: true
+  })
   @Property({ type: 'text', nullable: true })
   metadataJson?: string | null;
 
-  @ApiProperty({ description: 'Thời điểm false no-click được phép hiển thị', nullable: true })
+  @ApiProperty({
+    description: 'Thời điểm false no-click được phép hiển thị',
+    nullable: true
+  })
   @Property({ nullable: true })
   visibleAfterAt?: Date | null;
 
-  @ApiProperty({ description: 'Thời điểm người dùng click chấp nhận', nullable: true })
+  @ApiProperty({
+    description: 'Thời điểm người dùng click chấp nhận',
+    nullable: true
+  })
   @Property({ nullable: true })
   clickedAt?: Date | null;
 

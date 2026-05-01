@@ -9,4 +9,4 @@ import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.mo
   providers: [ProductService, ProductTool],
   exports: [ProductService, ProductTool]
 })
-export class ProductModule { }
+export class ProductModule {}

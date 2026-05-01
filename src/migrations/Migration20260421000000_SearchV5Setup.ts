@@ -6,7 +6,9 @@ import { Migration } from '@mikro-orm/migrations';
 export class Migration20260421000000 extends Migration {
   async up(): Promise<void> {
     // 1. Thêm cột search_text để lưu structured content
-    this.addSql('ALTER TABLE product_embeddings ADD COLUMN IF NOT EXISTS search_text TEXT;');
+    this.addSql(
+      'ALTER TABLE product_embeddings ADD COLUMN IF NOT EXISTS search_text TEXT;'
+    );
 
     // 2. Tạo index BM25 cho cột search_text
     // Lưu ý: Cần extension pg_textsearch đã được cài đặt
@@ -25,7 +27,9 @@ export class Migration20260421000000 extends Migration {
     this.addSql('DROP INDEX IF EXISTS idx_product_embeddings_bm25;');
 
     // Xóa cột
-    this.addSql('ALTER TABLE product_embeddings DROP COLUMN IF EXISTS search_text;');
+    this.addSql(
+      'ALTER TABLE product_embeddings DROP COLUMN IF EXISTS search_text;'
+    );
 
     console.log('Removed Search v5 components');
   }

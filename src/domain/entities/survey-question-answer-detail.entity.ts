@@ -9,7 +9,10 @@ import { ApiProperty } from '@nestjs/swagger';
 @Entity()
 export class SurveyQuestionAnswerDetail extends Common {
   /** Câu hỏi được trả lời */
-  @ApiProperty({ description: 'Câu hỏi được trả lời', type: () => SurveyQuestion })
+  @ApiProperty({
+    description: 'Câu hỏi được trả lời',
+    type: () => SurveyQuestion
+  })
   @ManyToOne(() => SurveyQuestion, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
@@ -17,7 +20,10 @@ export class SurveyQuestionAnswerDetail extends Common {
   question!: SurveyQuestion;
 
   /** Câu trả lời được chọn */
-  @ApiProperty({ description: 'Câu trả lời được chọn', type: () => SurveyAnswer })
+  @ApiProperty({
+    description: 'Câu trả lời được chọn',
+    type: () => SurveyAnswer
+  })
   @ManyToOne(() => SurveyAnswer, {
     deleteRule: 'cascade',
     updateRule: 'cascade'
@@ -25,7 +31,10 @@ export class SurveyQuestionAnswerDetail extends Common {
   answer!: SurveyAnswer;
 
   /** Bản ghi bài survey chứa chi tiết này */
-  @ApiProperty({ description: 'Bản ghi bài survey cha', type: () => SurveyQuestionAnswer })
+  @ApiProperty({
+    description: 'Bản ghi bài survey cha',
+    type: () => SurveyQuestionAnswer
+  })
   @ManyToOne(() => SurveyQuestionAnswer, {
     deleteRule: 'cascade',
     updateRule: 'cascade'

@@ -7,4 +7,4 @@ import { RestockReportEmailService } from 'src/infrastructure/domain/restock/res
   providers: [EmailService, RestockReportEmailService],
   exports: [EmailService, RestockReportEmailService]
 })
-export class EmailModule { }
+export class EmailModule {}

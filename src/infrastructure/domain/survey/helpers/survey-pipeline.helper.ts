@@ -8,17 +8,33 @@ import { AiAnalysisService } from 'src/infrastructure/domain/ai/ai-analysis.serv
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/survey-query-validator.service';
 import { SurveyAttributeService } from 'src/infrastructure/domain/survey/survey-attribute.service';
-import { QueryAnswerPayload, QueryFragment, SurveyAttributeType } from 'src/infrastructure/domain/survey/survey-query.types';
+import {
+  QueryAnswerPayload,
+  QueryFragment,
+  SurveyAttributeType
+} from 'src/infrastructure/domain/survey/survey-query.types';
 import { SurveyQuestionResponse } from 'src/application/dtos/response/survey-question.response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
-import { surveyContextPrompt, surveyProductContextPrompt, surveyRecommendationSystemPrompt, surveyPrompt, INSTRUCTION_TYPE_SURVEY } from 'src/application/constant/prompts';
-import { surveyOutput, conversationOutput } from 'src/chatbot/output/search.output';
+import {
+  surveyContextPrompt,
+  surveyProductContextPrompt,
+  surveyRecommendationSystemPrompt,
+  surveyPrompt,
+  INSTRUCTION_TYPE_SURVEY
+} from 'src/application/constant/prompts';
+import {
+  surveyOutput,
+  conversationOutput
+} from 'src/chatbot/output/search.output';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { buildSurveyContextForAI } from 'src/infrastructure/domain/survey/survey-merge.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { QueueName, SurveyJobName } from 'src/application/constant/processor';
-import { SurveyProductHelper, MinimalProductDto } from './survey-product.helper';
+import {
+  SurveyProductHelper,
+  MinimalProductDto
+} from './survey-product.helper';
 
 /** Analysis result từ AI hoặc query fragments */
 interface SurveyAnalysis {
@@ -73,11 +89,18 @@ export class SurveyPipelineHelper {
     const quesAnses: Array<{ question: string; answer: string }> = [];
 
     for (const surveyAnswer of surveyAnswers) {
-      const surveyQues = surveyQueses.find((q) => q.id === surveyAnswer.questionId);
+      const surveyQues = surveyQueses.find(
+        (q) => q.id === surveyAnswer.questionId
+      );
       if (surveyQues?.answers && surveyQues.question) {
-        const answer = surveyQues.answers.find((ans) => ans.id === surveyAnswer.answerId);
+        const answer = surveyQues.answers.find(
+          (ans) => ans.id === surveyAnswer.answerId
+        );
         if (answer?.answer) {
-          quesAnses.push({ question: surveyQues.question, answer: answer.answer });
+          quesAnses.push({
+            question: surveyQues.question,
+            answer: answer.answer
+          });
         }
       }
     }
@@ -92,17 +115,25 @@ export class SurveyPipelineHelper {
     surveyAnswers: { questionId: string; answerId: string }[],
     surveyQueses: SurveyQuestionResponse[]
   ): Array<{ questionId: string; question: string; answer: string }> {
-    const result: Array<{ questionId: string; question: string; answer: string }> = [];
+    const result: Array<{
+      questionId: string;
+      question: string;
+      answer: string;
+    }> = [];
 
     for (const surveyAnswer of surveyAnswers) {
-      const surveyQues = surveyQueses.find((q) => q.id === surveyAnswer.questionId);
+      const surveyQues = surveyQueses.find(
+        (q) => q.id === surveyAnswer.questionId
+      );
       if (surveyQues?.answers && surveyQues.question) {
-        const answer = surveyQues.answers.find((ans) => ans.id === surveyAnswer.answerId);
+        const answer = surveyQues.answers.find(
+          (ans) => ans.id === surveyAnswer.answerId
+        );
         if (answer?.answer) {
           result.push({
             questionId: surveyAnswer.questionId,
             question: surveyQues.question,
-            answer: answer.answer,
+            answer: answer.answer
           });
         }
       }
@@ -133,14 +164,19 @@ export class SurveyPipelineHelper {
   /**
    * Phân tích toàn bộ survey Q&A (dùng cho V2).
    */
-  async analyzeSurveyQA(quesAnses: Array<{ question: string; answer: string }>): Promise<SurveyAnalysis | null> {
+  async analyzeSurveyQA(
+    quesAnses: Array<{ question: string; answer: string }>
+  ): Promise<SurveyAnalysis | null> {
     return this.analysisService.analyzeSurvey(quesAnses);
   }
 
   /**
    * Phân tích từng câu trả lời riêng lẻ (dùng cho V3, V5).
    */
-  async analyzeSingleAnswer(qa: { question: string; answer: string }): Promise<SurveyAnalysis | null> {
+  async analyzeSingleAnswer(qa: {
+    question: string;
+    answer: string;
+  }): Promise<SurveyAnalysis | null> {
     return this.analysisService.analyzeSurveyAnswer(qa);
   }
 
@@ -157,8 +193,10 @@ export class SurveyPipelineHelper {
     productsContext: string,
     userPrompt: string = 'Dựa trên kết quả khảo sát và danh sách sản phẩm tiềm năng, hãy đưa ra tư vấn cá nhân hóa và chọn 5 sản phẩm tốt nhất.'
   ): Promise<SurveyAIResponse> {
-
-    const adminInstruction = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
+    const adminInstruction =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_SURVEY
+      );
 
     const surveyCtx = surveyContextPrompt(JSON.stringify(quesAnses));
     const productCtx = surveyProductContextPrompt(productsContext);
@@ -195,8 +233,15 @@ export class SurveyPipelineHelper {
     topProducts: MinimalProductDto[]
   ): Promise<SurveyAIResponse> {
     const surveyCtx = buildSurveyContextForAI(quesAnses, topProducts);
-    const adminInstruction = await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SURVEY);
-    const combinedSystemPrompt = surveyRecommendationSystemPrompt(adminInstruction || '', surveyCtx, '');
+    const adminInstruction =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_SURVEY
+      );
+    const combinedSystemPrompt = surveyRecommendationSystemPrompt(
+      adminInstruction || '',
+      surveyCtx,
+      ''
+    );
 
     const aiResponsePayload = await this.aiHelper.textGenerateFromPrompt(
       'Dựa trên kết quả khảo sát và danh sách sản phẩm tiềm năng đã được xếp hạng theo độ phù hợp, hãy đưa ra tư vấn cá nhân hóa và chọn ra 5 sản phẩm tốt nhất. Giải thích rõ tại sao các sản phẩm này lại đứng đầu bảng xếp hạng cho người dùng này.',
@@ -238,9 +283,10 @@ export class SurveyPipelineHelper {
   async generateV1Recommendation(
     contextQA: Array<{ question: string; answer: string }>
   ): Promise<{ success: boolean; data?: string }> {
-    const systemPrompt = await this.adminInstructionService.getSystemPromptForDomain(
-      INSTRUCTION_TYPE_SURVEY
-    );
+    const systemPrompt =
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_SURVEY
+      );
     const userPrompt = surveyPrompt(contextQA);
     const aiResponsePayload = await this.aiHelper.textGenerateFromPrompt(
       systemPrompt,
@@ -257,7 +303,10 @@ export class SurveyPipelineHelper {
   /**
    * Enqueue job lưu survey record vào background queue.
    */
-  async enqueueSurveySave(jobName: string, data: Record<string, unknown>): Promise<void> {
+  async enqueueSurveySave(
+    jobName: string,
+    data: Record<string, unknown>
+  ): Promise<void> {
     await this.surveyQueue.add(jobName, data);
   }
 
@@ -277,7 +326,10 @@ export class SurveyPipelineHelper {
    * Validate query fragment.
    * Wrapper cho SurveyQueryValidatorService.validateQueryFragment().
    */
-  validateQueryFragment(queryFragment: QueryFragment): { valid: boolean; errors: string[] } {
+  validateQueryFragment(queryFragment: QueryFragment): {
+    valid: boolean;
+    errors: string[];
+  } {
     return this.queryValidator.validateQueryFragment(queryFragment);
   }
 

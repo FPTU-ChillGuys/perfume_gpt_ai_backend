@@ -30,7 +30,7 @@ export class VocabDictionary extends Common {
   @Property({ type: 'json', columnType: 'jsonb' })
   snapshotPayload!: Record<string, unknown>;
 
-  @OneToMany(() => VocabTerm, term => term.dictionary)
+  @OneToMany(() => VocabTerm, (term) => term.dictionary)
   terms = new Array<VocabTerm>();
 
   constructor(init?: Partial<VocabDictionary>) {

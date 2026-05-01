@@ -1,4 +1,4 @@
 export enum ReviewTypeEnum {
-    ID = 'id',
-    ALL = 'all'
+  ID = 'id',
+  ALL = 'all'
 }

@@ -8,8 +8,9 @@ import { PagedResult } from 'src/application/dtos/response/common/paged-result';
  * Repository cơ sở chứa các logic dùng chung cho tất cả repository (MikroORM).
  * Tương đương với GenericRepository trong .NET EF Core.
  */
-export abstract class BaseRepository<T extends Common> extends SqlEntityRepository<T> {
-  
+export abstract class BaseRepository<
+  T extends Common
+> extends SqlEntityRepository<T> {
   /** Thêm entity mới vào context quản lý */
   add(entity: T): void {
     this.getEntityManager().persist(entity);
@@ -38,7 +39,10 @@ export abstract class BaseRepository<T extends Common> extends SqlEntityReposito
   }
 
   /** Tìm một bản ghi theo ID */
-  async findOneById(id: string, options?: FindOptions<T, any>): Promise<T | null> {
+  async findOneById(
+    id: string,
+    options?: FindOptions<T, any>
+  ): Promise<T | null> {
     return this.findOne({ id } as FilterQuery<T>, options as any);
   }
 
@@ -53,9 +57,9 @@ export abstract class BaseRepository<T extends Common> extends SqlEntityReposito
   ): Promise<PagedResult<T>> {
     const pageNumber = request.PageNumber || 1;
     const pageSize = request.PageSize || 10;
-    
+
     // Mặc định lọc các bản ghi hoạt động (Soft Delete logic)
-    const finalFilter = { 
+    const finalFilter = {
       isActive: true,
       ...(filter as any)
     } as FilterQuery<T>;
@@ -70,12 +74,15 @@ export abstract class BaseRepository<T extends Common> extends SqlEntityReposito
 
     // Sắp xếp
     if (request.SortOrder) {
-      findOptions.orderBy = { 
-        createdAt: request.SortOrder.toUpperCase() 
+      findOptions.orderBy = {
+        createdAt: request.SortOrder.toUpperCase()
       } as any;
     }
 
-    const [items, totalCount] = await this.findAndCount(finalFilter, findOptions);
+    const [items, totalCount] = await this.findAndCount(
+      finalFilter,
+      findOptions
+    );
     const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
     return new PagedResult<T>({
@@ -89,7 +96,10 @@ export abstract class BaseRepository<T extends Common> extends SqlEntityReposito
 
   /** Kiểm tra sự tồn tại của bản ghi */
   async exists(filter: FilterQuery<T>): Promise<boolean> {
-    const count = await this.count({ isActive: true, ...(filter as any) } as FilterQuery<T>);
+    const count = await this.count({
+      isActive: true,
+      ...(filter as any)
+    } as FilterQuery<T>);
     return count > 0;
   }
 }

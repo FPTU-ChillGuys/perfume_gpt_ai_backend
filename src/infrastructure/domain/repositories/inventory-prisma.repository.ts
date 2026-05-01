@@ -72,7 +72,10 @@ export class InventoryPrismaRepository {
   async countLowStocks(): Promise<number> {
     return this.prisma.stocks.count({
       where: {
-        TotalQuantity: { gt: 0, lte: this.prisma.stocks.fields.LowStockThreshold },
+        TotalQuantity: {
+          gt: 0,
+          lte: this.prisma.stocks.fields.LowStockThreshold
+        },
         ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
       }
     });
@@ -107,11 +110,15 @@ export class InventoryPrismaRepository {
     });
   }
 
-  async findProblematicStocks(nearExpiryDate: Date): Promise<StockWithVariant[]> {
+  async findProblematicStocks(
+    nearExpiryDate: Date
+  ): Promise<StockWithVariant[]> {
     return this.prisma.stocks.findMany({
       where: {
         OR: [
-          { TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold } },
+          {
+            TotalQuantity: { lte: this.prisma.stocks.fields.LowStockThreshold }
+          },
           {
             ProductVariants: {
               Batches: {
@@ -131,7 +138,9 @@ export class InventoryPrismaRepository {
 
   async findAllStocksSorted(take: number): Promise<StockWithVariant[]> {
     return this.prisma.stocks.findMany({
-      where: { ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } } },
+      where: {
+        ProductVariants: { IsDeleted: false, Products: { IsDeleted: false } }
+      },
       orderBy: { TotalQuantity: 'asc' },
       take,
       include: stockVariantInclude
@@ -151,7 +160,9 @@ export class InventoryPrismaRepository {
     });
   }
 
-  async findBatchesByVariantIds(variantIds: string[]): Promise<Prisma.BatchesGetPayload<{}>[]> {
+  async findBatchesByVariantIds(
+    variantIds: string[]
+  ): Promise<Prisma.BatchesGetPayload<{}>[]> {
     return this.prisma.batches.findMany({
       where: {
         VariantId: { in: variantIds },

@@ -18,7 +18,10 @@ export class Message extends Common {
   message!: string;
 
   /** Cuộc hội thoại chứa tin nhắn này */
-  @ApiProperty({ description: 'Cuộc hội thoại liên quan', type: () => Conversation })
+  @ApiProperty({
+    description: 'Cuộc hội thoại liên quan',
+    type: () => Conversation
+  })
   @ManyToOne(() => Conversation, {
     deleteRule: 'cascade',
     updateRule: 'cascade'

@@ -16,7 +16,7 @@ export const SURVEY_ATTRIBUTE_TYPES = [
   'note',
   'family',
   'attribute',
-  'budget',
+  'budget'
 ] as const;
 
 export type SurveyAttributeType = (typeof SURVEY_ATTRIBUTE_TYPES)[number];
@@ -25,7 +25,10 @@ export type SurveyAttributeType = (typeof SURVEY_ATTRIBUTE_TYPES)[number];
 
 /** Match chính xác 1 giá trị (gender, origin, brand, category, concentration, note, family) */
 export class QueryFragmentMatch {
-  @ApiProperty({ enum: SURVEY_ATTRIBUTE_TYPES, description: 'Loại thuộc tính (trừ attribute và budget)' })
+  @ApiProperty({
+    enum: SURVEY_ATTRIBUTE_TYPES,
+    description: 'Loại thuộc tính (trừ attribute và budget)'
+  })
   type: Exclude<SurveyAttributeType, 'attribute' | 'budget'>;
 
   @ApiProperty({ description: 'Giá trị cần khớp chính xác' })
@@ -37,7 +40,9 @@ export class QueryFragmentAttribute {
   @ApiProperty({ enum: ['attribute'] })
   type: 'attribute';
 
-  @ApiProperty({ description: 'Tên loại thuộc tính (ví dụ: Nồng độ, Độ lưu hương)' })
+  @ApiProperty({
+    description: 'Tên loại thuộc tính (ví dụ: Nồng độ, Độ lưu hương)'
+  })
   attributeName: string;
 
   @ApiProperty({ description: 'Giá trị thuộc tính cần khớp' })
@@ -93,8 +98,8 @@ export class SurveyAttributeValueItem {
     oneOf: [
       { $ref: getSchemaPath(QueryFragmentMatch) },
       { $ref: getSchemaPath(QueryFragmentAttribute) },
-      { $ref: getSchemaPath(QueryFragmentBudget) },
-    ],
+      { $ref: getSchemaPath(QueryFragmentBudget) }
+    ]
   })
   queryFragment: QueryFragment;
 }

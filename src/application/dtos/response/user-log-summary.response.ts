@@ -12,15 +12,27 @@ export class UserLogSummaryResponse extends CommonResponse {
   logSummary?: string;
 
   /** Snapshot feature dạng JSON */
-  @ApiProperty({ description: 'Feature snapshot dạng JSON', required: false, type: Object })
+  @ApiProperty({
+    description: 'Feature snapshot dạng JSON',
+    required: false,
+    type: Object
+  })
   featureSnapshot?: Record<string, unknown>;
 
   /** Bản tóm tắt log theo ngày */
-  @ApiProperty({ description: 'Bản tóm tắt log theo ngày', required: false, type: Object })
+  @ApiProperty({
+    description: 'Bản tóm tắt log theo ngày',
+    required: false,
+    type: Object
+  })
   dailyLogSummary?: Record<string, string>;
 
   /** Snapshot feature theo ngày */
-  @ApiProperty({ description: 'Feature snapshot theo ngày', required: false, type: Object })
+  @ApiProperty({
+    description: 'Feature snapshot theo ngày',
+    required: false,
+    type: Object
+  })
   dailyFeatureSnapshot?: Record<string, unknown>;
 
   /** Tổng số event đã xử lý */

@@ -1,6 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min
+} from 'class-validator';
 import { PagedAndSortedRequest } from './paged-and-sorted.request';
 
 const REVIEW_STATUSES = ['Pending', 'Approved', 'Rejected'] as const;
@@ -20,13 +28,20 @@ export class GetPagedReviewRequest extends PagedAndSortedRequest {
   UserId?: string;
 
   /** Trạng thái đánh giá */
-  @ApiPropertyOptional({ description: 'Trạng thái đánh giá', enum: REVIEW_STATUSES })
+  @ApiPropertyOptional({
+    description: 'Trạng thái đánh giá',
+    enum: REVIEW_STATUSES
+  })
   @IsOptional()
   @IsEnum(REVIEW_STATUSES)
   Status?: string;
 
   /** Số sao tối thiểu */
-  @ApiPropertyOptional({ description: 'Số sao tối thiểu', minimum: 1, maximum: 5 })
+  @ApiPropertyOptional({
+    description: 'Số sao tối thiểu',
+    minimum: 1,
+    maximum: 5
+  })
   @IsOptional()
   @IsInt()
   @Min(1)

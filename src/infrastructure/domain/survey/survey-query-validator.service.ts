@@ -4,7 +4,7 @@ import {
   QueryAnswerPayload,
   QueryValidationResult,
   SURVEY_ATTRIBUTE_TYPES,
-  SurveyAttributeType,
+  SurveyAttributeType
 } from './survey-query.types';
 
 /**
@@ -27,7 +27,9 @@ export class SurveyQueryValidatorService {
     if (!fragment.type) {
       errors.push('Thiếu field "type"');
     } else if (!SURVEY_ATTRIBUTE_TYPES.includes(fragment.type)) {
-      errors.push(`Type "${fragment.type}" không hợp lệ. Các type cho phép: ${SURVEY_ATTRIBUTE_TYPES.join(', ')}`);
+      errors.push(
+        `Type "${fragment.type}" không hợp lệ. Các type cho phép: ${SURVEY_ATTRIBUTE_TYPES.join(', ')}`
+      );
     }
 
     // Validate by type
@@ -48,8 +50,13 @@ export class SurveyQueryValidatorService {
         if (!fragment.match || typeof fragment.match !== 'string') {
           errors.push('Type "attribute" yêu cầu field "match" (string)');
         }
-        if (!fragment.attributeName || typeof fragment.attributeName !== 'string') {
-          errors.push('Type "attribute" yêu cầu field "attributeName" (string)');
+        if (
+          !fragment.attributeName ||
+          typeof fragment.attributeName !== 'string'
+        ) {
+          errors.push(
+            'Type "attribute" yêu cầu field "attributeName" (string)'
+          );
         }
         break;
 
@@ -63,7 +70,11 @@ export class SurveyQueryValidatorService {
         if (fragment.min === undefined && fragment.max === undefined) {
           errors.push('Budget cần ít nhất 1 trong 2 field "min" hoặc "max"');
         }
-        if (fragment.min !== undefined && fragment.max !== undefined && fragment.min > fragment.max) {
+        if (
+          fragment.min !== undefined &&
+          fragment.max !== undefined &&
+          fragment.min > fragment.max
+        ) {
           errors.push('Budget "min" không được lớn hơn "max"');
         }
         break;

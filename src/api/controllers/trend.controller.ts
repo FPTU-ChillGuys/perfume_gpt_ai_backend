@@ -1,14 +1,35 @@
-import { Controller, Get, Inject, Param, Query, Req, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Query,
+  Req,
+  UseInterceptors
+} from '@nestjs/common';
 import { Request } from 'express';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
-import { ApiAdminErrors, ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
-import { AllUserLogRequest, AllUserLogWithForceRefreshRequest } from 'src/application/dtos/request/user-log.request';
+import {
+  ApiAdminErrors,
+  ApiPublicErrorResponses
+} from 'src/application/decorators/swagger-error.decorator';
+import {
+  AllUserLogRequest,
+  AllUserLogWithForceRefreshRequest
+} from 'src/application/dtos/request/user-log.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { AITrendForecastStructuredResponse } from 'src/application/dtos/response/ai-structured.response';
-import { createBackgroundJob, checkBackgroundJobResult } from 'src/api/controllers/helper/background-job.helper';
-import { CacheInterceptor, CacheTTL, CACHE_MANAGER } from '@nestjs/cache-manager';
+import {
+  createBackgroundJob,
+  checkBackgroundJobResult
+} from 'src/api/controllers/helper/background-job.helper';
+import {
+  CacheInterceptor,
+  CacheTTL,
+  CACHE_MANAGER
+} from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { CACHE_TTL_1WEEK } from 'src/infrastructure/domain/common/cacheable/cacheable.constants';
 import { ProductCardResponse } from 'src/application/dtos/response/product-card.response';
@@ -23,14 +44,15 @@ export class TrendController {
   constructor(
     private readonly trendService: TrendService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache
-  ) { }
-
+  ) {}
 
   /** Dự đoán xu hướng từ tổng hợp log người dùng */
   @Get('summary')
   @Public()
   @ApiPublicErrorResponses()
-  @ApiOperation({ summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng' })
+  @ApiOperation({
+    summary: 'Dự đoán xu hướng dựa trên tổng hợp log người dùng'
+  })
   @ApiBaseResponse(String)
   @ApiBody({ type: AllUserLogRequest })
   async summarizeLogs(
@@ -45,11 +67,10 @@ export class TrendController {
     return this.trendService.getTrendProducts(allUserLogRequest);
   }
 
-
   /** Lấy product từ xu hướng người dùng (caching) */
   // kích hoạt cache response
   @Public()
-  @Get("product/caching")
+  @Get('product/caching')
   @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng (caching)' })
   @ApiBaseResponse(ProductCardResponse)
@@ -59,12 +80,12 @@ export class TrendController {
   async getProductFromTrendCaching(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<ProductCardResponse[]>> {
-    const trendResult = await this.getProductFromTrend(allUserLogRequest)
-    return trendResult
+    const trendResult = await this.getProductFromTrend(allUserLogRequest);
+    return trendResult;
   }
 
   /**
-    * Khởi tạo job để lấy product từ xu hướng (caching 1 tuần)
+   * Khởi tạo job để lấy product từ xu hướng (caching 1 tuần)
    */
   @Public()
   @Get('product/job')
@@ -75,7 +96,8 @@ export class TrendController {
   // @UseInterceptors(CacheInterceptor)
   async createProductTrendJob(
     @Req() request: Request,
-    @Query() allUserLogWithForceRefreshRequest: AllUserLogWithForceRefreshRequest,
+    @Query()
+    allUserLogWithForceRefreshRequest: AllUserLogWithForceRefreshRequest
   ): Promise<BaseResponse<{ jobId: string }>> {
     return createBackgroundJob(
       this.cacheManager,
@@ -84,7 +106,9 @@ export class TrendController {
         type: 'trend_job',
         cacheKeyFactory: (jobId) => `trend_job_${jobId}`,
         ttlMilliseconds: cachingTrendTTL,
-        forceRefresh: allUserLogWithForceRefreshRequest.forceRefresh === true || String(allUserLogWithForceRefreshRequest.forceRefresh) === 'true',
+        forceRefresh:
+          allUserLogWithForceRefreshRequest.forceRefresh === true ||
+          String(allUserLogWithForceRefreshRequest.forceRefresh) === 'true',
         cacheByRequest: true
       },
       request
@@ -101,28 +125,29 @@ export class TrendController {
   @ApiBaseResponse(Object) // Trả về dynamic object
   async getProductTrendJobResult(
     @Param('jobId') jobId: string
-  ): Promise<BaseResponse<{ jobId: string; result?: unknown; status?: string }>> {
-    return checkBackgroundJobResult(
-      this.cacheManager,
-      `trend_job_${jobId}`,
-      { jobId, endpoint: 'trends/product/job/:jobId' }
-    );
+  ): Promise<
+    BaseResponse<{ jobId: string; result?: unknown; status?: string }>
+  > {
+    return checkBackgroundJobResult(this.cacheManager, `trend_job_${jobId}`, {
+      jobId,
+      endpoint: 'trends/product/job/:jobId'
+    });
   }
 
   /** Lấy product từ xu hướng người dùng */
   @Public()
-  @Get("product")
+  @Get('product')
   @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Lấy product từ xu hướng người dùng' })
   @ApiBaseResponse(ProductCardResponse)
   @ApiBody({ type: AllUserLogRequest })
   @CacheTTL(1) // 1 ms
-  @UseInterceptors(CacheInterceptor)  // kích hoạt cache response
+  @UseInterceptors(CacheInterceptor) // kích hoạt cache response
   async getProductNoCaching(
     @Query() allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<ProductCardResponse[]>> {
-    const trendResult = await this.getProductFromTrend(allUserLogRequest)
-    return trendResult
+    const trendResult = await this.getProductFromTrend(allUserLogRequest);
+    return trendResult;
   }
 
   /**

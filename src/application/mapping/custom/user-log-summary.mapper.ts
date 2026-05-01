@@ -1,5 +1,5 @@
-import { UserLogSummaryResponse } from "src/application/dtos/response/user-log-summary.response";
-import { UserLogSummary } from "src/domain/entities/user-log-summary";
+import { UserLogSummaryResponse } from 'src/application/dtos/response/user-log-summary.response';
+import { UserLogSummary } from 'src/domain/entities/user-log-summary';
 
 export class UserLogSummaryMapper {
   static toResponse(entity: UserLogSummary): UserLogSummaryResponse {

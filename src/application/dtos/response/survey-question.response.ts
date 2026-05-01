@@ -6,7 +6,11 @@ import { QuestionType } from 'src/domain/entities/survey-question.entity';
 /** Response câu hỏi survey */
 export class SurveyQuestionResponse extends CommonResponse {
   /** Loại câu hỏi */
-  @ApiProperty({ description: 'Loại câu hỏi', enum: QuestionType, required: false })
+  @ApiProperty({
+    description: 'Loại câu hỏi',
+    enum: QuestionType,
+    required: false
+  })
   questionType?: QuestionType;
 
   /** Nội dung câu hỏi */
@@ -17,7 +21,11 @@ export class SurveyQuestionResponse extends CommonResponse {
   order?: number;
 
   /** Danh sách câu trả lời */
-  @ApiProperty({ description: 'Danh sách câu trả lời', type: () => [SurveyAnswerResponse], required: false })
+  @ApiProperty({
+    description: 'Danh sách câu trả lời',
+    type: () => [SurveyAnswerResponse],
+    required: false
+  })
   answers?: SurveyAnswerResponse[];
 
   constructor(init?: Partial<SurveyQuestionResponse>) {

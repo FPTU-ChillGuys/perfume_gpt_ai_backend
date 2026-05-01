@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Query,
-  Req
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -15,11 +8,18 @@ import {
 } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
-import { ApiAdminErrors, ApiAiErrors, ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
+import {
+  ApiAdminErrors,
+  ApiAiErrors,
+  ApiPublicErrorResponses
+} from 'src/application/decorators/swagger-error.decorator';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
-import { ApiBaseResponse, ExtendApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
+import {
+  ApiBaseResponse,
+  ExtendApiBaseResponse
+} from 'src/infrastructure/domain/utils/api-response-decorator';
 import { ConversationOutputDto } from 'src/application/dtos/common/conversation-output.dto';
 import { ConversationInputHelper } from 'src/infrastructure/domain/conversation/helpers/conversation-input.helper';
 
@@ -36,7 +36,7 @@ export class ConversationController {
   constructor(
     private readonly conversationService: ConversationService,
     private readonly inputHelper: ConversationInputHelper
-  ) { }
+  ) {}
 
   /** Lấy tất cả cuộc hội thoại (Admin) */
   @Role(['admin'])
@@ -54,7 +54,11 @@ export class ConversationController {
   @ApiBearerAuth('jwt')
   @ApiPublicErrorResponses()
   @ApiOperation({ summary: 'Lấy lịch sử chat của user hiện tại' })
-  @ApiQuery({ name: 'userId', required: false, description: 'Guest userId (nếu chưa đăng nhập)' })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    description: 'Guest userId (nếu chưa đăng nhập)'
+  })
   @ExtendApiBaseResponse(PagedResult, ConversationResponse)
   async getMyConversationHistory(
     @Req() request: Request,
@@ -62,7 +66,9 @@ export class ConversationController {
   ): Promise<BaseResponse<PagedResult<ConversationResponse>>> {
     const userId = this.inputHelper.extractUserId(request, pagedRequest.userId);
     pagedRequest.userId = userId;
-    return await this.conversationService.getAllConversationsPaginated(pagedRequest);
+    return await this.conversationService.getAllConversationsPaginated(
+      pagedRequest
+    );
   }
 
   /** Lấy danh sách hội thoại có phân trang (Admin) */
@@ -115,7 +121,10 @@ export class ConversationController {
     @Req() request: Request,
     @Body() chatRequest: ChatRequest
   ): Promise<BaseResponse<ConversationResponse>> {
-    const prepared = this.inputHelper.prepareStaffChatRequest(request, chatRequest);
+    const prepared = this.inputHelper.prepareStaffChatRequest(
+      request,
+      chatRequest
+    );
     const result = await this.conversationService.chat(prepared);
     return this.inputHelper.processMobileResponse(result, chatRequest.isMobile);
   }
@@ -125,7 +134,9 @@ export class ConversationController {
   @Post('chat/v11')
   @ApiBearerAuth('jwt')
   @ApiAiErrors()
-  @ApiOperation({ summary: 'Chat với AI (V11 — individual message persistence)' })
+  @ApiOperation({
+    summary: 'Chat với AI (V11 — individual message persistence)'
+  })
   @ApiBaseResponse(ChatV11Response)
   async chatV11(
     @Req() request: Request,
@@ -146,7 +157,10 @@ export class ConversationController {
     @Req() request: Request,
     @Body() chatRequest: ChatRequest
   ): Promise<BaseResponse<ChatV11Response>> {
-    const prepared = this.inputHelper.prepareStaffChatRequest(request, chatRequest);
+    const prepared = this.inputHelper.prepareStaffChatRequest(
+      request,
+      chatRequest
+    );
     return await this.conversationService.chatV11(prepared);
   }
 }

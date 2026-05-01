@@ -19,10 +19,16 @@ import {
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { BestSellingProductResponse } from 'src/application/dtos/response/product-insight.response';
 import { VariantSalesSignal } from 'src/application/dtos/trend/variant-sales-signal.type';
-import { TrendSeedKeyword, TrendSeedStage } from 'src/application/dtos/trend/trend-seed-keyword.type';
+import {
+  TrendSeedKeyword,
+  TrendSeedStage
+} from 'src/application/dtos/trend/trend-seed-keyword.type';
 import { GoogleTrendSignal } from 'src/application/dtos/trend/google-trend-signal.type';
 import { TrendKeywordMapperResult } from 'src/application/dtos/trend/trend-keyword-mapper-result.type';
-import { TrendPipelineSource, TrendPipelineResult } from 'src/application/dtos/trend/trend-pipeline-result.type';
+import {
+  TrendPipelineSource,
+  TrendPipelineResult
+} from 'src/application/dtos/trend/trend-pipeline-result.type';
 import { TrendProductsCachePayload } from 'src/application/dtos/trend/trend-products-cache-payload.type';
 import {
   ProductCardOutputItem,
@@ -64,7 +70,7 @@ export class TrendService {
     private readonly productService: ProductService,
     private readonly aiAcceptanceService: AIAcceptanceService,
     private readonly aiAnalysisService: AiAnalysisService
-  ) { }
+  ) {}
 
   private readonly logger = new Logger(TrendService.name);
 
@@ -73,7 +79,8 @@ export class TrendService {
   }
 
   private getForceRefreshFlag(allUserLogRequest: AllUserLogRequest): boolean {
-    const rawValue = (allUserLogRequest as { forceRefresh?: unknown }).forceRefresh;
+    const rawValue = (allUserLogRequest as { forceRefresh?: unknown })
+      .forceRefresh;
     return rawValue === true || String(rawValue).toLowerCase() === 'true';
   }
 
@@ -82,10 +89,16 @@ export class TrendService {
     endDate: Date;
   } {
     const now = new Date();
-    const endDate = TrendHelpersUtil.toValidDate(allUserLogRequest.endDate, now);
+    const endDate = TrendHelpersUtil.toValidDate(
+      allUserLogRequest.endDate,
+      now
+    );
 
     if (allUserLogRequest.startDate) {
-      const startDate = TrendHelpersUtil.toValidDate(allUserLogRequest.startDate, subDays(endDate, 30));
+      const startDate = TrendHelpersUtil.toValidDate(
+        allUserLogRequest.startDate,
+        subDays(endDate, 30)
+      );
       return { startDate, endDate };
     }
 
@@ -232,8 +245,12 @@ export class TrendService {
     }
 
     const interestRawText =
-      typeof interestRaw === 'string' ? interestRaw : JSON.stringify(interestRaw);
-    const score = TrendHelpersUtil.extractInterestScore(TrendHelpersUtil.safeParseJson(interestRaw));
+      typeof interestRaw === 'string'
+        ? interestRaw
+        : JSON.stringify(interestRaw);
+    const score = TrendHelpersUtil.extractInterestScore(
+      TrendHelpersUtil.safeParseJson(interestRaw)
+    );
 
     this.logger.log(
       `[Trend][GoogleFetch][RAW] requestId=${requestId} operation=interest_over_time keyword="${seed.keyword}" rawChars=${interestRawText.length} score=${score}`
@@ -261,14 +278,24 @@ export class TrendService {
     const signals: GoogleTrendSignal[] = [];
 
     for (const seed of seedKeywords) {
-      const relatedSignals = await this.fetchRelatedQueries(requestId, seed, startDate, endDate);
+      const relatedSignals = await this.fetchRelatedQueries(
+        requestId,
+        seed,
+        startDate,
+        endDate
+      );
 
       if (relatedSignals.length > 0) {
         signals.push(...relatedSignals);
         continue;
       }
 
-      const interestSignal = await this.fetchInterestOverTime(requestId, seed, startDate, endDate);
+      const interestSignal = await this.fetchInterestOverTime(
+        requestId,
+        seed,
+        startDate,
+        endDate
+      );
       if (interestSignal) {
         signals.push(interestSignal);
       }
@@ -292,7 +319,10 @@ export class TrendService {
       .map((signal) => signal.keyword);
 
     const attributeSignalKeywords = signals
-      .filter((signal) => signal.stage === 'attribute' || signal.source === 'related_query')
+      .filter(
+        (signal) =>
+          signal.stage === 'attribute' || signal.source === 'related_query'
+      )
       .sort((left, right) => right.score - left.score)
       .map((signal) => signal.keyword);
 
@@ -343,7 +373,11 @@ export class TrendService {
       .slice(0, GOOGLE_SIGNAL_PROMPT_LIMIT);
     const signalSummary = TrendHelpersUtil.summarizeSignals(compactSignals);
 
-    const mapped = this.buildKeywordFallback(requestId, seedKeywords, compactSignals);
+    const mapped = this.buildKeywordFallback(
+      requestId,
+      seedKeywords,
+      compactSignals
+    );
 
     this.logger.log(
       `[Trend][KeywordMap][DONE] requestId=${requestId} mode=nlp-only primaryCount=${mapped.primaryKeywords.length} expansionCount=${mapped.expansionKeywords.length} confidence=${mapped.confidence.toFixed(2)} durationMs=${Date.now() - startedAt} signalPreview="${signalSummary.preview}"`
@@ -352,7 +386,9 @@ export class TrendService {
     return mapped;
   }
 
-  private buildQueryKeywordList(mapperResult: TrendKeywordMapperResult): string[] {
+  private buildQueryKeywordList(
+    mapperResult: TrendKeywordMapperResult
+  ): string[] {
     const negatives = new Set(
       mapperResult.negativeTerms.map((term) => term.toLowerCase())
     );
@@ -362,7 +398,9 @@ export class TrendService {
       TREND_SEARCH_KEYWORD_LIMIT
     );
 
-    return mergedKeywords.filter((keyword) => !negatives.has(keyword.toLowerCase()));
+    return mergedKeywords.filter(
+      (keyword) => !negatives.has(keyword.toLowerCase())
+    );
   }
 
   private async queryProductsByKeywords(
@@ -394,7 +432,7 @@ export class TrendService {
           );
 
         keywordProducts = semanticSearchResult.success
-          ? semanticSearchResult.payload?.items ?? []
+          ? (semanticSearchResult.payload?.items ?? [])
           : [];
 
         this.logger.log(
@@ -442,19 +480,19 @@ export class TrendService {
       .map((product) => {
         const variants = Array.isArray(product.variants)
           ? product.variants
-            .map((variant) => ({
-              id: variant.id,
-              sku: variant.sku,
-              volumeMl: Number(variant.volumeMl),
-              basePrice: Number(variant.basePrice)
-            }))
-            .filter(
-              (variant) =>
-                variant.id &&
-                variant.sku &&
-                Number.isFinite(variant.volumeMl) &&
-                Number.isFinite(variant.basePrice)
-            )
+              .map((variant) => ({
+                id: variant.id,
+                sku: variant.sku,
+                volumeMl: Number(variant.volumeMl),
+                basePrice: Number(variant.basePrice)
+              }))
+              .filter(
+                (variant) =>
+                  variant.id &&
+                  variant.sku &&
+                  Number.isFinite(variant.volumeMl) &&
+                  Number.isFinite(variant.basePrice)
+              )
           : [];
 
         if (variants.length === 0) {
@@ -485,9 +523,12 @@ export class TrendService {
       return salesSignalMap;
     }
 
-    const analyticsResult = await this.restockService.getProductSalesAnalyticsForRestock();
+    const analyticsResult =
+      await this.restockService.getProductSalesAnalyticsForRestock();
     if (!analyticsResult.success || !analyticsResult.payload) {
-      this.logger.warn('[Trend][Rank] Cannot load sales analytics for variant ranking.');
+      this.logger.warn(
+        '[Trend][Rank] Cannot load sales analytics for variant ranking.'
+      );
       return salesSignalMap;
     }
 
@@ -594,9 +635,8 @@ export class TrendService {
     cacheKey: string
   ): Promise<ProductCardResponse[]> {
     try {
-      const cachedData = await this.cacheManager.get<TrendProductsCachePayload>(
-        cacheKey
-      );
+      const cachedData =
+        await this.cacheManager.get<TrendProductsCachePayload>(cacheKey);
       const cachedProducts = Array.isArray(cachedData?.products)
         ? cachedData.products
         : [];
@@ -677,7 +717,11 @@ export class TrendService {
     for (const signal of topSignals) {
       try {
         const singleAnalysis = await this.aiAnalysisService.analyzeTrend([
-          { keyword: signal.keyword, score: signal.score, source: signal.source }
+          {
+            keyword: signal.keyword,
+            score: signal.score,
+            source: signal.source
+          }
         ]);
 
         if (!singleAnalysis) {
@@ -692,10 +736,14 @@ export class TrendService {
           pagination: { pageNumber: 1, pageSize: 10 }
         };
 
-        const searchResponse = await this.productService.getProductsByStructuredQuery(expandedAnalysis);
-        const products = searchResponse.success && searchResponse.data
-          ? searchResponse.data.items
-          : [];
+        const searchResponse =
+          await this.productService.getProductsByStructuredQuery(
+            expandedAnalysis
+          );
+        const products =
+          searchResponse.success && searchResponse.data
+            ? searchResponse.data.items
+            : [];
 
         this.logger.log(
           `[Trend][Merge][KEYWORD] requestId=${requestId} keyword="${signal.keyword}" count=${products.length}`
@@ -703,7 +751,8 @@ export class TrendService {
 
         allQueryProducts.push(...products);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        const errorMessage =
+          error instanceof Error ? error.message : JSON.stringify(error);
         this.logger.warn(
           `[Trend][Merge][KEYWORD][FAIL] requestId=${requestId} keyword="${signal.keyword}" error=${errorMessage}`
         );
@@ -729,7 +778,9 @@ export class TrendService {
 
     if (bestSellerProducts.length > 0 && dedupedQueryProducts.length > 0) {
       const queryProductIds = new Set(dedupedQueryProducts.map((p) => p.id));
-      const intersection = bestSellerProducts.filter((p) => queryProductIds.has(p.id));
+      const intersection = bestSellerProducts.filter((p) =>
+        queryProductIds.has(p.id)
+      );
       if (intersection.length > 0) {
         this.logger.log(
           `[Trend][Merge][INTERSECTION] requestId=${requestId} intersectionCount=${intersection.length} — using best seller order`
@@ -747,7 +798,9 @@ export class TrendService {
     this.logger.log(
       `[Trend][Merge][ONE_SIDE] requestId=${requestId} using=${used}`
     );
-    return dedupedQueryProducts.length > 0 ? dedupedQueryProducts : bestSellerProducts;
+    return dedupedQueryProducts.length > 0
+      ? dedupedQueryProducts
+      : bestSellerProducts;
   }
 
   private async mergeTrendProducts(
@@ -756,23 +809,35 @@ export class TrendService {
   ): Promise<ProductCardResponse[]> {
     const startedAt = Date.now();
 
-    const allQueryProducts = await this.collectProductsPerSignal(requestId, signals);
+    const allQueryProducts = await this.collectProductsPerSignal(
+      requestId,
+      signals
+    );
 
-    const bestSellerResponse = await this.productService.getBestSellingProducts({
-      PageNumber: 1,
-      PageSize: 50,
-      SortOrder: 'desc',
-      IsDescending: true
-    });
-    const bestSellerProducts = bestSellerResponse.success && bestSellerResponse.data
-      ? bestSellerResponse.data.items.map((item: BestSellingProductResponse) => item.product)
-      : [];
+    const bestSellerResponse = await this.productService.getBestSellingProducts(
+      {
+        PageNumber: 1,
+        PageSize: 50,
+        SortOrder: 'desc',
+        IsDescending: true
+      }
+    );
+    const bestSellerProducts =
+      bestSellerResponse.success && bestSellerResponse.data
+        ? bestSellerResponse.data.items.map(
+            (item: BestSellingProductResponse) => item.product
+          )
+        : [];
 
     this.logger.log(
       `[Trend][Merge][BESTSELLER] requestId=${requestId} bestSellerCount=${bestSellerProducts.length}`
     );
 
-    const mergedProducts = this.intersectWithBestSellers(requestId, allQueryProducts, bestSellerProducts);
+    const mergedProducts = this.intersectWithBestSellers(
+      requestId,
+      allQueryProducts,
+      bestSellerProducts
+    );
 
     const productOutputItems = this.toProductOutputItems(
       this.dedupeProductsById(mergedProducts)
@@ -785,7 +850,6 @@ export class TrendService {
 
     return rankedProducts;
   }
-
 
   private async buildLiveTrendPipeline(
     requestId: string,
@@ -812,11 +876,12 @@ export class TrendService {
         primaryKeywords: googleSignals
           .sort((a, b) => b.score - a.score)
           .slice(0, 10)
-          .map(s => s.keyword),
+          .map((s) => s.keyword),
         expansionKeywords: [],
         negativeTerms: [],
         confidence: 0.85,
-        explanation: 'Per-keyword AI analysis used for trend product resolution.'
+        explanation:
+          'Per-keyword AI analysis used for trend product resolution.'
       };
       queryKeywords = mapperResult.primaryKeywords;
     } else {
@@ -824,12 +889,19 @@ export class TrendService {
       this.logger.warn(
         `[Trend][Pipeline][FALLBACK] requestId=${requestId} No Google signals, falling back to NLP pipeline`
       );
-      mapperResult = await this.mapGoogleSignalsToKeywords(requestId, seedKeywords, googleSignals);
+      mapperResult = await this.mapGoogleSignalsToKeywords(
+        requestId,
+        seedKeywords,
+        googleSignals
+      );
       queryKeywords = this.buildQueryKeywordList(mapperResult);
       this.logger.log(
         `[Trend][KeywordMap][RESULT] requestId=${requestId} queryKeywordCount=${queryKeywords.length} keywords=${JSON.stringify(queryKeywords)}`
       );
-      const rawProducts = await this.queryProductsByKeywords(requestId, queryKeywords);
+      const rawProducts = await this.queryProductsByKeywords(
+        requestId,
+        queryKeywords
+      );
       const dedupedProducts = this.dedupeProductsById(rawProducts);
       const productOutputItems = this.toProductOutputItems(dedupedProducts);
       rankedProducts = await this.toRankedProductCards(productOutputItems);
@@ -848,7 +920,6 @@ export class TrendService {
       mapperResult
     };
   }
-
 
   private makePipelineResult(
     products: ProductCardResponse[],
@@ -873,7 +944,10 @@ export class TrendService {
     cacheKey: string,
     startedAt: number
   ): Promise<TrendPipelineResult> {
-    const cachedProducts = await this.readCachedTrendProducts(requestId, cacheKey);
+    const cachedProducts = await this.readCachedTrendProducts(
+      requestId,
+      cacheKey
+    );
     if (cachedProducts.length > 0) {
       this.logger.log(
         `[Trend][EXIT] requestId=${requestId} source=cache fallbackTier=cache productCount=${cachedProducts.length} durationMs=${Date.now() - startedAt}`
@@ -900,7 +974,10 @@ export class TrendService {
     );
 
     if (!forceRefresh) {
-      const warmCacheProducts = await this.readCachedTrendProducts(requestId, cacheKey);
+      const warmCacheProducts = await this.readCachedTrendProducts(
+        requestId,
+        cacheKey
+      );
       if (warmCacheProducts.length > 0) {
         this.logger.log(
           `[Trend][EXIT] requestId=${requestId} source=cache fallbackTier=cache productCount=${warmCacheProducts.length} durationMs=${Date.now() - startedAt}`
@@ -916,7 +993,9 @@ export class TrendService {
       );
 
       if (liveResult.products.length === 0) {
-        throw new Error('No products generated from live Google trend pipeline');
+        throw new Error(
+          'No products generated from live Google trend pipeline'
+        );
       }
 
       const cachePayload: TrendProductsCachePayload = {
@@ -955,7 +1034,10 @@ export class TrendService {
     _output?: unknown
   ): Promise<BaseResponse<string>> {
     const requestId = this.createRequestId('trend-summary');
-    const result = await this.resolveTrendPipeline(requestId, allUserLogRequest);
+    const result = await this.resolveTrendPipeline(
+      requestId,
+      allUserLogRequest
+    );
 
     const summaryPayload = {
       message: 'Trend summary generated from Google Trends pipeline.',
@@ -975,18 +1057,22 @@ export class TrendService {
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<ProductCardResponse[]>> {
     const requestId = this.createRequestId('trend-product');
-    const result = await this.resolveTrendPipeline(requestId, allUserLogRequest);
+    const result = await this.resolveTrendPipeline(
+      requestId,
+      allUserLogRequest
+    );
 
-    const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-      contextType: 'trend',
-      sourceRefId: requestId,
-      products: result.products,
-      metadata: {
-        sourceUsed: result.sourceUsed,
-        fallbackTier: result.fallbackTier,
-        keywordCount: result.keywordsUsed.length
-      }
-    });
+    const attachResult =
+      await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        contextType: 'trend',
+        sourceRefId: requestId,
+        products: result.products,
+        metadata: {
+          sourceUsed: result.sourceUsed,
+          fallbackTier: result.fallbackTier,
+          keywordCount: result.keywordsUsed.length
+        }
+      });
 
     return Ok(attachResult.products as ProductCardResponse[]);
   }
@@ -996,7 +1082,10 @@ export class TrendService {
   ): Promise<BaseResponse<AITrendForecastStructuredResponse>> {
     const startedAt = Date.now();
     const requestId = this.createRequestId('trend-structured');
-    const result = await this.resolveTrendPipeline(requestId, allUserLogRequest);
+    const result = await this.resolveTrendPipeline(
+      requestId,
+      allUserLogRequest
+    );
 
     const forecast = [
       `Source used: ${result.sourceUsed}.`,

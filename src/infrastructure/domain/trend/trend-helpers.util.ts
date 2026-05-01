@@ -228,7 +228,8 @@ export class TrendHelpersUtil {
   static extractProductsFromUnknown(
     unknownProducts: unknown[]
   ): import('src/chatbot/output/product.output').ProductCardOutputItem[] {
-    const products: import('src/chatbot/output/product.output').ProductCardOutputItem[] = [];
+    const products: import('src/chatbot/output/product.output').ProductCardOutputItem[] =
+      [];
 
     for (const unknownItem of unknownProducts) {
       const item =
@@ -242,10 +243,12 @@ export class TrendHelpersUtil {
 
       const id = TrendHelpersUtil.readString(item.id);
       const name = TrendHelpersUtil.readString(item.name);
-      const brandName = TrendHelpersUtil.readString(item.brandName) ?? 'Unknown';
+      const brandName =
+        TrendHelpersUtil.readString(item.brandName) ?? 'Unknown';
       const rawVariants = Array.isArray(item.variants) ? item.variants : [];
 
-      const variants: import('src/chatbot/output/product.output').ProductCardVariantOutput[] = [];
+      const variants: import('src/chatbot/output/product.output').ProductCardVariantOutput[] =
+        [];
       for (const rawVariant of rawVariants) {
         const variant =
           rawVariant && typeof rawVariant === 'object'

@@ -5,6 +5,7 @@ import {
   EntityDictionary,
   EntityType
 } from 'src/domain/types/dictionary.types';
+import { PromptLoaderService } from 'src/infrastructure/domain/utils/prompt-loader.service';
 import { z } from 'zod';
 
 const BATCH_SIZE = 20;
@@ -26,11 +27,14 @@ const SYSTEM_PROMPT = `Bạn là chuyên gia nước hoa Việt Nam. Với mỗi
 export class AliasAiEnrichmentProcessor {
   private readonly logger = new Logger(AliasAiEnrichmentProcessor.name);
 
+  constructor(private readonly promptLoader: PromptLoaderService) {}
+
   async enrich(
     entityType: EntityType,
     canonicals: string[]
   ): Promise<Record<string, string[]>> {
     const enriched: Record<string, string[]> = {};
+    const batchStart = Date.now();
 
     for (let i = 0; i < canonicals.length; i += BATCH_SIZE) {
       const batch = canonicals.slice(i, i + BATCH_SIZE);
@@ -39,6 +43,14 @@ export class AliasAiEnrichmentProcessor {
         for (const item of result.items) {
           if (item.aliases.length > 0) {
             enriched[item.canonical] = item.aliases;
+            this.logger.debug(
+              this.promptLoader.get('log.alias_enrich.ai.detail', {
+                ENTITY_TYPE: entityType,
+                CANONICAL: item.canonical,
+                COUNT: String(item.aliases.length),
+                LIST: item.aliases.join(', ')
+              })
+            );
           }
         }
       } catch (err) {
@@ -47,6 +59,19 @@ export class AliasAiEnrichmentProcessor {
         );
       }
     }
+
+    const totalAliasesAdded = Object.values(enriched).reduce(
+      (sum, a) => sum + a.length,
+      0
+    );
+    this.logger.log(
+      this.promptLoader.get('log.alias_enrich.ai.type', {
+        ENTITY_TYPE: entityType,
+        CANONICALS: String(canonicals.length),
+        ALIASES: String(totalAliasesAdded),
+        ELAPSED: String(Date.now() - batchStart)
+      })
+    );
 
     return enriched;
   }

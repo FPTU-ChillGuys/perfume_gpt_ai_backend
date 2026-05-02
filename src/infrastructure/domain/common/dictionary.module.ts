@@ -3,13 +3,13 @@ import { ConfigModule } from '@nestjs/config';
 import { DictionaryBuilderService } from './dictionary-builder.service';
 import { NaturalNlpService } from './natural-nlp.service';
 import { NlpEngineService } from './nlp-engine.service';
-import { MasterDataService } from './master-data.service';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { VocabularySnapshotService } from './vocabulary-snapshot.service';
 import { AliasPatternsHelper } from './helpers/alias-patterns.helper';
 import { AliasNgramHelper } from './helpers/alias-ngram.helper';
 import { AliasAiEnrichmentProcessor } from './alias-ai-enrichment.processor';
 import { VocabBm25SearchService } from './vocab-bm25.service';
+import { PrismaMasterDataRepository } from 'src/infrastructure/domain/repositories/prisma-master-data.repository';
 
 @Module({
   imports: [PrismaModule, ConfigModule],
@@ -17,12 +17,12 @@ import { VocabBm25SearchService } from './vocab-bm25.service';
     DictionaryBuilderService,
     NaturalNlpService,
     NlpEngineService,
-    MasterDataService,
     VocabularySnapshotService,
     AliasPatternsHelper,
     AliasNgramHelper,
     AliasAiEnrichmentProcessor,
-    VocabBm25SearchService
+    VocabBm25SearchService,
+    PrismaMasterDataRepository
   ],
   exports: [
     DictionaryBuilderService,
@@ -31,7 +31,8 @@ import { VocabBm25SearchService } from './vocab-bm25.service';
     VocabularySnapshotService,
     AliasPatternsHelper,
     AliasNgramHelper,
-    VocabBm25SearchService
+    VocabBm25SearchService,
+    PrismaMasterDataRepository
   ]
 })
 export class DictionaryModule implements OnModuleInit {

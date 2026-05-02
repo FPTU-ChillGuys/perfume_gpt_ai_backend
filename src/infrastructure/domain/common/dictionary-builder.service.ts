@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaMasterDataRepository } from 'src/infrastructure/domain/repositories/prisma-master-data.repository';
 import { MasterDataService } from './master-data.service';
 import { AliasPatternsHelper } from './helpers/alias-patterns.helper';
 import { AliasNgramHelper } from './helpers/alias-ngram.helper';
@@ -30,7 +30,7 @@ export class DictionaryBuilderService {
   private lastBuiltAt: Date | null = null;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly masterDataRepo: PrismaMasterDataRepository,
     private readonly masterDataService: MasterDataService,
     private readonly aliasPatternsHelper: AliasPatternsHelper,
     private readonly aliasNgramHelper: AliasNgramHelper,
@@ -47,6 +47,9 @@ export class DictionaryBuilderService {
     const startTime = Date.now();
 
     try {
+      this.logger.log(
+        '[DictionaryBuilder] Fetching master data from SQL Server...'
+      );
       // Fetch all master data (no filters, full dataset)
       const [
         brands,
@@ -58,21 +61,21 @@ export class DictionaryBuilderService {
         products,
         productVariants
       ] = await Promise.all([
-        this.prisma.brands.findMany(),
-        this.prisma.categories.findMany(),
-        this.prisma.concentrations.findMany(),
-        this.prisma.olfactoryFamilies.findMany(),
-        this.prisma.scentNotes.findMany(),
-        this.prisma.attributes.findMany({ include: { AttributeValues: true } }),
-        this.prisma.products.findMany({
-          include: {
-            ProductFamilyMaps: true,
-            ProductNoteMaps: true,
-            ProductAttributes: true
-          }
-        }),
-        this.prisma.productVariants.findMany()
+        this.masterDataRepo.getAllBrands(),
+        this.masterDataRepo.getAllCategories(),
+        this.masterDataRepo.getAllConcentrations(),
+        this.masterDataRepo.getAllOlfactoryFamilies(),
+        this.masterDataRepo.getAllScentNotes(),
+        this.masterDataRepo.getAllAttributesWithValues(),
+        this.masterDataRepo.getAllProducts(),
+        this.masterDataRepo.getAllProductVariants()
       ]);
+
+      this.logger.log(
+        `[DictionaryBuilder] Master data fetched: ${brands.length} brands, ${categories.length} categories, ` +
+          `${concentrations.length} concentrations, ${families.length} families, ${notes.length} notes, ` +
+          `${attributes.length} attributes, ${products.length} products, ${productVariants.length} variants`
+      );
 
       // Build entity dictionary (entity type -> Map<canonical -> synonyms>)
       const dict: EntityDictionary = {

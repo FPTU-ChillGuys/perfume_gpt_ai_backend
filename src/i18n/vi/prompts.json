@@ -23,5 +23,27 @@
   },
   "service": {
     "survey_prompt_prefix": "Phân tích khảo sát nước hoa"
+  },
+  "log": {
+    "alias_enrich": {
+      "pattern": {
+        "seed": "[AliasPatterns] {ENTITY_TYPE}: {COUNT} seed aliases added",
+        "short_name": "[AliasPatterns] {COUNT} brand short-name aliases added",
+        "diacritics": "[AliasPatterns] {ENTITY_TYPE}: {COUNT} diacritics variants added",
+        "product_brand": "[AliasPatterns] {COUNT} product-brand link aliases added",
+        "summary": "[AliasPatterns] Pattern enrichment complete: {TOTAL} aliases across {TYPES} entity types",
+        "detail": "[AliasPatterns] {ENTITY_TYPE} \"{CANONICAL}\": {COUNT} aliases ({LIST})"
+      },
+      "ngram": {
+        "type": "[AliasNgram] {ENTITY_TYPE}: {ALIASES} n-gram aliases from {SUBTERMS} subterms",
+        "skipped": "[AliasNgram] {ENTITY_TYPE}: skipped ({RATE}% collision > 50%)",
+        "summary": "[AliasNgram] N-gram enrichment complete: {TOTAL} aliases across {TYPES} entity types",
+        "detail": "[AliasNgram] {ENTITY_TYPE} \"{CANONICAL}\": {COUNT} aliases ({LIST})"
+      },
+      "ai": {
+        "type": "[AliasAI] {ENTITY_TYPE}: {CANONICALS} canonicals → {ALIASES} aliases ({ELAPSED}ms)",
+        "detail": "[AliasAI] {ENTITY_TYPE} \"{CANONICAL}\": {COUNT} aliases ({LIST})"
+      }
+    }
   }
 }

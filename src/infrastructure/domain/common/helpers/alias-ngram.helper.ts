@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   EntityDictionary,
   EntityType
 } from 'src/domain/types/dictionary.types';
+import { PromptLoaderService } from 'src/infrastructure/domain/utils/prompt-loader.service';
 
 const GENERIC_WORDS = new Set([
   'cho',
@@ -43,10 +44,29 @@ const GENERIC_WORDS = new Set([
 
 @Injectable()
 export class AliasNgramHelper {
+  private readonly logger = new Logger(AliasNgramHelper.name);
+
+  constructor(private readonly promptLoader: PromptLoaderService) {}
+
   enrichAll(dict: EntityDictionary): void {
     for (const [type, map] of Object.entries(dict)) {
       this.enrichForType(type as EntityType, map);
     }
+
+    let totalAliases = 0;
+    let typeCount = 0;
+    for (const map of Object.values(dict)) {
+      for (const aliases of Object.values(map)) {
+        totalAliases += aliases.length;
+        typeCount++;
+      }
+    }
+    this.logger.log(
+      this.promptLoader.get('log.alias_enrich.ngram.summary', {
+        TOTAL: String(totalAliases),
+        TYPES: String(typeCount)
+      })
+    );
   }
 
   private enrichForType(
@@ -56,21 +76,50 @@ export class AliasNgramHelper {
     const existing = this.buildIndex(map);
     const canonicals = Object.keys(map);
 
+    let totalSubterms = 0;
+    const originalCount = Object.values(map).reduce(
+      (sum, a) => sum + a.length,
+      0
+    );
+
     for (const canonical of canonicals) {
       const words = canonical.split(/\s+/).filter((w) => w.length >= 2);
       if (words.length < 2) continue;
 
       const subterms = this.extractSubterms(words);
+      totalSubterms += subterms.length;
       const newAliases = subterms.filter(
         (st) => !existing.has(st) && !GENERIC_WORDS.has(st) && st.length >= 3
       );
 
       if (newAliases.length > 0) {
+        const added = newAliases.length;
         map[canonical] = Array.from(
           new Set([...(map[canonical] ?? []), ...newAliases])
         );
+        this.logger.debug(
+          this.promptLoader.get('log.alias_enrich.ngram.detail', {
+            ENTITY_TYPE: entityType,
+            CANONICAL: canonical,
+            COUNT: String(added),
+            LIST: newAliases.join(', ')
+          })
+        );
       }
     }
+
+    const finalCount = Object.values(map).reduce(
+      (sum, a) => sum + a.length,
+      0
+    );
+    const aliasAdded = finalCount - originalCount;
+    this.logger.log(
+      this.promptLoader.get('log.alias_enrich.ngram.type', {
+        ENTITY_TYPE: entityType,
+        ALIASES: String(aliasAdded),
+        SUBTERMS: String(totalSubterms)
+      })
+    );
   }
 
   private buildIndex(map: Record<string, string[]>): Set<string> {

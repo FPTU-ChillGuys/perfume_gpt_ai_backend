@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   EntityDictionary,
   EntityType
 } from 'src/domain/types/dictionary.types';
+import { PromptLoaderService } from 'src/infrastructure/domain/utils/prompt-loader.service';
 
 /**
  * Seed aliases manually curated for perfume domain.
@@ -93,21 +94,60 @@ const ENRICHMENT_RULES: Partial<Record<EntityType, Record<string, string[]>>> =
 
 @Injectable()
 export class AliasPatternsHelper {
+  private readonly logger = new Logger(AliasPatternsHelper.name);
+
+  constructor(private readonly promptLoader: PromptLoaderService) {}
+
   enrichAll(dict: EntityDictionary): void {
     this.enrichSeedAliases(dict);
     this.enrichBrandShortNames(dict);
     this.enrichDiacriticsVariants(dict);
     this.enrichProductBrandLink(dict);
+
+    let totalAliases = 0;
+    let typeCount = 0;
+    for (const map of Object.values(dict)) {
+      for (const aliases of Object.values(map)) {
+        totalAliases += aliases.length;
+        typeCount++;
+      }
+    }
+    this.logger.log(
+      this.promptLoader.get('log.alias_enrich.pattern.summary', {
+        TOTAL: String(totalAliases),
+        TYPES: String(typeCount)
+      })
+    );
   }
 
   private enrichSeedAliases(dict: EntityDictionary): void {
     for (const [entityType, rules] of Object.entries(ENRICHMENT_RULES)) {
       const map = dict[entityType as EntityType];
       if (!map) continue;
+      let count = 0;
       for (const [canonical, aliases] of Object.entries(rules ?? {})) {
         if (!map[canonical]) continue;
+        const before = map[canonical].length;
         map[canonical] = this.mergeAliases(map[canonical], aliases);
+        const added = map[canonical].length - before;
+        count += added;
+        if (added > 0) {
+          this.logger.debug(
+            this.promptLoader.get('log.alias_enrich.pattern.detail', {
+              ENTITY_TYPE: entityType,
+              CANONICAL: canonical,
+              COUNT: String(added),
+              LIST: aliases.join(', ')
+            })
+          );
+        }
       }
+      this.logger.log(
+        this.promptLoader.get('log.alias_enrich.pattern.seed', {
+          ENTITY_TYPE: entityType,
+          COUNT: String(count)
+        })
+      );
     }
   }
 
@@ -115,18 +155,57 @@ export class AliasPatternsHelper {
     const brandMap = dict.brand;
     if (!brandMap) return;
 
+    let count = 0;
     for (const canonical of Object.keys(brandMap)) {
       const aliases = this.extractShortNames(canonical);
+      const before = brandMap[canonical].length;
       brandMap[canonical] = this.mergeAliases(brandMap[canonical], aliases);
+      const added = brandMap[canonical].length - before;
+      count += added;
+      if (added > 0) {
+        this.logger.debug(
+          this.promptLoader.get('log.alias_enrich.pattern.detail', {
+            ENTITY_TYPE: 'brand',
+            CANONICAL: canonical,
+            COUNT: String(added),
+            LIST: aliases.join(', ')
+          })
+        );
+      }
     }
+    this.logger.log(
+      this.promptLoader.get('log.alias_enrich.pattern.short_name', {
+        COUNT: String(count)
+      })
+    );
   }
 
   private enrichDiacriticsVariants(dict: EntityDictionary): void {
-    for (const map of Object.values(dict)) {
+    for (const [entityType, map] of Object.entries(dict)) {
+      let count = 0;
       for (const [canonical, aliases] of Object.entries(map)) {
+        const before = aliases.length;
         const variants = aliases.flatMap((a) => this.asciiVariant(a));
         map[canonical] = this.mergeAliases(aliases, variants);
+        const added = map[canonical].length - before;
+        count += added;
+        if (added > 0) {
+          this.logger.debug(
+            this.promptLoader.get('log.alias_enrich.pattern.detail', {
+              ENTITY_TYPE: entityType,
+              CANONICAL: canonical,
+              COUNT: String(added),
+              LIST: variants.join(', ')
+            })
+          );
+        }
       }
+      this.logger.log(
+        this.promptLoader.get('log.alias_enrich.pattern.diacritics', {
+          ENTITY_TYPE: entityType,
+          COUNT: String(count)
+        })
+      );
     }
   }
 
@@ -135,6 +214,7 @@ export class AliasPatternsHelper {
     const productMap = dict.product_name;
     if (!brandMap || !productMap) return;
 
+    let count = 0;
     const brandCanonicals = Object.keys(brandMap);
     for (const [productCanonical, aliases] of Object.entries(productMap)) {
       const linkedBrands = brandCanonicals.filter(
@@ -145,8 +225,16 @@ export class AliasPatternsHelper {
         b,
         ...(brandMap[b] ?? [])
       ]);
+      const before = aliases.length;
       productMap[productCanonical] = this.mergeAliases(aliases, brandAliases);
+      const added = productMap[productCanonical].length - before;
+      count += added;
     }
+    this.logger.log(
+      this.promptLoader.get('log.alias_enrich.pattern.product_brand', {
+        COUNT: String(count)
+      })
+    );
   }
 
   private extractShortNames(canonical: string): string[] {

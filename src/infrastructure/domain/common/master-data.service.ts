@@ -1,53 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaMasterDataRepository } from 'src/infrastructure/domain/repositories/prisma-master-data.repository';
 import { JaroWinklerDistance } from 'natural';
 
 @Injectable()
 export class MasterDataService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly masterDataRepo: PrismaMasterDataRepository) {}
 
   async getNormalizationContextData() {
     const [notes, families, attributes, products, variants] = await Promise.all(
       [
-        this.prisma.scentNotes.findMany({
-          select: { Name: true },
-          orderBy: { Name: 'asc' },
-          take: 300
-        }),
-        this.prisma.olfactoryFamilies.findMany({
-          select: { Name: true },
-          orderBy: { Name: 'asc' },
-          take: 200
-        }),
-        this.prisma.attributes.findMany({
-          include: {
-            AttributeValues: true
-          }
-        }),
-        this.prisma.products.findMany({
-          where: { IsDeleted: false },
-          select: {
-            Id: true,
-            Name: true,
-            Origin: true,
-            Gender: true,
-            ReleaseYear: true,
-            Brands: { select: { Name: true } },
-            Categories: { select: { Name: true } }
-          },
-          orderBy: { UpdatedAt: 'desc' },
-          take: 300
-        }),
-        this.prisma.productVariants.findMany({
-          where: { IsDeleted: false },
-          select: {
-            Type: true,
-            Longevity: true,
-            Sillage: true,
-            Concentrations: { select: { Name: true } }
-          },
-          take: 600
-        })
+        this.masterDataRepo.getScentNotesForContext(300),
+        this.masterDataRepo.getOlfactoryFamiliesForContext(200),
+        this.masterDataRepo.getAllAttributesWithValues(),
+        this.masterDataRepo.getProductsForContext(300),
+        this.masterDataRepo.getProductVariantsForContext(600)
       ]
     );
 
@@ -134,63 +100,34 @@ export class MasterDataService {
   }
 
   async searchBrands(keyword: string) {
-    return this.prisma.brands.findMany({
-      where: { Name: { contains: keyword } },
-      take: 10
-    });
+    return this.masterDataRepo.searchBrands(keyword);
   }
 
   async searchCategories(keyword: string) {
-    return this.prisma.categories.findMany({
-      where: { Name: { contains: keyword } },
-      take: 10
-    });
+    return this.masterDataRepo.searchCategories(keyword);
   }
 
   async searchScentNotes(keyword: string) {
-    return this.prisma.scentNotes.findMany({
-      where: { Name: { contains: keyword } },
-      take: 20
-    });
+    return this.masterDataRepo.searchScentNotes(keyword);
   }
 
   async searchOlfactoryFamilies(keyword: string) {
-    return this.prisma.olfactoryFamilies.findMany({
-      where: { Name: { contains: keyword } },
-      take: 10
-    });
+    return this.masterDataRepo.searchOlfactoryFamilies(keyword);
   }
 
   async getAttributesWithValues() {
-    return this.prisma.attributes.findMany({
-      include: {
-        AttributeValues: true
-      }
-    });
+    return this.masterDataRepo.getAllAttributesWithValues();
   }
 
   /**
    * Search for a specific attribute value across all attributes
    */
   async searchAttributeValues(keyword: string) {
-    return this.prisma.attributeValues.findMany({
-      where: { Value: { contains: keyword } },
-      include: {
-        Attributes: true
-      },
-      take: 20
-    });
+    return this.masterDataRepo.searchAttributeValues(keyword);
   }
 
   async searchProducts(keyword: string) {
-    return this.prisma.products.findMany({
-      where: { Name: { contains: keyword } },
-      select: {
-        Id: true,
-        Name: true
-      },
-      take: 10
-    });
+    return this.masterDataRepo.searchProducts(keyword);
   }
 
   /**
@@ -200,9 +137,7 @@ export class MasterDataService {
   async countProductsByField(keyword: string, type: string): Promise<number> {
     const where = this.buildTypeWhereClause(keyword, type);
     if (!where) return 0;
-    return this.prisma.products.count({
-      where: { IsDeleted: false, ...where }
-    });
+    return this.masterDataRepo.countProducts(where);
   }
 
   /**
@@ -250,37 +185,29 @@ export class MasterDataService {
 
     switch (type) {
       case 'brand':
-        items = (
-          await this.prisma.brands.findMany({
-            select: { Id: true, Name: true }
-          })
-        ).map((x) => ({ id: x.Id, name: x.Name }));
+        items = (await this.masterDataRepo.getAllBrandsForFuzzy()).map((x) => ({
+          id: x.Id,
+          name: x.Name
+        }));
         break;
       case 'category':
-        items = (
-          await this.prisma.categories.findMany({
-            select: { Id: true, Name: true }
-          })
-        ).map((x) => ({ id: x.Id, name: x.Name }));
+        items = (await this.masterDataRepo.getAllCategoriesForFuzzy()).map(
+          (x) => ({ id: x.Id, name: x.Name })
+        );
         break;
       case 'note':
-        items = (
-          await this.prisma.scentNotes.findMany({
-            select: { Id: true, Name: true }
-          })
-        ).map((x) => ({ id: x.Id, name: x.Name }));
+        items = (await this.masterDataRepo.getAllScentNotesForFuzzy()).map(
+          (x) => ({ id: x.Id, name: x.Name })
+        );
         break;
       case 'family':
         items = (
-          await this.prisma.olfactoryFamilies.findMany({
-            select: { Id: true, Name: true }
-          })
+          await this.masterDataRepo.getAllOlfactoryFamiliesForFuzzy()
         ).map((x) => ({ id: x.Id, name: x.Name }));
         break;
       case 'attribute':
-        const attrValues = await this.prisma.attributeValues.findMany({
-          select: { Id: true, Value: true }
-        });
+        const attrValues =
+          await this.masterDataRepo.getAllAttributeValuesForFuzzy();
         items = attrValues.map((x) => ({ id: x.Id, name: x.Value }));
         break;
     }

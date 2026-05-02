@@ -50,11 +50,21 @@ export class AdminMaintenanceController {
   @ApiOperation({ summary: 'Full rebuild: dictionary + embeddings + BM25' })
   @ApiOkResponse({ description: 'Full rebuild completed successfully' })
   async rebuildAll() {
+    const startTime = Date.now();
     try {
+      this.logger.log('[RebuildAll] Starting full rebuild...');
+
+      this.logger.log('[RebuildAll] Step 1/5: Building dictionary...');
       const snapshot = await this.dictionaryBuilderService.buildDictionary();
+
+      this.logger.log('[RebuildAll] Step 2/5: Persisting snapshot...');
       await this.vocabularySnapshotService.persistSnapshot(
         snapshot,
         'manual-rebuild-all'
+      );
+
+      this.logger.log(
+        '[RebuildAll] Step 3/5: Reloading + hydrating snapshot...'
       );
       const reloadedSnapshot =
         await this.vocabularySnapshotService.loadActiveSnapshot();
@@ -62,15 +72,23 @@ export class AdminMaintenanceController {
         this.dictionaryBuilderService.hydrateSnapshot(reloadedSnapshot);
       }
       await this.nlpEngineService.initializeWithDictionary();
+
+      this.logger.log('[RebuildAll] Step 4/5: Refreshing BM25 view...');
       const bm25Promise = this.vocabBm25SearchService.refreshView();
+
+      this.logger.log('[RebuildAll] Step 5/5: Rebuilding embeddings...');
       const embeddingStats = await this.embeddingService.rebuildAllEmbeddings();
       const bm25Status = await this.catchBm25Status(bm25Promise);
+
+      const elapsed = Date.now() - startTime;
+      this.logger.log(`[RebuildAll] Full rebuild completed in ${elapsed}ms`);
 
       return {
         success: true,
         dictionaryStats: reloadedSnapshot?.stats ?? snapshot.stats,
         embeddingStats,
         bm25Refreshed: bm25Status,
+        elapsedMs: elapsed,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
@@ -87,10 +105,19 @@ export class AdminMaintenanceController {
   @ApiOkResponse({ description: 'Dictionary rebuilt successfully' })
   async rebuildDictionary() {
     try {
+      this.logger.log('[RebuildDictionary] Starting dictionary rebuild...');
+
+      this.logger.log('[RebuildDictionary] Step 1/3: Building dictionary...');
       const snapshot = await this.dictionaryBuilderService.buildDictionary();
+
+      this.logger.log('[RebuildDictionary] Step 2/3: Persisting snapshot...');
       await this.vocabularySnapshotService.persistSnapshot(
         snapshot,
         'manual-rebuild'
+      );
+
+      this.logger.log(
+        '[RebuildDictionary] Step 3/3: Reloading + hydrating snapshot + initializing NLP...'
       );
       const reloadedSnapshot =
         await this.vocabularySnapshotService.loadActiveSnapshot();

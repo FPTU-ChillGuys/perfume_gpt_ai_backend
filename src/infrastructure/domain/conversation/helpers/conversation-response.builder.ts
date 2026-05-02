@@ -61,6 +61,9 @@ export class ConversationResponseBuilder {
       const res = new MessageResponse();
       res.sender = m.sender as Sender;
       res.message = m.message;
+      res.products = null;
+      res.productTemp = null;
+      res.suggestedQuestions = null;
       res.createdAt = new Date();
       return res;
     });

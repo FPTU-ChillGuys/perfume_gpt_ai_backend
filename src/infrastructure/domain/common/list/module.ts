@@ -17,11 +17,10 @@ import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.modul
 import { UserLogAIModule } from 'src/infrastructure/domain/user-log/user-log-ai.module';
 import { UserModule } from 'src/infrastructure/domain/user/user.module';
 import { RecommendationModule } from 'src/infrastructure/domain/recommendation/recommendation.module';
-import { ConversationModule } from "../../conversation/conversation.module";
+import { ConversationModule } from '../../conversation/conversation.module';
 import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
 import { DictionaryModule } from 'src/infrastructure/domain/common/dictionary.module';
 import { HybridSearchModule } from 'src/infrastructure/domain/hybrid-search/hybrid-search.module';
-import { RebuildEmbeddingsModule } from 'src/api/controllers/modules/rebuild-embeddings.module';
 import { SourcingModule } from 'src/infrastructure/domain/sourcing/sourcing.module';
 
 export const modules = [
@@ -48,6 +47,5 @@ export const modules = [
   RestockModule,
   CartModule,
   HybridSearchModule,
-  RebuildEmbeddingsModule,
-  SourcingModule,
+  SourcingModule
 ];

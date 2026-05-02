@@ -4,7 +4,6 @@ import { UnitOfWorkModule } from 'src/infrastructure/domain/common/unit-of-work.
 import { LogTool } from 'src/chatbot/tools/log.tool';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from 'src/application/constant/processor';
-
 @Module({
   imports: [
     UnitOfWorkModule,
@@ -13,5 +12,4 @@ import { QueueName } from 'src/application/constant/processor';
   providers: [UserLogService, LogTool],
   exports: [UserLogService, LogTool]
 })
-export class UserLogModule { }
-
+export class UserLogModule {}

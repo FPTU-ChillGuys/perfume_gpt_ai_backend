@@ -1,7 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { WordTokenizer, JaroWinklerDistance, NGrams } from 'natural';
 import { DictionaryBuilderService } from './dictionary-builder.service';
-import { AgeBucketSnapshot, EntityDictionary, EntityType, ParserRuleSnapshot } from 'src/domain/types/dictionary.types';
+import {
+  AgeBucketSnapshot,
+  EntityDictionary,
+  EntityType,
+  ParserRuleSnapshot,
+  PhraseRuleSnapshot
+} from 'src/domain/types/dictionary.types';
+import { VocabBm25SearchService } from './vocab-bm25.service';
+import { VocabBm25Result } from 'src/application/dtos/response/dictionary/vocab-bm25-result';
 
 type Mapping = { type: EntityType; canonical: string; confidence: number };
 
@@ -27,8 +35,26 @@ type SpecialSignals = {
 };
 
 const GENERIC_FUZZY_TOKENS = new Set([
-  'co', 'huong', 'mui', 'nuoc', 'hoa', 'danh', 'cho', 'tren', 'duoi', 'tuoi', 'va', 'hoac',
-  'nguoi', 'nam', 'nu', 'la', 'o', 'tai', 'gan', 'khoang',
+  'co',
+  'huong',
+  'mui',
+  'nuoc',
+  'hoa',
+  'danh',
+  'cho',
+  'tren',
+  'duoi',
+  'tuoi',
+  'va',
+  'hoac',
+  'nguoi',
+  'nam',
+  'nu',
+  'la',
+  'o',
+  'tai',
+  'gan',
+  'khoang'
 ]);
 
 @Injectable()
@@ -37,12 +63,17 @@ export class NaturalNlpService {
   private readonly tokenizer = new WordTokenizer();
   private isInitialized = false;
 
-  constructor(private readonly dictionaryBuilderService: DictionaryBuilderService) {}
+  constructor(
+    private readonly dictionaryBuilderService: DictionaryBuilderService,
+    @Optional() private readonly vocabBm25SearchService?: VocabBm25SearchService
+  ) {}
 
   async initializeWithDictionary(): Promise<void> {
     const snapshot = this.dictionaryBuilderService.getSnapshot();
     if (!snapshot) {
-      throw new Error('Dictionary not built yet. Call buildDictionary() on DictionaryBuilderService first.');
+      throw new Error(
+        'Dictionary not built yet. Call buildDictionary() on DictionaryBuilderService first.'
+      );
     }
 
     this.isInitialized = true;
@@ -53,9 +84,87 @@ export class NaturalNlpService {
     return this.isInitialized;
   }
 
+  private async findBm25Matches(
+    remainingText: string,
+    matchedValues: Set<string>,
+    reverseMap: Record<
+      string,
+      { type: EntityType; canonical: string; confidence: number }
+    >
+  ): Promise<Array<{ value: string; raw: string; mapping: Mapping }>> {
+    if (!this.vocabBm25SearchService) {
+      return [];
+    }
+
+    try {
+      const tokens = this.tokenizer.tokenize(remainingText);
+      const matches: Array<{ value: string; raw: string; mapping: Mapping }> =
+        [];
+      const seenCanonicals = new Set<string>();
+
+      for (const token of tokens) {
+        if (!token || token.length < 2) continue;
+        if (GENERIC_FUZZY_TOKENS.has(token)) continue;
+        if (reverseMap[token]) continue;
+
+        const results = await this.vocabBm25SearchService.search(token, 3);
+        for (const result of results) {
+          if (
+            matchedValues.has(result.canonical) ||
+            seenCanonicals.has(result.canonical)
+          ) {
+            continue;
+          }
+
+          const validEntityTypes: EntityType[] = [
+            'brand',
+            'category',
+            'concentration',
+            'olfactory_family',
+            'scent_note',
+            'attribute_category',
+            'attribute_value',
+            'product_name',
+            'gender',
+            'origin',
+            'variant_type'
+          ];
+
+          if (!validEntityTypes.includes(result.entityType)) {
+            continue;
+          }
+
+          seenCanonicals.add(result.canonical);
+          matches.push({
+            value: result.canonical,
+            raw: result.canonical,
+            mapping: {
+              type: result.entityType,
+              canonical: result.canonical,
+              confidence: Math.min(0.98, 0.9 + result.score)
+            }
+          });
+
+          if (seenCanonicals.size >= 5) break;
+        }
+
+        if (seenCanonicals.size >= 5) break;
+      }
+
+      return matches;
+    } catch (error) {
+      this.logger.warn(
+        `[NaturalNLP] BM25 search failed: ${(error as Error).message}`
+      );
+      return [];
+    }
+  }
+
   extractEntities(text: string): string[] {
     if (!this.isInitialized) {
-      throw new Error('NaturalNlpService not initialized. Call initializeWithDictionary() first.');
+      throw new Error(
+        'NaturalNlpService not initialized. Call initializeWithDictionary() first.'
+      );
     }
 
     const snapshot = this.dictionaryBuilderService.getSnapshot();
@@ -79,7 +188,7 @@ export class NaturalNlpService {
     return Array.from(found);
   }
 
-  parseAndNormalize(text: string): Record<string, any> {
+  async parseAndNormalize(text: string): Promise<Record<string, any>> {
     if (!this.isInitialized) {
       throw new Error('NaturalNlpService not initialized');
     }
@@ -91,7 +200,11 @@ export class NaturalNlpService {
 
     const normalizedText = this.normalizeText(text);
     const normalizedTextWithDiacritics = this.normalizeTextKeepDiacritics(text);
-    const signals = this.extractSpecialSignals(normalizedText, normalizedTextWithDiacritics);
+    const signals = this.extractSpecialSignals(
+      normalizedText,
+      normalizedTextWithDiacritics,
+      snapshot.phraseRules ?? []
+    );
 
     const rawEntities = this.extractEntities(normalizedText);
 
@@ -101,7 +214,7 @@ export class NaturalNlpService {
       rawEntities,
       signals,
       normalized: {},
-      byType: {},
+      byType: {}
     };
 
     const reverseMap = this.buildReverseMap(snapshot.entityDictionary);
@@ -115,7 +228,10 @@ export class NaturalNlpService {
       }
     }
 
-    const fallbackMatches = this.findFallbackMatches(normalizedText, snapshot.entityDictionary);
+    const fallbackMatches = this.findFallbackMatches(
+      normalizedText,
+      snapshot.entityDictionary
+    );
     for (const match of fallbackMatches) {
       if (!matchedValues.has(match.value)) {
         matchedValues.add(match.value);
@@ -125,10 +241,26 @@ export class NaturalNlpService {
 
     const remainingText = this.removeMatchedTermsFromText(
       normalizedText,
-      Array.from(matchedValues).concat(signals.consumedTerms),
+      Array.from(matchedValues).concat(signals.consumedTerms)
     );
 
-    const fuzzyMatches = this.findFuzzyNgramMatches(remainingText, reverseMap, 0.92);
+    const bm25Matches = await this.findBm25Matches(
+      remainingText,
+      matchedValues,
+      reverseMap
+    );
+    for (const match of bm25Matches) {
+      if (!matchedValues.has(match.value)) {
+        matchedValues.add(match.value);
+        this.appendNormalizedResult(result, match.mapping, match.raw);
+      }
+    }
+
+    const fuzzyMatches = this.findFuzzyNgramMatches(
+      remainingText,
+      reverseMap,
+      0.92
+    );
     for (const match of fuzzyMatches) {
       if (!matchedValues.has(match.value)) {
         matchedValues.add(match.value);
@@ -138,7 +270,7 @@ export class NaturalNlpService {
 
     const productNameMatches = this.findProductNameSubsetMatches(
       remainingText,
-      snapshot.entityDictionary.product_name ?? {},
+      snapshot.entityDictionary.product_name ?? {}
     );
     for (const match of productNameMatches) {
       if (!matchedValues.has(match.value)) {
@@ -153,7 +285,7 @@ export class NaturalNlpService {
       signals.ageRange,
       normalizedText,
       snapshot.entityDictionary,
-      snapshot.ageBuckets ?? [],
+      snapshot.ageBuckets ?? []
     );
 
     for (const ageMatch of ageAttributeMatches) {
@@ -173,7 +305,7 @@ export class NaturalNlpService {
   private pruneAgeAttributeNoise(
     result: Record<string, any>,
     signals: SpecialSignals,
-    parserRules: ParserRuleSnapshot[],
+    parserRules: ParserRuleSnapshot[]
   ): void {
     const hasPriceSignal = !!signals.priceRange;
     const hasAgeSignal = !!signals.ageRange;
@@ -185,10 +317,13 @@ export class NaturalNlpService {
       ? result.normalized.attribute_value
       : [];
 
-    const filteredNormalized = normalizedAttr.filter((entry: { canonical?: string }) => {
-      const canonical = typeof entry?.canonical === 'string' ? entry.canonical : '';
-      return !this.looksLikeAgeAttributeValue(canonical, parserRules);
-    });
+    const filteredNormalized = normalizedAttr.filter(
+      (entry: { canonical?: string }) => {
+        const canonical =
+          typeof entry?.canonical === 'string' ? entry.canonical : '';
+        return !this.looksLikeAgeAttributeValue(canonical, parserRules);
+      }
+    );
 
     if (filteredNormalized.length > 0) {
       result.normalized.attribute_value = filteredNormalized;
@@ -200,7 +335,8 @@ export class NaturalNlpService {
       ? result.byType.attribute_value
       : [];
     const filteredByType = byTypeAttr.filter(
-      (canonical: string) => !this.looksLikeAgeAttributeValue(canonical, parserRules),
+      (canonical: string) =>
+        !this.looksLikeAgeAttributeValue(canonical, parserRules)
     );
 
     if (filteredByType.length > 0) {
@@ -210,18 +346,25 @@ export class NaturalNlpService {
     }
   }
 
-  private looksLikeAgeAttributeValue(value: string, parserRules: ParserRuleSnapshot[]): boolean {
+  private looksLikeAgeAttributeValue(
+    value: string,
+    parserRules: ParserRuleSnapshot[]
+  ): boolean {
     const normalized = this.normalizeTextForSignals(value);
     if (!normalized) {
       return false;
     }
 
     const ageRules = parserRules
-      .filter(rule => rule.ruleGroup === 'age_attribute_value')
+      .filter((rule) => rule.ruleGroup === 'age_attribute_value')
       .sort((a, b) => b.priority - a.priority);
 
     if (ageRules.length === 0) {
-      if (/(tuoi|thanh nien|nguoi lon|trung nien|thieu nien|teen)/.test(normalized)) {
+      if (
+        /(tuoi|thanh nien|nguoi lon|trung nien|thieu nien|teen)/.test(
+          normalized
+        )
+      ) {
         return true;
       }
       if (/(duoi|tren|tu)\s*\d{1,3}/.test(normalized)) {
@@ -255,16 +398,22 @@ export class NaturalNlpService {
   }
 
   private buildReverseMap(
-    entityDictionary: EntityDictionary,
-  ): Record<string, { type: EntityType; canonical: string; confidence: number }> {
-    const map: Record<string, { type: EntityType; canonical: string; confidence: number }> = {};
+    entityDictionary: EntityDictionary
+  ): Record<
+    string,
+    { type: EntityType; canonical: string; confidence: number }
+  > {
+    const map: Record<
+      string,
+      { type: EntityType; canonical: string; confidence: number }
+    > = {};
 
     for (const [entityType, canonicalMap] of Object.entries(entityDictionary)) {
       for (const [canonical, synonyms] of Object.entries(canonicalMap)) {
         map[canonical] = {
           type: entityType as EntityType,
           canonical,
-          confidence: 1.0,
+          confidence: 1.0
         };
 
         for (const syn of synonyms) {
@@ -272,7 +421,7 @@ export class NaturalNlpService {
             map[syn] = {
               type: entityType as EntityType,
               canonical,
-              confidence: 0.95,
+              confidence: 0.95
             };
           }
         }
@@ -284,7 +433,7 @@ export class NaturalNlpService {
 
   private findFallbackMatches(
     normalizedText: string,
-    entityDictionary: EntityDictionary,
+    entityDictionary: EntityDictionary
   ): Array<{ value: string; raw: string; mapping: Mapping }> {
     const matches: Array<{ value: string; raw: string; mapping: Mapping }> = [];
 
@@ -305,8 +454,8 @@ export class NaturalNlpService {
               mapping: {
                 type: entityType as EntityType,
                 canonical,
-                confidence: normalizedTerm === canonical ? 1.0 : 0.9,
-              },
+                confidence: normalizedTerm === canonical ? 1.0 : 0.9
+              }
             });
           }
         }
@@ -318,7 +467,7 @@ export class NaturalNlpService {
 
   private findProductNameSubsetMatches(
     remainingText: string,
-    productNameMap: Record<string, string[]>,
+    productNameMap: Record<string, string[]>
   ): Array<{ value: string; raw: string; mapping: Mapping }> {
     const matches: Array<{ value: string; raw: string; mapping: Mapping }> = [];
     const queryTokens = this.tokenizeForSubsetMatching(remainingText);
@@ -337,7 +486,9 @@ export class NaturalNlpService {
           continue;
         }
 
-        const common = queryTokens.filter(token => termTokens.includes(token)).length;
+        const common = queryTokens.filter((token) =>
+          termTokens.includes(token)
+        ).length;
         const coverage = common / queryTokens.length;
         if (coverage > bestCoverage) {
           bestCoverage = coverage;
@@ -351,8 +502,8 @@ export class NaturalNlpService {
           mapping: {
             type: 'product_name',
             canonical,
-            confidence: Math.min(0.98, 0.9 + bestCoverage * 0.08),
-          },
+            confidence: Math.min(0.98, 0.9 + bestCoverage * 0.08)
+          }
         });
       }
     }
@@ -364,14 +515,17 @@ export class NaturalNlpService {
   private tokenizeForSubsetMatching(text: string): string[] {
     return this.normalizeText(text)
       .split(/\s+/)
-      .filter(token => token.length >= 3)
-      .filter(token => !GENERIC_FUZZY_TOKENS.has(token));
+      .filter((token) => token.length >= 3)
+      .filter((token) => !GENERIC_FUZZY_TOKENS.has(token));
   }
 
   private findFuzzyNgramMatches(
     remainingText: string,
-    reverseMap: Record<string, { type: EntityType; canonical: string; confidence: number }>,
-    threshold: number,
+    reverseMap: Record<
+      string,
+      { type: EntityType; canonical: string; confidence: number }
+    >,
+    threshold: number
   ): Array<{ value: string; raw: string; mapping: Mapping }> {
     const matches: Array<{ value: string; raw: string; mapping: Mapping }> = [];
     const candidates = Object.keys(reverseMap);
@@ -381,7 +535,7 @@ export class NaturalNlpService {
     if (tokens.length === 0) return matches;
 
     for (let size = Math.min(4, tokens.length); size >= 1; size--) {
-      const grams = NGrams.ngrams(tokens, size).map(g => g.join(' '));
+      const grams = NGrams.ngrams(tokens, size).map((g) => g.join(' '));
 
       for (const gram of grams) {
         if (!gram) continue;
@@ -389,7 +543,11 @@ export class NaturalNlpService {
         const normalizedGram = this.normalizeText(gram);
         if (!normalizedGram) continue;
 
-        if (size === 1 && (normalizedGram.length <= 2 || GENERIC_FUZZY_TOKENS.has(normalizedGram))) {
+        if (
+          size === 1 &&
+          (normalizedGram.length <= 2 ||
+            GENERIC_FUZZY_TOKENS.has(normalizedGram))
+        ) {
           continue;
         }
 
@@ -412,8 +570,11 @@ export class NaturalNlpService {
             mapping: {
               type: mapping.type,
               canonical: mapping.canonical,
-              confidence: Math.min(0.98, Math.max(mapping.confidence, best.score)),
-            },
+              confidence: Math.min(
+                0.98,
+                Math.max(mapping.confidence, best.score)
+              )
+            }
           });
         }
       }
@@ -434,38 +595,52 @@ export class NaturalNlpService {
     return updated.replace(/\s+/g, ' ').trim();
   }
 
-  private appendNormalizedResult(result: Record<string, any>, mapping: Mapping, raw: string) {
+  private appendNormalizedResult(
+    result: Record<string, any>,
+    mapping: Mapping,
+    raw: string
+  ) {
     if (!result.normalized[mapping.type]) {
       result.normalized[mapping.type] = [];
     }
 
-    const existed = result.normalized[mapping.type].some((x: { canonical: string }) => x.canonical === mapping.canonical);
+    const existed = result.normalized[mapping.type].some(
+      (x: { canonical: string }) => x.canonical === mapping.canonical
+    );
     if (existed) return;
 
     result.normalized[mapping.type].push({
       raw,
       canonical: mapping.canonical,
       confidence: mapping.confidence,
-      type: mapping.type,
+      type: mapping.type
     });
 
     if (!result.byType[mapping.type]) {
       result.byType[mapping.type] = [];
     }
-    result.byType[mapping.type].push(mapping.canonical);
+    if (!result.byType[mapping.type].includes(mapping.canonical)) {
+      result.byType[mapping.type].push(mapping.canonical);
+    }
   }
 
-  private buildLogicHints(byType: Record<string, string[]>, signals: SpecialSignals) {
+  private buildLogicHints(
+    byType: Record<string, string[]>,
+    signals: SpecialSignals
+  ) {
     const andGroups = Object.entries(byType)
       .filter(([, values]) => values.length > 0)
-      .map(([entityType, values]) => ({ entityType, values }));
+      .map(([entityType, values]) => ({
+        entityType,
+        values: Array.from(new Set(values))
+      }));
 
     return {
       operators: signals.operators,
       andGroups,
       orGroups: [],
       priceRange: signals.priceRange,
-      ageRange: signals.ageRange,
+      ageRange: signals.ageRange
     };
   }
 
@@ -473,30 +648,37 @@ export class NaturalNlpService {
     ageRange: AgeRangeSignal | null,
     normalizedText: string,
     entityDictionary: EntityDictionary,
-    ageBuckets: AgeBucketSnapshot[],
+    ageBuckets: AgeBucketSnapshot[]
   ): Array<{ raw: string; mapping: Mapping }> {
     const results: Array<{ raw: string; mapping: Mapping }> = [];
     const attrValues = entityDictionary.attribute_value ?? {};
 
-    const matchingBuckets = this.findMatchingAgeBuckets(normalizedText, ageRange, ageBuckets);
+    const matchingBuckets = this.findMatchingAgeBuckets(
+      normalizedText,
+      ageRange,
+      ageBuckets
+    );
     if (matchingBuckets.length === 0) {
       return results;
     }
 
     for (const bucket of matchingBuckets) {
       const bucketLabel = this.normalizeText(bucket.label);
-      const canonical = this.findAttributeValueCanonicalByLabel(bucketLabel, attrValues);
+      const canonical = this.findAttributeValueCanonicalByLabel(
+        bucketLabel,
+        attrValues
+      );
       if (!canonical) {
         continue;
       }
 
-      if (results.some(entry => entry.mapping.canonical === canonical)) {
+      if (results.some((entry) => entry.mapping.canonical === canonical)) {
         continue;
       }
 
       results.push({
         raw: bucket.label,
-        mapping: { type: 'attribute_value', canonical, confidence: 0.95 },
+        mapping: { type: 'attribute_value', canonical, confidence: 0.95 }
       });
     }
 
@@ -506,26 +688,31 @@ export class NaturalNlpService {
   private findMatchingAgeBuckets(
     normalizedText: string,
     ageRange: AgeRangeSignal | null,
-    ageBuckets: AgeBucketSnapshot[],
+    ageBuckets: AgeBucketSnapshot[]
   ): AgeBucketSnapshot[] {
-    const runtimeBuckets = ageBuckets.length > 0
-      ? ageBuckets
-      : this.deriveAgeBucketsFromAttributeValues(this.dictionaryBuilderService.getSnapshot()?.entityDictionary);
+    const runtimeBuckets =
+      ageBuckets.length > 0
+        ? ageBuckets
+        : this.deriveAgeBucketsFromAttributeValues(
+            this.dictionaryBuilderService.getSnapshot()?.entityDictionary
+          );
 
     if (!runtimeBuckets.length) {
       return [];
     }
 
     const normalizedBuckets = runtimeBuckets
-      .filter(bucket => bucket.label && bucket.label.trim().length > 0)
-      .map(bucket => ({
+      .filter((bucket) => bucket.label && bucket.label.trim().length > 0)
+      .map((bucket) => ({
         bucket,
-        normalizedLabel: this.normalizeText(bucket.label),
+        normalizedLabel: this.normalizeText(bucket.label)
       }))
-      .filter(entry => entry.normalizedLabel.length > 0);
+      .filter((entry) => entry.normalizedLabel.length > 0);
 
     const directLabelMatches = normalizedBuckets
-      .filter(({ normalizedLabel }) => this.containsWholePhrase(normalizedText, normalizedLabel))
+      .filter(({ normalizedLabel }) =>
+        this.containsWholePhrase(normalizedText, normalizedLabel)
+      )
       .map(({ bucket }) => bucket);
 
     if (directLabelMatches.length > 0) {
@@ -543,7 +730,9 @@ export class NaturalNlpService {
     return this.sortAgeBuckets(rangeMatches);
   }
 
-  private deriveAgeBucketsFromAttributeValues(entityDictionary?: EntityDictionary): AgeBucketSnapshot[] {
+  private deriveAgeBucketsFromAttributeValues(
+    entityDictionary?: EntityDictionary
+  ): AgeBucketSnapshot[] {
     const attrValues = entityDictionary?.attribute_value ?? {};
     const buckets: AgeBucketSnapshot[] = [];
 
@@ -558,7 +747,7 @@ export class NaturalNlpService {
           label: canonical,
           minAge,
           maxAge,
-          priority: Math.max(1, maxAge - minAge),
+          priority: Math.max(1, maxAge - minAge)
         });
         continue;
       }
@@ -566,11 +755,21 @@ export class NaturalNlpService {
       if (digits.length === 1) {
         const age = digits[0];
         if (/duoi|nho hon/.test(normalized)) {
-          buckets.push({ label: canonical, minAge: 0, maxAge: age, priority: age });
+          buckets.push({
+            label: canonical,
+            minAge: 0,
+            maxAge: age,
+            priority: age
+          });
           continue;
         }
         if (/tren|hon|tu\s+\d+/.test(normalized)) {
-          buckets.push({ label: canonical, minAge: age, maxAge: 150, priority: age });
+          buckets.push({
+            label: canonical,
+            minAge: age,
+            maxAge: 150,
+            priority: age
+          });
         }
       }
     }
@@ -578,9 +777,14 @@ export class NaturalNlpService {
     return buckets;
   }
 
-  private doesAgeRangeOverlapBucket(ageRange: AgeRangeSignal, bucket: AgeBucketSnapshot): boolean {
+  private doesAgeRangeOverlapBucket(
+    ageRange: AgeRangeSignal,
+    bucket: AgeBucketSnapshot
+  ): boolean {
     if (ageRange.exactAge !== undefined) {
-      return ageRange.exactAge >= bucket.minAge && ageRange.exactAge <= bucket.maxAge;
+      return (
+        ageRange.exactAge >= bucket.minAge && ageRange.exactAge <= bucket.maxAge
+      );
     }
 
     const min = ageRange.minAge ?? Number.NEGATIVE_INFINITY;
@@ -604,14 +808,16 @@ export class NaturalNlpService {
 
   private findAttributeValueCanonicalByLabel(
     bucketLabel: string,
-    attributeValues: Record<string, string[]>,
+    attributeValues: Record<string, string[]>
   ): string | null {
     for (const [canonical, synonyms] of Object.entries(attributeValues)) {
       if (this.normalizeText(canonical) === bucketLabel) {
         return canonical;
       }
 
-      if (synonyms.some(synonym => this.normalizeText(synonym) === bucketLabel)) {
+      if (
+        synonyms.some((synonym) => this.normalizeText(synonym) === bucketLabel)
+      ) {
         return canonical;
       }
     }
@@ -625,10 +831,16 @@ export class NaturalNlpService {
     return regex.test(text);
   }
 
-  private extractSpecialSignals(normalizedText: string, normalizedTextWithDiacritics?: string): SpecialSignals {
+  private extractSpecialSignals(
+    normalizedText: string,
+    normalizedTextWithDiacritics?: string,
+    phraseRules: PhraseRuleSnapshot[] = []
+  ): SpecialSignals {
     const operators: Array<'and' | 'or'> = [];
     const consumedTerms: string[] = [];
-    const signalText = this.normalizeTextForSignals(normalizedTextWithDiacritics ?? normalizedText);
+    const signalText = this.normalizeTextForSignals(
+      normalizedTextWithDiacritics ?? normalizedText
+    );
 
     const tokens = normalizedText.split(/\s+/);
     for (const token of tokens) {
@@ -652,7 +864,10 @@ export class NaturalNlpService {
       consumedTerms.push('tuoi');
     }
 
-    const noisyPhrases = this.extractNoisyPhrases(normalizedTextWithDiacritics ?? normalizedText);
+    const noisyPhrases = this.extractNoisyPhrases(
+      normalizedTextWithDiacritics ?? normalizedText,
+      phraseRules
+    );
     for (const phrase of noisyPhrases) {
       consumedTerms.push(this.normalizeText(phrase));
     }
@@ -661,23 +876,42 @@ export class NaturalNlpService {
       operators,
       priceRange,
       ageRange,
-      consumedTerms: Array.from(new Set(consumedTerms)),
+      consumedTerms: Array.from(new Set(consumedTerms))
     };
   }
 
-  private extractNoisyPhrases(normalizedTextWithDiacritics: string): string[] {
+  private extractNoisyPhrases(
+    normalizedTextWithDiacritics: string,
+    phraseRules: PhraseRuleSnapshot[] = []
+  ): string[] {
     if (!normalizedTextWithDiacritics) return [];
+
+    if (phraseRules.length > 0) {
+      const found: string[] = [];
+      for (const rule of phraseRules) {
+        if (rule.ruleType !== 'consume') continue;
+        const escaped = rule.normalizedPhrase.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          '\\$&'
+        );
+        const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+        if (regex.test(normalizedTextWithDiacritics)) {
+          found.push(rule.normalizedPhrase);
+        }
+      }
+      return found;
+    }
 
     const phraseGroups: Array<{ canonical: string; variants: string[] }> = [
       { canonical: 'co huong', variants: ['co huong', 'có hương'] },
       { canonical: 'mui huong', variants: ['mui huong', 'mùi hương'] },
       { canonical: 'nuoc hoa', variants: ['nuoc hoa', 'nước hoa'] },
-      { canonical: 'danh cho', variants: ['danh cho', 'dành cho'] },
+      { canonical: 'danh cho', variants: ['danh cho', 'dành cho'] }
     ];
 
     const found: string[] = [];
     for (const group of phraseGroups) {
-      const hit = group.variants.some(variant => {
+      const hit = group.variants.some((variant) => {
         const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`\\b${escaped}\\b`, 'i');
         return regex.test(normalizedTextWithDiacritics);
@@ -691,15 +925,25 @@ export class NaturalNlpService {
     return found;
   }
 
-  private extractPriceRangeSignal(normalizedText: string): PriceRangeSignal | null {
+  private extractPriceRangeSignal(
+    normalizedText: string
+  ): PriceRangeSignal | null {
     if (/tuoi/.test(normalizedText)) {
       return null;
     }
 
-    const above = normalizedText.match(/(?:tren|hon)\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)\b/i);
-    const below = normalizedText.match(/(?:duoi|it hon|nho hon)\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)\b/i);
-    const approx = normalizedText.match(/(?:xap xi|gan gan|khoang|gan)\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)\b/i);
-    const between = normalizedText.match(/tu\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)?\s+den\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)?\b/i);
+    const above = normalizedText.match(
+      /(?:tren|hon)\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)\b/i
+    );
+    const below = normalizedText.match(
+      /(?:duoi|it hon|nho hon)\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)\b/i
+    );
+    const approx = normalizedText.match(
+      /(?:xap xi|gan gan|khoang|gan)\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)\b/i
+    );
+    const between = normalizedText.match(
+      /tu\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)?\s+den\s+(\d+(?:[.,]\d+)?)\s*(trieu|nghin|ngan|k|m|vnd|dong)?\b/i
+    );
 
     if (between) {
       const leftUnit = between[2] || between[4] || 'vnd';
@@ -709,7 +953,7 @@ export class NaturalNlpService {
       return {
         minPriceVnd: Math.min(left, right),
         maxPriceVnd: Math.max(left, right),
-        confidence: 0.95,
+        confidence: 0.95
       };
     }
 
@@ -739,14 +983,17 @@ export class NaturalNlpService {
     if (!unit) return Math.round(n);
     const u = unit.toLowerCase();
     if (u === 'm' || u === 'trieu') return Math.round(n * 1_000_000);
-    if (u === 'k' || u === 'nghin' || u === 'ngan') return Math.round(n * 1_000);
+    if (u === 'k' || u === 'nghin' || u === 'ngan')
+      return Math.round(n * 1_000);
     return Math.round(n);
   }
 
   private extractAgeRangeSignal(normalizedText: string): AgeRangeSignal | null {
     const exact = normalizedText.match(/\b(\d{1,2})\s*tuoi\b/i);
     const min = normalizedText.match(/(?:tren|tu\s+)(\d{1,2})\s*tuoi\b/i);
-    const max = normalizedText.match(/(?:duoi|nho\s+hon)\s*(\d{1,2})\s*tuoi\b/i);
+    const max = normalizedText.match(
+      /(?:duoi|nho\s+hon)\s*(\d{1,2})\s*tuoi\b/i
+    );
 
     if (min?.[1]) {
       return { minAge: Number(min[1]), confidence: 0.92 };

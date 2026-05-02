@@ -7,7 +7,7 @@ import { SurveyQuestion } from 'src/domain/entities/survey-question.entity';
 @Injectable()
 export class SurveyQuestionAnswerRepository extends SqlEntityRepository<SurveyQuestionAnswer> {
   async createQuesAns(
-    surveyQuestionAnswer: SurveyQuestionAnswer,
+    surveyQuestionAnswer: SurveyQuestionAnswer
   ): Promise<SurveyQuestionAnswer> {
     const orm = this.getEntityManager();
     orm.persist(surveyQuestionAnswer);

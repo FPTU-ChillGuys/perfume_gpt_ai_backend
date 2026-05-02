@@ -11,8 +11,18 @@ import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-a
 import { ProfileModule } from 'src/infrastructure/domain/profile/profile.module';
 
 @Module({
-  imports: [AIModule, AdminInstructionModule, UserModule, EmailModule, OrderModule, ProductModule, UserLogModule, AIAcceptanceModule, ProfileModule],
+  imports: [
+    AIModule,
+    AdminInstructionModule,
+    UserModule,
+    EmailModule,
+    OrderModule,
+    ProductModule,
+    UserLogModule,
+    AIAcceptanceModule,
+    ProfileModule
+  ],
   providers: [RecommendationService],
   exports: [RecommendationService]
 })
-export class RecommendationModule { }
+export class RecommendationModule {}

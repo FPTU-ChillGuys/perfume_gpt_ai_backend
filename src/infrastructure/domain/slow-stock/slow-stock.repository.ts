@@ -10,9 +10,9 @@ export class SlowStockRepository {
     Prisma.StocksGetPayload<{
       include: {
         ProductVariants: {
-          include: { Products: true; Concentrations: true }
-        }
-      }
+          include: { Products: true; Concentrations: true };
+        };
+      };
     }>[]
   > {
     return this.prisma.stocks.findMany({

@@ -3,15 +3,12 @@
  * Tập trung export tất cả các prompt từ một nơi
  */
 
-// System prompts
+// System prompts (business prompts kept as constants; technical prompts loaded from i18n)
 export {
   SYSTEM_PROMPT,
-  PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
   CONVERSATION_ANALYSIS_SYSTEM_PROMPT,
-  INTENT_ONLY_ANALYSIS_SYSTEM_PROMPT,
-  SURVEY_ANALYSIS_SYSTEM_PROMPT,
   TREND_ANALYSIS_SYSTEM_PROMPT,
-  STAFF_CONSULTATION_SYSTEM_PROMPT,
+  STAFF_CONSULTATION_SYSTEM_PROMPT
 } from './system.prompt';
 
 // Controller prompts
@@ -54,6 +51,10 @@ export {
   INSTRUCTION_TYPE_RESTOCK,
   INSTRUCTION_TYPE_SLOW_STOCK,
   INSTRUCTION_TYPE_STAFF_CONSULTATION,
+  INSTRUCTION_TYPE_SEARCH_EXTRACTION,
   ALL_INSTRUCTION_TYPES
 } from './admin-instruction-types';
 export type { InstructionDomainType } from './admin-instruction-types';
+
+// Survey answer analysis prompt
+export { SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT } from './survey-question.analysis.system';

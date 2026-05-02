@@ -45,7 +45,10 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
     variantName?: string,
     extraMetadata?: Record<string, unknown>
   ): Promise<string> {
-    const contentText = [productName, variantName].filter(Boolean).join(' ').trim();
+    const contentText = [productName, variantName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
 
     return this.createEventLog({
       userId,
@@ -98,30 +101,26 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
 
     const eventLogs = surveyQuesAnsDetails
       .filter((detail) => !existingDetailIds.has(detail.id))
-      .map(
-        (detail) => {
-          const answerPayload = {
-            questionId: detail.question?.id,
-            question: detail.question?.question,
-            answerId: detail.answer?.id,
-            answer: detail.answer?.answer
-          };
+      .map((detail) => {
+        const answerPayload = {
+          questionId: detail.question?.id,
+          question: detail.question?.question,
+          answerId: detail.answer?.id,
+          answer: detail.answer?.answer
+        };
 
-          return (
-          new EventLog({
-            userId,
-            eventType: EventLogEventType.SURVEY,
-            entityType: EventLogEntityType.SURVEY,
-            entityId: detail.id,
-            metadata: {
-              source: 'survey_submitted',
-              ...answerPayload,
-              answers: [answerPayload]
-            }
-          })
-          );
-        }
-      );
+        return new EventLog({
+          userId,
+          eventType: EventLogEventType.SURVEY,
+          entityType: EventLogEntityType.SURVEY,
+          entityId: detail.id,
+          metadata: {
+            source: 'survey_submitted',
+            ...answerPayload,
+            answers: [answerPayload]
+          }
+        });
+      });
 
     if (!eventLogs.length) {
       return [];
@@ -140,12 +139,13 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
       throw new BadRequestException('entityType is required');
     }
 
-    const expectedEntityTypeMap: Record<EventLogEventType, EventLogEntityType> = {
-      [EventLogEventType.MESSAGE]: EventLogEntityType.CONVERSATION,
-      [EventLogEventType.SEARCH]: EventLogEntityType.SEARCH,
-      [EventLogEventType.SURVEY]: EventLogEntityType.SURVEY,
-      [EventLogEventType.PRODUCT]: EventLogEntityType.PRODUCT
-    };
+    const expectedEntityTypeMap: Record<EventLogEventType, EventLogEntityType> =
+      {
+        [EventLogEventType.MESSAGE]: EventLogEntityType.CONVERSATION,
+        [EventLogEventType.SEARCH]: EventLogEntityType.SEARCH,
+        [EventLogEventType.SURVEY]: EventLogEntityType.SURVEY,
+        [EventLogEventType.PRODUCT]: EventLogEntityType.PRODUCT
+      };
 
     const expectedEntityType = expectedEntityTypeMap[event.eventType];
     if (event.entityType !== expectedEntityType) {
@@ -232,9 +232,11 @@ export class EventLogRepository extends SqlEntityRepository<EventLog> {
   }
 
   async getDistinctUserIds(): Promise<string[]> {
-    const rows = await this.getEntityManager().getConnection().execute<
-      Array<{ user_id: string }>
-    >('select distinct user_id from event_log where user_id is not null');
+    const rows = await this.getEntityManager()
+      .getConnection()
+      .execute<
+        Array<{ user_id: string }>
+      >('select distinct user_id from event_log where user_id is not null');
 
     return rows.map((row) => row.user_id).filter(Boolean);
   }

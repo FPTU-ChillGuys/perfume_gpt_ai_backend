@@ -53,4 +53,3 @@ export const CACHE_TTL_1WEEK = 7 * 24 * 60 * 60 * 1000;
 export const CACHE_TTL_1MONTH = 30 * 24 * 60 * 60 * 1000;
 
 export const CACHE_TTL_1YEAR = 365 * 24 * 60 * 60 * 1000;
-

@@ -1,13 +1,15 @@
+import { Controller, Get, Logger, Post, Query } from '@nestjs/common';
 import {
-  Controller,
-  Get,
-  Logger,
-  Post,
-  Query
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags
+} from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
-import { ApiAdminErrors, ApiPublicErrorResponses } from 'src/application/decorators/swagger-error.decorator';
+import {
+  ApiAdminErrors,
+  ApiPublicErrorResponses
+} from 'src/application/decorators/swagger-error.decorator';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { Ok } from 'src/application/dtos/response/common/success-response';
@@ -26,7 +28,7 @@ export class RecommendationController {
   constructor(
     private readonly recommendationService: RecommendationService,
     private readonly aiAcceptanceService: AIAcceptanceService
-  ) { }
+  ) {}
 
   /**
    * Test recommendation API
@@ -73,7 +75,9 @@ export class RecommendationController {
     @Query('orderId') orderId: string
   ): Promise<BaseResponse<string>> {
     await this.recommendationService.sendRepurchase(userId, orderId);
-    return Ok('Repurchase recommendation generated and email sent successfully');
+    return Ok(
+      'Repurchase recommendation generated and email sent successfully'
+    );
   }
 
   @Post('daily/send')
@@ -81,19 +85,16 @@ export class RecommendationController {
   @ApiBearerAuth('jwt')
   @ApiAdminErrors()
   @ApiOperation({
-    summary:
-      'Manual trigger gửi daily recommendation cho user active (sync)'
+    summary: 'Manual trigger gửi daily recommendation cho user active (sync)'
   })
   @ApiBaseResponse(Object)
   async sendDailyRecommendationManual(): Promise<
     BaseResponse<DailyRecommendationBatchSummary>
   > {
-    const summary = await this.recommendationService.sendRecommendationToAllUsers(
-      'manual'
-    );
+    const summary =
+      await this.recommendationService.sendRecommendationToAllUsers('manual');
     return Ok(summary);
   }
-
 
   /**
    * Get simple robust practical recommendations (V3)
@@ -130,15 +131,16 @@ export class RecommendationController {
     );
 
     if (result.success && result.data?.recommendations?.length) {
-      const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-        contextType: 'recommendation',
-        sourceRefId: `recommendation-v3-simple-${userId}-${Date.now()}`,
-        products: result.data.recommendations,
-        metadata: {
-          sizeRequested: size || 10,
-          productCount: result.data.recommendations.length
-        }
-      });
+      const attachResult =
+        await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+          contextType: 'recommendation',
+          sourceRefId: `recommendation-v3-simple-${userId}-${Date.now()}`,
+          products: result.data.recommendations,
+          metadata: {
+            sizeRequested: size || 10,
+            productCount: result.data.recommendations.length
+          }
+        });
 
       result.data.recommendations = attachResult.products as any;
       if (attachResult.aiAcceptanceId) {
@@ -149,4 +151,3 @@ export class RecommendationController {
     return result;
   }
 }
-

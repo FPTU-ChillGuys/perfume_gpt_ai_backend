@@ -11,7 +11,10 @@ export class SurveyQuesAnwsRequest {
   userId!: string;
 
   /** Danh sách chi tiết câu hỏi - câu trả lời */
-  @ApiProperty({ description: 'Danh sách câu hỏi - câu trả lời', type: [SurveyQuesAnsDetailRequest] })
+  @ApiProperty({
+    description: 'Danh sách câu hỏi - câu trả lời',
+    type: [SurveyQuesAnsDetailRequest]
+  })
   @IsArray()
   @ArrayMinSize(1, { message: 'Cần ít nhất 1 câu trả lời' })
   @ValidateNested({ each: true })

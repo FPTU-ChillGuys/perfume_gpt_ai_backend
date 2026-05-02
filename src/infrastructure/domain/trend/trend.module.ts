@@ -9,8 +9,16 @@ import { ProductModule } from 'src/infrastructure/domain/product/product.module'
 import { AIAcceptanceModule } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.module';
 
 @Module({
-  imports: [AIModule, AdminInstructionModule, UserLogModule, InventoryModule, RestockModule, ProductModule, AIAcceptanceModule],
+  imports: [
+    AIModule,
+    AdminInstructionModule,
+    UserLogModule,
+    InventoryModule,
+    RestockModule,
+    ProductModule,
+    AIAcceptanceModule
+  ],
   providers: [TrendService],
   exports: [TrendService]
 })
-export class TrendModule { }
+export class TrendModule {}

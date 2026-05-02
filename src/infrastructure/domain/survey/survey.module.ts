@@ -15,7 +15,6 @@ import { SurveyQueryValidatorService } from 'src/infrastructure/domain/survey/su
 import { SurveyInputHelper } from 'src/infrastructure/domain/survey/helpers/survey-input.helper';
 import { SurveyProductHelper } from 'src/infrastructure/domain/survey/helpers/survey-product.helper';
 import { SurveyPipelineHelper } from 'src/infrastructure/domain/survey/helpers/survey-pipeline.helper';
-
 @Module({
   imports: [
     UnitOfWorkModule,
@@ -35,7 +34,11 @@ import { SurveyPipelineHelper } from 'src/infrastructure/domain/survey/helpers/s
     SurveyProductHelper,
     SurveyPipelineHelper
   ],
-  exports: [SurveyService, SurveyAttributeService, SurveyQueryValidatorService, SurveyInputHelper]
+  exports: [
+    SurveyService,
+    SurveyAttributeService,
+    SurveyQueryValidatorService,
+    SurveyInputHelper
+  ]
 })
 export class SurveyModule {}
-

@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { EmailService, EmailTemplate } from 'src/infrastructure/domain/common/mail.service';
+import {
+  EmailService,
+  EmailTemplate
+} from 'src/infrastructure/domain/common/mail.service';
 
 type CriticalRestockEmailItem = {
   product: string;
@@ -20,9 +23,12 @@ export class RestockReportEmailService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService
-  ) { }
+  ) {}
 
-  private isCriticalStock(totalQuantity: number, lowStockThreshold: number): boolean {
+  private isCriticalStock(
+    totalQuantity: number,
+    lowStockThreshold: number
+  ): boolean {
     const criticalThreshold = Math.max(1, Math.floor(lowStockThreshold * 0.5));
     return totalQuantity === 0 || totalQuantity <= criticalThreshold;
   }
@@ -99,12 +105,17 @@ export class RestockReportEmailService {
       this.logger.warn(
         '[DailyCriticalRestockReport] No staff recipients found. Report email skipped.'
       );
-      return { sent: false, recipientCount: 0, criticalCount: criticalItems.length };
+      return {
+        sent: false,
+        recipientCount: 0,
+        criticalCount: criticalItems.length
+      };
     }
 
     const items: CriticalRestockEmailItem[] = criticalItems
       .map((stock) => {
-        const concentrationName = stock.ProductVariants.Concentrations?.Name?.trim();
+        const concentrationName =
+          stock.ProductVariants.Concentrations?.Name?.trim();
         const productBase = stock.ProductVariants.Products.Name;
         const volumeMl = stock.ProductVariants.VolumeMl;
         const product = concentrationName

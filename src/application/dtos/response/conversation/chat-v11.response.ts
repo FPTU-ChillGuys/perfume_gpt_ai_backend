@@ -2,8 +2,11 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Sender } from 'src/domain/enum/sender.enum';
 
 export class ChatV11AiMessage {
-  @ApiProperty({ description: 'Người gửi (luôn là assistant)', enum: ['assistant'] })
-  sender: Sender = "user" as Sender;
+  @ApiProperty({
+    description: 'Người gửi (luôn là assistant)',
+    enum: ['assistant']
+  })
+  sender: Sender = 'user' as Sender;
 
   @ApiProperty({ description: 'Nội dung tin nhắn AI trả lời' })
   message!: string;
@@ -17,5 +20,5 @@ export class ChatV11Response {
   conversationId!: string;
 
   @ApiProperty({ description: 'Tin nhắn AI phản hồi', type: ChatV11AiMessage })
-  aiMessage: ChatV11AiMessage = new ChatV11AiMessage;
+  aiMessage: ChatV11AiMessage = new ChatV11AiMessage();
 }

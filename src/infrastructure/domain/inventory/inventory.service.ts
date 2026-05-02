@@ -7,7 +7,7 @@ import { InventoryStockRequest } from 'src/application/dtos/request/inventory-st
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { InventoryStockResponse } from 'src/application/dtos/response/inventory-stock.response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { BatchResponse } from 'src/application/dtos/response/batch.response';
 import { BatchRequest } from 'src/application/dtos/request/batch.request';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
@@ -17,7 +17,11 @@ import { TrendLog } from 'src/domain/entities/trend-log.entity';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { Output } from 'ai';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
-import { AI_HELPER, AI_INVENTORY_REPORT_HELPER, AI_RESTOCK_HELPER } from 'src/infrastructure/domain/ai/ai.module';
+import {
+  AI_HELPER,
+  AI_INVENTORY_REPORT_HELPER,
+  AI_RESTOCK_HELPER
+} from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import {
   inventoryReportPrompt,
@@ -37,7 +41,10 @@ import {
 } from 'src/application/dtos/response/ai-structured.response';
 import { restockOutput } from 'src/chatbot/output/restock.output';
 import { SourcingCatalogService } from 'src/infrastructure/domain/sourcing/sourcing-catalog.service';
-import { RestockVariantResult, RestockLogPayload } from 'src/application/dtos/response/inventory/restock-variant.response';
+import {
+  RestockVariantResult,
+  RestockLogPayload
+} from 'src/application/dtos/response/inventory/restock-variant.response';
 
 @Injectable()
 export class InventoryService {
@@ -49,8 +56,9 @@ export class InventoryService {
     @Inject(AI_INVENTORY_REPORT_HELPER) private readonly aiHelper: AIHelper,
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
-    private readonly sourcingCatalogService: SourcingCatalogService
-  ) { }
+    private readonly sourcingCatalogService: SourcingCatalogService,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   private async ensureCriticalLowStockIncluded(
     restockData: unknown
@@ -63,20 +71,27 @@ export class InventoryService {
       ? [...safeData.variants]
       : [];
 
-    const criticalStocks = await this.inventoryPrismaRepo.findStocksByThreshold();
+    const criticalStocks =
+      await this.inventoryPrismaRepo.findStocksByThreshold();
 
     if (criticalStocks.length === 0) {
       return { variants: currentVariants };
     }
 
     const existingIds = new Set(currentVariants.map((item) => item.id));
-    const merged = this.mergeCriticalStocks(currentVariants, criticalStocks, existingIds);
+    const merged = this.mergeCriticalStocks(
+      currentVariants,
+      criticalStocks,
+      existingIds
+    );
     return { variants: this.sortVariantsByRestockPriority(merged) };
   }
 
   private mergeCriticalStocks(
     currentVariants: RestockVariantResult[],
-    criticalStocks: Awaited<ReturnType<InventoryPrismaRepository['findStocksByThreshold']>>,
+    criticalStocks: Awaited<
+      ReturnType<InventoryPrismaRepository['findStocksByThreshold']>
+    >,
     existingIds: Set<string>
   ): RestockVariantResult[] {
     for (const stock of criticalStocks) {
@@ -87,7 +102,10 @@ export class InventoryService {
       const isInactive = status === 'Inactive' || status === 'Discontinue';
       const suggestedRestockQuantity = isInactive
         ? 0
-        : Math.max(stock.LowStockThreshold * 2 - stock.TotalQuantity, stock.LowStockThreshold * 2);
+        : Math.max(
+            stock.LowStockThreshold * 2 - stock.TotalQuantity,
+            stock.LowStockThreshold * 2
+          );
 
       currentVariants.push({
         id: stock.VariantId,
@@ -108,7 +126,9 @@ export class InventoryService {
     return currentVariants;
   }
 
-  private sortVariantsByRestockPriority(variants: RestockVariantResult[]): RestockVariantResult[] {
+  private sortVariantsByRestockPriority(
+    variants: RestockVariantResult[]
+  ): RestockVariantResult[] {
     return variants.sort((left, right) => {
       if (right.suggestedRestockQuantity !== left.suggestedRestockQuantity) {
         return right.suggestedRestockQuantity - left.suggestedRestockQuantity;
@@ -120,80 +140,78 @@ export class InventoryService {
   async getInventoryStock(
     request: InventoryStockRequest
   ): Promise<BaseResponseAPI<PagedResult<InventoryStockResponse>>> {
-    return await funcHandlerAsync(
-      async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const where = this.buildStockWhereClause(request);
-        const [stocks, totalCount] = await Promise.all([
-          this.inventoryPrismaRepo.findAllStocks(where, skip, request.PageSize),
-          this.inventoryPrismaRepo.countStocks(where)
-        ]);
-        const items = this.mapStocksToResponse(stocks);
-        const result = new PagedResult<InventoryStockResponse>({
-          items,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        });
-        return { success: true, payload: result };
-      },
-      'Failed to fetch inventory stock',
-      true
-    );
+    return this.err.wrap(async () => {
+      const skip = (request.PageNumber - 1) * request.PageSize;
+      const where = this.buildStockWhereClause(request);
+      const [stocks, totalCount] = await Promise.all([
+        this.inventoryPrismaRepo.findAllStocks(where, skip, request.PageSize),
+        this.inventoryPrismaRepo.countStocks(where)
+      ]);
+      const items = this.mapStocksToResponse(stocks);
+      const result = new PagedResult<InventoryStockResponse>({
+        items,
+        pageNumber: request.PageNumber,
+        pageSize: request.PageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / request.PageSize)
+      });
+      return { success: true, payload: result };
+    }, 'errors.inventory.fetch_stock');
   }
 
-  private buildStockWhereClause(request: InventoryStockRequest): Prisma.StocksWhereInput {
+  private buildStockWhereClause(
+    request: InventoryStockRequest
+  ): Prisma.StocksWhereInput {
     return {
       ...(request.VariantId ? { VariantId: request.VariantId } : {}),
       ...(request.SearchTerm
         ? {
-          ProductVariants: {
-            Products: { Name: { contains: request.SearchTerm } }
+            ProductVariants: {
+              Products: { Name: { contains: request.SearchTerm } }
+            }
           }
-        }
         : {}),
       ...(request.IsLowStock != null
         ? {
-          ProductVariants: {
-            Stocks: request.IsLowStock ? { isNot: null } : undefined
+            ProductVariants: {
+              Stocks: request.IsLowStock ? { isNot: null } : undefined
+            }
           }
-        }
         : {})
     };
   }
 
-  private mapStocksToResponse(stocks: Awaited<ReturnType<InventoryPrismaRepository['findAllStocks']>>): InventoryStockResponse[] {
+  private mapStocksToResponse(
+    stocks: Awaited<ReturnType<InventoryPrismaRepository['findAllStocks']>>
+  ): InventoryStockResponse[] {
     return stocks.map((s) => InventoryStockResponse.fromPrisma(s)!);
   }
 
   async getBatch(
     request: BatchRequest
   ): Promise<BaseResponseAPI<PagedResult<BatchResponse>>> {
-    return await funcHandlerAsync(
-      async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const where = this.buildBatchWhereClause(request);
-        const [batches, totalCount] = await Promise.all([
-          this.inventoryPrismaRepo.findBatches(where, skip, request.PageSize),
-          this.inventoryPrismaRepo.countBatches(where)
-        ]);
-        const items = this.mapBatchesToResponse(batches);
-        const result = new PagedResult<BatchResponse>({
-          items,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        });
-        return { success: true, payload: result };
-      },
-      'Failed to fetch batches',
-      true
-    );
+    return this.err.wrap(async () => {
+      const skip = (request.PageNumber - 1) * request.PageSize;
+      const where = this.buildBatchWhereClause(request);
+      const [batches, totalCount] = await Promise.all([
+        this.inventoryPrismaRepo.findBatches(where, skip, request.PageSize),
+        this.inventoryPrismaRepo.countBatches(where)
+      ]);
+      const items = this.mapBatchesToResponse(batches);
+      const result = new PagedResult<BatchResponse>({
+        items,
+        pageNumber: request.PageNumber,
+        pageSize: request.PageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / request.PageSize)
+      });
+      return { success: true, payload: result };
+    }, 'errors.inventory.fetch_batch');
   }
 
-  private buildBatchWhereClause(request: BatchRequest): Prisma.BatchesWhereInput {
+  private buildBatchWhereClause(
+    request: BatchRequest
+  ): Prisma.BatchesWhereInput {
     return {
       ...(request.id ? { Id: request.id } : {}),
       ...(request.variantId ? { VariantId: request.variantId } : {}),
@@ -214,38 +232,40 @@ export class InventoryService {
         : {}),
       ...(request.isExpired != null
         ? {
-          ExpiryDate: request.isExpired
-            ? { lt: new Date() }
-            : { gte: new Date() }
-        }
+            ExpiryDate: request.isExpired
+              ? { lt: new Date() }
+              : { gte: new Date() }
+          }
         : {}),
       ...(request.variantSku ||
-        request.productName ||
-        request.volumeMl ||
-        request.concentrationName
+      request.productName ||
+      request.volumeMl ||
+      request.concentrationName
         ? {
-          ProductVariants: {
-            ...(request.variantSku
-              ? { Sku: { contains: request.variantSku } }
-              : {}),
-            ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
-            ...(request.productName
-              ? { Products: { Name: { contains: request.productName } } }
-              : {}),
-            ...(request.concentrationName
-              ? {
-                Concentrations: {
-                  Name: { contains: request.concentrationName }
-                }
-              }
-              : {})
+            ProductVariants: {
+              ...(request.variantSku
+                ? { Sku: { contains: request.variantSku } }
+                : {}),
+              ...(request.volumeMl ? { VolumeMl: request.volumeMl } : {}),
+              ...(request.productName
+                ? { Products: { Name: { contains: request.productName } } }
+                : {}),
+              ...(request.concentrationName
+                ? {
+                    Concentrations: {
+                      Name: { contains: request.concentrationName }
+                    }
+                  }
+                : {})
+            }
           }
-        }
         : {})
     };
   }
 
-  private mapBatchesToResponse(batches: Awaited<ReturnType<InventoryPrismaRepository['findBatches']>>): BatchResponse[] {
+  private mapBatchesToResponse(
+    batches: Awaited<ReturnType<InventoryPrismaRepository['findBatches']>>
+  ): BatchResponse[] {
     return batches.map(
       (b) =>
         new BatchResponse({
@@ -301,20 +321,36 @@ export class InventoryService {
       this.inventoryPrismaRepo.findAllStocksSorted(1000)
     ]);
 
-    const { mergedStocks, existingVariantIds } = this.mergeStocks(problematicStocks, standardStocks);
+    const { mergedStocks, existingVariantIds } = this.mergeStocks(
+      problematicStocks,
+      standardStocks
+    );
     const batches = await this.inventoryPrismaRepo.findBatchesByVariantIds(
       Array.from(existingVariantIds)
     );
 
-    return this.buildReportMarkdown(stats, mergedStocks, batches, now, thirtyDaysFromNow);
+    return this.buildReportMarkdown(
+      stats,
+      mergedStocks,
+      batches,
+      now,
+      thirtyDaysFromNow
+    );
   }
 
   private mergeStocks(
-    problematicStocks: Awaited<ReturnType<InventoryPrismaRepository['findProblematicStocks']>>,
-    standardStocks: Awaited<ReturnType<InventoryPrismaRepository['findAllStocksSorted']>>
-  ): { mergedStocks: typeof problematicStocks; existingVariantIds: Set<string> } {
+    problematicStocks: Awaited<
+      ReturnType<InventoryPrismaRepository['findProblematicStocks']>
+    >,
+    standardStocks: Awaited<
+      ReturnType<InventoryPrismaRepository['findAllStocksSorted']>
+    >
+  ): {
+    mergedStocks: typeof problematicStocks;
+    existingVariantIds: Set<string>;
+  } {
     const mergedStocks = [...problematicStocks];
-    const existingVariantIds = new Set(mergedStocks.map(s => s.VariantId));
+    const existingVariantIds = new Set(mergedStocks.map((s) => s.VariantId));
 
     for (const s of standardStocks) {
       if (!existingVariantIds.has(s.VariantId)) {
@@ -327,13 +363,17 @@ export class InventoryService {
 
   private buildReportMarkdown(
     stats: Awaited<ReturnType<InventoryService['getInventoryOverallStats']>>,
-    mergedStocks: Awaited<ReturnType<InventoryPrismaRepository['findProblematicStocks']>>,
-    batches: Awaited<ReturnType<InventoryPrismaRepository['findBatchesByVariantIds']>>,
+    mergedStocks: Awaited<
+      ReturnType<InventoryPrismaRepository['findProblematicStocks']>
+    >,
+    batches: Awaited<
+      ReturnType<InventoryPrismaRepository['findBatchesByVariantIds']>
+    >,
     now: Date,
     thirtyDaysFromNow: Date
   ): string {
     const batchesByVariantId = new Map<string, typeof batches>();
-    batches.forEach(b => {
+    batches.forEach((b) => {
       const existing = batchesByVariantId.get(b.VariantId) || [];
       existing.push(b);
       batchesByVariantId.set(b.VariantId, existing);
@@ -352,16 +392,20 @@ export class InventoryService {
       'Lưu ý: Danh sách dưới đây liệt kê ưu tiên các mặt hàng đang có vấn đề về tồn kho hoặc hạn dùng.'
     ];
 
-    mergedStocks.forEach(s => {
+    mergedStocks.forEach((s) => {
       const variantBatches = batchesByVariantId.get(s.VariantId) || [];
-      const batchInfo = this.formatBatchInfo(variantBatches, now, thirtyDaysFromNow);
+      const batchInfo = this.formatBatchInfo(
+        variantBatches,
+        now,
+        thirtyDaysFromNow
+      );
 
       reportLines.push(
         `Sản phẩm: ${s.ProductVariants.Products.Name} (${s.ProductVariants.Concentrations.Name}, ${s.ProductVariants.VolumeMl}ml)`,
         `SKU: ${s.ProductVariants.Sku}`,
         `Tồn kho hiện tại: ${s.TotalQuantity}`,
         `Ngưỡng báo động: ${s.LowStockThreshold}`,
-        `Trạng thái: ${s.TotalQuantity === 0 ? 'HẾT HÀNG' : (s.TotalQuantity <= s.LowStockThreshold ? 'SẮP HẾT HÀNG' : 'ỔN ĐỊNH')}`,
+        `Trạng thái: ${s.TotalQuantity === 0 ? 'HẾT HÀNG' : s.TotalQuantity <= s.LowStockThreshold ? 'SẮP HẾT HÀNG' : 'ỔN ĐỊNH'}`,
         `Thông tin lô hàng:`,
         `  ${batchInfo}`,
         '-----------------------------------'
@@ -372,72 +416,67 @@ export class InventoryService {
   }
 
   private formatBatchInfo(
-    batches: Awaited<ReturnType<InventoryPrismaRepository['findBatchesByVariantIds']>>,
+    batches: Awaited<
+      ReturnType<InventoryPrismaRepository['findBatchesByVariantIds']>
+    >,
     now: Date,
     nearExpiryDate: Date
   ): string {
     if (batches.length === 0) {
       return '- (Không có dữ liệu lô hàng còn tồn)';
     }
-    return batches.map(b => {
-      const isExpired = new Date(b.ExpiryDate) < now;
-      const isNearExpiry = !isExpired && new Date(b.ExpiryDate) < nearExpiryDate;
-      let statusLabel = '';
-      if (isExpired) statusLabel = ' [HẾT HẠN]';
-      else if (isNearExpiry) statusLabel = ' [CẬN HẠN]';
+    return batches
+      .map((b) => {
+        const isExpired = new Date(b.ExpiryDate) < now;
+        const isNearExpiry =
+          !isExpired && new Date(b.ExpiryDate) < nearExpiryDate;
+        let statusLabel = '';
+        if (isExpired) statusLabel = ' [HẾT HẠN]';
+        else if (isNearExpiry) statusLabel = ' [CẬN HẠN]';
 
-      return `- Lô ${b.BatchCode}: Hạn dùng ${b.ExpiryDate.toISOString().split('T')[0]}, Còn lại ${b.RemainingQuantity}${statusLabel}`;
-    }).join('\n  ');
+        return `- Lô ${b.BatchCode}: Hạn dùng ${b.ExpiryDate.toISOString().split('T')[0]}, Còn lại ${b.RemainingQuantity}${statusLabel}`;
+      })
+      .join('\n  ');
   }
 
   async createInventoryLog(
     report: string,
     type: InventoryLogType = InventoryLogType.REPORT
   ): Promise<BaseResponseAPI<InventoryLog>> {
-    return funcHandlerAsync(
-      async () => {
-        const logEntry = await this.unitOfWork.InventoryLogRepo.persistAndReturn(
-          new InventoryLog({
-            inventoryLog: report,
-            type: type
-          })
-        );
-        return { success: true, data: logEntry };
-      },
-      'Failed to create inventory log',
-      true
-    );
+    return this.err.wrap(async () => {
+      const logEntry = await this.unitOfWork.InventoryLogRepo.persistAndReturn(
+        new InventoryLog({
+          inventoryLog: report,
+          type: type
+        })
+      );
+      return { success: true, data: logEntry };
+    }, 'errors.inventory.create_log');
   }
 
   async getAllInventoryLogs(
     type?: InventoryLogType
   ): Promise<BaseResponse<InventoryLog[]>> {
-    return funcHandlerAsync(
-      async () => {
-        const where = type ? { type } : {};
-        const logs = await this.unitOfWork.InventoryLogRepo.find(where, {
-          orderBy: { updatedAt: 'DESC' }
-        });
-        return { success: true, data: logs };
-      },
-      'Failed to fetch inventory logs',
-      true
-    );
+    return this.err.wrap(async () => {
+      const where = type ? { type } : {};
+      const logs = await this.unitOfWork.InventoryLogRepo.find(where, {
+        orderBy: { updatedAt: 'DESC' }
+      });
+      return { success: true, data: logs };
+    }, 'errors.inventory.fetch_logs');
   }
 
   async getInventoryLogById(id: string): Promise<BaseResponse<InventoryLog>> {
-    return funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
       if (!log) {
-        return { success: false, error: 'Inventory log not found' };
+        return this.err.fail('errors.inventory.not_found');
       }
       return { success: true, data: log };
-    }, 'Failed to fetch inventory log');
+    }, 'errors.inventory.fetch_log');
   }
 
-  async convertInventoryLogMarkdownToPdf(
-    id: string
-  ): Promise<
+  async convertInventoryLogMarkdownToPdf(id: string): Promise<
     BaseResponse<{
       fileName: string;
       absolutePath: string;
@@ -445,50 +484,51 @@ export class InventoryService {
       logType: InventoryLogType;
     }>
   > {
-    return funcHandlerAsync(
-      async () => {
-        const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
-        if (!log) {
-          return { success: false, error: 'Inventory log not found' };
+    return this.err.wrap(async () => {
+      const log = await this.unitOfWork.InventoryLogRepo.findOne({ id });
+      if (!log) {
+        return this.err.fail('errors.inventory.not_found');
+      }
+
+      const converterRoot = path.join(process.cwd(), 'md-pdf-converter');
+      const outputDir = path.join(converterRoot, 'outputs');
+      const stylePath = path.join(
+        converterRoot,
+        'styles',
+        'inventory-report.css'
+      );
+      await fs.promises.mkdir(outputDir, { recursive: true });
+
+      const generatedAt = new Date().toISOString();
+      const markdownContent = this.buildPdfMarkdown(log, id, generatedAt);
+      const { markdownPath, pdfPath } = this.resolvePdfPaths(outputDir, id);
+
+      await fs.promises.writeFile(markdownPath, markdownContent, 'utf8');
+      const hasStyleFile = await fs.promises
+        .access(stylePath, fs.constants.F_OK)
+        .then(() => true)
+        .catch(() => false);
+
+      const { mdToPdf } = await import('md-to-pdf');
+      const result = await mdToPdf(
+        { path: markdownPath },
+        { dest: pdfPath, stylesheet: hasStyleFile ? [stylePath] : [] }
+      );
+
+      if (!result || !result.filename) {
+        return this.err.fail('errors.inventory.pdf_convert');
+      }
+
+      return {
+        success: true,
+        data: {
+          fileName: `inventory-log-${id}.pdf`,
+          absolutePath: pdfPath,
+          generatedAt,
+          logType: log.type
         }
-
-        const converterRoot = path.join(process.cwd(), 'md-pdf-converter');
-        const outputDir = path.join(converterRoot, 'outputs');
-        const stylePath = path.join(converterRoot, 'styles', 'inventory-report.css');
-        await fs.promises.mkdir(outputDir, { recursive: true });
-
-        const generatedAt = new Date().toISOString();
-        const markdownContent = this.buildPdfMarkdown(log, id, generatedAt);
-        const { markdownPath, pdfPath } = this.resolvePdfPaths(outputDir, id);
-
-        await fs.promises.writeFile(markdownPath, markdownContent, 'utf8');
-        const hasStyleFile = await fs.promises
-          .access(stylePath, fs.constants.F_OK)
-          .then(() => true)
-          .catch(() => false);
-
-        const { mdToPdf } = await import('md-to-pdf');
-        const result = await mdToPdf(
-          { path: markdownPath },
-          { dest: pdfPath, stylesheet: hasStyleFile ? [stylePath] : [] }
-        );
-
-        if (!result || !result.filename) {
-          return { success: false, error: 'Failed to convert markdown to pdf' };
-        }
-
-        return {
-          success: true,
-          data: {
-            fileName: `inventory-log-${id}.pdf`,
-            absolutePath: pdfPath,
-            generatedAt,
-            logType: log.type
-          }
-        };
-      },
-      'Failed to convert inventory log markdown to pdf'
-    );
+      };
+    }, 'errors.inventory.pdf_convert');
   }
 
   async readInventoryLogPdf(id: string): Promise<{
@@ -497,17 +537,26 @@ export class InventoryService {
   }> {
     const converted = await this.convertInventoryLogMarkdownToPdf(id);
     if (!converted.success) {
-      if (converted.error === 'Inventory log not found') {
-        throw new Error('Inventory log not found');
+      if (converted.error === this.err.t('errors.inventory.not_found')) {
+        this.err.throw(
+          'errors.inventory.not_found',
+          InternalServerErrorWithDetailsException
+        );
       }
-      throw new Error(converted.error || 'Failed to convert markdown to pdf');
+      this.err.throw(
+        'errors.inventory.pdf_convert',
+        InternalServerErrorWithDetailsException
+      );
     }
 
     const filePath = converted.data?.absolutePath;
     const fileName = converted.data?.fileName || `inventory-log-${id}.pdf`;
 
     if (!filePath) {
-      throw new Error('PDF file path is empty');
+      this.err.throw(
+        'errors.inventory.pdf_empty_path',
+        InternalServerErrorWithDetailsException
+      );
     }
 
     const fileBuffer = await fs.promises.readFile(filePath);
@@ -533,7 +582,11 @@ export class InventoryService {
     return { markdownPath, pdfPath };
   }
 
-  private buildPdfMarkdown(log: InventoryLog, id: string, generatedAt: string): string {
+  private buildPdfMarkdown(
+    log: InventoryLog,
+    id: string,
+    generatedAt: string
+  ): string {
     const title =
       log.type === InventoryLogType.RESTOCK
         ? 'Báo cáo phân tích nhập hàng'
@@ -562,7 +615,9 @@ export class InventoryService {
       return rawContent;
     }
 
-    const parsedPayload = this.tryParseJson(rawContent) as RestockLogPayload | null;
+    const parsedPayload = this.tryParseJson(
+      rawContent
+    ) as RestockLogPayload | null;
     const variants = Array.isArray(parsedPayload?.variants)
       ? parsedPayload?.variants
       : [];
@@ -581,8 +636,7 @@ export class InventoryService {
   private buildRestockMarkdownTable(variants: RestockVariantResult[]): string {
     const tableHeader =
       '| SKU | Tên sản phẩm | Volume | Type | Giá | Tồn kho | Đã đặt | Gợi ý nhập |';
-    const tableSeparator =
-      '| --- | --- | --- | --- | --- | --- | --- | --- |';
+    const tableSeparator = '| --- | --- | --- | --- | --- | --- | --- | --- |';
     const tableRows = variants.map((variant) => {
       const sku = this.escapeMarkdownCell(variant.sku);
       const productName = this.escapeMarkdownCell(variant.productName);
@@ -627,10 +681,10 @@ export class InventoryService {
   }
 
   async getLatestTrendLogs(limit: number) {
-    return funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const logs = await this.unitOfWork.TrendLogRepo.getLatestLogs(limit);
       return { success: true, data: logs };
-    }, 'Failed to fetch trend logs');
+    }, 'errors.inventory.fetch_trend_logs');
   }
 
   async saveTrendLog(trendData: string): Promise<void> {
@@ -638,7 +692,7 @@ export class InventoryService {
       const log = new TrendLog({ trendData });
       await this.unitOfWork.TrendLogRepo.addAndFlush(log);
     } catch (err) {
-      this.logger.error('Failed to save trend log:', err);
+      this.err.log('errors.inventory.trend_log_save');
     }
   }
 
@@ -648,8 +702,12 @@ export class InventoryService {
       return Ok(INSUFFICIENT_DATA_MESSAGES.INVENTORY_REPORT);
     }
     const [inventoryPrompt, slowStockPrompt] = await Promise.all([
-      this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY),
-      this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SLOW_STOCK)
+      this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_INVENTORY
+      ),
+      this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_SLOW_STOCK
+      )
     ]);
     const combinedPrompt = slowStockPrompt
       ? `${inventoryPrompt}\n\n## SLOW STOCK SUPPLEMENT\n${slowStockPrompt}`
@@ -659,9 +717,13 @@ export class InventoryService {
       combinedPrompt
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
-        service: 'AIHelper'
-      });
+      this.err.throw(
+        'errors.inventory.ai_report',
+        InternalServerErrorWithDetailsException,
+        {
+          service: 'AIHelper'
+        }
+      );
     }
     await this.createInventoryLog(aiResponse.data ?? 'No report generated');
     return Ok(aiResponse.data);
@@ -671,11 +733,14 @@ export class InventoryService {
     variant: RestockVariantResult
   ): Promise<RestockVariantResult> {
     try {
-      const sourcingResponse = await this.sourcingCatalogService.getCatalogsAsync(variant.id);
+      const sourcingResponse =
+        await this.sourcingCatalogService.getCatalogsAsync(variant.id);
       if (sourcingResponse.success && Array.isArray(sourcingResponse.payload)) {
         const primarySourcing = sourcingResponse.payload
-          .filter(c => c.isPrimary)
-          .sort((a, b) => Number(a.negotiatedPrice) - Number(b.negotiatedPrice))[0];
+          .filter((c) => c.isPrimary)
+          .sort(
+            (a, b) => Number(a.negotiatedPrice) - Number(b.negotiatedPrice)
+          )[0];
         if (primarySourcing) {
           return {
             ...variant,
@@ -687,7 +752,7 @@ export class InventoryService {
         }
       }
     } catch (err) {
-      console.error(`[InventoryService] Failed to enrich sourcing for variant ${variant.id}:`, err);
+      this.err.log('errors.inventory.enrich_sourcing');
     }
     return variant;
   }
@@ -709,15 +774,21 @@ export class InventoryService {
       );
     }
     const adminPrompt =
-      await this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_INVENTORY);
+      await this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_INVENTORY
+      );
     const aiResponse = await this.aiHelper.textGenerateFromPrompt(
       inventoryReportPrompt(report.toString()),
       adminPrompt
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI inventory report', {
-        service: 'AIHelper'
-      });
+      this.err.throw(
+        'errors.inventory.ai_report',
+        InternalServerErrorWithDetailsException,
+        {
+          service: 'AIHelper'
+        }
+      );
     }
     return Ok(
       new AIInventoryReportStructuredResponse({
@@ -730,10 +801,16 @@ export class InventoryService {
     );
   }
 
-  async analyzeRestockNeeds(): Promise<BaseResponse<{ variants: RestockVariantResult[] }>> {
+  async analyzeRestockNeeds(): Promise<
+    BaseResponse<{ variants: RestockVariantResult[] }>
+  > {
     const [restockPrompt, slowStockPrompt] = await Promise.all([
-      this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_RESTOCK),
-      this.adminInstructionService.getSystemPromptForDomain(INSTRUCTION_TYPE_SLOW_STOCK)
+      this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_RESTOCK
+      ),
+      this.adminInstructionService.getSystemPromptForDomain(
+        INSTRUCTION_TYPE_SLOW_STOCK
+      )
     ]);
     const combinedPrompt = slowStockPrompt
       ? `${restockPrompt}\n\n## SLOW STOCK SUPPLEMENT\n${slowStockPrompt}`
@@ -744,22 +821,30 @@ export class InventoryService {
       Output.object({ schema: restockOutput.schema })
     );
     if (!aiResponse.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI restock analysis', {
-        service: 'AIRestockHelper'
-      });
+      this.err.throw(
+        'errors.inventory.ai_restock',
+        InternalServerErrorWithDetailsException,
+        {
+          service: 'AIRestockHelper'
+        }
+      );
     }
 
-    const normalizedResult = await this.ensureCriticalLowStockIncluded(aiResponse.data);
+    const normalizedResult = await this.ensureCriticalLowStockIncluded(
+      aiResponse.data
+    );
 
     if (normalizedResult.variants && normalizedResult.variants.length > 0) {
       normalizedResult.variants = await Promise.all(
-        normalizedResult.variants.map(v => this.enrichVariantWithSourcingInfo(v))
+        normalizedResult.variants.map((v) =>
+          this.enrichVariantWithSourcingInfo(v)
+        )
       );
     }
 
     const restockDataStr = JSON.stringify(normalizedResult);
     this.createInventoryLog(restockDataStr, InventoryLogType.RESTOCK).catch(
-      (err) => console.error('Failed to save restock log:', err)
+      () => this.err.log('errors.inventory.trend_log_save')
     );
 
     return Ok(normalizedResult);

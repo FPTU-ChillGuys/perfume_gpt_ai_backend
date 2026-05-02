@@ -27,8 +27,14 @@ export class SurveyAnswer extends Common {
   question!: SurveyQuestion;
 
   /** Danh sách chi tiết bài survey liên kết với câu trả lời này */
-  @ApiProperty({ description: 'Danh sách chi tiết bài survey', type: () => SurveyQuestionAnswerDetail, isArray: true })
-  @OneToMany(() => SurveyQuestionAnswerDetail, (qqa) => qqa.answer, { orphanRemoval: true })
+  @ApiProperty({
+    description: 'Danh sách chi tiết bài survey',
+    type: () => SurveyQuestionAnswerDetail,
+    isArray: true
+  })
+  @OneToMany(() => SurveyQuestionAnswerDetail, (qqa) => qqa.answer, {
+    orphanRemoval: true
+  })
   surveyQuestionAnswers = new Collection<SurveyQuestionAnswerDetail>(this);
 
   constructor(init?: Partial<SurveyAnswer>) {

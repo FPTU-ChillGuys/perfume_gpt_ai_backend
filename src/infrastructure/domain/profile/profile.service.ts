@@ -2,87 +2,89 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { ProfileResponse } from 'src/application/dtos/response/profile.response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   async getOwnProfile(
     userId: string
   ): Promise<BaseResponseAPI<ProfileResponse>> {
-    return await funcHandlerAsync(
-      async () => {
-        const profile = await this.prisma.customerProfiles.findUnique({
-          where: { UserId: userId },
-          include: {
-            CustomerFamilyPreferences: {
-              include: {
-                OlfactoryFamilies: true
-              }
-            },
-            CustomerNotePreferences: {
-              include: {
-                ScentNotes: true
-              }
-            },
-            CustomerAttributePreferences: {
-              include: {
-                AttributeValues: true
-              }
+    return this.err.wrap(async () => {
+      const profile = await this.prisma.customerProfiles.findUnique({
+        where: { UserId: userId },
+        include: {
+          CustomerFamilyPreferences: {
+            include: {
+              OlfactoryFamilies: true
+            }
+          },
+          CustomerNotePreferences: {
+            include: {
+              ScentNotes: true
+            }
+          },
+          CustomerAttributePreferences: {
+            include: {
+              AttributeValues: true
             }
           }
-        });
-        if (!profile) {
-          return { success: false, error: 'Profile not found' };
         }
+      });
+      if (!profile) {
+        return this.err.fail('errors.profile.not_found');
+      }
 
-        const scentPreference =
-          profile.CustomerFamilyPreferences.length > 0
-            ? profile.CustomerFamilyPreferences
-                .map((item) => item.OlfactoryFamilies.Name)
-                .filter(Boolean)
-                .join(', ')
-            : null;
+      const scentPreference =
+        profile.CustomerFamilyPreferences.length > 0
+          ? profile.CustomerFamilyPreferences.map(
+              (item) => item.OlfactoryFamilies.Name
+            )
+              .filter(Boolean)
+              .join(', ')
+          : null;
 
-        const favoriteNotes =
-          profile.CustomerNotePreferences.length > 0
-            ? profile.CustomerNotePreferences
-                .map((item) => item.ScentNotes.Name)
-                .filter(Boolean)
-                .join(', ')
-            : null;
+      const favoriteNotes =
+        profile.CustomerNotePreferences.length > 0
+          ? profile.CustomerNotePreferences.map((item) => item.ScentNotes.Name)
+              .filter(Boolean)
+              .join(', ')
+          : null;
 
-        const preferredStyle =
-          profile.CustomerAttributePreferences.length > 0
-            ? profile.CustomerAttributePreferences
-                .map((item) => item.AttributeValues.Value)
-                .filter(Boolean)
-                .join(', ')
-            : null;
+      const preferredStyle =
+        profile.CustomerAttributePreferences.length > 0
+          ? profile.CustomerAttributePreferences.map(
+              (item) => item.AttributeValues.Value
+            )
+              .filter(Boolean)
+              .join(', ')
+          : null;
 
-        const response = new ProfileResponse({
-          id: profile.Id,
-          userId: profile.UserId,
-          dateOfBirth: profile.DateOfBirth
-            ? profile.DateOfBirth.toISOString()
-            : null,
-          scentPreference,
-          minBudget: profile.MinBudget ? Number(profile.MinBudget) : null,
-          maxBudget: profile.MaxBudget ? Number(profile.MaxBudget) : null,
-          preferredStyle,
-          favoriteNotes,
-          createdAt: profile.CreatedAt.toISOString(),
-          updatedAt: profile.UpdatedAt ? profile.UpdatedAt.toISOString() : null,
-        });
-        return { success: true, payload: response };
-      },
-      'Failed to fetch profile'
-    );
+      const response = new ProfileResponse({
+        id: profile.Id,
+        userId: profile.UserId,
+        dateOfBirth: profile.DateOfBirth
+          ? profile.DateOfBirth.toISOString()
+          : null,
+        scentPreference,
+        minBudget: profile.MinBudget ? Number(profile.MinBudget) : null,
+        maxBudget: profile.MaxBudget ? Number(profile.MaxBudget) : null,
+        preferredStyle,
+        favoriteNotes,
+        createdAt: profile.CreatedAt.toISOString(),
+        updatedAt: profile.UpdatedAt ? profile.UpdatedAt.toISOString() : null
+      });
+      return { success: true, payload: response };
+    }, 'errors.profile.fetch');
   }
 
-  async createProfileReport(profileResponse?: ProfileResponse): Promise<string> {
-    // Convert profileResponse to string for prompt
+  async createProfileReport(
+    profileResponse?: ProfileResponse
+  ): Promise<string> {
     const profileReport = `User Profile:
     - User ID: ${profileResponse?.userId}
     - Profile ID: ${profileResponse?.id}
@@ -105,7 +107,7 @@ export class ProfileService {
   }
 
   async searchProfile(query: string): Promise<BaseResponseAPI<any[]>> {
-    return await funcHandlerAsync(async () => {
+    return this.err.wrap(async () => {
       const users = await this.prisma.aspNetUsers.findMany({
         where: {
           OR: [
@@ -135,7 +137,6 @@ export class ProfileService {
       }));
 
       return { success: true, payload: results };
-    }, 'Failed to search profiles');
+    }, 'errors.profile.fetch');
   }
 }
-

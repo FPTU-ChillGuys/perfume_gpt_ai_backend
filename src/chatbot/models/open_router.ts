@@ -31,7 +31,6 @@ export const gemma3nE4bIt: LanguageModel = openrouter('google/gemma-3n-e4b-it');
 
 export const gemma3n27b: LanguageModel = openrouter('google/gemma-3-27b-it');
 
-
 export const gptOssSafeguard20b: LanguageModel = openrouter(
   'openai/gpt-oss-safeguard-20b'
 );
@@ -96,4 +95,6 @@ export const qwen3_5_flash: LanguageModel = openrouter(
   'qwen/qwen3.5-flash-02-23'
 );
 
-export const seed1_6 : LanguageModel = openrouter('bytedance-seed/seed-1.6-flash')
+export const seed1_6: LanguageModel = openrouter(
+  'bytedance-seed/seed-1.6-flash'
+);

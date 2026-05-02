@@ -70,8 +70,7 @@ export class Tools implements OnModuleInit {
       getInventoryStock: this.inventoryTool.getInventoryStock,
       getProductSalesAnalyticsForRestock:
         this.inventoryTool.getProductSalesAnalyticsForRestock,
-      getSlowStockCandidates:
-        this.inventoryTool.getSlowStockCandidates
+      getSlowStockCandidates: this.inventoryTool.getSlowStockCandidates
     };
   }
 
@@ -80,13 +79,18 @@ export class Tools implements OnModuleInit {
     return {
       getProductSalesAnalyticsForRestock:
         this.inventoryTool.getProductSalesAnalyticsForRestock,
-      getSlowStockCandidates:
-        this.inventoryTool.getSlowStockCandidates
+      getSlowStockCandidates: this.inventoryTool.getSlowStockCandidates
     };
   }
 
   get getToolsForRecomendationAndRepurchase(): ToolSet {
-    if (!this.productTool || !this.orderTool || !this.profileTool || !this.userTool) return {};
+    if (
+      !this.productTool ||
+      !this.orderTool ||
+      !this.profileTool ||
+      !this.userTool
+    )
+      return {};
     return {
       getAllProducts: this.productTool.getAllProducts,
       getNewestProducts: this.productTool.getNewestProducts,
@@ -104,7 +108,8 @@ export class Tools implements OnModuleInit {
       getReviewStatisticsByVariantId:
         this.reviewTool.getReviewStatisticsByVariantId,
       getReviewsByVariantId: this.reviewTool.getReviewsByVariantId,
-      getLatestReviewSummaryByVariantId: this.reviewTool.getLatestReviewSummaryByVariantId
+      getLatestReviewSummaryByVariantId:
+        this.reviewTool.getLatestReviewSummaryByVariantId
     };
   }
 
@@ -113,9 +118,12 @@ export class Tools implements OnModuleInit {
     return {
       getInventoryStock: this.inventoryTool.getInventoryStock,
       getReviewsByVariantId: this.reviewTool.getReviewsByVariantId,
-      getReviewStatisticsByVariantId: this.reviewTool.getReviewStatisticsByVariantId,
-      getLatestReviewSummaryByVariantId: this.reviewTool.getLatestReviewSummaryByVariantId,
-      getProfileRecommendationContext: this.profileTool.getProfileRecommendationContext
+      getReviewStatisticsByVariantId:
+        this.reviewTool.getReviewStatisticsByVariantId,
+      getLatestReviewSummaryByVariantId:
+        this.reviewTool.getLatestReviewSummaryByVariantId,
+      getProfileRecommendationContext:
+        this.profileTool.getProfileRecommendationContext
     };
   }
 
@@ -136,7 +144,7 @@ export class Tools implements OnModuleInit {
   private masterDataTool?: MasterDataTool;
   private cartTool?: CartTool;
 
-  constructor(private readonly moduleRef: ModuleRef) { }
+  constructor(private readonly moduleRef: ModuleRef) {}
 
   onModuleInit() {
     this.productTool = this.moduleRef.get(ProductTool, { strict: false });
@@ -149,5 +157,4 @@ export class Tools implements OnModuleInit {
     this.masterDataTool = this.moduleRef.get(MasterDataTool, { strict: false });
     this.cartTool = this.moduleRef.get(CartTool, { strict: false });
   }
-
 }

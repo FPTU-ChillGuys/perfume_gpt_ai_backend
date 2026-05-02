@@ -5,4 +5,4 @@ import { Tools } from 'src/chatbot/tools';
   providers: [Tools],
   exports: [Tools]
 })
-export class ToolModule { }
+export class ToolModule {}

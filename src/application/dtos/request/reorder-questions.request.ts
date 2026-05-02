@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsNumber, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  ValidateNested
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ReorderQuestionItem {
@@ -14,7 +20,10 @@ export class ReorderQuestionItem {
 }
 
 export class ReorderQuestionsRequest {
-  @ApiProperty({ description: 'Danh sách thứ tự câu hỏi', type: [ReorderQuestionItem] })
+  @ApiProperty({
+    description: 'Danh sách thứ tự câu hỏi',
+    type: [ReorderQuestionItem]
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ReorderQuestionItem)

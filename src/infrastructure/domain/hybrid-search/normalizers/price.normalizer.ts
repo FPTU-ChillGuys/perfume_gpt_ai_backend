@@ -9,7 +9,10 @@ import { z } from 'zod';
 export const PriceNormalizerSchema = z.object({
   min: z.number().optional().describe('Giá tối thiểu (VND)'),
   max: z.number().optional().describe('Giá tối đa (VND)'),
-  operator: z.enum(['lt', 'lte', 'gt', 'gte', 'between']).optional().describe('Toán tử so sánh'),
+  operator: z
+    .enum(['lt', 'lte', 'gt', 'gte', 'between'])
+    .optional()
+    .describe('Toán tử so sánh')
 });
 
 export class PriceNormalizerOutput {
@@ -19,9 +22,9 @@ export class PriceNormalizerOutput {
   @ApiPropertyOptional({ description: 'Giá tối đa (VND)' })
   max?: number;
 
-  @ApiPropertyOptional({ 
-    description: 'Toán tử so sánh', 
-    enum: ['lt', 'lte', 'gt', 'gte', 'between'] 
+  @ApiPropertyOptional({
+    description: 'Toán tử so sánh',
+    enum: ['lt', 'lte', 'gt', 'gte', 'between']
   })
   operator?: 'lt' | 'lte' | 'gt' | 'gte' | 'between';
 }
@@ -35,8 +38,10 @@ export class PriceNormalizer {
   private readonly logger = new Logger(PriceNormalizer.name);
 
   private readonly priceRegex = /(\d+(?:[\.,]\d+)?)\s*(triệu|tr|m)/i;
-  private readonly rangeRegex = /(\d+(?:[\.,]\d+)?)\s*(?:-|đến|tới|to)\s*(\d+(?:[\.,]\d+)?)\s*(triệu|tr|m)/i;
-  private readonly lessThanPattern = /dưới|<=|less than|under|tối đa|không quá/i;
+  private readonly rangeRegex =
+    /(\d+(?:[\.,]\d+)?)\s*(?:-|đến|tới|to)\s*(\d+(?:[\.,]\d+)?)\s*(triệu|tr|m)/i;
+  private readonly lessThanPattern =
+    /dưới|<=|less than|under|tối đa|không quá/i;
   private readonly greaterThanPattern = /trên|>=|more than|over|ít nhất|từ/i;
 
   async normalize(searchText: string): Promise<PriceNormalizerOutput | null> {

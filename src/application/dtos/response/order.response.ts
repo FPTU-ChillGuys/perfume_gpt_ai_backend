@@ -222,10 +222,23 @@ export class OrderResponse {
 
   @ApiProperty({
     description: 'Order status',
-    enum: ['Pending', 'Processing', 'Shipped', 'Delivered', 'Canceled', 'Returned'],
+    enum: [
+      'Pending',
+      'Processing',
+      'Shipped',
+      'Delivered',
+      'Canceled',
+      'Returned'
+    ],
     example: 'Pending'
   })
-  orderStatus: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Canceled' | 'Returned';
+  orderStatus:
+    | 'Pending'
+    | 'Processing'
+    | 'Shipped'
+    | 'Delivered'
+    | 'Canceled'
+    | 'Returned';
 
   @ApiProperty({
     description: 'Total amount of the order',

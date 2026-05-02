@@ -18,7 +18,10 @@ export class SurveyAnswerMapper {
     return entities.map((entity) => this.toResponse(entity));
   }
 
-  static toEntity(request: SurveyAnswerRequest, question?: SurveyQuestion): SurveyAnswer {
+  static toEntity(
+    request: SurveyAnswerRequest,
+    question?: SurveyQuestion
+  ): SurveyAnswer {
     const surveyAnswer = new SurveyAnswer({
       answer: request.answer
     });
@@ -31,11 +34,17 @@ export class SurveyAnswerMapper {
     return surveyAnswer;
   }
 
-  static toEntityList(requests: SurveyAnswerRequest[], question?: SurveyQuestion): SurveyAnswer[] {
+  static toEntityList(
+    requests: SurveyAnswerRequest[],
+    question?: SurveyQuestion
+  ): SurveyAnswer[] {
     return requests.map((request) => this.toEntity(request, question));
   }
 
-  static updateEntity(entity: SurveyAnswer, request: SurveyAnswerRequest): SurveyAnswer {
+  static updateEntity(
+    entity: SurveyAnswer,
+    request: SurveyAnswerRequest
+  ): SurveyAnswer {
     if (request.answer) {
       entity.answer = request.answer;
     }
@@ -43,4 +52,3 @@ export class SurveyAnswerMapper {
     return entity;
   }
 }
-

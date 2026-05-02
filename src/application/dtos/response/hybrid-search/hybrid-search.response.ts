@@ -4,10 +4,17 @@ import { ProductWithVariantsResponse } from 'src/application/dtos/response/produ
 import { NormalizedQueryFilters } from 'src/infrastructure/domain/hybrid-search/normalizers/orchestrator';
 
 export class HybridSearchResponse extends PagedResult<ProductWithVariantsResponse> {
-  @ApiProperty({ description: 'Danh sách bản ghi', type: () => [ProductWithVariantsResponse] })
+  @ApiProperty({
+    description: 'Danh sách bản ghi',
+    type: () => [ProductWithVariantsResponse]
+  })
   declare items: ProductWithVariantsResponse[];
 
-  @ApiPropertyOptional({ description: 'Filters found in query', type: () => NormalizedQueryFilters, nullable: true })
+  @ApiPropertyOptional({
+    description: 'Filters found in query',
+    type: () => NormalizedQueryFilters,
+    nullable: true
+  })
   queryFilters?: NormalizedQueryFilters | null;
 
   @ApiProperty({ description: 'Whether vector similarity was used' })

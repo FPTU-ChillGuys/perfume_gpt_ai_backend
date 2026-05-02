@@ -4,7 +4,10 @@ import { SurveyAnswerMapper } from './survey-answer.mapper';
 import { SurveyQuestionRequest } from 'src/application/dtos/request/survey-question.request';
 
 export class SurveyQuestionMapper {
-  static toResponse(entity: SurveyQuestion, includeAnswers: boolean = false): SurveyQuestionResponse {
+  static toResponse(
+    entity: SurveyQuestion,
+    includeAnswers: boolean = false
+  ): SurveyQuestionResponse {
     const response = new SurveyQuestionResponse({
       id: entity.id,
       questionType: entity.questionType,
@@ -15,13 +18,18 @@ export class SurveyQuestionMapper {
     });
 
     if (includeAnswers && entity.answers.isInitialized()) {
-      response.answers = SurveyAnswerMapper.toResponseList(entity.answers.getItems());
+      response.answers = SurveyAnswerMapper.toResponseList(
+        entity.answers.getItems()
+      );
     }
 
     return response;
   }
 
-  static toResponseList(entities: SurveyQuestion[], includeAnswers: boolean = false): SurveyQuestionResponse[] {
+  static toResponseList(
+    entities: SurveyQuestion[],
+    includeAnswers: boolean = false
+  ): SurveyQuestionResponse[] {
     return entities.map((entity) => this.toResponse(entity, includeAnswers));
   }
 
@@ -34,7 +42,7 @@ export class SurveyQuestionMapper {
 
     // Map answers if provided
     if (request.answers && request.answers.length > 0) {
-      const answers = request.answers.map(answerRequest =>
+      const answers = request.answers.map((answerRequest) =>
         SurveyAnswerMapper.toEntity(answerRequest, surveyQuestion)
       );
       surveyQuestion.answers.set(answers);
@@ -47,7 +55,10 @@ export class SurveyQuestionMapper {
     return requests.map((request) => this.toEntity(request));
   }
 
-  static updateEntity(entity: SurveyQuestion, request: SurveyQuestionRequest): SurveyQuestion {
+  static updateEntity(
+    entity: SurveyQuestion,
+    request: SurveyQuestionRequest
+  ): SurveyQuestion {
     if (request.questionType !== undefined) {
       entity.questionType = request.questionType;
     }
@@ -61,7 +72,7 @@ export class SurveyQuestionMapper {
     }
 
     if (request.answers) {
-      const answers = request.answers.map(answerRequest =>
+      const answers = request.answers.map((answerRequest) =>
         SurveyAnswerMapper.toEntity(answerRequest, entity)
       );
       entity.answers.set(answers);

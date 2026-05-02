@@ -7,24 +7,24 @@ export class TextNormalizer {
    */
   static clean(text: string | null | undefined): string {
     if (!text) return '';
-    
+
     let result = text;
-    
+
     // 1. Strip HTML
     result = result.replace(/<[^>]*>?/gm, ' ');
-    
+
     // 2. Lowercase
     result = result.toLowerCase();
-    
+
     // 3. Normalize Vietnamese (Bỏ dấu)
     result = this.removeVietnameseTones(result);
-    
+
     // 4. Remove special characters (chỉ giữ lại chữ cái, số và khoảng trắng)
     result = result.replace(/[^a-z0-9\s]/g, ' ');
-    
+
     // 5. Clean extra whitespaces
     result = result.replace(/\s+/g, ' ').trim();
-    
+
     return result;
   }
 
@@ -33,7 +33,10 @@ export class TextNormalizer {
    */
   static stripHtml(text: string | null | undefined): string {
     if (!text) return '';
-    return text.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+    return text
+      .replace(/<[^>]*>?/gm, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
@@ -47,10 +50,10 @@ export class TextNormalizer {
     str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, 'u');
     str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, 'y');
     str = str.replace(/đ/g, 'd');
-    
+
     // Xử lý các ký tự Unicode tổ hợp
     str = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    
+
     return str;
   }
 }

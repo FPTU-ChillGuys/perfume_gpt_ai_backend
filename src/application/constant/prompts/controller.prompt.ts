@@ -37,8 +37,7 @@ export const conversationTestSystemPrompt = (
   systemPrompt: string,
   userLogPromptText: string,
   orderReportText: string
-): string =>
-  `${systemPrompt}\n${userLogPromptText}\n${orderReportText}`;
+): string => `${systemPrompt}\n${userLogPromptText}\n${orderReportText}`;
 
 // ==================== Trend Prompts ====================
 
@@ -104,9 +103,9 @@ export const recommendationReportPrompt = (reportPrompt: string): string =>
  * Cung cấp context: summary report để tóm tắt sở thích người dùng.
  * Hành vi được điều khiển bởi Admin Instruction domain "recommendation".
  */
-export const recommendationSummaryPrompt = (summaryReportPrompt: string): string =>
-  `[DỮ LIỆU TÓM TẮT HÀNH VI NGƯỜI DÙNG]\n${summaryReportPrompt}`;
-
+export const recommendationSummaryPrompt = (
+  summaryReportPrompt: string
+): string => `[DỮ LIỆU TÓM TẮT HÀNH VI NGƯỜI DÙNG]\n${summaryReportPrompt}`;
 
 // ==================== Survey Prompts ====================
 

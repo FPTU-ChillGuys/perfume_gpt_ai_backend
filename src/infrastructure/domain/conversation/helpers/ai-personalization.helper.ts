@@ -29,12 +29,15 @@ export class AIPersonalizationHelper {
       return [];
     }
 
-    if (!['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)) {
+    if (
+      !['Search', 'Consult', 'Recommend', 'Compare'].includes(analysis.intent)
+    ) {
       return [];
     }
 
     try {
-      const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
+      const payload =
+        await this.profileTool.getProfileRecommendationContextPayload(userId);
       if (!payload || payload.source === 'none') {
         return [];
       }
@@ -64,9 +67,18 @@ export class AIPersonalizationHelper {
       const surveyToon = payload?.toonContext?.surveyDataToon?.encoded;
       const profileToon = payload?.toonContext?.profileDataToon?.encoded;
 
-      if (orderToon) messages.push(this.createSystemMessage(`ORDER_CONTEXT_TOON: ${orderToon}`));
-      if (surveyToon) messages.push(this.createSystemMessage(`SURVEY_CONTEXT_TOON: ${surveyToon}`));
-      if (profileToon) messages.push(this.createSystemMessage(`PROFILE_CONTEXT_TOON: ${profileToon}`));
+      if (orderToon)
+        messages.push(
+          this.createSystemMessage(`ORDER_CONTEXT_TOON: ${orderToon}`)
+        );
+      if (surveyToon)
+        messages.push(
+          this.createSystemMessage(`SURVEY_CONTEXT_TOON: ${surveyToon}`)
+        );
+      if (profileToon)
+        messages.push(
+          this.createSystemMessage(`PROFILE_CONTEXT_TOON: ${profileToon}`)
+        );
 
       return messages;
     } catch (error) {

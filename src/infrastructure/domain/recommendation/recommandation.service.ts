@@ -3,7 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Output, UIMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
-import { INSTRUCTION_TYPE_RECOMMENDATION, INSTRUCTION_TYPE_REPURCHASE } from 'src/application/constant/prompts';
+import {
+  INSTRUCTION_TYPE_RECOMMENDATION,
+  INSTRUCTION_TYPE_REPURCHASE
+} from 'src/application/constant/prompts';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { InternalServerErrorWithDetailsException } from 'src/application/common/exceptions/http-with-details.exception';
 import { Ok } from 'src/application/dtos/response/common/success-response';
@@ -12,7 +15,11 @@ import { buildCombinedPromptV5 } from 'src/infrastructure/domain/utils/prompt-bu
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { AI_RECOMMENDATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
-import { EmailService, EmailProduct, EmailTemplate } from 'src/infrastructure/domain/common/mail.service';
+import {
+  EmailService,
+  EmailProduct,
+  EmailTemplate
+} from 'src/infrastructure/domain/common/mail.service';
 import {
   ActiveDailyRecommendationRecipient,
   UserService
@@ -25,7 +32,6 @@ import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { ProfileTool } from 'src/chatbot/tools/profile.tool';
-
 
 export type DailyRecommendationTrigger = 'cron' | 'manual';
 type DailyRecommendationUserResult =
@@ -63,10 +69,12 @@ export class RecommendationService {
     private readonly prisma: PrismaService,
     private readonly aiAcceptanceService: AIAcceptanceService,
     private readonly profileTool: ProfileTool
-  ) { }
+  ) {}
 
   private uniqueKeywords(items: string[]): string[] {
-    return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean))).slice(0, 16);
+    return Array.from(
+      new Set(items.map((item) => item.trim()).filter(Boolean))
+    ).slice(0, 16);
   }
 
   private splitTerms(input?: string | null): string[] {
@@ -78,17 +86,21 @@ export class RecommendationService {
   }
 
   private async hasPurchaseHistory(userId: string): Promise<boolean> {
-    const orderResponse = await this.orderService.getOrderDetailsWithOrdersByUserId(userId);
-    return Boolean(orderResponse.success && (orderResponse.data?.length ?? 0) > 0);
+    const orderResponse =
+      await this.orderService.getOrderDetailsWithOrdersByUserId(userId);
+    return Boolean(
+      orderResponse.success && (orderResponse.data?.length ?? 0) > 0
+    );
   }
 
   private async buildNoPurchaseFallbackResponse(): Promise<string> {
-    const newestProductsResponse = await this.productService.getNewestProductsWithVariants({
-      PageNumber: 1,
-      PageSize: 5,
-      SortOrder: 'desc',
-      IsDescending: true
-    });
+    const newestProductsResponse =
+      await this.productService.getNewestProductsWithVariants({
+        PageNumber: 1,
+        PageSize: 5,
+        SortOrder: 'desc',
+        IsDescending: true
+      });
 
     const products = newestProductsResponse.success
       ? (newestProductsResponse.data?.items ?? [])
@@ -113,11 +125,14 @@ export class RecommendationService {
       Output.object(searchOutput)
     );
     if (!response.success) {
-      throw new InternalServerErrorWithDetailsException('Failed to get AI recommendation response', {
-        userId,
-        service: 'AIHelper',
-        endpoint
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to get AI recommendation response',
+        {
+          userId,
+          service: 'AIHelper',
+          endpoint
+        }
+      );
     }
     return response.data ?? '';
   }
@@ -146,12 +161,19 @@ export class RecommendationService {
     // Step 1: Fetch products from Simple Recommendation (always has results)
     let simpleResult: BaseResponse<any> | null = null;
     if (contextType === 'repurchase' && options.orderId) {
-      simpleResult = await this.getRepurchaseRecommendationsSimple(userId, options.orderId as string, limit);
+      simpleResult = await this.getRepurchaseRecommendationsSimple(
+        userId,
+        options.orderId as string,
+        limit
+      );
     } else {
       simpleResult = await this.getRecommendationsSimple(userId, limit);
     }
-    
-    const simpleRecs: any[] = (simpleResult && simpleResult.success) ? (simpleResult.data?.recommendations ?? []) : [];
+
+    const simpleRecs: any[] =
+      simpleResult && simpleResult.success
+        ? (simpleResult.data?.recommendations ?? [])
+        : [];
 
     // Map to the minimal format the AI understands (same as conversationV10)
     const minimalProducts = simpleRecs.map((rec: any) => ({
@@ -167,7 +189,8 @@ export class RecommendationService {
       source: rec.source ?? 'RECOMMENDATION'
     }));
 
-    const tag = contextType === 'repurchase' ? '[REPURCHASE]' : '[RECOMMENDATION]';
+    const tag =
+      contextType === 'repurchase' ? '[REPURCHASE]' : '[RECOMMENDATION]';
 
     this.logger.log(
       `${tag}[TOON_INJECT] userId=${userId} injecting ${minimalProducts.length} products into AI context`
@@ -179,20 +202,52 @@ export class RecommendationService {
     // Inject Persona Context if available (Point 2: Pattern Conversation V10)
     if (options.personalizationPayload) {
       const p = options.personalizationPayload;
-      const sourcePriority = Array.isArray(p.sourcePriority) ? p.sourcePriority.join(' > ') : 'INPUT > ORDER > PROFILE';
-      
-      messages.push({ id: uuid(), role: 'system', parts: [{ type: 'text', text: `PERSONALIZATION_SOURCE_PRIORITY: ${sourcePriority}` }] });
-      messages.push({ id: uuid(), role: 'system', parts: [{ type: 'text', text: `PERSONALIZATION_CONTEXT_SUMMARY: ${JSON.stringify(p.contextSummaries || {})}` }] });
-      
+      const sourcePriority = Array.isArray(p.sourcePriority)
+        ? p.sourcePriority.join(' > ')
+        : 'INPUT > ORDER > PROFILE';
+
+      messages.push({
+        id: uuid(),
+        role: 'system',
+        parts: [
+          {
+            type: 'text',
+            text: `PERSONALIZATION_SOURCE_PRIORITY: ${sourcePriority}`
+          }
+        ]
+      });
+      messages.push({
+        id: uuid(),
+        role: 'system',
+        parts: [
+          {
+            type: 'text',
+            text: `PERSONALIZATION_CONTEXT_SUMMARY: ${JSON.stringify(p.contextSummaries || {})}`
+          }
+        ]
+      });
+
       const orderToon = p?.toonContext?.orderDataToon?.encoded;
       const profileToon = p?.toonContext?.profileDataToon?.encoded;
-      if (orderToon) messages.push({ id: uuid(), role: 'system', parts: [{ type: 'text', text: `ORDER_CONTEXT_TOON: ${orderToon}` }] });
-      if (profileToon) messages.push({ id: uuid(), role: 'system', parts: [{ type: 'text', text: `PROFILE_CONTEXT_TOON: ${profileToon}` }] });
+      if (orderToon)
+        messages.push({
+          id: uuid(),
+          role: 'system',
+          parts: [{ type: 'text', text: `ORDER_CONTEXT_TOON: ${orderToon}` }]
+        });
+      if (profileToon)
+        messages.push({
+          id: uuid(),
+          role: 'system',
+          parts: [
+            { type: 'text', text: `PROFILE_CONTEXT_TOON: ${profileToon}` }
+          ]
+        });
     }
 
     const encodedContext = encodeToolOutput(minimalProducts);
     const encoded = encodedContext.encoded;
-    
+
     this.logger.log(
       `${tag}[TOON_ENCODED] size=${encoded.length}/${encodedContext.originalSize} ratio=${encodedContext.compressionRatio}%`
     );
@@ -216,44 +271,59 @@ export class RecommendationService {
       Output.object(searchOutput)
     );
 
-    const rawMessage = aiResponse.success ? aiResponse.data ?? '' : '';
-    this.logger.log(`${tag}[AI_RAW] length=${rawMessage.length} preview=${String(rawMessage).slice(0, 120)}`);
+    const rawMessage = aiResponse.success ? (aiResponse.data ?? '') : '';
+    this.logger.log(
+      `${tag}[AI_RAW] length=${rawMessage.length} preview=${String(rawMessage).slice(0, 120)}`
+    );
 
-    let parsedAI: { message?: string; productTemp?: any[]; products?: any[] } = {};
+    let parsedAI: { message?: string; productTemp?: any[]; products?: any[] } =
+      {};
     try {
-      parsedAI = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
+      parsedAI =
+        typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
     } catch {
       parsedAI = { message: rawMessage };
     }
 
     const aiMessage = parsedAI.message ?? '';
 
-    // Step 4: Hydrate productTemp exactly like conversationV10, but fallback to "products" 
+    // Step 4: Hydrate productTemp exactly like conversationV10, but fallback to "products"
     // because the instruction prompts often tell the AI to use the "products" array.
     let emailProducts: EmailProduct[] = [];
-    let productTemp = Array.isArray(parsedAI.productTemp) && parsedAI.productTemp.length > 0
-      ? parsedAI.productTemp
-      : (Array.isArray(parsedAI.products) ? parsedAI.products : []);
+    let productTemp =
+      Array.isArray(parsedAI.productTemp) && parsedAI.productTemp.length > 0
+        ? parsedAI.productTemp
+        : Array.isArray(parsedAI.products)
+          ? parsedAI.products
+          : [];
 
-    this.logger.log(`${tag}[PRODUCT_TEMP] productTempCount=${productTemp.length} ids=[${productTemp.map((p:any) => p.id).join(',')}]`);
+    this.logger.log(
+      `${tag}[PRODUCT_TEMP] productTempCount=${productTemp.length} ids=[${productTemp.map((p: any) => p.id).join(',')}]`
+    );
 
     if (productTemp.length > 0) {
-      const ids = productTemp.map((item: any) => item.id).filter((id: any) => !!id);
+      const ids = productTemp
+        .map((item: any) => item.id)
+        .filter((id: any) => !!id);
       if (ids.length > 0) {
-        const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+        const productResponse =
+          await this.productService.getProductsByIdsForOutput(ids);
         if (productResponse.success && Array.isArray(productResponse.data)) {
           const recommendationsMap = new Map<string, Set<string>>();
           productTemp.forEach((item: any) => {
             if (item.id && Array.isArray(item.variants)) {
-              recommendationsMap.set(item.id, new Set(item.variants.map((v: any) => v.id)));
+              recommendationsMap.set(
+                item.id,
+                new Set(item.variants.map((v: any) => v.id))
+              );
             }
           });
 
           emailProducts = productResponse.data
             .map((product) => {
               const allowedVariantIds = recommendationsMap.get(product.id);
-              const variants = (product.variants || []).filter(v =>
-                !allowedVariantIds || allowedVariantIds.has(v.id)
+              const variants = (product.variants || []).filter(
+                (v) => !allowedVariantIds || allowedVariantIds.has(v.id)
               );
               if (variants.length === 0) return null;
               return this.mapProductCardOutputToEmailProduct(product, variants);
@@ -270,15 +340,23 @@ export class RecommendationService {
         `[RecommendationService][V10_PATTERN] userId=${userId} productTemp hydration failed, falling back to Simple products directly`
       );
       const ids = simpleRecs.map((r: any) => r.productId).filter(Boolean);
-      const productResponse = await this.productService.getProductsByIdsForOutput(ids);
+      const productResponse =
+        await this.productService.getProductsByIdsForOutput(ids);
       if (productResponse.success && Array.isArray(productResponse.data)) {
         emailProducts = productResponse.data
-          .map((product) => this.mapProductCardOutputToEmailProduct(product, product.variants || []))
+          .map((product) =>
+            this.mapProductCardOutputToEmailProduct(
+              product,
+              product.variants || []
+            )
+          )
           .slice(0, limit);
       }
     }
 
-    this.logger.log(`${tag}[HYDRATION_DONE] emailProductsCount=${emailProducts.length} ids=[${emailProducts.map(p => p.id).join(',')}]`);
+    this.logger.log(
+      `${tag}[HYDRATION_DONE] emailProductsCount=${emailProducts.length} ids=[${emailProducts.map((p) => p.id).join(',')}]`
+    );
 
     return { message: aiMessage, emailProducts };
   }
@@ -309,18 +387,23 @@ export class RecommendationService {
     };
   }
 
-  async generateRecommendationText(userId: string): Promise<BaseResponse<string>> {
+  async generateRecommendationText(
+    userId: string
+  ): Promise<BaseResponse<string>> {
     const promptResult = await buildCombinedPromptV5(
       INSTRUCTION_TYPE_RECOMMENDATION,
       this.adminInstructionService,
       userId
     );
     if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
-        userId,
-        service: 'PromptBuilder',
-        endpoint: 'generateRecommendationText'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          service: 'PromptBuilder',
+          endpoint: 'generateRecommendationText'
+        }
+      );
     }
     const text = await this.generateAIText(
       promptResult.data.combinedPrompt,
@@ -335,7 +418,8 @@ export class RecommendationService {
     userId: string,
     hasPurchaseHistoryOverride?: boolean
   ): Promise<BaseResponse<string>> {
-    const hasPurchaseHistory = hasPurchaseHistoryOverride ?? (await this.hasPurchaseHistory(userId));
+    const hasPurchaseHistory =
+      hasPurchaseHistoryOverride ?? (await this.hasPurchaseHistory(userId));
 
     if (!hasPurchaseHistory) {
       const fallback = await this.buildNoPurchaseFallbackResponse();
@@ -348,11 +432,14 @@ export class RecommendationService {
       userId
     );
     if (!promptResult.success || !promptResult.data) {
-      throw new InternalServerErrorWithDetailsException('Failed to build combined prompt', {
-        userId,
-        service: 'PromptBuilder',
-        endpoint: 'generateRepurchaseText'
-      });
+      throw new InternalServerErrorWithDetailsException(
+        'Failed to build combined prompt',
+        {
+          userId,
+          service: 'PromptBuilder',
+          endpoint: 'generateRepurchaseText'
+        }
+      );
     }
     const text = await this.generateAIText(
       promptResult.data.combinedPrompt,
@@ -381,15 +468,16 @@ export class RecommendationService {
       return [];
     }
 
-    const attachResult = await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-      contextType,
-      sourceRefId,
-      products,
-      metadata: {
-        channel: 'email',
-        productCount: products.length
-      }
-    });
+    const attachResult =
+      await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+        contextType,
+        sourceRefId,
+        products,
+        metadata: {
+          channel: 'email',
+          productCount: products.length
+        }
+      });
 
     return attachResult.products as EmailProduct[];
   }
@@ -402,7 +490,7 @@ export class RecommendationService {
       (variant) => variant.status?.toLowerCase() === 'active'
     );
     const sourceVariants =
-      activeVariants.length > 0 ? activeVariants : product.variants ?? [];
+      activeVariants.length > 0 ? activeVariants : (product.variants ?? []);
 
     const variants = sourceVariants.slice(0, 3).map((variant) => ({
       id: variant.id,
@@ -429,7 +517,8 @@ export class RecommendationService {
     return {
       id: product.id,
       name: product.name,
-      description: product.description || 'Hương nước hoa được gợi ý theo hồ sơ của bạn.',
+      description:
+        product.description || 'Hương nước hoa được gợi ý theo hồ sơ của bạn.',
       brandName: product.brandName,
       categoryName: product.categoryName || 'Perfume',
       primaryImage: product.primaryImage ?? undefined,
@@ -441,21 +530,26 @@ export class RecommendationService {
     userId: string
   ): Promise<EmailProduct[]> {
     try {
-      const systemPrompt = '📧 Bạn là chuyên gia tư vấn nước hoa cá nhân hóa của PerfumeGPT. Dựa trên RECOMMENDATION_CONTEXT, viết lời chào cá nhân đến khách hàng và gợi ý các sản phẩm trong context.';
-      const combinedPrompt = 'Hãy viết lời tư vấn chân thành cho khách hàng dựa trên các sản phẩm trong RECOMMENDATION_CONTEXT.';
+      const systemPrompt =
+        '📧 Bạn là chuyên gia tư vấn nước hoa cá nhân hóa của PerfumeGPT. Dựa trên RECOMMENDATION_CONTEXT, viết lời chào cá nhân đến khách hàng và gợi ý các sản phẩm trong context.';
+      const combinedPrompt =
+        'Hãy viết lời tư vấn chân thành cho khách hàng dựa trên các sản phẩm trong RECOMMENDATION_CONTEXT.';
 
-      const { message, emailProducts } = await this.generateRecommendationTextWithProducts(
-        userId,
-        systemPrompt,
-        combinedPrompt,
-        {
-          limit: this.dailyRecommendationProductLimit,
-          contextType: 'recommendation'
-        }
-      );
+      const { message, emailProducts } =
+        await this.generateRecommendationTextWithProducts(
+          userId,
+          systemPrompt,
+          combinedPrompt,
+          {
+            limit: this.dailyRecommendationProductLimit,
+            contextType: 'recommendation'
+          }
+        );
 
       if (emailProducts.length === 0) {
-        this.logger.warn(`${this.dailyRecommendationTag}[V3_EMPTY] userId=${userId} reason=NO_PRODUCTS_AFTER_AI`);
+        this.logger.warn(
+          `${this.dailyRecommendationTag}[V3_EMPTY] userId=${userId} reason=NO_PRODUCTS_AFTER_AI`
+        );
         return [];
       }
 
@@ -466,8 +560,11 @@ export class RecommendationService {
         `daily-recommendation-${userId}-${Date.now()}`
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.warn(`${this.dailyRecommendationTag}[V3_FAIL] userId=${userId} error=${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.warn(
+        `${this.dailyRecommendationTag}[V3_FAIL] userId=${userId} error=${errorMessage}`
+      );
       return [];
     }
   }
@@ -558,7 +655,8 @@ export class RecommendationService {
 
     for (const recipient of recipients) {
       try {
-        const result = await this.sendDailyRecommendationForRecipient(recipient);
+        const result =
+          await this.sendDailyRecommendationForRecipient(recipient);
         if (result === 'sent') {
           sentCount += 1;
         } else if (result === 'skipped-no-recommendation') {
@@ -613,23 +711,32 @@ export class RecommendationService {
         userId
       );
 
-      const systemPrompt = promptResult.success ? (promptResult.data?.adminInstruction ?? '') : '';
-      const combinedPrompt = promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : '';
+      const systemPrompt = promptResult.success
+        ? (promptResult.data?.adminInstruction ?? '')
+        : '';
+      const combinedPrompt = promptResult.success
+        ? (promptResult.data?.combinedPrompt ?? '')
+        : '';
 
-      const { message, emailProducts } = await this.generateRecommendationTextWithProducts(
-        userId,
-        systemPrompt,
-        combinedPrompt,
-        { limit: 3, contextType: 'recommendation' }
-      );
+      const { message, emailProducts } =
+        await this.generateRecommendationTextWithProducts(
+          userId,
+          systemPrompt,
+          combinedPrompt,
+          { limit: 3, contextType: 'recommendation' }
+        );
 
-      const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://perfumegpt.com');
-      const productsWithAcceptance = await this.attachAcceptanceForEmailProducts(
-        userId,
-        'recommendation',
-        emailProducts,
-        `recommendation-email-${userId}-${Date.now()}`
+      const frontendUrl = this.configService.get<string>(
+        'FRONTEND_URL',
+        'https://perfumegpt.com'
       );
+      const productsWithAcceptance =
+        await this.attachAcceptanceForEmailProducts(
+          userId,
+          'recommendation',
+          emailProducts,
+          `recommendation-email-${userId}-${Date.now()}`
+        );
 
       await this.emailService.sendTemplateEmail(
         email,
@@ -643,21 +750,30 @@ export class RecommendationService {
           frontendUrl
         }
       );
-      this.logger.log(`Sent recommendation email to ${email} for user ${userId}`);
+      this.logger.log(
+        `Sent recommendation email to ${email} for user ${userId}`
+      );
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send recommendation for user ${userId}:`, error);
+      this.logger.error(
+        `Failed to send recommendation for user ${userId}:`,
+        error
+      );
       return false;
     }
   }
 
   async sendRepurchase(userId: string, orderId: string): Promise<boolean> {
     try {
-      this.logger.log(`[REPURCHASE][START] userId=${userId} orderId=${orderId}`);
+      this.logger.log(
+        `[REPURCHASE][START] userId=${userId} orderId=${orderId}`
+      );
 
       const userInfo = await this.userService.getUserEmailInfo(userId);
       if (!userInfo.success || !userInfo.payload) {
-        this.logger.error(`[REPURCHASE][ERROR] Failed to get user info for user ${userId}`);
+        this.logger.error(
+          `[REPURCHASE][ERROR] Failed to get user info for user ${userId}`
+        );
         return false;
       }
       const { email, userName } = userInfo.payload;
@@ -667,7 +783,9 @@ export class RecommendationService {
       const order = orderRes.success ? orderRes.payload : null;
       const orderItems = order?.orderDetails ?? [];
 
-      this.logger.log(`[REPURCHASE][ORDER_FETCHED] orderId=${orderId} itemCount=${orderItems.length}`);
+      this.logger.log(
+        `[REPURCHASE][ORDER_FETCHED] orderId=${orderId} itemCount=${orderItems.length}`
+      );
 
       // Build rich combinedPrompt with ordered items context
       const promptResult = await buildCombinedPromptV5(
@@ -675,12 +793,17 @@ export class RecommendationService {
         this.adminInstructionService,
         userId
       );
-      const systemPrompt = promptResult.success ? (promptResult.data?.adminInstruction ?? '') : '';
+      const systemPrompt = promptResult.success
+        ? (promptResult.data?.adminInstruction ?? '')
+        : '';
 
       // Build an order summary table for AI to understand what was purchased
-      const orderTableRows = orderItems.map(item =>
-        `| ${item.variantName} | ${item.quantity} | ${item.unitPrice.toLocaleString('vi-VN')}₫ |`
-      ).join('\n');
+      const orderTableRows = orderItems
+        .map(
+          (item) =>
+            `| ${item.variantName} | ${item.quantity} | ${item.unitPrice.toLocaleString('vi-VN')}₫ |`
+        )
+        .join('\n');
 
       const repurchaseCombinedPrompt = `
 Khách hàng ${userName || userId} vừa chọn mua các sản phẩm từ đơn hàng #${orderId} tại PerfumeGPT:
@@ -697,26 +820,41 @@ Sau đó, dựa trên RECOMMENDATION_CONTEXT, hãy tư vấn cho họ:
 Hãy viết lời tư vấn thật tự nhiên và chuyên nghiệp.
 ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim();
 
-      this.logger.log(`[REPURCHASE][PROMPT_BUILT] combinedPrompt length=${repurchaseCombinedPrompt.length}`);
-
-      const personaPayload = await this.profileTool.getProfileRecommendationContextPayload(userId);
-
-      const { message, emailProducts } = await this.generateRecommendationTextWithProducts(
-        userId,
-        systemPrompt,
-        repurchaseCombinedPrompt,
-        { limit: 3, contextType: 'repurchase', orderId, personalizationPayload: personaPayload }
+      this.logger.log(
+        `[REPURCHASE][PROMPT_BUILT] combinedPrompt length=${repurchaseCombinedPrompt.length}`
       );
 
-      this.logger.log(`[REPURCHASE][AI_DONE] userId=${userId} message length=${message.length} emailProductsCount=${emailProducts.length}`);
+      const personaPayload =
+        await this.profileTool.getProfileRecommendationContextPayload(userId);
 
-      const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://perfumegpt.com');
-      const productsWithAcceptance = await this.attachAcceptanceForEmailProducts(
-        userId,
-        'repurchase',
-        emailProducts,
-        `repurchase-email-${userId}-${Date.now()}`
+      const { message, emailProducts } =
+        await this.generateRecommendationTextWithProducts(
+          userId,
+          systemPrompt,
+          repurchaseCombinedPrompt,
+          {
+            limit: 3,
+            contextType: 'repurchase',
+            orderId,
+            personalizationPayload: personaPayload
+          }
+        );
+
+      this.logger.log(
+        `[REPURCHASE][AI_DONE] userId=${userId} message length=${message.length} emailProductsCount=${emailProducts.length}`
       );
+
+      const frontendUrl = this.configService.get<string>(
+        'FRONTEND_URL',
+        'https://perfumegpt.com'
+      );
+      const productsWithAcceptance =
+        await this.attachAcceptanceForEmailProducts(
+          userId,
+          'repurchase',
+          emailProducts,
+          `repurchase-email-${userId}-${Date.now()}`
+        );
 
       await this.emailService.sendTemplateEmail(
         email,
@@ -726,16 +864,21 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
           userName: userName || 'Khách hàng',
           heading: 'Dựa trên đơn hàng của bạn, chúng tôi có một số gợi ý mới',
           message,
-          orderItems,   // order detail table for email template
+          orderItems, // order detail table for email template
           products: productsWithAcceptance,
           frontendUrl,
           savingsPercent: '15'
         }
       );
-      this.logger.log(`[REPURCHASE][EMAIL_SENT] email=${email} userId=${userId} orderId=${orderId} productCount=${productsWithAcceptance.length}`);
+      this.logger.log(
+        `[REPURCHASE][EMAIL_SENT] email=${email} userId=${userId} orderId=${orderId} productCount=${productsWithAcceptance.length}`
+      );
       return true;
     } catch (error) {
-      this.logger.error(`[REPURCHASE][FAILED] userId=${userId} orderId=${orderId}`, error);
+      this.logger.error(
+        `[REPURCHASE][FAILED] userId=${userId} orderId=${orderId}`,
+        error
+      );
       return false;
     }
   }
@@ -754,7 +897,9 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
   // @Cron(CronExpression.EVERY_DAY_AT_9AM, { timeZone: 'Asia/Ho_Chi_Minh' }) // Chạy vào 9h sáng mỗi ngày
   async sendRepurchaseToAllUsers(): Promise<void> {
-    this.logger.log('Bắt đầu chạy cron job: Gửi daily repurchase cho tất cả người dùng (SKIPPED vì cần orderId)');
+    this.logger.log(
+      'Bắt đầu chạy cron job: Gửi daily repurchase cho tất cả người dùng (SKIPPED vì cần orderId)'
+    );
     // Ghi chú: Kịch bản mới bắt buộc có orderId, CronJob này cần được thiết kế lại
     // theo logic lấy các đơn hàng Delivered sau 1 khoảng thời gian thay vì lặp qua toàn bộ User.
   }
@@ -779,7 +924,8 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     hasPreferences: boolean;
     contextSummaries: Record<string, any>;
   }> {
-    const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
+    const payload =
+      await this.profileTool.getProfileRecommendationContextPayload(userId);
 
     const source = payload?.source ?? 'none';
     const userType = source === 'none' ? 'new_user' : 'returning_user';
@@ -792,9 +938,7 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     // e.g. "Dior Sauvage EDT 100ml" → "Dior"
     const topBrands = Array.from(
       new Set(
-        topOrderProducts
-          .map(name => name.split(' ')[0])
-          .filter(Boolean)
+        topOrderProducts.map((name) => name.split(' ')[0]).filter(Boolean)
       )
     ).slice(0, 3);
 
@@ -808,21 +952,25 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     // Note: PurchasedProductIds are not encoded in toon; we keep this set empty here.
     // Brand/product sub-queries already exclude via label matching.
 
-    const hasPreferences = source !== 'none' && (topOrderProducts.length > 0 || profileKeywords.length > 0);
+    const hasPreferences =
+      source !== 'none' &&
+      (topOrderProducts.length > 0 || profileKeywords.length > 0);
 
     this.logger.log(
       `[V3_MULTI_QUERY][PROFILE_CONTEXT] source=${source} userType=${userType} ` +
-      `orderCount=${contextSummaries.order?.orderCount ?? 0} ` +
-      `topOrderProducts=[${topOrderProducts.slice(0, 3).join(', ')}] ` +
-      `budgetHint=${JSON.stringify(budgetHint)}`
+        `orderCount=${contextSummaries.order?.orderCount ?? 0} ` +
+        `topOrderProducts=[${topOrderProducts.slice(0, 3).join(', ')}] ` +
+        `budgetHint=${JSON.stringify(budgetHint)}`
     );
     this.logger.log(
       `[V3_MULTI_QUERY][PROFILE_CONTEXT] profileKeywords=[${profileKeywords.join(', ')}] ` +
-      `contextSummaries=${JSON.stringify(contextSummaries)}`
+        `contextSummaries=${JSON.stringify(contextSummaries)}`
     );
 
     if (!hasPreferences) {
-      this.logger.log(`[V3_MULTI_QUERY][NEW_USER] userId=${userId} — No order/profile data, using best-sellers only`);
+      this.logger.log(
+        `[V3_MULTI_QUERY][NEW_USER] userId=${userId} — No order/profile data, using best-sellers only`
+      );
     }
 
     return {
@@ -837,11 +985,14 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       avgPrice,
       purchasedProductIds,
       hasPreferences,
-      contextSummaries,
+      contextSummaries
     };
   }
 
-  private async buildPreferencesFromOrder(userId: string, orderId: string): Promise<{
+  private async buildPreferencesFromOrder(
+    userId: string,
+    orderId: string
+  ): Promise<{
     topBrands: string[];
     topOrderProducts: string[];
     genders: string[];
@@ -851,22 +1002,35 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     purchasedProductIds: Set<string>;
     hasPreferences: boolean;
   }> {
-    const empty = { topBrands: [], topOrderProducts: [], genders: [], scentKeywords: [], olfactoryKeywords: [], budgetHint: null, purchasedProductIds: new Set<string>(), hasPreferences: false };
+    const empty = {
+      topBrands: [],
+      topOrderProducts: [],
+      genders: [],
+      scentKeywords: [],
+      olfactoryKeywords: [],
+      budgetHint: null,
+      purchasedProductIds: new Set<string>(),
+      hasPreferences: false
+    };
 
     const orderRes = await this.orderService.getOrderById(orderId);
     const order = orderRes.success ? orderRes.payload : null;
 
     if (!order || order.orderDetails.length === 0) {
-      this.logger.warn(`[REPURCHASE][BUILD_PREFS] orderId=${orderId} — no order details found`);
+      this.logger.warn(
+        `[REPURCHASE][BUILD_PREFS] orderId=${orderId} — no order details found`
+      );
       return empty;
     }
 
     // ── Budget from unit prices ────────────────────────────────────────────────
     let minPrice = Infinity;
     let maxPrice = 0;
-    const variantIds = order.orderDetails.map(d => d.variantId).filter(Boolean);
+    const variantIds = order.orderDetails
+      .map((d) => d.variantId)
+      .filter(Boolean);
 
-    order.orderDetails.forEach(item => {
+    order.orderDetails.forEach((item) => {
       if (item.unitPrice < minPrice) minPrice = item.unitPrice;
       if (item.unitPrice > maxPrice) maxPrice = item.unitPrice;
     });
@@ -883,7 +1047,10 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     const variantQuantities = new Map<string, number>();
     for (const item of order.orderDetails) {
       if (!item.variantId) continue;
-      variantQuantities.set(item.variantId, (variantQuantities.get(item.variantId) || 0) + item.quantity);
+      variantQuantities.set(
+        item.variantId,
+        (variantQuantities.get(item.variantId) || 0) + item.quantity
+      );
     }
 
     const counters = {
@@ -891,9 +1058,13 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       genders: new Map<string, number>(),
       concentrations: new Map<string, number>(),
       scentNotes: new Map<string, number>(),
-      olfactoryFamilies: new Map<string, number>(),
+      olfactoryFamilies: new Map<string, number>()
     };
-    const addCount = (map: Map<string, number>, key: string | null | undefined, weight: number) => {
+    const addCount = (
+      map: Map<string, number>,
+      key: string | null | undefined,
+      weight: number
+    ) => {
       if (!key) return;
       const k = key.trim();
       if (k) map.set(k, (map.get(k) || 0) + weight);
@@ -906,7 +1077,7 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
           include: {
             Brands: true,
             ProductNoteMaps: { include: { ScentNotes: true } },
-            ProductFamilyMaps: { include: { OlfactoryFamilies: true } },
+            ProductFamilyMaps: { include: { OlfactoryFamilies: true } }
           }
         }
       }
@@ -922,12 +1093,17 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
       addCount(counters.brands, p.Brands?.Name, qty);
       addCount(counters.genders, p.Gender, qty);
-      for (const nm of p.ProductNoteMaps || []) addCount(counters.scentNotes, nm.ScentNotes?.Name, qty);
-      for (const fm of p.ProductFamilyMaps || []) addCount(counters.olfactoryFamilies, fm.OlfactoryFamilies?.Name, qty);
+      for (const nm of p.ProductNoteMaps || [])
+        addCount(counters.scentNotes, nm.ScentNotes?.Name, qty);
+      for (const fm of p.ProductFamilyMaps || [])
+        addCount(counters.olfactoryFamilies, fm.OlfactoryFamilies?.Name, qty);
     }
 
     const getTop = (map: Map<string, number>, limit: number) =>
-      Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name]) => name);
+      Array.from(map.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([name]) => name);
 
     const topBrands = getTop(counters.brands, 3);
     const genders = getTop(counters.genders, 2);
@@ -938,17 +1114,19 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     const topOrderProducts = [
       ...scentKeywords.slice(0, 3),
       ...olfactoryKeywords.slice(0, 2),
-      ...topBrands.slice(0, 1),
-    ].filter(Boolean).slice(0, 6);
+      ...topBrands.slice(0, 1)
+    ]
+      .filter(Boolean)
+      .slice(0, 6);
 
     this.logger.log(
       `[REPURCHASE][BUILD_PREFS] orderId=${orderId} ` +
-      `budget=[${budgetHint.min}→${budgetHint.max}] ` +
-      `brands=[${topBrands.join(',')}] ` +
-      `genders=[${genders.join(',')}] ` +
-      `scentNotes=[${scentKeywords.join(',')}] ` +
-      `olfactory=[${olfactoryKeywords.join(',')}] ` +
-      `excludeCount=${purchasedProductIds.size}`
+        `budget=[${budgetHint.min}→${budgetHint.max}] ` +
+        `brands=[${topBrands.join(',')}] ` +
+        `genders=[${genders.join(',')}] ` +
+        `scentNotes=[${scentKeywords.join(',')}] ` +
+        `olfactory=[${olfactoryKeywords.join(',')}] ` +
+        `excludeCount=${purchasedProductIds.size}`
     );
 
     return {
@@ -970,13 +1148,15 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
   ): Promise<BaseResponse<any>> {
     try {
       const userId = userIdRaw.toLowerCase();
-      this.logger.log(`[V3_MULTI_QUERY][REPURCHASE] userId=${userId} orderId=${orderId} size=${size}`);
+      this.logger.log(
+        `[V3_MULTI_QUERY][REPURCHASE] userId=${userId} orderId=${orderId} size=${size}`
+      );
 
       const prefs = await this.buildPreferencesFromOrder(userId, orderId);
 
       // If no valid order items, return generic or empty
       if (!prefs.hasPreferences) {
-         return { success: true, data: { recommendations: [] } };
+        return { success: true, data: { recommendations: [] } };
       }
 
       const promises: Promise<{ label: string; products: any[] }>[] = [];
@@ -985,50 +1165,68 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       // New: Specific sub-query for the items in the current order (True Repurchase candidate)
       if (prefs.purchasedProductIds.size > 0) {
         promises.push(
-          this.prisma.products.findMany({
-            where: { Id: { in: Array.from(prefs.purchasedProductIds) } },
-            include: this.productInclude
-          }).then(products => ({ label: 'CURRENT_ORDER', products }))
+          this.prisma.products
+            .findMany({
+              where: { Id: { in: Array.from(prefs.purchasedProductIds) } },
+              include: this.productInclude
+            })
+            .then((products) => ({ label: 'CURRENT_ORDER', products }))
         );
       }
 
       // Brand sub-queries (with budget filter)
       for (const brand of prefs.topBrands) {
         promises.push(
-          this.runBrandSubQuery(brand, subQueryLimit, prefs.budgetHint)
-            .then(products => ({ label: `BRAND:${brand}`, products }))
+          this.runBrandSubQuery(brand, subQueryLimit, prefs.budgetHint).then(
+            (products) => ({ label: `BRAND:${brand}`, products })
+          )
         );
       }
 
       // Scent note sub-queries - using real DB scent notes
       for (const scent of prefs.scentKeywords.slice(0, 3)) {
         promises.push(
-          this.runScentSubQuery(scent, subQueryLimit, prefs.budgetHint)
-            .then(products => ({ label: `SCENT:${scent}`, products }))
+          this.runScentSubQuery(scent, subQueryLimit, prefs.budgetHint).then(
+            (products) => ({ label: `SCENT:${scent}`, products })
+          )
         );
       }
 
       // Top product/keyword sub-query (scentNotes + olfactory + brand keywords)
       if (prefs.topOrderProducts.length > 0) {
         promises.push(
-          this.runTopProductsSubQuery(prefs.topOrderProducts, prefs.budgetHint, subQueryLimit * 2)
-            .then(products => ({ label: 'ORDER_QUERY', products }))
+          this.runTopProductsSubQuery(
+            prefs.topOrderProducts,
+            prefs.budgetHint,
+            subQueryLimit * 2
+          ).then((products) => ({ label: 'ORDER_QUERY', products }))
         );
       }
 
       // Best seller fallback with budget filter (Point 1 & 2: No more exclude purchasedProductIds)
-      promises.push(this.runBestSellerSubQuery(size * 2).then(products => {
-        const budgetFiltered = prefs.budgetHint ? products.filter(p => {
-          const minV = Math.min(...(p.variants || []).map((v: any) => v.basePrice));
-          return minV >= prefs.budgetHint!.min && minV <= prefs.budgetHint!.max;
-        }) : products;
-        return { label: 'BESTSELLER', products: budgetFiltered.length > 0 ? budgetFiltered : products };
-      }));
+      promises.push(
+        this.runBestSellerSubQuery(size * 2).then((products) => {
+          const budgetFiltered = prefs.budgetHint
+            ? products.filter((p) => {
+                const minV = Math.min(
+                  ...(p.variants || []).map((v: any) => v.basePrice)
+                );
+                return (
+                  minV >= prefs.budgetHint!.min && minV <= prefs.budgetHint!.max
+                );
+              })
+            : products;
+          return {
+            label: 'BESTSELLER',
+            products: budgetFiltered.length > 0 ? budgetFiltered : products
+          };
+        })
+      );
 
       const subResults = await Promise.all(promises);
       const mergedProducts = this.mergeByIntersectionScore(subResults, size);
 
-      const results = mergedProducts.map(p => {
+      const results = mergedProducts.map((p) => {
         if (p._isBestSeller) {
           return {
             productId: p.id,
@@ -1041,7 +1239,11 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
               volumeMl: v.volumeMl,
               basePrice: v.basePrice
             })),
-            source: prefs.hasPreferences ? (p._matchScore >= 2 ? 'matched_preference' : 'best_seller') : 'best_seller'
+            source: prefs.hasPreferences
+              ? p._matchScore >= 2
+                ? 'matched_preference'
+                : 'best_seller'
+              : 'best_seller'
           };
         }
 
@@ -1056,11 +1258,16 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
             volumeMl: v.VolumeMl,
             basePrice: Number(v.BasePrice)
           })),
-          source: (p._matchScore && p._matchScore >= 2) ? 'matched_intersection' : 'order_preference'
+          source:
+            p._matchScore && p._matchScore >= 2
+              ? 'matched_intersection'
+              : 'order_preference'
         };
       });
 
-      this.logger.log(`[V3_MULTI_QUERY][REPURCHASE_DONE] userId=${userId} returning=${results.length} products`);
+      this.logger.log(
+        `[V3_MULTI_QUERY][REPURCHASE_DONE] userId=${userId} returning=${results.length} products`
+      );
 
       return {
         success: true,
@@ -1076,14 +1283,19 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
             scentKeywords: prefs.scentKeywords,
             olfactoryKeywords: prefs.olfactoryKeywords,
             topOrderProducts: prefs.topOrderProducts,
-            budgetRange: prefs.budgetHint ? [prefs.budgetHint.min, prefs.budgetHint.max] : [0, 0],
+            budgetRange: prefs.budgetHint
+              ? [prefs.budgetHint.min, prefs.budgetHint.max]
+              : [0, 0],
             purchasedProductIds: Array.from(prefs.purchasedProductIds)
           }
         }
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.error(`[V3_MULTI_QUERY][REPURCHASE_ERROR] userId=${userIdRaw} error=${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.error(
+        `[V3_MULTI_QUERY][REPURCHASE_ERROR] userId=${userIdRaw} error=${errorMessage}`
+      );
       return { success: false, data: null };
     }
   }
@@ -1098,31 +1310,46 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     }
   };
 
-  private async runBrandSubQuery(brand: string, limit: number, budgetHint: { min: number; max: number } | null = null): Promise<any[]> {
+  private async runBrandSubQuery(
+    brand: string,
+    limit: number,
+    budgetHint: { min: number; max: number } | null = null
+  ): Promise<any[]> {
     const products = await this.prisma.products.findMany({
       where: {
         IsDeleted: false,
         Brands: { Name: brand },
-        ...(budgetHint ? {
-          ProductVariants: {
-            some: {
-              BasePrice: {
-                gte: budgetHint.min,
-                lte: budgetHint.max
+        ...(budgetHint
+          ? {
+              ProductVariants: {
+                some: {
+                  BasePrice: {
+                    gte: budgetHint.min,
+                    lte: budgetHint.max
+                  }
+                }
               }
             }
-          }
-        } : {})
+          : {})
       },
       include: this.productInclude,
       take: limit
     });
-    const topNames = products.slice(0, 5).map(p => p.Name).join(', ');
-    this.logger.log(`[V3_MULTI_QUERY][BRAND] brand="${brand}" found=${products.length}. Top: [${topNames}]`);
+    const topNames = products
+      .slice(0, 5)
+      .map((p) => p.Name)
+      .join(', ');
+    this.logger.log(
+      `[V3_MULTI_QUERY][BRAND] brand="${brand}" found=${products.length}. Top: [${topNames}]`
+    );
     return products;
   }
 
-  private async runScentSubQuery(scent: string, limit: number, budgetHint: { min: number; max: number } | null = null): Promise<any[]> {
+  private async runScentSubQuery(
+    scent: string,
+    limit: number,
+    budgetHint: { min: number; max: number } | null = null
+  ): Promise<any[]> {
     const products = await this.prisma.products.findMany({
       where: {
         IsDeleted: false,
@@ -1138,22 +1365,29 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
             Brands: { OR: [{ Name: { contains: scent } }] }
           }
         ],
-        ...(budgetHint ? {
-          ProductVariants: {
-            some: {
-              BasePrice: {
-                gte: budgetHint.min,
-                lte: budgetHint.max
+        ...(budgetHint
+          ? {
+              ProductVariants: {
+                some: {
+                  BasePrice: {
+                    gte: budgetHint.min,
+                    lte: budgetHint.max
+                  }
+                }
               }
             }
-          }
-        } : {})
+          : {})
       },
       include: this.productInclude,
       take: limit
     });
-    const topNames = products.slice(0, 5).map(p => p.Name).join(', ');
-    this.logger.log(`[V3_MULTI_QUERY][SCENT] scent="${scent}" found=${products.length}. Top: [${topNames}]`);
+    const topNames = products
+      .slice(0, 5)
+      .map((p) => p.Name)
+      .join(', ');
+    this.logger.log(
+      `[V3_MULTI_QUERY][SCENT] scent="${scent}" found=${products.length}. Top: [${topNames}]`
+    );
     return products;
   }
 
@@ -1170,20 +1404,24 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     if (keywords.length === 0) return [];
 
     const miniAnalysis: any = {
-      logic: [keywords],     // OR between all combined keywords — same as V10
+      logic: [keywords], // OR between all combined keywords — same as V10
       productNames: null,
       sorting: null,
-      budget: budgetHint,    // KEY: apply budget filter like V10
+      budget: budgetHint, // KEY: apply budget filter like V10
       pagination: { pageNumber: 1, pageSize: limit }
     };
 
-    const res = await this.productService.getProductsByStructuredQuery(miniAnalysis);
+    const res =
+      await this.productService.getProductsByStructuredQuery(miniAnalysis);
     if (res.success && res.data) {
       const items = res.data.items;
-      const topNames = items.slice(0, 5).map((p: any) => p.name).join(', ');
+      const topNames = items
+        .slice(0, 5)
+        .map((p: any) => p.name)
+        .join(', ');
       this.logger.log(
         `[V3_MULTI_QUERY][PROFILE_QUERY] keywords=[${keywords.slice(0, 3).join(', ')}...] ` +
-        `budget=${JSON.stringify(budgetHint)} found=${items.length}. Top: [${topNames}]`
+          `budget=${JSON.stringify(budgetHint)} found=${items.length}. Top: [${topNames}]`
       );
       return items;
     }
@@ -1198,11 +1436,19 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       SortOrder: 'desc',
       IsDescending: true
     } as PagedAndSortedRequest);
-    
+
     if (res.success && res.data) {
-      const items = res.data.items.map((item: any) => ({ _isBestSeller: true, ...item.product }));
-      const topNames = items.slice(0, 5).map(p => p.name).join(', ');
-      this.logger.log(`[V3_MULTI_QUERY][BESTSELLER] found=${items.length}. Top: [${topNames}]`);
+      const items = res.data.items.map((item: any) => ({
+        _isBestSeller: true,
+        ...item.product
+      }));
+      const topNames = items
+        .slice(0, 5)
+        .map((p) => p.name)
+        .join(', ');
+      this.logger.log(
+        `[V3_MULTI_QUERY][BESTSELLER] found=${items.length}. Top: [${topNames}]`
+      );
       return items;
     }
     this.logger.log(`[V3_MULTI_QUERY][BESTSELLER] found=0`);
@@ -1213,7 +1459,10 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     subResults: Array<{ label: string; products: any[] }>,
     size: number
   ): any[] {
-    const scoreMap = new Map<string, { product: any; score: number; sources: Set<string> }>();
+    const scoreMap = new Map<
+      string,
+      { product: any; score: number; sources: Set<string> }
+    >();
 
     for (const sub of subResults) {
       for (const p of sub.products) {
@@ -1233,11 +1482,11 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     allScored.sort((a, b) => b.score - a.score); // Highest score first
 
     // Prefer intersection (score >= 2)
-    const intersections = allScored.filter(x => x.score >= 2);
-    const unions = allScored.filter(x => x.score < 2);
+    const intersections = allScored.filter((x) => x.score >= 2);
+    const unions = allScored.filter((x) => x.score < 2);
 
     const finalResults: any[] = [];
-    
+
     // Fill from intersections
     for (const item of intersections) {
       if (finalResults.length < size) {
@@ -1252,8 +1501,10 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       }
     }
 
-    const finalNames = finalResults.map(p => p.Name || p.name).join(', ');
-    this.logger.log(`[V3_MULTI_QUERY][MERGE] Total unique=${allScored.length}, Intersections(>=2)=${intersections.length}, Unions=${unions.length}. Result: [${finalNames}]`);
+    const finalNames = finalResults.map((p) => p.Name || p.name).join(', ');
+    this.logger.log(
+      `[V3_MULTI_QUERY][MERGE] Total unique=${allScored.length}, Intersections(>=2)=${intersections.length}, Unions=${unions.length}. Result: [${finalNames}]`
+    );
 
     return finalResults;
   }
@@ -1281,8 +1532,9 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
       for (const brand of prefs.topBrands) {
         promises.push(
-          this.runBrandSubQuery(brand, subQueryLimit, prefs.budgetHint)
-            .then(products => ({ label: `BRAND:${brand}`, products }))
+          this.runBrandSubQuery(brand, subQueryLimit, prefs.budgetHint).then(
+            (products) => ({ label: `BRAND:${brand}`, products })
+          )
         );
       }
 
@@ -1295,8 +1547,11 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
         if (profileQueryKeywords.length > 0) {
           promises.push(
-            this.runTopProductsSubQuery(profileQueryKeywords, prefs.budgetHint, subQueryLimit * 2)
-              .then(products => ({ label: 'PROFILE_QUERY', products }))
+            this.runTopProductsSubQuery(
+              profileQueryKeywords,
+              prefs.budgetHint,
+              subQueryLimit * 2
+            ).then((products) => ({ label: 'PROFILE_QUERY', products }))
           );
         }
       }
@@ -1305,20 +1560,23 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       if (prefs.source === 'profile' && prefs.profileKeywords.length > 0) {
         for (const scent of prefs.profileKeywords.slice(0, 5)) {
           promises.push(
-            this.runScentSubQuery(scent, subQueryLimit, prefs.budgetHint)
-              .then(products => ({ label: `SCENT:${scent}`, products }))
+            this.runScentSubQuery(scent, subQueryLimit, prefs.budgetHint).then(
+              (products) => ({ label: `SCENT:${scent}`, products })
+            )
           );
         }
       }
 
-      promises.push(this.runBestSellerSubQuery(size * 2).then(products => {
-        // Exclude purchased products explicitly here since bestseller query doesn't accept exclude
-        const filtered = products.filter(p => {
-          const pId = p.Id || p.id;
-          return !prefs.purchasedProductIds.has(pId);
-        });
-        return { label: 'BESTSELLER', products: filtered };
-      }));
+      promises.push(
+        this.runBestSellerSubQuery(size * 2).then((products) => {
+          // Exclude purchased products explicitly here since bestseller query doesn't accept exclude
+          const filtered = products.filter((p) => {
+            const pId = p.Id || p.id;
+            return !prefs.purchasedProductIds.has(pId);
+          });
+          return { label: 'BESTSELLER', products: filtered };
+        })
+      );
 
       const subResults = await Promise.all(promises);
 
@@ -1326,7 +1584,7 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       const mergedProducts = this.mergeByIntersectionScore(subResults, size);
 
       // 4. Format output
-      const results = mergedProducts.map(p => {
+      const results = mergedProducts.map((p) => {
         // Best seller or already matched items format check
         if (p._isBestSeller) {
           return {
@@ -1340,7 +1598,11 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
               volumeMl: v.volumeMl,
               basePrice: v.basePrice
             })),
-            source: prefs.hasPreferences ? (p._matchScore >= 2 ? 'matched_preference' : 'best_seller') : 'best_seller'
+            source: prefs.hasPreferences
+              ? p._matchScore >= 2
+                ? 'matched_preference'
+                : 'best_seller'
+              : 'best_seller'
           };
         }
 
@@ -1356,7 +1618,10 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
             volumeMl: v.VolumeMl,
             basePrice: Number(v.BasePrice)
           })),
-          source: (p._matchScore && p._matchScore >= 2) ? 'matched_intersection' : 'order_preference'
+          source:
+            p._matchScore && p._matchScore >= 2
+              ? 'matched_intersection'
+              : 'order_preference'
         };
       });
 
@@ -1382,10 +1647,12 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
         }
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.error(`[V3_MULTI_QUERY][ERROR] userId=${userIdRaw} error=${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.error(
+        `[V3_MULTI_QUERY][ERROR] userId=${userIdRaw} error=${errorMessage}`
+      );
       return { success: false, data: null };
     }
   }
 }
-

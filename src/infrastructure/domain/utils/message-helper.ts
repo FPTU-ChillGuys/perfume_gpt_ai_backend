@@ -10,11 +10,15 @@ import { ConversationResponse } from 'src/application/dtos/response/conversation
 export function convertToMessages(messages: ChatMessageRequest[]): UIMessage[] {
   return messages.map((msgReq) => ({
     id: uuidv4(),
-    role: msgReq.sender.toString().toLowerCase() === 'user' ? 'user' : 'assistant',
+    role:
+      msgReq.sender.toString().toLowerCase() === 'user' ? 'user' : 'assistant',
     parts: [
       {
         type: 'text',
-        text: typeof msgReq.message === 'string' ? msgReq.message : JSON.stringify(msgReq.message)
+        text:
+          typeof msgReq.message === 'string'
+            ? msgReq.message
+            : JSON.stringify(msgReq.message)
       }
     ]
   }));
@@ -79,7 +83,8 @@ export const processResponseForMobile = (
               parsed = JSON.parse(parsed);
             }
             // Parse lần 2 nếu kết quả vẫn là string (tránh double stringify)
-            msg.message = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+            msg.message =
+              typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
           } catch (e) {
             // Bỏ qua nếu parse lỗi
           }

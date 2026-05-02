@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { UIMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
-import { AnalysisObject, QueryItemObject } from 'src/chatbot/output/analysis.output';
+import {
+  AnalysisObject,
+  QueryItemObject
+} from 'src/chatbot/output/analysis.output';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
 import { CartService } from 'src/infrastructure/domain/cart/cart.service';
 import { OrderService } from 'src/infrastructure/domain/order/order.service';
@@ -19,7 +22,7 @@ export class AISearchExecutorHelper {
     private readonly cartService: CartService,
     private readonly orderService: OrderService,
     private readonly profileTool: ProfileTool
-  ) { }
+  ) {}
 
   /**
    * Điều phối thực thi tất cả các truy vấn đã được phân tách, merge và xóa trùng.
@@ -36,7 +39,9 @@ export class AISearchExecutorHelper {
     const taskResults: UIMessage[] = [];
     const seenProductIds = new Set<string>();
 
-    this.logger.log(`[AISearchExecutorHelper] Executing ${queries.length} decomposed queries`);
+    this.logger.log(
+      `[AISearchExecutorHelper] Executing ${queries.length} decomposed queries`
+    );
 
     for (const query of queries) {
       switch (query.purpose) {
@@ -44,8 +49,17 @@ export class AISearchExecutorHelper {
           if (!query.functionCall) break;
           const funcName = query.functionCall.name;
 
-          if (['addToCart', 'getCart', 'clearCart', 'getOrdersByUserId'].includes(funcName)) {
-            const taskMsg = await this.handleTaskFunction(funcName, query.functionCall.arguments, userId, isGuestUser);
+          if (
+            ['addToCart', 'getCart', 'clearCart', 'getOrdersByUserId'].includes(
+              funcName
+            )
+          ) {
+            const taskMsg = await this.handleTaskFunction(
+              funcName,
+              query.functionCall.arguments,
+              userId,
+              isGuestUser
+            );
             if (taskMsg) taskResults.push(taskMsg);
           } else {
             const items = await this.executeFunctionQuery(query);
@@ -61,7 +75,11 @@ export class AISearchExecutorHelper {
 
         case 'profile': {
           if (isGuestUser) break;
-          const items = await this.executeProfileQuery(userId, query, rootAnalysis);
+          const items = await this.executeProfileQuery(
+            userId,
+            query,
+            rootAnalysis
+          );
           for (const p of items) {
             if (p.id && !seenProductIds.has(p.id)) {
               seenProductIds.add(p.id);
@@ -84,16 +102,21 @@ export class AISearchExecutorHelper {
       }
     }
 
-    const functionMinimal = functionProducts.map(p => this.mapToMinimalProduct(p, 'FUNCTION_RESULTS'));
+    const functionMinimal = functionProducts.map((p) =>
+      this.mapToMinimalProduct(p, 'FUNCTION_RESULTS')
+    );
     let combined = [...functionMinimal, ...allProducts];
 
     // Lọc theo ngân sách (Budget strict filter)
-    if (rootAnalysis.budget && (rootAnalysis.budget.min !== null || rootAnalysis.budget.max !== null)) {
+    if (
+      rootAnalysis.budget &&
+      (rootAnalysis.budget.min !== null || rootAnalysis.budget.max !== null)
+    ) {
       let { min, max } = rootAnalysis.budget;
       min = min ?? 0;
       max = max ?? Number.MAX_SAFE_INTEGER;
       combined = combined
-        .map(p => ({
+        .map((p) => ({
           ...p,
           variants: (p.variants || []).filter((v: any) => {
             const price = v.price;
@@ -102,7 +125,7 @@ export class AISearchExecutorHelper {
             return fitsMin && fitsMax;
           })
         }))
-        .filter(p => p.variants.length > 0);
+        .filter((p) => p.variants.length > 0);
     }
 
     return {
@@ -111,7 +134,12 @@ export class AISearchExecutorHelper {
     };
   }
 
-  private async handleTaskFunction(funcName: string, args: any, userId: string, isGuestUser: boolean): Promise<UIMessage | null> {
+  private async handleTaskFunction(
+    funcName: string,
+    args: any,
+    userId: string,
+    isGuestUser: boolean
+  ): Promise<UIMessage | null> {
     if (isGuestUser) {
       return this.createSystemMessage(
         `FUNCTION_ACTION_RESULT: TỪ CHỐI THỰC THI. Tính năng ${funcName} yêu cầu đăng nhập.`
@@ -120,23 +148,33 @@ export class AISearchExecutorHelper {
 
     let res: any;
     if (funcName === 'addToCart') {
-      this.logger.log(`[TASK][addToCart] UserId: ${userId}, Args: ${JSON.stringify(args)}`);
+      this.logger.log(
+        `[TASK][addToCart] UserId: ${userId}, Args: ${JSON.stringify(args)}`
+      );
       const items = Array.isArray(args?.items) ? args.items : [];
 
       if (items.length === 0) {
-        this.logger.warn(`[TASK][addToCart] No items to add. Full args: ${JSON.stringify(args)}`);
+        this.logger.warn(
+          `[TASK][addToCart] No items to add. Full args: ${JSON.stringify(args)}`
+        );
       }
 
-      res = await Promise.all(items.map(async (i: any) => {
-        this.logger.debug(`[TASK][addToCart] Processing item: ${JSON.stringify(i)}`);
-        const addRes = await this.cartService.addToCart(userId, {
-          variantId: i.variantId || i.id, // Fallback if AI uses 'id' instead of 'variantId'
-          quantity: i.quantity || 1
-        });
+      res = await Promise.all(
+        items.map(async (i: any) => {
+          this.logger.debug(
+            `[TASK][addToCart] Processing item: ${JSON.stringify(i)}`
+          );
+          const addRes = await this.cartService.addToCart(userId, {
+            variantId: i.variantId || i.id, // Fallback if AI uses 'id' instead of 'variantId'
+            quantity: i.quantity || 1
+          });
 
-        this.logger.log(`[TASK][addToCart] Result for ${i.variantId || i.id}: Success=${addRes.success}${!addRes.success ? `, Error=${addRes.error}` : ''}`);
-        return { variantId: i.variantId || i.id, success: addRes.success };
-      }));
+          this.logger.log(
+            `[TASK][addToCart] Result for ${i.variantId || i.id}: Success=${addRes.success}${!addRes.success ? `, Error=${addRes.error}` : ''}`
+          );
+          return { variantId: i.variantId || i.id, success: addRes.success };
+        })
+      );
     } else if (funcName === 'getCart') {
       const cartRes = await this.cartService.getCart(userId);
       res = cartRes.success ? cartRes.data : cartRes.error;
@@ -153,7 +191,9 @@ export class AISearchExecutorHelper {
       res = (orderRes as any).data?.items || (orderRes as any).items || [];
     }
 
-    return this.createSystemMessage(`FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`);
+    return this.createSystemMessage(
+      `FUNCTION_ACTION_RESULT: ${funcName} executed: ${JSON.stringify(res)}`
+    );
   }
 
   private async executeFunctionQuery(query: QueryItemObject): Promise<any[]> {
@@ -162,39 +202,67 @@ export class AISearchExecutorHelper {
     let targetItems: any[] = [];
 
     if (funcName === 'getBestSellingProducts') {
-      const res = await this.productService.getBestSellingProducts({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
-      if (res.success && res.data) targetItems = res.data.items.map((i: any) => i.product);
+      const res = await this.productService.getBestSellingProducts({
+        PageNumber: 1,
+        PageSize: 50,
+        SortOrder: 'desc',
+        IsDescending: true
+      });
+      if (res.success && res.data)
+        targetItems = res.data.items.map((i: any) => i.product);
     } else if (funcName === 'getNewestProducts') {
-      const res = await this.productService.getNewestProductsWithVariants({ PageNumber: 1, PageSize: 50, SortOrder: 'desc', IsDescending: true });
+      const res = await this.productService.getNewestProductsWithVariants({
+        PageNumber: 1,
+        PageSize: 50,
+        SortOrder: 'desc',
+        IsDescending: true
+      });
       if (res.success && res.data) targetItems = res.data.items;
     }
 
     return targetItems;
   }
 
-  private async executeProfileQuery(userId: string, query: QueryItemObject, rootAnalysis: AnalysisObject): Promise<any[]> {
+  private async executeProfileQuery(
+    userId: string,
+    query: QueryItemObject,
+    rootAnalysis: AnalysisObject
+  ): Promise<any[]> {
     try {
-      const payload = await this.profileTool.getProfileRecommendationContextPayload(userId);
+      const payload =
+        await this.profileTool.getProfileRecommendationContextPayload(userId);
       if (!payload || payload.source === 'none') return [];
 
-      const keywords = [...(payload.profileKeywords || []), ...(payload.topOrderProducts || []).slice(0, 3)].filter(Boolean);
+      const keywords = [
+        ...(payload.profileKeywords || []),
+        ...(payload.topOrderProducts || []).slice(0, 3)
+      ].filter(Boolean);
       if (keywords.length === 0) return [];
 
       const miniAnalysis: any = {
         logic: [keywords],
         sorting: query.sorting || null,
-        budget: query.budget || rootAnalysis.budget || (payload.budgetHint ? { min: payload.budgetHint.min, max: payload.budgetHint.max } : null),
+        budget:
+          query.budget ||
+          rootAnalysis.budget ||
+          (payload.budgetHint
+            ? { min: payload.budgetHint.min, max: payload.budgetHint.max }
+            : null),
         pagination: { pageNumber: 1, pageSize: 20 }
       };
 
-      const res = await this.productService.getProductsByStructuredQuery(miniAnalysis);
+      const res =
+        await this.productService.getProductsByStructuredQuery(miniAnalysis);
       return res.success && res.data ? res.data.items : [];
     } catch {
       return [];
     }
   }
 
-  private async executeSearchQuery(query: QueryItemObject, rootAnalysis: AnalysisObject): Promise<any[]> {
+  private async executeSearchQuery(
+    query: QueryItemObject,
+    rootAnalysis: AnalysisObject
+  ): Promise<any[]> {
     const logicGroups = query.logic || [];
     if (logicGroups.length <= 1) {
       const res = await this.productService.getProductsByStructuredQuery({
@@ -205,26 +273,30 @@ export class AISearchExecutorHelper {
     }
 
     // AND-decomposition logic...
-    const subQueryResults = await Promise.all(logicGroups.map(async (group) => {
-      const res = await this.productService.getProductsByStructuredQuery({
-        logic: [group],
-        budget: rootAnalysis.budget,
-        pagination: { pageSize: 50, pageNumber: 1 }
-      } as any);
-      return res.success && res.data ? res.data.items : [];
-    }));
+    const subQueryResults = await Promise.all(
+      logicGroups.map(async (group) => {
+        const res = await this.productService.getProductsByStructuredQuery({
+          logic: [group],
+          budget: rootAnalysis.budget,
+          pagination: { pageSize: 50, pageNumber: 1 }
+        } as any);
+        return res.success && res.data ? res.data.items : [];
+      })
+    );
 
     const scoreMap = new Map<string, { product: any; score: number }>();
-    subQueryResults.forEach(products => {
-      products.forEach(p => {
+    subQueryResults.forEach((products) => {
+      products.forEach((p) => {
         const existing = scoreMap.get(p.id);
         if (existing) existing.score += 1;
         else scoreMap.set(p.id, { product: p, score: 1 });
       });
     });
 
-    const sorted = Array.from(scoreMap.values()).sort((a, b) => b.score - a.score);
-    return sorted.map(e => e.product);
+    const sorted = Array.from(scoreMap.values()).sort(
+      (a, b) => b.score - a.score
+    );
+    return sorted.map((e) => e.product);
   }
 
   private mapToMinimalProduct(product: any, source: string) {
@@ -234,10 +306,16 @@ export class AISearchExecutorHelper {
       brand: product.brandName,
       category: product.categoryName,
       image: product.primaryImage,
-      attributes: (product.attributes || []).map((attr: any) => `${attr.attribute}: ${attr.value}`),
+      attributes: (product.attributes || []).map(
+        (attr: any) => `${attr.attribute}: ${attr.value}`
+      ),
       scentNotes: product.scentNotes,
       olfactoryFamilies: product.olfactoryFamilies,
-      variants: (product.variants || []).map((v: any) => ({ id: v.id, volume: v.volumeMl, price: v.basePrice })),
+      variants: (product.variants || []).map((v: any) => ({
+        id: v.id,
+        volume: v.volumeMl,
+        price: v.basePrice
+      })),
       source
     };
   }

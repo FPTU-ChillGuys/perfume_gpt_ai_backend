@@ -7,7 +7,6 @@ import { ApiProperty } from '@nestjs/swagger';
 /** Entity lưu bản tóm tắt đánh giá sản phẩm do AI tạo */
 @Entity({ repository: () => ReviewSummaryLogRepository })
 export class ReviewSummaryLog extends Common {
-
   /** ID sản phẩm được tóm tắt */
   @ApiProperty({ description: 'ID sản phẩm', format: 'uuid' })
   @Property()
@@ -27,7 +26,7 @@ export class ReviewSummaryLog extends Common {
   @ApiProperty({ description: 'Số lượng đánh giá' })
   @Property()
   reviewCount!: number;
-  
+
   constructor(init?: Partial<ReviewSummaryLog>) {
     super();
     Object.assign(this, init);

@@ -2,7 +2,11 @@ import { ProductCardResponse } from 'src/application/dtos/response/product-card.
 import { GoogleTrendSignal } from 'src/application/dtos/trend/google-trend-signal.type';
 import { TrendKeywordMapperResult } from 'src/application/dtos/trend/trend-keyword-mapper-result.type';
 
-export type TrendPipelineSource = 'live-google' | 'cache' | 'trend-log' | 'empty';
+export type TrendPipelineSource =
+  | 'live-google'
+  | 'cache'
+  | 'trend-log'
+  | 'empty';
 
 export type TrendPipelineResult = {
   products: ProductCardResponse[];

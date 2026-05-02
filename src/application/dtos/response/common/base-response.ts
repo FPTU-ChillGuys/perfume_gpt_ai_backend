@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 /** Response chuẩn cho API nội bộ (dùng trường `data`) */
 export class BaseResponse<T = undefined> {
@@ -7,7 +7,11 @@ export class BaseResponse<T = undefined> {
   success!: boolean;
 
   /** Thông báo lỗi (nếu có) */
-  @ApiProperty({ description: 'Thông báo lỗi', nullable: true, required: false })
+  @ApiProperty({
+    description: 'Thông báo lỗi',
+    nullable: true,
+    required: false
+  })
   error?: string | null;
 
   /** Chi tiết lỗi (nếu có) */

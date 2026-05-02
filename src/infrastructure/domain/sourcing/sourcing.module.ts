@@ -6,6 +6,6 @@ import { RedisModule } from '../common/redis/redis.module';
   imports: [RedisModule],
   controllers: [],
   providers: [SourcingCatalogService],
-  exports: [SourcingCatalogService],
+  exports: [SourcingCatalogService]
 })
-export class SourcingModule { }
+export class SourcingModule {}

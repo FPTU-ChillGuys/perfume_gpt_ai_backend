@@ -5,7 +5,6 @@ import { BaseRepository } from './base/base.repository';
 /** Repository thao tác dữ liệu AdminInstruction */
 @Injectable()
 export class AdminInstructionRepository extends BaseRepository<AdminInstruction> {
-
   /**
    * Lấy tất cả chỉ thị theo loại (instructionType).
    * @param type - Loại chỉ thị cần lọc

@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { AutomapperModule } from '@automapper/nestjs';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import defineConfig from '../mikro-orm.config';
+import { I18nErrorHandlerModule } from './infrastructure/domain/common/i18n.module';
 import { ProviderModule } from './infrastructure/domain/common/provider.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -19,17 +20,28 @@ import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import * as path from 'path';
 import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
+import { I18nModule } from 'nestjs-i18n';
+import { AdminMaintenanceModule } from './api/controllers/modules/admin-maintenance.module';
 
 @Module({
   imports: [
     PrismaModule,
     RedisModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    I18nModule.forRoot({
+      fallbackLanguage: 'vi',
+      loaderOptions: {
+        path: path.join(__dirname, '..', 'i18n'),
+        watch: true
+      }
+    }),
     AutomapperModule.forRoot({
       strategyInitializer: mikro(),
       namingConventions: new CamelCaseNamingConvention()
     }),
+    I18nErrorHandlerModule,
     ProviderModule,
+    AdminMaintenanceModule,
     MikroOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -37,10 +49,11 @@ import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
         const config = await defineConfig();
         return {
           ...config,
-          host: config.host ?? configService.get<string>("POSTGRES_HOST"),
-          port:   config.port ?? configService.get<number>("POSTGRES_PORT"),
-          user: config.user ?? configService.get<string>("POSTGRES_USER"),
-          password: config.password ?? configService.get<string>("POSTGRES_PASSWORD")
+          host: config.host ?? configService.get<string>('POSTGRES_HOST'),
+          port: config.port ?? configService.get<number>('POSTGRES_PORT'),
+          user: config.user ?? configService.get<string>('POSTGRES_USER'),
+          password:
+            config.password ?? configService.get<string>('POSTGRES_PASSWORD')
         };
       }
     }),
@@ -148,4 +161,4 @@ import { RedisModule } from './infrastructure/domain/common/redis/redis.module';
     }
   ]
 })
-export class AppModule { }
+export class AppModule {}

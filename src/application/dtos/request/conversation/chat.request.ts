@@ -8,22 +8,39 @@ export class ChatRequest {
   @IsString()
   id!: string;
 
-  @ApiProperty({ description: 'ID người dùng (optional — tự động lấy từ JWT token nếu không truyền)', format: 'uuid', required: false })
+  @ApiProperty({
+    description:
+      'ID người dùng (optional — tự động lấy từ JWT token nếu không truyền)',
+    format: 'uuid',
+    required: false
+  })
   @IsOptional()
   @IsString()
   userId?: string;
 
-  @ApiProperty({ description: 'Danh sách tin nhắn', type: [ChatMessageRequest], required: true })
+  @ApiProperty({
+    description: 'Danh sách tin nhắn',
+    type: [ChatMessageRequest],
+    required: true
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ChatMessageRequest)
   messages: ChatMessageRequest[] = [];
 
-  @ApiProperty({ description: 'Chế độ nhân viên tư vấn tại quầy', required: false, default: false })
+  @ApiProperty({
+    description: 'Chế độ nhân viên tư vấn tại quầy',
+    required: false,
+    default: false
+  })
   @IsOptional()
   isStaff?: boolean;
 
-  @ApiProperty({ description: 'Client là Mobile App', required: false, default: false })
+  @ApiProperty({
+    description: 'Client là Mobile App',
+    required: false,
+    default: false
+  })
   @IsOptional()
   isMobile?: boolean;
 }

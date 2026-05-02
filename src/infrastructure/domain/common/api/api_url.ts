@@ -13,7 +13,7 @@ export default function ApiUrl() {
 
   const PROFILE_URL = (url: string) => `${BASE_URL}/profiles/${url}`;
 
-  const USER_URL = (url: string) => `${BASE_URL}/users/${url}`; 
+  const USER_URL = (url: string) => `${BASE_URL}/users/${url}`;
   return {
     PRODUCT_URL,
     REVIEW_URL,

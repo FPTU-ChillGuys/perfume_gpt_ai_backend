@@ -15,7 +15,11 @@ export enum QuestionType {
 @Entity({ repository: () => SurveyQuestionRepository })
 export class SurveyQuestion extends Common {
   /** Loại câu hỏi (chọn 1 hoặc nhiều đáp án) */
-  @ApiProperty({ description: 'Loại câu hỏi', enum: QuestionType, default: QuestionType.SINGLE })
+  @ApiProperty({
+    description: 'Loại câu hỏi',
+    enum: QuestionType,
+    default: QuestionType.SINGLE
+  })
   @Enum({ items: () => QuestionType, default: QuestionType.SINGLE })
   questionType: QuestionType = QuestionType.SINGLE;
 
@@ -45,7 +49,9 @@ export class SurveyQuestion extends Common {
     type: () => SurveyQuestionAnswerDetail,
     isArray: true
   })
-  @OneToMany(() => SurveyQuestionAnswerDetail, (qqa) => qqa.question, { orphanRemoval: true })
+  @OneToMany(() => SurveyQuestionAnswerDetail, (qqa) => qqa.question, {
+    orphanRemoval: true
+  })
   surveyQuestionAnswers = new Collection<SurveyQuestionAnswerDetail>(this);
 
   constructor(init?: Partial<SurveyQuestion>) {

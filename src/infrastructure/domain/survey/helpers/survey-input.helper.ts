@@ -8,7 +8,6 @@ import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/ext
  */
 @Injectable()
 export class SurveyInputHelper {
-
   /**
    * Resolve userId: ưu tiên query param, fallback từ JWT token hoặc fingerprint.
    */

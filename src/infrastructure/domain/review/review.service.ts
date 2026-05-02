@@ -9,14 +9,15 @@ import {
 } from 'src/application/dtos/response/review.response';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { GetPagedReviewRequest } from 'src/application/dtos/request/get-paged-review.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { ReviewLog } from 'src/domain/entities/review-log.entity';
 import { ReviewTypeEnum } from 'src/domain/enum/review-log-type.enum';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUUID(id: string): boolean {
   return UUID_REGEX.test(id);
@@ -46,11 +47,16 @@ type ReviewWithRelations = Prisma.ReviewsGetPayload<{
 
 type ReviewStatus = 'Pending' | 'Approved' | 'Rejected';
 
-function deriveReviewStatus(review: Pick<ReviewWithRelations, 'StaffFeedbackAt' | 'StaffFeedbackComment'>): ReviewStatus {
+function deriveReviewStatus(
+  review: Pick<ReviewWithRelations, 'StaffFeedbackAt' | 'StaffFeedbackComment'>
+): ReviewStatus {
   if (!review.StaffFeedbackAt) {
     return 'Pending';
   }
-  if (review.StaffFeedbackComment && review.StaffFeedbackComment.trim().length > 0) {
+  if (
+    review.StaffFeedbackComment &&
+    review.StaffFeedbackComment.trim().length > 0
+  ) {
     return 'Rejected';
   }
   return 'Approved';
@@ -65,20 +71,17 @@ function buildReviewStatusWhere(status?: string): Prisma.ReviewsWhereInput {
         AND: [
           { StaffFeedbackAt: { not: null } },
           {
-            OR: [
-              { StaffFeedbackComment: null },
-              { StaffFeedbackComment: '' },
-            ],
-          },
-        ],
+            OR: [{ StaffFeedbackComment: null }, { StaffFeedbackComment: '' }]
+          }
+        ]
       };
     case 'Rejected':
       return {
         AND: [
           { StaffFeedbackAt: { not: null } },
           { StaffFeedbackComment: { not: null } },
-          { NOT: { StaffFeedbackComment: '' } },
-        ],
+          { NOT: { StaffFeedbackComment: '' } }
+        ]
       };
     default:
       return {};
@@ -142,131 +145,122 @@ function mapToReviewListItemResponse(
 export class ReviewService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly unitOfWork: UnitOfWork
+    private readonly unitOfWork: UnitOfWork,
+    private readonly err: I18nErrorHandler
   ) {}
-  
+
   async getAllReviews(
     request: GetPagedReviewRequest
   ): Promise<BaseResponseAPI<PagedResult<ReviewListItemResponse>>> {
-    return await funcHandlerAsync(
-      async () => {
-        const skip = (request.PageNumber - 1) * request.PageSize;
-        const take = request.PageSize;
+    return this.err.wrap(async () => {
+      const skip = (request.PageNumber - 1) * request.PageSize;
+      const take = request.PageSize;
 
-        const where: Prisma.ReviewsWhereInput = {
-          ...(request.VariantId && isUUID(request.VariantId)
-            ? { OrderDetails: { VariantId: request.VariantId } }
-            : {}),
-          ...(request.UserId && isUUID(request.UserId) ? { UserId: request.UserId } : {}),
-          ...buildReviewStatusWhere(request.Status),
-          ...(request.MinRating || request.MaxRating
-            ? {
+      const where: Prisma.ReviewsWhereInput = {
+        ...(request.VariantId && isUUID(request.VariantId)
+          ? { OrderDetails: { VariantId: request.VariantId } }
+          : {}),
+        ...(request.UserId && isUUID(request.UserId)
+          ? { UserId: request.UserId }
+          : {}),
+        ...buildReviewStatusWhere(request.Status),
+        ...(request.MinRating || request.MaxRating
+          ? {
               Rating: {
                 ...(request.MinRating ? { gte: request.MinRating } : {}),
                 ...(request.MaxRating ? { lte: request.MaxRating } : {})
               }
             }
-            : {}),
-          ...(request.HasImages ? { Media: { some: {} } } : {})
-        };
+          : {}),
+        ...(request.HasImages ? { Media: { some: {} } } : {})
+      };
 
-        const [reviews, totalCount] = await Promise.all([
-          this.prisma.reviews.findMany({
-            where,
-            skip,
-            take,
-            include: reviewInclude
-          }),
-          this.prisma.reviews.count({ where })
-        ]);
+      const [reviews, totalCount] = await Promise.all([
+        this.prisma.reviews.findMany({
+          where,
+          skip,
+          take,
+          include: reviewInclude
+        }),
+        this.prisma.reviews.count({ where })
+      ]);
 
-        const result = new PagedResult<ReviewListItemResponse>({
-          items: reviews.map(mapToReviewListItemResponse),
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        });
-        return { success: true, payload: result };
-      },
-      'Failed to fetch reviews',
-      true
-    );
+      const result = new PagedResult<ReviewListItemResponse>({
+        items: reviews.map(mapToReviewListItemResponse),
+        pageNumber: request.PageNumber,
+        pageSize: request.PageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / request.PageSize)
+      });
+      return { success: true, payload: result };
+    }, 'errors.review.get_paginated');
   }
 
   async getReviewsByVariantId(
     variantId: string
   ): Promise<BaseResponseAPI<ReviewResponse[]>> {
-    return await funcHandlerAsync(
-      async () => {
-        if (!isUUID(variantId)) {
-          return { success: true, payload: [] };
-        }
-        const reviews = await this.prisma.reviews.findMany({
-          where: { OrderDetails: { VariantId: variantId } },
-          include: reviewInclude
-        });
-        return { success: true, payload: reviews.map(mapToReviewResponse) };
-      },
-      'Failed to fetch reviews',
-      true
-    );
+    return this.err.wrap(async () => {
+      if (!isUUID(variantId)) {
+        return { success: true, payload: [] };
+      }
+      const reviews = await this.prisma.reviews.findMany({
+        where: { OrderDetails: { VariantId: variantId } },
+        include: reviewInclude
+      });
+      return { success: true, payload: reviews.map(mapToReviewResponse) };
+    }, 'errors.review.get_paginated');
   }
 
   async getReviewStatisticByVariantId(
     variantId: string
   ): Promise<BaseResponseAPI<ReviewStatisticsResponse>> {
-    return await funcHandlerAsync(
-      async () => {
-        if (!isUUID(variantId)) {
-          return {
-            success: true,
-            payload: {
-              variantId,
-              totalReviews: 0,
-              averageRating: 0,
-              fiveStarCount: 0,
-              fourStarCount: 0,
-              threeStarCount: 0,
-              twoStarCount: 0,
-              oneStarCount: 0
-            }
-          };
-        }
-        const reviews = await this.prisma.reviews.findMany({
-          where: { OrderDetails: { VariantId: variantId } },
-          select: { Rating: true }
-        });
-
-        const totalReviews = reviews.length;
-        const averageRating =
-          totalReviews > 0
-            ? reviews.reduce((sum, r) => sum + r.Rating, 0) / totalReviews
-            : 0;
-
-        const countByRating = reviews.reduce(
-          (acc, r) => {
-            acc[r.Rating] = (acc[r.Rating] ?? 0) + 1;
-            return acc;
-          },
-          {} as Record<number, number>
-        );
-
-        const stats: ReviewStatisticsResponse = {
-          variantId,
-          totalReviews,
-          averageRating: Math.round(averageRating * 100) / 100,
-          fiveStarCount: countByRating[5] ?? 0,
-          fourStarCount: countByRating[4] ?? 0,
-          threeStarCount: countByRating[3] ?? 0,
-          twoStarCount: countByRating[2] ?? 0,
-          oneStarCount: countByRating[1] ?? 0
+    return this.err.wrap(async () => {
+      if (!isUUID(variantId)) {
+        return {
+          success: true,
+          payload: {
+            variantId,
+            totalReviews: 0,
+            averageRating: 0,
+            fiveStarCount: 0,
+            fourStarCount: 0,
+            threeStarCount: 0,
+            twoStarCount: 0,
+            oneStarCount: 0
+          }
         };
-        return { success: true, payload: stats };
-      },
-      'Failed to fetch review statistics',
-      true
-    );
+      }
+      const reviews = await this.prisma.reviews.findMany({
+        where: { OrderDetails: { VariantId: variantId } },
+        select: { Rating: true }
+      });
+
+      const totalReviews = reviews.length;
+      const averageRating =
+        totalReviews > 0
+          ? reviews.reduce((sum, r) => sum + r.Rating, 0) / totalReviews
+          : 0;
+
+      const countByRating = reviews.reduce(
+        (acc, r) => {
+          acc[r.Rating] = (acc[r.Rating] ?? 0) + 1;
+          return acc;
+        },
+        {} as Record<number, number>
+      );
+
+      const stats: ReviewStatisticsResponse = {
+        variantId,
+        totalReviews,
+        averageRating: Math.round(averageRating * 100) / 100,
+        fiveStarCount: countByRating[5] ?? 0,
+        fourStarCount: countByRating[4] ?? 0,
+        threeStarCount: countByRating[3] ?? 0,
+        twoStarCount: countByRating[2] ?? 0,
+        oneStarCount: countByRating[1] ?? 0
+      };
+      return { success: true, payload: stats };
+    }, 'errors.review.statistics');
   }
 
   async addReviewLog(
@@ -274,76 +268,58 @@ export class ReviewService {
     variantId: string | null,
     reviewLog: string
   ): Promise<BaseResponseAPI<ReviewLog>> {
-    return await funcHandlerAsync(
-      async () => {
-        const log = new ReviewLog({
-          typeReview: type,
-          ...(variantId ? { variantId } : {}),
-          reviewLog
-        });
-        const result = await this.unitOfWork.ReviewLogRepo.insert(log);
-        return { success: true, payload: result };
-      },
-      'Failed to add review log',
-      true
-    );
+    return this.err.wrap(async () => {
+      const log = new ReviewLog({
+        typeReview: type,
+        ...(variantId ? { variantId } : {}),
+        reviewLog
+      });
+      const result = await this.unitOfWork.ReviewLogRepo.insert(log);
+      return { success: true, payload: result };
+    }, 'errors.review.add_log');
   }
 
   async getReviewLogsByVariantId(
     variantId: string
   ): Promise<BaseResponseAPI<ReviewLog[]>> {
-    return await funcHandlerAsync(
-      async () => {
-        const logs = await this.unitOfWork.ReviewLogRepo.find({ variantId });
-        return { success: true, payload: logs };
-      },
-      'Failed to fetch review logs',
-      true
-    );
+    return this.err.wrap(async () => {
+      const logs = await this.unitOfWork.ReviewLogRepo.find({ variantId });
+      return { success: true, payload: logs };
+    }, 'errors.review.fetch_logs');
   }
 
   async getLatestReviewLogByVariantId(
     variantId: string
   ): Promise<BaseResponseAPI<ReviewLog | null>> {
-    return await funcHandlerAsync(
-      async () => {
-        const log = await this.unitOfWork.ReviewLogRepo.findOne(
-          { variantId },
-          { orderBy: { createdAt: 'DESC' } }
-        );
-        if (!log) {
-          return { success: true, payload: null };
-        }
-        return { success: true, payload: log };
-      },
-      'Failed to fetch latest review log',
-      true
-    );
+    return this.err.wrap(async () => {
+      const log = await this.unitOfWork.ReviewLogRepo.findOne(
+        { variantId },
+        { orderBy: { createdAt: 'DESC' } }
+      );
+      if (!log) {
+        return { success: true, payload: null };
+      }
+      return { success: true, payload: log };
+    }, 'errors.review.latest_log');
   }
 
   async getReviewLogById(id: string): Promise<BaseResponseAPI<ReviewLog>> {
-    return await funcHandlerAsync(
-      async () => {
-        const log = await this.unitOfWork.ReviewLogRepo.findOne({ id });
-        if (!log) {
-          return { success: false, error: 'Review log not found' };
-        }
-        return { success: true, payload: log };
-      },
-      'Failed to fetch review log',
-      true
-    );
+    return this.err.wrap(async () => {
+      const log = await this.unitOfWork.ReviewLogRepo.findOne({ id });
+      if (!log) {
+        return this.err.fail('errors.review.not_found');
+      }
+      return { success: true, payload: log };
+    }, 'errors.review.fetch_log');
   }
 
   async getAllReviewLogs(): Promise<BaseResponseAPI<ReviewLog[]>> {
-    return await funcHandlerAsync(
-      async () => {
-        const result = await this.unitOfWork.ReviewLogRepo.findAll({ orderBy: { updatedAt: 'DESC' } });
-        return { success: true, payload: result };
-      },
-      'Failed to fetch review logs',
-      true
-    );
+    return this.err.wrap(async () => {
+      const result = await this.unitOfWork.ReviewLogRepo.findAll({
+        orderBy: { updatedAt: 'DESC' }
+      });
+      return { success: true, payload: result };
+    }, 'errors.review.fetch_logs');
   }
 
   /** Lấy toàn bộ review không phân trang – dùng cho AI summary */

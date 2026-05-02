@@ -1,4 +1,10 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus
+} from '@nestjs/common';
 
 interface ExceptionResponseBody {
   success: false;
@@ -18,7 +24,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const error = this.extractError(exceptionResponse);
     const detail = this.extractDetail(exceptionResponse);
 
-    const body: ExceptionResponseBody = { success: false, error, detail, statusCode: status };
+    const body: ExceptionResponseBody = {
+      success: false,
+      error,
+      detail,
+      statusCode: status
+    };
     response.status(status).json(body);
   }
 
@@ -28,7 +39,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return (obj.error as string) ?? (obj.message as string) ?? 'Unknown error';
   }
 
-  private extractDetail(exceptionResponse: string | object): Record<string, unknown> | null {
+  private extractDetail(
+    exceptionResponse: string | object
+  ): Record<string, unknown> | null {
     if (typeof exceptionResponse === 'string') return null;
     const obj = exceptionResponse as Record<string, unknown>;
     return (obj.detail as Record<string, unknown>) ?? null;

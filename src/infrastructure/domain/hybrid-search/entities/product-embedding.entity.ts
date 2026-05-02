@@ -10,7 +10,10 @@ import { Common } from '../../../../domain/entities/common/common.entities';
 @Index({ properties: ['productId'] })
 export class ProductEmbedding extends Common {
   /** UUID của product từ SQL Server */
-  @ApiProperty({ description: 'UUID của product từ SQL Server', format: 'uuid' })
+  @ApiProperty({
+    description: 'UUID của product từ SQL Server',
+    format: 'uuid'
+  })
   @Property({ type: 'text' })
   productId!: string;
 
@@ -20,7 +23,11 @@ export class ProductEmbedding extends Common {
   vector!: number[];
 
   /** Text mô tả đã được dùng để generate embedding (để debug/rebuild) */
-  @ApiProperty({ description: 'Text mô tả đã được dùng để generate embedding', required: false, nullable: true })
+  @ApiProperty({
+    description: 'Text mô tả đã được dùng để generate embedding',
+    required: false,
+    nullable: true
+  })
   @Property({ type: 'text' })
   description?: string;
 

@@ -120,7 +120,7 @@ export async function buildCombinedPromptV2(
   orderService: OrderService,
   profileService: ProfileService,
   adminInstructionService: AdminInstructionService,
-  userId: string | undefined,
+  userId: string | undefined
 ): Promise<BaseResponse<CombinedPromptResult>> {
   let userLogData = '';
   let orderReportData = '';
@@ -161,7 +161,10 @@ export async function buildCombinedPromptV2(
 
   const combinedPrompt = `${userLogData}\n\n
     Báo cáo đơn hàng:\n${orderReportData}\n\n
-    Hồ sơ người dùng:\n${profileReport ?? ''}${dataNote}${adminInstruction ? `\n\nHướng dẫn quản trị viên:\n${adminInstruction}` : ''
+    Hồ sơ người dùng:\n${profileReport ?? ''}${dataNote}${
+      adminInstruction
+        ? `\n\nHướng dẫn quản trị viên:\n${adminInstruction}`
+        : ''
     }`;
 
   return {
@@ -240,13 +243,17 @@ export async function buildCombinedPromptV4(
   typeOfInstruction: string,
   logService: UserLogService,
   adminInstructionService: AdminInstructionService,
-  userId: string | undefined,
+  userId: string | undefined
 ): Promise<BaseResponse<CombinedPromptResult>> {
   let userLogData = '';
   let userLogPromptText = '';
   // Chỉ lấy log và order khi có userId (user đã đăng nhập)
   if (userId) {
-    const userLog = await logService.getUserLogSummaryReportByUserId(userId, subWeeks(convertToUTC(new Date()), 1), convertToUTC(new Date()));
+    const userLog = await logService.getUserLogSummaryReportByUserId(
+      userId,
+      subWeeks(convertToUTC(new Date()), 1),
+      convertToUTC(new Date())
+    );
     userLogData = userLog.data ?? '';
     userLogPromptText = userLogPrompt(userLogData);
   }
@@ -257,8 +264,11 @@ export async function buildCombinedPromptV4(
 
   const combinedPrompt = `${userLogData}\n\n
     ${userLogPromptText}\n\n 
-    ${adminInstruction ? `\n\n
-      Hướng dẫn quản trị viên:\n${adminInstruction}` : ''
+    ${
+      adminInstruction
+        ? `\n\n
+      Hướng dẫn quản trị viên:\n${adminInstruction}`
+        : ''
     }
     ${userId ? `\n\n[ID người dùng: ${userId}]` : '\n\n[Khách vãng lai - không có ID]'}`;
 
@@ -285,15 +295,18 @@ export async function buildCombinedPromptV4(
 export async function buildCombinedPromptV5(
   typeOfInstruction: string,
   adminInstructionService: AdminInstructionService,
-  userId: string | undefined,
+  userId: string | undefined
 ): Promise<BaseResponse<CombinedPromptResult>> {
   // Lấy admin instruction cho conversation (nếu có)
   const adminInstruction =
     await adminInstructionService.getSystemPromptForDomain(typeOfInstruction);
 
   const combinedPrompt = `
-    ${adminInstruction ? `\n\n
-      Hướng dẫn quản trị viên:\n${adminInstruction}` : ''
+    ${
+      adminInstruction
+        ? `\n\n
+      Hướng dẫn quản trị viên:\n${adminInstruction}`
+        : ''
     }
     ${userId ? `\n\n[ID người dùng: ${userId}]` : '\n\n[Khách vãng lai - không có ID]'}`;
 
@@ -307,6 +320,4 @@ export async function buildCombinedPromptV5(
       adminInstruction
     }
   };
-
 }
-

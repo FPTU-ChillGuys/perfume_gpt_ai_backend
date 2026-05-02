@@ -3,7 +3,7 @@ import { tool, Tool } from 'ai';
 import { RestockService } from 'src/infrastructure/domain/restock/restock.service';
 import { SlowStockService } from 'src/infrastructure/domain/slow-stock/slow-stock.service';
 import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import * as z from 'zod';
 
@@ -16,8 +16,9 @@ export class InventoryTool {
   constructor(
     private readonly inventoryPrismaRepo: InventoryPrismaRepository,
     private readonly restockService: RestockService,
-    private readonly slowStockService: SlowStockService
-  ) { }
+    private readonly slowStockService: SlowStockService,
+    private readonly err: I18nErrorHandler
+  ) {}
 
   /**
    * Lấy dữ liệu tồn kho tất cả variant.
@@ -32,31 +33,27 @@ export class InventoryTool {
     inputSchema: z.object({}),
     execute: async () => {
       this.logger.log(`[getInventoryStock] called`);
-      return await funcHandlerAsync(
-        async () => {
-          const stocks = await this.inventoryPrismaRepo.findAllStocksForTool();
+      return await this.err.wrap(async () => {
+        const stocks = await this.inventoryPrismaRepo.findAllStocksForTool();
 
-          const items = stocks.map((s) => ({
-            variantId: s.VariantId,
-            sku: s.ProductVariants.Sku,
-            productName: s.ProductVariants.Products.Name,
-            volumeMl: s.ProductVariants.VolumeMl,
-            type: s.ProductVariants.Type,
-            basePrice: Number(s.ProductVariants.BasePrice),
-            status: s.ProductVariants.Status,
-            concentrationName: s.ProductVariants.Concentrations.Name,
-            totalQuantity: s.TotalQuantity,
-            reservedQuantity: s.ReservedQuantity,
-            lowStockThreshold: s.LowStockThreshold,
-            isLowStock: s.TotalQuantity <= s.LowStockThreshold
-          }));
+        const items = stocks.map((s) => ({
+          variantId: s.VariantId,
+          sku: s.ProductVariants.Sku,
+          productName: s.ProductVariants.Products.Name,
+          volumeMl: s.ProductVariants.VolumeMl,
+          type: s.ProductVariants.Type,
+          basePrice: Number(s.ProductVariants.BasePrice),
+          status: s.ProductVariants.Status,
+          concentrationName: s.ProductVariants.Concentrations.Name,
+          totalQuantity: s.TotalQuantity,
+          reservedQuantity: s.ReservedQuantity,
+          lowStockThreshold: s.LowStockThreshold,
+          isLowStock: s.TotalQuantity <= s.LowStockThreshold
+        }));
 
-          const encodingResult = encodeToolOutput(items);
-          return { success: true, encodedData: encodingResult.encoded };
-        },
-        'Error occurred while fetching inventory stock.',
-        true
-      );
+        const encodingResult = encodeToolOutput(items);
+        return { success: true, encodedData: encodingResult.encoded };
+      }, 'errors.inventory.tool_stock');
     }
   });
 
@@ -72,31 +69,28 @@ export class InventoryTool {
     inputSchema: z.object({}),
     execute: async () => {
       this.logger.log(`[getProductSalesAnalyticsForTrend] called`);
-      return await funcHandlerAsync(
-        async () => {
-          const result = await this.restockService.getProductSalesAnalyticsForTrendCandidates(
+      return await this.err.wrap(async () => {
+        const result =
+          await this.restockService.getProductSalesAnalyticsForTrendCandidates(
             this.trendAnalyticsProductLimit
           );
-          if (!result.success || !result.payload) {
-            return {
-              success: false,
-              error: result.error ?? 'Failed to fetch trend analytics candidates'
-            };
-          }
+        if (!result.success || !result.payload) {
+          return {
+            success: false,
+            error: result.error ?? 'Failed to fetch trend analytics candidates'
+          };
+        }
 
-          const encodingResult = encodeToolOutput(result.payload);
-          return { success: true, encodedData: encodingResult.encoded };
-        },
-        'Error occurred while fetching trend sales analytics candidates.',
-        true
-      );
+        const encodingResult = encodeToolOutput(result.payload);
+        return { success: true, encodedData: encodingResult.encoded };
+      }, 'errors.inventory.tool_trend');
     }
   });
 
   /**
    * Lấy danh sách sản phẩm cần restock dựa trên sales analytics.
    * Chỉ lấy tối đa 20 sản phẩm có sales > 0, sản phẩm không cần restock sẽ không xuất hiện.
-   * 
+   *
    * 🎯 Dữ liệu đã tối ưu: product-level candidates thay vì toàn bộ variant.
    */
   getProductSalesAnalyticsForRestock: Tool = tool({
@@ -109,24 +103,22 @@ export class InventoryTool {
     inputSchema: z.object({}),
     execute: async () => {
       this.logger.log(`[getProductSalesAnalyticsForRestock] called`);
-      return await funcHandlerAsync(
-        async () => {
-          const result = await this.restockService.getProductSalesAnalyticsForRestockCandidates(
+      return await this.err.wrap(async () => {
+        const result =
+          await this.restockService.getProductSalesAnalyticsForRestockCandidates(
             this.restockAnalyticsProductLimit
           );
-          if (!result.success || !result.payload) {
-            return {
-              success: false,
-              error: result.error ?? 'Failed to fetch restock analytics candidates'
-            };
-          }
+        if (!result.success || !result.payload) {
+          return {
+            success: false,
+            error:
+              result.error ?? 'Failed to fetch restock analytics candidates'
+          };
+        }
 
-          const encodingResult = encodeToolOutput(result.payload);
-          return { success: true, encodedData: encodingResult.encoded };
-        },
-        'Error occurred while fetching restock sales analytics candidates.',
-        true
-      );
+        const encodingResult = encodeToolOutput(result.payload);
+        return { success: true, encodedData: encodingResult.encoded };
+      }, 'errors.inventory.tool_restock');
     }
   });
 
@@ -139,23 +131,18 @@ export class InventoryTool {
     inputSchema: z.object({}),
     execute: async () => {
       this.logger.log(`[getSlowStockCandidates] called`);
-      return await funcHandlerAsync(
-        async () => {
-          const result = await this.slowStockService.getSlowStockCandidates();
-          if (!result.success || !result.payload) {
-            return {
-              success: false,
-              error: result.error ?? 'Failed to fetch slow stock candidates'
-            };
-          }
+      return await this.err.wrap(async () => {
+        const result = await this.slowStockService.getSlowStockCandidates();
+        if (!result.success || !result.payload) {
+          return {
+            success: false,
+            error: result.error ?? 'Failed to fetch slow stock candidates'
+          };
+        }
 
-          const encodingResult = encodeToolOutput(result.payload);
-          return { success: true, encodedData: encodingResult.encoded };
-        },
-        'Error occurred while fetching slow stock candidates.',
-        true
-      );
+        const encodingResult = encodeToolOutput(result.payload);
+        return { success: true, encodedData: encodingResult.encoded };
+      }, 'errors.inventory.tool_slow_stock');
     }
   });
 }
-

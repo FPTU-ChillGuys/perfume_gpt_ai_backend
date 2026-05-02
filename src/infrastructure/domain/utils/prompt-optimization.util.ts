@@ -1,6 +1,5 @@
 import { Logger } from '@nestjs/common';
 import { UIMessage } from 'ai';
-import { PROMPT_OPTIMIZATION_SYSTEM_PROMPT } from 'src/application/constant/prompts';
 import { aiModelForOptimizePrompt } from 'src/chatbot/ai-model';
 import { textGenerationFromPromptToResultWithErrorHandler } from 'src/chatbot/chatbot';
 
@@ -41,36 +40,42 @@ export async function optimizePromptWithIntermediateModel(
   originalPrompt: string,
   optimizationConfig?: PromptOptimizationConfig,
   logger?: Logger,
-  systemContext?: string
+  systemContext?: string,
+  optimizationSystemPrompt?: string
 ): Promise<string> {
   if (!optimizationConfig?.enablePromptOptimization) {
     return originalPrompt;
   }
 
-  const customOptimizationPrompt = optimizationConfig.optimizationPrompt?.trim();
+  const customOptimizationPrompt =
+    optimizationConfig.optimizationPrompt?.trim();
 
   try {
     logger?.log('[PromptOptimization] Starting prompt optimization...');
-    const optimizedText = await textGenerationFromPromptToResultWithErrorHandler(
-      aiModelForOptimizePrompt,
-      `${customOptimizationPrompt ? `Case-specific optimization instruction:\n${customOptimizationPrompt}\n\n` : ''}` +
-      `System context (reference only):\n${(systemContext || '').slice(0, 1200)}\n\n` +
-        `Optimize the following prompt while keeping the same intent and domain.\n` +
-        `Keep the SAME language as input.\n` +
-        `Do NOT answer the request. Do NOT add new questions.\n` +
-        `Only rewrite for clarity and brevity.\n\n${originalPrompt}`,
-      PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
-      undefined,
-      undefined,
-      10,
-      undefined,
-      0.7,
-      undefined
-    );
+    const optimizedText =
+      await textGenerationFromPromptToResultWithErrorHandler(
+        aiModelForOptimizePrompt,
+        `${customOptimizationPrompt ? `Case-specific optimization instruction:\n${customOptimizationPrompt}\n\n` : ''}` +
+          `System context (reference only):\n${(systemContext || '').slice(0, 1200)}\n\n` +
+          `Optimize the following prompt while keeping the same intent and domain.\n` +
+          `Keep the SAME language as input.\n` +
+          `Do NOT answer the request. Do NOT add new questions.\n` +
+          `Only rewrite for clarity and brevity.\n\n${originalPrompt}`,
+        optimizationSystemPrompt || '',
+        undefined,
+        undefined,
+        10,
+        undefined,
+        0.7,
+        undefined
+      );
     logger?.log('[PromptOptimization] Prompt optimization completed');
     return optimizedText?.trim() || originalPrompt;
   } catch (error) {
-    logger?.warn('[PromptOptimization] Optimization failed, using original prompt', error as Error);
+    logger?.warn(
+      '[PromptOptimization] Optimization failed, using original prompt',
+      error as Error
+    );
     return originalPrompt;
   }
 }
@@ -79,13 +84,15 @@ export async function optimizeUserMessageWithIntermediateModel(
   messages: UIMessage[],
   optimizationConfig?: PromptOptimizationConfig,
   logger?: Logger,
-  systemContext?: string
+  systemContext?: string,
+  optimizationSystemPrompt?: string
 ): Promise<UIMessage[]> {
   if (!optimizationConfig?.enablePromptOptimization || messages.length === 0) {
     return messages;
   }
 
-  const customOptimizationPrompt = optimizationConfig.optimizationPrompt?.trim();
+  const customOptimizationPrompt =
+    optimizationConfig.optimizationPrompt?.trim();
 
   try {
     logger?.log('[PromptOptimization] Starting messages optimization...');
@@ -118,31 +125,35 @@ export async function optimizeUserMessageWithIntermediateModel(
       return conciseMessages;
     }
 
-    const optimizedText = await textGenerationFromPromptToResultWithErrorHandler(
-      aiModelForOptimizePrompt,
-      `${customOptimizationPrompt ? `Case-specific optimization instruction:\n${customOptimizationPrompt}\n\n` : ''}` +
-      `System context (reference only):\n${(systemContext || '').slice(0, 1200)}\n\n` +
-        `Optimize the following user message so the main model can respond better.\n` +
-        `Keep the same intent and domain.\n` +
-        `If the input is Vietnamese, translate it to natural English first.\n` +
-        `Output MUST be in English only.\n` +
-        `Do NOT answer the user.\n` +
-        `Do NOT add new questions or request extra information.\n` +
-        `Only rewrite wording for clarity and keep length similar to original.\n\n${userText}`,
-      PROMPT_OPTIMIZATION_SYSTEM_PROMPT,
-      undefined,
-      undefined,
-      10,
-      undefined,
-      0.7,
-      undefined
-    );
+    const optimizedText =
+      await textGenerationFromPromptToResultWithErrorHandler(
+        aiModelForOptimizePrompt,
+        `${customOptimizationPrompt ? `Case-specific optimization instruction:\n${customOptimizationPrompt}\n\n` : ''}` +
+          `System context (reference only):\n${(systemContext || '').slice(0, 1200)}\n\n` +
+          `Optimize the following user message so the main model can respond better.\n` +
+          `Keep the same intent and domain.\n` +
+          `If the input is Vietnamese, translate it to natural English first.\n` +
+          `Output MUST be in English only.\n` +
+          `Do NOT answer the user.\n` +
+          `Do NOT add new questions or request extra information.\n` +
+          `Only rewrite wording for clarity and keep length similar to original.\n\n${userText}`,
+        optimizationSystemPrompt || '',
+        undefined,
+        undefined,
+        10,
+        undefined,
+        0.7,
+        undefined
+      );
 
     logger?.log('[PromptOptimization] Messages optimization completed');
     logger?.debug(`[PromptOptimization] Original user message: "${userText}"`);
     const finalOptimizedText = (optimizedText || userText).trim();
-    const messageWithLanguageHint = appendVietnameseAnswerHint(finalOptimizedText);
-    logger?.debug(`[PromptOptimization] Optimized user message: "${messageWithLanguageHint}"`);
+    const messageWithLanguageHint =
+      appendVietnameseAnswerHint(finalOptimizedText);
+    logger?.debug(
+      `[PromptOptimization] Optimized user message: "${messageWithLanguageHint}"`
+    );
 
     const optimizedMessages = [...messages];
     optimizedMessages[optimizedMessages.length - 1] = {
@@ -152,7 +163,10 @@ export async function optimizeUserMessageWithIntermediateModel(
 
     return optimizedMessages;
   } catch (error) {
-    logger?.warn('[PromptOptimization] Messages optimization failed, using original messages', error as Error);
+    logger?.warn(
+      '[PromptOptimization] Messages optimization failed, using original messages',
+      error as Error
+    );
     return messages;
   }
 }

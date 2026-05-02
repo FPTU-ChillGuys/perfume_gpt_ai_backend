@@ -142,7 +142,10 @@ export function applyEventToFeatureSnapshot(
   event: EventLog
 ): void {
   increaseCounter(featureSnapshot.eventTypeCounts, event.eventType);
-  increaseCounter(featureSnapshot.hourCounts, String(event.createdAt.getHours()));
+  increaseCounter(
+    featureSnapshot.hourCounts,
+    String(event.createdAt.getHours())
+  );
 
   const textParts: string[] = [];
   if (event.contentText) {
@@ -189,7 +192,8 @@ export function applyEventToDailyFeatureSnapshot(
   event: EventLog
 ): void {
   const dateKey = getEventDateKey(event.createdAt);
-  const snapshot = dailyFeatureSnapshot[dateKey] || createEmptyRollingFeatureSnapshot();
+  const snapshot =
+    dailyFeatureSnapshot[dateKey] || createEmptyRollingFeatureSnapshot();
   applyEventToFeatureSnapshot(snapshot, event);
   dailyFeatureSnapshot[dateKey] = snapshot;
 }
@@ -213,7 +217,10 @@ export function buildDailyLogSummaryMap(
   return Object.fromEntries(
     sortedEntries.map(([dateKey, snapshot]) => [
       dateKey,
-      buildRollingSummaryText(snapshot, getTotalEventsFromFeatureSnapshot(snapshot))
+      buildRollingSummaryText(
+        snapshot,
+        getTotalEventsFromFeatureSnapshot(snapshot)
+      )
     ])
   );
 }
@@ -410,14 +417,14 @@ export function buildSummaryResponseFromEvents(
   const createdAt =
     eventLogs.length > 0
       ? new Date(
-        Math.min(...eventLogs.map((event) => event.createdAt.getTime()))
-      )
+          Math.min(...eventLogs.map((event) => event.createdAt.getTime()))
+        )
       : now;
   const updatedAt =
     eventLogs.length > 0
       ? new Date(
-        Math.max(...eventLogs.map((event) => event.createdAt.getTime()))
-      )
+          Math.max(...eventLogs.map((event) => event.createdAt.getTime()))
+        )
       : now;
 
   return new UserLogSummaryResponse({

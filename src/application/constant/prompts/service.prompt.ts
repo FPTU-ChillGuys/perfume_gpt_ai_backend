@@ -62,5 +62,3 @@ export const surveyPrompt = (
 Đây là kết quả survey tư vấn nước hoa của một khách hàng, bao gồm các câu hỏi và câu trả lời của họ để hiểu sở thích và nhu cầu của khách hàng (Và vui lòng gọi các tool đã được cung cấp để lấy dữ liệu sản phẩm thực tế, đừng dựa vào trí nhớ hoặc phỏng đoán):
 ${convertQuesAnsesToString(quesAnses)}
 `;
-
-

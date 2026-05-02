@@ -7,15 +7,21 @@ import { SurveyQuestion } from 'src/domain/entities/survey-question.entity';
 
 @Injectable()
 export class SurveyQuestionRepository extends SqlEntityRepository<SurveyQuestion> {
-  async createWithAnswers(request: SurveyQuestionRequest): Promise<SurveyQuestion> {
+  async createWithAnswers(
+    request: SurveyQuestionRequest
+  ): Promise<SurveyQuestion> {
     const em = this.getEntityManager();
 
     let order = request.order;
     if (order === undefined || order === null) {
-      const maxResult = await em.findOne(SurveyQuestion, { isActive: true }, {
-        orderBy: { order: 'DESC' },
-        fields: ['order']
-      });
+      const maxResult = await em.findOne(
+        SurveyQuestion,
+        { isActive: true },
+        {
+          orderBy: { order: 'DESC' },
+          fields: ['order']
+        }
+      );
       order = (maxResult?.order ?? -1) + 1;
     }
 
@@ -67,7 +73,10 @@ export class SurveyQuestionRepository extends SqlEntityRepository<SurveyQuestion
   async softDeleteQuestion(id: string): Promise<SurveyQuestion | null> {
     const em = this.getEntityManager();
 
-    const surveyQuestion = await this.findOne({ id, isActive: true }, { populate: ['answers'] });
+    const surveyQuestion = await this.findOne(
+      { id, isActive: true },
+      { populate: ['answers'] }
+    );
     if (!surveyQuestion) return null;
 
     // Soft delete question
@@ -84,7 +93,10 @@ export class SurveyQuestionRepository extends SqlEntityRepository<SurveyQuestion
 
   async rebuildOrder(): Promise<void> {
     const em = this.getEntityManager();
-    const questions = await this.find({ isActive: true }, { orderBy: { order: 'ASC' } });
+    const questions = await this.find(
+      { isActive: true },
+      { orderBy: { order: 'ASC' } }
+    );
     for (let i = 0; i < questions.length; i++) {
       questions[i].order = i + 1;
     }

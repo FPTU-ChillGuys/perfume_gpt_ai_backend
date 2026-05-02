@@ -12,7 +12,11 @@ export class UserLogRequest {
   userId: string;
 
   /** Khoảng thời gian lọc (weekly, monthly, yearly) */
-  @ApiProperty({ description: 'Khoảng thời gian lọc', enum: PeriodEnum, required: false })
+  @ApiProperty({
+    description: 'Khoảng thời gian lọc',
+    enum: PeriodEnum,
+    required: false
+  })
   @IsOptional()
   @IsEnum(PeriodEnum)
   period: PeriodEnum = PeriodEnum.MONTHLY;
@@ -38,7 +42,11 @@ export class UserLogRequest {
 /** Request lấy log hành vi tất cả người dùng */
 export class AllUserLogRequest {
   /** Khoảng thời gian lọc */
-  @ApiProperty({ description: 'Khoảng thời gian lọc', enum: PeriodEnum, required: false })
+  @ApiProperty({
+    description: 'Khoảng thời gian lọc',
+    enum: PeriodEnum,
+    required: false
+  })
   @IsOptional()
   @IsEnum(PeriodEnum)
   period: PeriodEnum = PeriodEnum.MONTHLY;

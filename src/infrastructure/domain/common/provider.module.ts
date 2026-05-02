@@ -19,29 +19,33 @@ import { CacheableMemory, Keyv } from 'cacheable';
 import KeyvRedis from '@keyv/redis';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { CacheableModule } from './cacheable/cacheable.module';
-
 const registerQueue = BullModule.registerQueue(
   ...Object.values(QueueName).map((value) => ({ name: value }))
 );
 
 @Module({
-  imports: [...modules, registerQueue, ProcessorModule, CacheModule.registerAsync({
-    isGlobal: true,
-    imports: [ConfigModule],
-    inject: [ConfigService],
-    useFactory: async (config: ConfigService) => {
-      const redisUrl = `redis://${config.get<string>('REDIS_HOST') ?? 'localhost'}:${config.get<number>('REDIS_PORT') ?? 6379}`;
-      return {
-        ttl: config.get<number>('CACHE_TTL') ?? 60000,
-        lruSize: config.get<number>('CACHE_LRU_SIZE') ?? 5000,
-        stores: [
-          new Keyv({
-            store: new KeyvRedis(redisUrl),
-          }),
-        ],
-      };
-    },
-  }),],
+  imports: [
+    ...modules,
+    registerQueue,
+    ProcessorModule,
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => {
+        const redisUrl = `redis://${config.get<string>('REDIS_HOST') ?? 'localhost'}:${config.get<number>('REDIS_PORT') ?? 6379}`;
+        return {
+          ttl: config.get<number>('CACHE_TTL') ?? 60000,
+          lruSize: config.get<number>('CACHE_LRU_SIZE') ?? 5000,
+          stores: [
+            new Keyv({
+              store: new KeyvRedis(redisUrl)
+            })
+          ]
+        };
+      }
+    })
+  ],
   controllers: [
     ProductController,
     SurveyController,
@@ -52,15 +56,9 @@ const registerQueue = BullModule.registerQueue(
     RecommendationController,
     InventoryController,
     AIAcceptanceController,
-    AdminInstructionController,
+    AdminInstructionController
   ],
-  // providers: [
-  //   {
-  //     provide: APP_INTERCEPTOR,
-  //     useClass: CacheInterceptor
-  //   },
-  //   CacheableModule
-  // ],
-  exports: modules
+  providers: [],
+  exports: [...modules]
 })
-export class ProviderModule { }
+export class ProviderModule {}

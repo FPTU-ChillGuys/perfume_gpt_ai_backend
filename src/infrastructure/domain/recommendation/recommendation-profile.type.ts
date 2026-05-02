@@ -9,31 +9,31 @@ export interface RecommendationProfile {
   userId: string;
 
   recommendationMode: RecommendationMode;
-  
+
   // Age & Demographics
   dynamicAge: number;
   gender?: string;
-  
+
   // Preferences from purchase history (last 2 years)
   topBrands: string[];
   topScents: string[];
   topGenders: string[];
   topOccasions: string[];
   topPriceRanges: string[];
-  
+
   // Budget information
   monthlyBudgetAvg: number;
   minBudgetMonthly: number;
   maxBudgetMonthly: number;
-  
+
   // Seasonality
   currentSeason: Season;
-  
+
   // Survey preferences
   surveyTopScents: string[];
   surveyTopOccasions: string[];
   surveyTopStyles: string[];
-  
+
   // Purchase frequency patterns
   repurchaseFrequencyMap: Record<string, number>; // productId -> days
 }
@@ -49,7 +49,7 @@ export interface ProductScore {
   gender?: string;
   scentNotes?: string[];
   score: number;
-  
+
   // Score breakdown for transparency
   scoreBreakdown: {
     brandScore: number;
@@ -60,10 +60,10 @@ export interface ProductScore {
     budgetScore: number;
     repurchaseBonus: number;
   };
-  
+
   // Diversification aids
   olfactoryFamilies?: string[];
-  
+
   // Additional metadata
   isRepurchaseCandidate: boolean;
   repurchaseDaysRemaining?: number;
@@ -153,7 +153,7 @@ export interface ProductScoreV3 {
   basePrice?: number;
   scentNotes?: string[];
   score: number;
-  
+
   // Simplified breakdown for V3
   scoreBreakdown: {
     brandScore: number;
@@ -174,8 +174,8 @@ export interface ScoresWeights {
 
 const DEFAULT_WEIGHTS: ScoresWeights = {
   brand: 0.25,
-  scent: 0.40, // Merge survey weight into hard purchase history
-  survey: 0.10, // Weak signal
+  scent: 0.4, // Merge survey weight into hard purchase history
+  survey: 0.1, // Weak signal
   season: 0.12,
   age: 0.08,
   budget: 0.05

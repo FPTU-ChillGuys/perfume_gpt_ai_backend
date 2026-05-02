@@ -5,5 +5,5 @@ export enum PeriodEnum {
   /** Theo tháng */
   MONTHLY = 'monthly',
   /** Theo năm */
-  YEARLY = 'yearly',
+  YEARLY = 'yearly'
 }

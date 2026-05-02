@@ -9,17 +9,20 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     conversationId: string,
     messages: Message[]
   ): Promise<Conversation> {
-    const conversation = await this.findOne({ id: conversationId }, {
-      populate: ['messages']
-    });
-    
+    const conversation = await this.findOne(
+      { id: conversationId },
+      {
+        populate: ['messages']
+      }
+    );
+
     if (!conversation) {
       throw new Error('Conversation not found');
     }
 
     if (messages.length >= 2) {
       conversation.messages.add([
-        messages[messages.length - 2], 
+        messages[messages.length - 2],
         messages[messages.length - 1]
       ]);
     } else if (messages.length === 1) {
@@ -52,7 +55,9 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     this.getEntityManager().persist(message);
     await this.flush();
 
-    const saved = await this.getEntityManager().findOne(Message, { id: message.id });
+    const saved = await this.getEntityManager().findOne(Message, {
+      id: message.id
+    });
     return saved ?? message;
   }
 }

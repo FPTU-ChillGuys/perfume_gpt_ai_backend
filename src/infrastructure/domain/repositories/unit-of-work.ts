@@ -26,8 +26,9 @@ export class UnitOfWork {
     private readonly adminInstructionRepository: AdminInstructionRepository,
     private readonly inventoryLogRepository: InventoryLogRepository,
     private readonly trendLogRepository: TrendLogRepository,
-    @InjectRepository(ReviewLog) private readonly reviewLogRepository: EntityRepository<ReviewLog>
-  ) { }
+    @InjectRepository(ReviewLog)
+    private readonly reviewLogRepository: EntityRepository<ReviewLog>
+  ) {}
 
   get AIConversationRepo(): ConversationRepository {
     return this.aiConversationRepository;

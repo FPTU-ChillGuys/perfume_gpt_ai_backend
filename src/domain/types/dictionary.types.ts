@@ -14,8 +14,7 @@ export type EntityType =
   | 'product_name'
   | 'gender'
   | 'origin'
-  | 'variant_type'
-  | 'note_type';
+  | 'variant_type';
 
 export type NumericFieldType =
   | 'price'
@@ -37,6 +36,14 @@ export interface ParserRuleSnapshot {
   pattern: string;
   isRegex: boolean;
   priority: number;
+}
+
+export interface PhraseRuleSnapshot {
+  phrase: string;
+  normalizedPhrase: string;
+  ruleType: string;
+  scope: string;
+  confidence: number;
 }
 
 /**
@@ -72,7 +79,7 @@ export interface ParsedEntity {
   canonicalValue?: string;
   normalizedValue?: string | number;
   confidence: number; // 0-1
-  source: 'exact_match' | 'fuzzy_match' | 'numeric_pattern' | 'wink_nlp';
+  source: 'exact_match' | 'fuzzy_match' | 'numeric_pattern';
   metadata?: Record<string, any>;
 }
 
@@ -84,10 +91,14 @@ export interface DictionarySnapshot {
   numericPatterns: Map<NumericFieldType, NumericPattern>;
   ageBuckets?: AgeBucketSnapshot[];
   parserRules?: ParserRuleSnapshot[];
+  phraseRules?: PhraseRuleSnapshot[];
   stats: {
     totalCanonicals: number;
     totalSynonyms: number;
-    entityBreakdown: Record<EntityType, { canonicals: number; synonyms: number }>;
+    entityBreakdown: Record<
+      EntityType,
+      { canonicals: number; synonyms: number }
+    >;
     timestamp: Date;
   };
 }

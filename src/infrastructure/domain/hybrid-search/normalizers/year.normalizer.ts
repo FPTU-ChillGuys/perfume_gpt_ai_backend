@@ -8,16 +8,19 @@ import { z } from 'zod';
  */
 export const YearNormalizerSchema = z.object({
   year: z.number().int().optional().describe('Năm ra mắt'),
-  operator: z.enum(['eq', 'gte', 'lte', 'newer', 'older']).optional().describe('Toán tử so sánh'),
+  operator: z
+    .enum(['eq', 'gte', 'lte', 'newer', 'older'])
+    .optional()
+    .describe('Toán tử so sánh')
 });
 
 export class YearNormalizerOutput {
   @ApiPropertyOptional({ description: 'Năm ra mắt' })
   year?: number;
 
-  @ApiPropertyOptional({ 
-    description: 'Toán tử so sánh', 
-    enum: ['eq', 'gte', 'lte', 'newer', 'older'] 
+  @ApiPropertyOptional({
+    description: 'Toán tử so sánh',
+    enum: ['eq', 'gte', 'lte', 'newer', 'older']
   })
   operator?: 'eq' | 'gte' | 'lte' | 'newer' | 'older';
 }

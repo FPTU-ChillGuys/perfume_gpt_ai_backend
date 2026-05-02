@@ -1,9 +1,17 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit
+} from '@nestjs/common';
 import { PrismaClient } from 'generated/prisma/client';
 import { PrismaMssql } from '@prisma/adapter-mssql';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
@@ -15,8 +23,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       database: process.env.SQL_SERVER_DATABASE_NAME,
       options: {
         encrypt: false,
-        trustServerCertificate: true,
-      },
+        trustServerCertificate: true
+      }
     });
 
     super({ adapter });
@@ -36,7 +44,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       await this.$queryRaw`SELECT 1 AS ping`;
       this.logger.log('[Prisma] ✅ Database ping thành công!');
     } catch (error: any) {
-      this.logger.error('[Prisma] ❌ Kết nối database thất bại:', error.message);
+      this.logger.error(
+        '[Prisma] ❌ Kết nối database thất bại:',
+        error.message
+      );
       throw error; // Dừng app nếu không kết nối được DB
     }
   }

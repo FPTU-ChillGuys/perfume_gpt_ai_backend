@@ -1,7 +1,22 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/application/common/Metadata';
-import { ApiPublicErrorResponses, ApiAiErrors } from 'src/application/decorators/swagger-error.decorator';
+import {
+  ApiPublicErrorResponses,
+  ApiAiErrors
+} from 'src/application/decorators/swagger-error.decorator';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
@@ -17,7 +32,10 @@ import { Request } from 'express';
 import { resolveLogUserIdFromRequest } from 'src/infrastructure/domain/utils/extract-token';
 import { SearchRequest } from 'src/application/dtos/request/search.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { ProductViewLogRequest, SearchTextLogRequest } from 'src/application/dtos/request/product-log.request';
+import {
+  ProductViewLogRequest,
+  SearchTextLogRequest
+} from 'src/application/dtos/request/product-log.request';
 
 @ApiTags('Products')
 @ApiPublicErrorResponses()
@@ -29,14 +47,16 @@ export class ProductController {
     private userLog: UserLogService,
     private aiAnalysisService: AiAnalysisService,
     private hybridSearchService: HybridSearchService
-  ) { }
+  ) {}
 
   /** Lấy danh sách tất cả sản phẩm */
   @Public()
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả sản phẩm' })
   @ExtendApiBaseResponse(PagedResult, ProductResponse)
-  async getAllProducts(@Query() request: PagedAndSortedRequest): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
+  async getAllProducts(
+    @Query() request: PagedAndSortedRequest
+  ): Promise<BaseResponseAPI<PagedResult<ProductResponse>>> {
     return this.productService.getAllProducts(request);
   }
 
@@ -46,8 +66,14 @@ export class ProductController {
   @ApiAiErrors()
   @ApiOperation({ summary: 'Tìm kiếm sản phẩm bằng semantic search' })
   @ExtendApiBaseResponse(PagedResult, ProductWithVariantsResponse)
-  async getProductsBySemanticSearch(@Req() req: Request, @Query() request: SearchRequest): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
-    const result = await this.productService.getProductsUsingSemanticSearch(request.searchText, request);
+  async getProductsBySemanticSearch(
+    @Req() req: Request,
+    @Query() request: SearchRequest
+  ): Promise<BaseResponseAPI<PagedResult<ProductWithVariantsResponse>>> {
+    const result = await this.productService.getProductsUsingSemanticSearch(
+      request.searchText,
+      request
+    );
     const logUserId = resolveLogUserIdFromRequest(req);
     await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
     return result;
@@ -57,32 +83,40 @@ export class ProductController {
   @Public()
   @Get('search/v4')
   @ApiAiErrors()
-  @ApiOperation({ summary: 'Hybrid Search v4 - Kết hợp Query Layer (hard filters) và Vector Layer (similarity)' })
+  @ApiOperation({
+    summary:
+      'Hybrid Search v4 - Kết hợp Query Layer (hard filters) và Vector Layer (similarity)'
+  })
   @ExtendApiBaseResponse(HybridSearchResponse)
   async getProductsByHybridSearch(
     @Req() req: Request,
     @Query() request: SearchRequest
   ): Promise<BaseResponseAPI<HybridSearchResponse>> {
-    const result = await this.hybridSearchService.search(request.searchText, request);
+    const result = await this.hybridSearchService.search(
+      request.searchText,
+      request
+    );
 
     const logUserId = resolveLogUserIdFromRequest(req);
     await this.userLog.addSearchLogToUserLog(logUserId, request.searchText);
 
     return result;
   }
-  
+
   /** Ghi log khi người dùng click vào một sản phẩm hoặc variant */
   @Public()
   @Post('log/view')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ghi log khi người dùng xem / click vào product hoặc variant' })
+  @ApiOperation({
+    summary: 'Ghi log khi người dùng xem / click vào product hoặc variant'
+  })
   async logProductView(
     @Req() req: Request,
     @Body() body: ProductViewLogRequest
   ): Promise<BaseResponse<{ id: string }>> {
     const rawUserId = body.userId || resolveLogUserIdFromRequest(req);
     const userId = rawUserId.toLowerCase();
-    
+
     if (userId.startsWith('anonymous:')) {
       this.logger.warn(
         `[PRODUCT-LOG] logProductView is using anonymous userId. Pass body.userId or Bearer token for personalized recommendation.`
@@ -118,14 +152,16 @@ export class ProductController {
   @Public()
   @Post('log/search')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ghi log từ khóa tìm kiếm (không thực hiện tìm kiếm)' })
+  @ApiOperation({
+    summary: 'Ghi log từ khóa tìm kiếm (không thực hiện tìm kiếm)'
+  })
   async logSearchText(
     @Req() req: Request,
     @Body() body: SearchTextLogRequest
   ): Promise<BaseResponse<{ id: string }>> {
     const rawUserId = body.userId || resolveLogUserIdFromRequest(req);
     const userId = rawUserId.toLowerCase();
-    
+
     if (userId.startsWith('anonymous:')) {
       this.logger.warn(
         `[PRODUCT-LOG] logSearchText is using anonymous userId. Pass body.userId or Bearer token for personalized recommendation.`
@@ -138,5 +174,4 @@ export class ProductController {
     const id = await this.userLog.addSearchTextLog(userId, body.searchText);
     return { success: true, data: { id } };
   }
-
-  }
+}

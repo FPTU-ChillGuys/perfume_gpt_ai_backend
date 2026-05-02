@@ -7,7 +7,7 @@ import { z } from 'zod';
  * Phân tích nguồn gốc từ search text
  */
 export const OriginNormalizerSchema = z.object({
-  origins: z.array(z.string()).optional().describe('Danh sách nguồn gốc'),
+  origins: z.array(z.string()).optional().describe('Danh sách nguồn gốc')
 });
 
 export class OriginNormalizerOutput {
@@ -36,8 +36,10 @@ export class OriginNormalizer {
     try {
       const normalizedText = searchText.toLowerCase();
       const origins = this.originMap
-        .filter(item => item.terms.some(term => normalizedText.includes(term)))
-        .map(item => item.value);
+        .filter((item) =>
+          item.terms.some((term) => normalizedText.includes(term))
+        )
+        .map((item) => item.value);
 
       return origins.length > 0 ? { origins } : null;
     } catch (error) {

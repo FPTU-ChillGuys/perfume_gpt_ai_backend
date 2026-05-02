@@ -17,36 +17,38 @@ import { AIPersonalizationHelper } from './helpers/ai-personalization.helper';
 import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
 import { ConversationInputHelper } from './helpers/conversation-input.helper';
 import { ConversationResponseBuilder } from './helpers/conversation-response.builder';
-
+import { NlpQueryMapper } from './helpers/nlp-query-mapper.helper';
 @Module({
-    imports: [
-        UnitOfWorkModule,
-        AIModule,
-        UserLogModule,
-        ProductModule,
-        CartModule,
-        SurveyModule,
-        OrderModule,
-        ProfileModule,
-        AIAcceptanceModule,
-        AdminInstructionModule,
-        DictionaryModule,
-        forwardRef(() => RecommendationModule),
-    ],
-    providers: [
-        ConversationService, 
-        AIAnalysisHelper,
-        AIPersonalizationHelper,
-        AISearchExecutorHelper,
-        ConversationInputHelper,
-        ConversationResponseBuilder
-    ],
-    exports: [
-        ConversationService, 
-        AIAnalysisHelper,
-        AIPersonalizationHelper,
-        AISearchExecutorHelper,
-        ConversationInputHelper
-    ],
+  imports: [
+    UnitOfWorkModule,
+    AIModule,
+    UserLogModule,
+    ProductModule,
+    CartModule,
+    SurveyModule,
+    OrderModule,
+    ProfileModule,
+    AIAcceptanceModule,
+    AdminInstructionModule,
+    DictionaryModule,
+    forwardRef(() => RecommendationModule)
+  ],
+  providers: [
+    ConversationService,
+    AIAnalysisHelper,
+    AIPersonalizationHelper,
+    AISearchExecutorHelper,
+    ConversationInputHelper,
+    ConversationResponseBuilder,
+    NlpQueryMapper
+  ],
+  exports: [
+    ConversationService,
+    AIAnalysisHelper,
+    AIPersonalizationHelper,
+    AISearchExecutorHelper,
+    ConversationInputHelper,
+    NlpQueryMapper
+  ]
 })
-export class ConversationModule { }
+export class ConversationModule {}

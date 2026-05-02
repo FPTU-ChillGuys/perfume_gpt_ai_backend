@@ -30,4 +30,4 @@ import { FptEmbeddingService } from './fpt-embedding.service';
   ],
   exports: [HybridSearchService, EmbeddingService]
 })
-export class HybridSearchModule { }
+export class HybridSearchModule {}

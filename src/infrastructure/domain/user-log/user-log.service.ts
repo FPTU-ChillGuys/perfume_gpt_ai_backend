@@ -1,7 +1,7 @@
 import { UnitOfWork } from 'src/infrastructure/domain/repositories/unit-of-work';
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
-import { funcHandlerAsync } from 'src/infrastructure/domain/utils/error-handler';
+import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 import { PeriodEnum } from 'src/domain/enum/period.enum';
 import {
   AllUserLogRequest,
@@ -64,6 +64,7 @@ export class UserLogService {
 
   constructor(
     protected unitOfWork: UnitOfWork,
+    private readonly err: I18nErrorHandler,
     @InjectQueue(QueueName.USER_LOG_SUMMARY_QUEUE)
     private readonly userLogSummaryQueue: Queue
   ) {}
@@ -74,7 +75,9 @@ export class UserLogService {
     }
 
     const safeUserId = userId.replace(/:/g, '_');
-    this.logger.debug(`[SUMMARY-QUEUE] Enqueue rolling summary update for userId=${userId}`);
+    this.logger.debug(
+      `[SUMMARY-QUEUE] Enqueue rolling summary update for userId=${userId}`
+    );
 
     await this.userLogSummaryQueue.add(
       UserLogSummaryJobName.UPDATE_ROLLING_SUMMARY,
@@ -94,213 +97,189 @@ export class UserLogService {
   }
 
   async getAllEventLogs(): Promise<BaseResponse<EventLog[]>> {
-    return await funcHandlerAsync(
-      async () => {
-        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({});
-        return { success: true, data: eventLogs };
-      },
-      'Failed to get all event logs',
-      true
-    );
+    return await this.err.wrap(async () => {
+      const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({});
+      return { success: true, data: eventLogs };
+    }, 'errors.user_log.get_all');
   }
 
   /** Lay event log moi */
   async getEventLogs(
     request: EventLogQueryRequest
   ): Promise<BaseResponse<EventLog[]>> {
-    return await funcHandlerAsync(
-      async () => {
-        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-          userId: request.userId,
-          eventType: request.eventType,
-          startDate: request.startDate
-            ? startOfDay(convertToUTC(request.startDate))
-            : undefined,
-          endDate: request.endDate
-            ? endOfDay(convertToUTC(request.endDate))
-            : undefined
-        });
+    return await this.err.wrap(async () => {
+      const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+        userId: request.userId,
+        eventType: request.eventType,
+        startDate: request.startDate
+          ? startOfDay(convertToUTC(request.startDate))
+          : undefined,
+        endDate: request.endDate
+          ? endOfDay(convertToUTC(request.endDate))
+          : undefined
+      });
 
-        return { success: true, data: eventLogs };
-      },
-      'Failed to get event logs',
-      true
-    );
+      return { success: true, data: eventLogs };
+    }, 'errors.user_log.get_by_user');
   }
 
   async getEventLogsPaged(
     request: EventLogPagedQueryRequest
   ): Promise<BaseResponse<PagedResult<EventLog>>> {
-    return await funcHandlerAsync(
-      async () => {
-        const pageNumber = Math.max(Number(request.PageNumber) || 1, 1);
-        const pageSize = Math.max(Number(request.PageSize) || 10, 1);
+    return await this.err.wrap(async () => {
+      const pageNumber = Math.max(Number(request.PageNumber) || 1, 1);
+      const pageSize = Math.max(Number(request.PageSize) || 10, 1);
 
-        const paged = await this.unitOfWork.EventLogRepo.getEventLogsPaged(
-          {
-            userId: request.userId,
-            eventType: request.eventType,
-            startDate: request.startDate
-              ? startOfDay(convertToUTC(request.startDate))
-              : undefined,
-            endDate: request.endDate
-              ? endOfDay(convertToUTC(request.endDate))
-              : undefined
-          },
-          pageNumber,
-          pageSize,
-          request.IsDescending
-        );
+      const paged = await this.unitOfWork.EventLogRepo.getEventLogsPaged(
+        {
+          userId: request.userId,
+          eventType: request.eventType,
+          startDate: request.startDate
+            ? startOfDay(convertToUTC(request.startDate))
+            : undefined,
+          endDate: request.endDate
+            ? endOfDay(convertToUTC(request.endDate))
+            : undefined
+        },
+        pageNumber,
+        pageSize,
+        request.IsDescending
+      );
 
-        return { success: true, data: paged };
-      },
-      'Failed to get paged event logs',
-      true
-    );
+      return { success: true, data: paged };
+    }, 'errors.user_log.get_paged');
   }
 
   async createEventLog(
     request: EventLogCreateRequest
   ): Promise<BaseResponse<{ id: string }>> {
-    return await funcHandlerAsync(
-      async () => {
-        this.logger.debug(
-          `[EVENT-LOG] Creating event log type=${request.eventType}, entityType=${request.entityType}, userId=${request.userId || 'anonymous'}`
-        );
+    return await this.err.wrap(async () => {
+      this.logger.debug(
+        `[EVENT-LOG] Creating event log type=${request.eventType}, entityType=${request.entityType}, userId=${request.userId || 'anonymous'}`
+      );
 
-        const id = await this.unitOfWork.EventLogRepo.createEventLog({
-          userId: request.userId,
-          eventType: request.eventType,
-          entityType: request.entityType,
-          entityId: request.entityId,
-          contentText: request.contentText,
-          metadata: request.metadata
-        });
+      const id = await this.unitOfWork.EventLogRepo.createEventLog({
+        userId: request.userId,
+        eventType: request.eventType,
+        entityType: request.entityType,
+        entityId: request.entityId,
+        contentText: request.contentText,
+        metadata: request.metadata
+      });
 
-        if (request.userId) {
-          await this.enqueueRollingSummaryUpdate(request.userId);
-        }
+      if (request.userId) {
+        await this.enqueueRollingSummaryUpdate(request.userId);
+      }
 
-        return { success: true, data: { id } };
-      },
-      'Failed to create event log',
-      true
-    );
+      return { success: true, data: { id } };
+    }, 'errors.user_log.create');
   }
 
   async getEventLogsSummary(
     request: EventLogSummaryQueryRequest
   ): Promise<BaseResponse<EventLogSummaryResponse>> {
-    return await funcHandlerAsync(
-      async () => {
-        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+    return await this.err.wrap(async () => {
+      const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+        userId: request.userId,
+        startDate: request.startDate
+          ? startOfDay(convertToUTC(request.startDate))
+          : undefined,
+        endDate: request.endDate
+          ? endOfDay(convertToUTC(request.endDate))
+          : undefined
+      });
+
+      const messageCount = eventLogs.filter(
+        (log) => log.eventType === EventLogEventType.MESSAGE
+      ).length;
+      const searchCount = eventLogs.filter(
+        (log) => log.eventType === EventLogEventType.SEARCH
+      ).length;
+      const surveyCount = eventLogs.filter(
+        (log) => log.eventType === EventLogEventType.SURVEY
+      ).length;
+      const productCount = eventLogs.filter(
+        (log) => log.eventType === EventLogEventType.PRODUCT
+      ).length;
+
+      return {
+        success: true,
+        data: {
           userId: request.userId,
-          startDate: request.startDate
-            ? startOfDay(convertToUTC(request.startDate))
-            : undefined,
-          endDate: request.endDate
-            ? endOfDay(convertToUTC(request.endDate))
-            : undefined
-        });
-
-        const messageCount = eventLogs.filter(
-          (log) => log.eventType === EventLogEventType.MESSAGE
-        ).length;
-        const searchCount = eventLogs.filter(
-          (log) => log.eventType === EventLogEventType.SEARCH
-        ).length;
-        const surveyCount = eventLogs.filter(
-          (log) => log.eventType === EventLogEventType.SURVEY
-        ).length;
-        const productCount = eventLogs.filter(
-          (log) => log.eventType === EventLogEventType.PRODUCT
-        ).length;
-
-        return {
-          success: true,
-          data: {
-            userId: request.userId,
-            startDate: request.startDate,
-            endDate: request.endDate,
-            totalCount: eventLogs.length,
-            messageCount,
-            searchCount,
-            surveyCount,
-            productCount
-          }
-        };
-      },
-      'Failed to summarize event logs',
-      true
-    );
+          startDate: request.startDate,
+          endDate: request.endDate,
+          totalCount: eventLogs.length,
+          messageCount,
+          searchCount,
+          surveyCount,
+          productCount
+        }
+      };
+    }, 'errors.user_log.summarize');
   }
 
   async getEventLogsTimeSeries(
     request: EventLogSummaryQueryRequest
   ): Promise<BaseResponse<EventLogTimeSeriesResponse>> {
-    return await funcHandlerAsync(
-      async () => {
-        const granularity = request.granularity || 'day';
-        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-          userId: request.userId,
-          startDate: request.startDate
-            ? startOfDay(convertToUTC(request.startDate))
-            : undefined,
-          endDate: request.endDate
-            ? endOfDay(convertToUTC(request.endDate))
-            : undefined
-        });
+    return await this.err.wrap(async () => {
+      const granularity = request.granularity || 'day';
+      const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+        userId: request.userId,
+        startDate: request.startDate
+          ? startOfDay(convertToUTC(request.startDate))
+          : undefined,
+        endDate: request.endDate
+          ? endOfDay(convertToUTC(request.endDate))
+          : undefined
+      });
 
-        const buckets = new Map<string, EventLogTimeSeriesPointResponse>();
+      const buckets = new Map<string, EventLogTimeSeriesPointResponse>();
 
-        const getBucketDate = (date: Date): Date => {
-          return granularity === 'week' ? startOfWeek(date) : startOfDay(date);
+      const getBucketDate = (date: Date): Date => {
+        return granularity === 'week' ? startOfWeek(date) : startOfDay(date);
+      };
+
+      for (const eventLog of eventLogs) {
+        const bucketDate = getBucketDate(eventLog.createdAt);
+        const bucketKey = bucketDate.toISOString();
+        const existingBucket = buckets.get(bucketKey) || {
+          bucketStart: bucketDate,
+          totalCount: 0,
+          messageCount: 0,
+          searchCount: 0,
+          surveyCount: 0,
+          productCount: 0
         };
 
-        for (const eventLog of eventLogs) {
-          const bucketDate = getBucketDate(eventLog.createdAt);
-          const bucketKey = bucketDate.toISOString();
-          const existingBucket = buckets.get(bucketKey) || {
-            bucketStart: bucketDate,
-            totalCount: 0,
-            messageCount: 0,
-            searchCount: 0,
-            surveyCount: 0,
-            productCount: 0
-          };
-
-          existingBucket.totalCount += 1;
-          if (eventLog.eventType === EventLogEventType.MESSAGE) {
-            existingBucket.messageCount += 1;
-          } else if (eventLog.eventType === EventLogEventType.SEARCH) {
-            existingBucket.searchCount += 1;
-          } else if (eventLog.eventType === EventLogEventType.SURVEY) {
-            existingBucket.surveyCount += 1;
-          } else if (eventLog.eventType === EventLogEventType.PRODUCT) {
-            existingBucket.productCount += 1;
-          }
-
-          buckets.set(bucketKey, existingBucket);
+        existingBucket.totalCount += 1;
+        if (eventLog.eventType === EventLogEventType.MESSAGE) {
+          existingBucket.messageCount += 1;
+        } else if (eventLog.eventType === EventLogEventType.SEARCH) {
+          existingBucket.searchCount += 1;
+        } else if (eventLog.eventType === EventLogEventType.SURVEY) {
+          existingBucket.surveyCount += 1;
+        } else if (eventLog.eventType === EventLogEventType.PRODUCT) {
+          existingBucket.productCount += 1;
         }
 
-        const points = Array.from(buckets.values()).sort(
-          (a, b) => a.bucketStart.getTime() - b.bucketStart.getTime()
-        );
+        buckets.set(bucketKey, existingBucket);
+      }
 
-        return {
-          success: true,
-          data: {
-            userId: request.userId,
-            startDate: request.startDate,
-            endDate: request.endDate,
-            granularity,
-            points
-          }
-        };
-      },
-      'Failed to build event log time series',
-      true
-    );
+      const points = Array.from(buckets.values()).sort(
+        (a, b) => a.bucketStart.getTime() - b.bucketStart.getTime()
+      );
+
+      return {
+        success: true,
+        data: {
+          userId: request.userId,
+          startDate: request.startDate,
+          endDate: request.endDate,
+          granularity,
+          points
+        }
+      };
+    }, 'errors.user_log.timeseries');
   }
 
   async rebuildRollingSummaryForUser(userIdRaw: string): Promise<void> {
@@ -311,7 +290,9 @@ export class UserLogService {
     const userId = userIdRaw.toLowerCase();
     this.logger.log(`[SUMMARY] Rebuild start for userId=${userId}`);
 
-    const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
+    const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+      userId
+    });
 
     this.logger.log(
       `[SUMMARY] Existing summary=${existingSummary ? 'yes' : 'no'}, mode=full-rebuild`
@@ -325,7 +306,9 @@ export class UserLogService {
     this.logger.log(`[SUMMARY] Loaded events=${sortedEvents.length}`);
 
     if (!sortedEvents.length) {
-      this.logger.log(`[SUMMARY] No events found for userId=${userId}, skip rebuild`);
+      this.logger.log(
+        `[SUMMARY] No events found for userId=${userId}, skip rebuild`
+      );
       return;
     }
 
@@ -348,10 +331,9 @@ export class UserLogService {
 
     if (!existingSummary) {
       // For new summary, createdAt should be the first event's time
-      const createdAt = sortedEvents.length > 0
-        ? sortedEvents[0].createdAt
-        : new Date();
-      
+      const createdAt =
+        sortedEvents.length > 0 ? sortedEvents[0].createdAt : new Date();
+
       const newSummary = new UserLogSummary({
         userId,
         logSummary,
@@ -362,7 +344,9 @@ export class UserLogService {
         createdAt
       });
       await this.unitOfWork.UserLogSummaryRepo.insert(newSummary);
-      this.logger.log(`[SUMMARY] Created new rolling summary for userId=${userId}`);
+      this.logger.log(
+        `[SUMMARY] Created new rolling summary for userId=${userId}`
+      );
       return;
     }
 
@@ -376,31 +360,29 @@ export class UserLogService {
     await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
       existingSummary
     );
-    this.logger.log(`[SUMMARY] Updated existing rolling summary for userId=${userId}`);
+    this.logger.log(
+      `[SUMMARY] Updated existing rolling summary for userId=${userId}`
+    );
   }
 
   async getEventLogsWithPeriod(
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<EventLog[]>> {
-    return await funcHandlerAsync(
-      async () => {
-        if (!allUserLogRequest.startDate) {
-          allUserLogRequest.startDate = getFirstDateOfPeriod(
-            allUserLogRequest.period,
-            convertToUTC(allUserLogRequest.endDate)
-          );
-        }
+    return await this.err.wrap(async () => {
+      if (!allUserLogRequest.startDate) {
+        allUserLogRequest.startDate = getFirstDateOfPeriod(
+          allUserLogRequest.period,
+          convertToUTC(allUserLogRequest.endDate)
+        );
+      }
 
-        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-          startDate: convertToUTC(startOfDay(allUserLogRequest.startDate!)),
-          endDate: convertToUTC(endOfDay(allUserLogRequest.endDate!))
-        });
+      const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+        startDate: convertToUTC(startOfDay(allUserLogRequest.startDate!)),
+        endDate: convertToUTC(endOfDay(allUserLogRequest.endDate!))
+      });
 
-        return { success: true, data: eventLogs };
-      },
-      'Failed to get event logs with period',
-      true
-    );
+      return { success: true, data: eventLogs };
+    }, 'errors.user_log.get_with_period');
   }
 
   async addSearchTextLog(userId: string, searchText: string): Promise<string> {
@@ -412,7 +394,10 @@ export class UserLogService {
     return id;
   }
 
-  async addSearchLogToUserLog(userId: string, searchText: string): Promise<string> {
+  async addSearchLogToUserLog(
+    userId: string,
+    searchText: string
+  ): Promise<string> {
     return this.addSearchTextLog(userId, searchText);
   }
 
@@ -445,10 +430,11 @@ export class UserLogService {
         id: surveyQuesAnsId
       });
 
-    const ids = await this.unitOfWork.EventLogRepo.createSurveyEventsFromDetails(
-      userId,
-      surveyQuesAnsDetail?.details.getItems() || []
-    );
+    const ids =
+      await this.unitOfWork.EventLogRepo.createSurveyEventsFromDetails(
+        userId,
+        surveyQuesAnsDetail?.details.getItems() || []
+      );
 
     if (ids.length) {
       await this.enqueueRollingSummaryUpdate(userId);
@@ -464,39 +450,36 @@ export class UserLogService {
     dailyLogSummary?: Record<string, string>,
     dailyFeatureSnapshot?: Record<string, unknown>
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(
-      async () => {
-        const existingSummary =
-          await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
-        if (!existingSummary) {
-          const userLogSummary = new UserLogSummary({
-            userId,
-            logSummary: summary,
-            totalEvents: 0,
-            featureSnapshot: featureSnapshot || {},
-            dailyLogSummary: dailyLogSummary || {},
-            dailyFeatureSnapshot: dailyFeatureSnapshot || {}
-          });
+    return await this.err.wrap(async () => {
+      const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+        userId
+      });
+      if (!existingSummary) {
+        const userLogSummary = new UserLogSummary({
+          userId,
+          logSummary: summary,
+          totalEvents: 0,
+          featureSnapshot: featureSnapshot || {},
+          dailyLogSummary: dailyLogSummary || {},
+          dailyFeatureSnapshot: dailyFeatureSnapshot || {}
+        });
 
-          await this.unitOfWork.UserLogSummaryRepo.insert(userLogSummary);
-          return { success: true, data: userLogSummary.logSummary };
-        }
+        await this.unitOfWork.UserLogSummaryRepo.insert(userLogSummary);
+        return { success: true, data: userLogSummary.logSummary };
+      }
 
-        existingSummary.logSummary = summary;
-        existingSummary.featureSnapshot =
-          featureSnapshot || existingSummary.featureSnapshot;
-        existingSummary.dailyLogSummary =
-          dailyLogSummary || existingSummary.dailyLogSummary;
-        existingSummary.dailyFeatureSnapshot =
-          dailyFeatureSnapshot || existingSummary.dailyFeatureSnapshot;
-        await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
-          existingSummary
-        );
-        return { success: true, data: existingSummary.logSummary };
-      },
-      'Failed to save user log summary',
-      true
-    );
+      existingSummary.logSummary = summary;
+      existingSummary.featureSnapshot =
+        featureSnapshot || existingSummary.featureSnapshot;
+      existingSummary.dailyLogSummary =
+        dailyLogSummary || existingSummary.dailyLogSummary;
+      existingSummary.dailyFeatureSnapshot =
+        dailyFeatureSnapshot || existingSummary.dailyFeatureSnapshot;
+      await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
+        existingSummary
+      );
+      return { success: true, data: existingSummary.logSummary };
+    }, 'errors.user_log.save_summary');
   }
 
   async updateUserLogSummary(
@@ -505,22 +488,19 @@ export class UserLogService {
     endDate: Date,
     summary: string
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(
-      async () => {
-        const existingSummary =
-          await this.unitOfWork.UserLogSummaryRepo.findOne({ userId });
-        if (!existingSummary) {
-          return { success: false, error: 'User log summary not found' };
-        }
-        existingSummary.logSummary = summary;
-        await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
-          existingSummary
-        );
-        return { success: true, data: existingSummary.logSummary };
-      },
-      'Failed to update user log summary',
-      true
-    );
+    return await this.err.wrap(async () => {
+      const existingSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+        userId
+      });
+      if (!existingSummary) {
+        return this.err.fail('errors.user_log.summary_not_found');
+      }
+      existingSummary.logSummary = summary;
+      await this.unitOfWork.UserLogSummaryRepo.getEntityManager().persistAndFlush(
+        existingSummary
+      );
+      return { success: true, data: existingSummary.logSummary };
+    }, 'errors.user_log.update_summary');
   }
 
   /** Lay summary tu userId */
@@ -529,32 +509,26 @@ export class UserLogService {
     startDate?: Date,
     endDate?: Date
   ): Promise<BaseResponse<UserLogSummaryResponse[]>> {
-    return await funcHandlerAsync(
-      async () => {
-        this.logger.debug(
-          `Start Date: ${
-            startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
-          }, End Date: ${
-            endDate ? endOfDay(convertToUTC(endDate)) : endOfDay(new Date())
-          }`
-        );
+    return await this.err.wrap(async () => {
+      this.logger.debug(
+        `Start Date: ${
+          startDate ? startOfDay(convertToUTC(startDate)) : new Date(0)
+        }, End Date: ${
+          endDate ? endOfDay(convertToUTC(endDate)) : endOfDay(new Date())
+        }`
+      );
 
-        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne(
-          {
-            userId: userId
-          }
-        );
-        if (!userLogSummary) {
-          return { success: false, error: 'User log summary not found' };
-        }
-        return {
-          success: true,
-          data: [UserLogSummaryMapper.toResponse(userLogSummary)]
-        };
-      },
-      'Failed to get user log summary',
-      true
-    );
+      const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+        userId: userId
+      });
+      if (!userLogSummary) {
+        return this.err.fail('errors.user_log.summary_not_found');
+      }
+      return {
+        success: true,
+        data: [UserLogSummaryMapper.toResponse(userLogSummary)]
+      };
+    }, 'errors.user_log.get_summary');
   }
 
   // Tao report tu cac user log summary
@@ -563,31 +537,27 @@ export class UserLogService {
     startDate?: Date,
     endDate?: Date
   ): Promise<BaseResponse<string>> {
-    return await funcHandlerAsync(
-      async () => {
-        const userLogSummaries = await this.getUserLogSummariesByUserId(
-          userId,
-          startDate,
-          endDate
-        );
-        if (!userLogSummaries.success || !userLogSummaries.data) {
-          return { success: false, error: 'User log summaries not found' };
-        }
-        // Tao data tu cac log summary
-        const data = userLogSummaries.data
-          .map((summary) => summary.logSummary)
-          .join('\n');
+    return await this.err.wrap(async () => {
+      const userLogSummaries = await this.getUserLogSummariesByUserId(
+        userId,
+        startDate,
+        endDate
+      );
+      if (!userLogSummaries.success || !userLogSummaries.data) {
+        return this.err.fail('errors.user_log.summaries_not_found');
+      }
+      // Tao data tu cac log summary
+      const data = userLogSummaries.data
+        .map((summary) => summary.logSummary)
+        .join('\n');
 
-        // Tao report
-        const report = `User Log Summary Report from ${startDate ? convertToUTC(startDate) : 'the beginning'} to ${
-          endDate ? convertToUTC(endDate) : new Date().toISOString()
-        }:\n${data}`;
+      // Tao report
+      const report = `User Log Summary Report from ${startDate ? convertToUTC(startDate) : 'the beginning'} to ${
+        endDate ? convertToUTC(endDate) : new Date().toISOString()
+      }:\n${data}`;
 
-        return { success: true, data: report };
-      },
-      'Failed to get user log summary report',
-      true
-    );
+      return { success: true, data: report };
+    }, 'errors.user_log.summary_report');
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
@@ -596,127 +566,119 @@ export class UserLogService {
   ): Promise<
     BaseResponse<{ prompt: string; response: string; count: number }>
   > {
-    return await funcHandlerAsync(
-      async () => {
-        // Xu ly neu khong co startDate thi lay theo period
-        if (!userLogRequest.startDate) {
-          userLogRequest.startDate = getFirstDateOfPeriod(
-            userLogRequest.period,
-            convertToUTC(userLogRequest.endDate)
-          );
-        }
-
-        // Lay log cua user trong khoang thoi gian
-        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-          userId: userLogRequest.userId,
-          startDate: startOfDay(convertToUTC(userLogRequest.startDate!)),
-          endDate: endOfDay(convertToUTC(userLogRequest.endDate))
-        });
-
-        if (!eventLogs.length) {
-          return { success: false, error: 'User log not found' };
-        }
-
-        const { searchContents, messageContents, surveyContents, count } =
-          buildContentSectionsFromEvents(eventLogs);
-
-        this.logger.debug(`User ID: ${userLogRequest.userId}`);
-        this.logger.debug(`Search Contents: ${searchContents}`);
-        this.logger.debug(`Message Contents: ${messageContents}`);
-        this.logger.debug(`Survey Contents: ${surveyContents}`);
-
-        // Tao prompt de tong hop log
-        const prompt = generateSummaryPrompt(
-          searchContents,
-          messageContents,
-          surveyContents,
-          startOfDay(convertToUTC(userLogRequest.startDate!)),
-          endOfDay(convertToUTC(userLogRequest.endDate))
+    return await this.err.wrap(async () => {
+      // Xu ly neu khong co startDate thi lay theo period
+      if (!userLogRequest.startDate) {
+        userLogRequest.startDate = getFirstDateOfPeriod(
+          userLogRequest.period,
+          convertToUTC(userLogRequest.endDate)
         );
+      }
 
-        // Tao response tu cac log
-        const response = convertUserLogsToReport(
-          searchContents,
-          messageContents,
-          surveyContents,
-          startOfDay(convertToUTC(userLogRequest.startDate!)),
-          endOfDay(convertToUTC(userLogRequest.endDate))
-        );
+      // Lay log cua user trong khoang thoi gian
+      const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+        userId: userLogRequest.userId,
+        startDate: startOfDay(convertToUTC(userLogRequest.startDate!)),
+        endDate: endOfDay(convertToUTC(userLogRequest.endDate))
+      });
 
-        return { success: true, data: { prompt, response, count } };
-      },
-      'Failed to summarize user logs',
-      true
-    );
+      if (!eventLogs.length) {
+        return this.err.fail('errors.user_log.not_found');
+      }
+
+      const { searchContents, messageContents, surveyContents, count } =
+        buildContentSectionsFromEvents(eventLogs);
+
+      this.logger.debug(`User ID: ${userLogRequest.userId}`);
+      this.logger.debug(`Search Contents: ${searchContents}`);
+      this.logger.debug(`Message Contents: ${messageContents}`);
+      this.logger.debug(`Survey Contents: ${surveyContents}`);
+
+      // Tao prompt de tong hop log
+      const prompt = generateSummaryPrompt(
+        searchContents,
+        messageContents,
+        surveyContents,
+        startOfDay(convertToUTC(userLogRequest.startDate!)),
+        endOfDay(convertToUTC(userLogRequest.endDate))
+      );
+
+      // Tao response tu cac log
+      const response = convertUserLogsToReport(
+        searchContents,
+        messageContents,
+        surveyContents,
+        startOfDay(convertToUTC(userLogRequest.startDate!)),
+        endOfDay(convertToUTC(userLogRequest.endDate))
+      );
+
+      return { success: true, data: { prompt, response, count } };
+    }, 'errors.user_log.summarize_user');
   }
 
   // Tong hop cac log cua user trong mot khoang thoi gian
   async getReportAndPromptSummaryAllUsersLogs(
     allUserLogRequest: AllUserLogRequest
   ): Promise<BaseResponse<{ prompt: string; response: string }>> {
-    return await funcHandlerAsync(
-      async () => {
-        if (!allUserLogRequest.startDate) {
-          allUserLogRequest.startDate = getFirstDateOfPeriod(
-            allUserLogRequest.period,
-            allUserLogRequest.endDate
-          );
-        }
+    return await this.err.wrap(async () => {
+      if (!allUserLogRequest.startDate) {
+        allUserLogRequest.startDate = getFirstDateOfPeriod(
+          allUserLogRequest.period,
+          allUserLogRequest.endDate
+        );
+      }
 
-        this.logger.debug(`Period: ${allUserLogRequest.period}`);
-        this.logger.debug(`Start Date: ${allUserLogRequest.startDate}`);
-        this.logger.debug(`End Date: ${allUserLogRequest.endDate}`);
+      this.logger.debug(`Period: ${allUserLogRequest.period}`);
+      this.logger.debug(`Start Date: ${allUserLogRequest.startDate}`);
+      this.logger.debug(`End Date: ${allUserLogRequest.endDate}`);
 
-        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-          startDate: startOfDay(convertToUTC(allUserLogRequest.startDate!)),
-          endDate: endOfDay(convertToUTC(allUserLogRequest.endDate))
-        });
+      const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+        startDate: startOfDay(convertToUTC(allUserLogRequest.startDate!)),
+        endDate: endOfDay(convertToUTC(allUserLogRequest.endDate))
+      });
 
-        const groupedByUserId = new Map<string, EventLog[]>();
-        eventLogs.forEach((eventLog) => {
-          const key = eventLog.userId || 'anonymous';
-          const currentLogs = groupedByUserId.get(key) || [];
-          currentLogs.push(eventLog);
-          groupedByUserId.set(key, currentLogs);
-        });
+      const groupedByUserId = new Map<string, EventLog[]>();
+      eventLogs.forEach((eventLog) => {
+        const key = eventLog.userId || 'anonymous';
+        const currentLogs = groupedByUserId.get(key) || [];
+        currentLogs.push(eventLog);
+        groupedByUserId.set(key, currentLogs);
+      });
 
-        let prompt = '';
-        let response = '';
+      let prompt = '';
+      let response = '';
 
-        for (const [userId, userEventLogs] of groupedByUserId.entries()) {
-          const { searchContents, messageContents, surveyContents } =
-            buildContentSectionsFromEvents(userEventLogs);
+      for (const [userId, userEventLogs] of groupedByUserId.entries()) {
+        const { searchContents, messageContents, surveyContents } =
+          buildContentSectionsFromEvents(userEventLogs);
 
-          this.logger.debug(`User ID: ${userId}`);
-          this.logger.debug(`Search Contents: ${searchContents}`);
-          this.logger.debug(`Message Contents: ${messageContents}`);
-          this.logger.debug(`Survey Contents: ${surveyContents}`);
+        this.logger.debug(`User ID: ${userId}`);
+        this.logger.debug(`Search Contents: ${searchContents}`);
+        this.logger.debug(`Message Contents: ${messageContents}`);
+        this.logger.debug(`Survey Contents: ${surveyContents}`);
 
-          // Tao prompt de tong hop log
-          prompt +=
-            generateSummaryPrompt(
-              searchContents,
-              messageContents,
-              surveyContents,
-              startOfDay(convertToUTC(allUserLogRequest.startDate!)),
-              endOfDay(convertToUTC(allUserLogRequest.endDate))
-            ) + '\n';
+        // Tao prompt de tong hop log
+        prompt +=
+          generateSummaryPrompt(
+            searchContents,
+            messageContents,
+            surveyContents,
+            startOfDay(convertToUTC(allUserLogRequest.startDate!)),
+            endOfDay(convertToUTC(allUserLogRequest.endDate))
+          ) + '\n';
 
-          response +=
-            convertUserLogsToReport(
-              searchContents,
-              messageContents,
-              surveyContents,
-              startOfDay(convertToUTC(allUserLogRequest.startDate!)),
-              endOfDay(convertToUTC(allUserLogRequest.endDate))
-            ) + '\n';
-        }
+        response +=
+          convertUserLogsToReport(
+            searchContents,
+            messageContents,
+            surveyContents,
+            startOfDay(convertToUTC(allUserLogRequest.startDate!)),
+            endOfDay(convertToUTC(allUserLogRequest.endDate))
+          ) + '\n';
+      }
 
-        return { success: true, data: { prompt, response } };
-      },
-      'Failed to summarize user logs',
-      true
-    );
+      return { success: true, data: { prompt, response } };
+    }, 'errors.user_log.summarize_all');
   }
 
   // Tam thoi lay tat ca userId tu log
@@ -727,66 +689,60 @@ export class UserLogService {
 
   async getUserLogSummary(
     allUserLogRequest?: AllUserLogRequest
-  ): Promise<
-    BaseResponse<UserLogSummaryResponse>
-  > {
-    return funcHandlerAsync(
-      async () => {
-        const summaries = await this.getAllUserLogSummary(allUserLogRequest);
-        if (!summaries.success || !summaries.data?.length) {
-          return {
-            success: false,
-            error: 'User log summaries not found'
-          };
-        }
+  ): Promise<BaseResponse<UserLogSummaryResponse>> {
+    return this.err.wrap(async () => {
+      const summaries = await this.getAllUserLogSummary(allUserLogRequest);
+      if (!summaries.success || !summaries.data?.length) {
+        return this.err.fail('errors.user_log.summaries_not_found');
+      }
 
-        const normalizedSnapshots = summaries.data.map((summary) =>
-          normalizeFeatureSnapshot(summary.featureSnapshot)
-        );
-        const normalizedDailySnapshots = summaries.data.map((summary) =>
-          normalizeDailyFeatureSnapshot(summary.dailyFeatureSnapshot)
-        );
-        const mergedSnapshot = mergeFeatureSnapshots(normalizedSnapshots);
-        const mergedDailySnapshot = mergeDailyFeatureSnapshots(
-          normalizedDailySnapshots
-        );
-        const totalEvents = summaries.data.reduce(
-          (sum, summary) => sum + (summary.totalEvents || 0),
-          0
-        );
+      const normalizedSnapshots = summaries.data.map((summary) =>
+        normalizeFeatureSnapshot(summary.featureSnapshot)
+      );
+      const normalizedDailySnapshots = summaries.data.map((summary) =>
+        normalizeDailyFeatureSnapshot(summary.dailyFeatureSnapshot)
+      );
+      const mergedSnapshot = mergeFeatureSnapshots(normalizedSnapshots);
+      const mergedDailySnapshot = mergeDailyFeatureSnapshots(
+        normalizedDailySnapshots
+      );
+      const totalEvents = summaries.data.reduce(
+        (sum, summary) => sum + (summary.totalEvents || 0),
+        0
+      );
 
-        const aggregatedText = buildRollingSummaryText(mergedSnapshot, totalEvents);
-        const dailyLogSummary = buildDailyLogSummaryMap(mergedDailySnapshot);
+      const aggregatedText = buildRollingSummaryText(
+        mergedSnapshot,
+        totalEvents
+      );
+      const dailyLogSummary = buildDailyLogSummaryMap(mergedDailySnapshot);
 
-        // Get earliest createdAt and latest updatedAt from all summaries
-        const createdAt = new Date(
-          Math.min(
-            ...summaries.data.map((s) => s.createdAt?.getTime() || Date.now())
-          )
-        );
-        const updatedAt = new Date(
-          Math.max(
-            ...summaries.data.map((s) => s.updatedAt?.getTime() || Date.now())
-          )
-        );
+      // Get earliest createdAt and latest updatedAt from all summaries
+      const createdAt = new Date(
+        Math.min(
+          ...summaries.data.map((s) => s.createdAt?.getTime() || Date.now())
+        )
+      );
+      const updatedAt = new Date(
+        Math.max(
+          ...summaries.data.map((s) => s.updatedAt?.getTime() || Date.now())
+        )
+      );
 
-        return {
-          success: true,
-          data: new UserLogSummaryResponse({
-            userId: 'all',
-            totalEvents,
-            createdAt,
-            logSummary: aggregatedText,
-            dailyLogSummary,
-            featureSnapshot: mergedSnapshot,
-            dailyFeatureSnapshot: mergedDailySnapshot,
-            updatedAt
-          })
-        };
-      },
-      'Failed to aggregate user log summaries',
-      true
-    );
+      return {
+        success: true,
+        data: new UserLogSummaryResponse({
+          userId: 'all',
+          totalEvents,
+          createdAt,
+          logSummary: aggregatedText,
+          dailyLogSummary,
+          featureSnapshot: mergedSnapshot,
+          dailyFeatureSnapshot: mergedDailySnapshot,
+          updatedAt
+        })
+      };
+    }, 'errors.user_log.aggregate');
   }
 
   async isLogsFromLastWeek(userId: string): Promise<boolean> {
@@ -842,143 +798,112 @@ export class UserLogService {
     startDate?: Date,
     endDate?: Date
   ): Promise<BaseResponse<UserLogSummaryResponse | null>> {
-    return funcHandlerAsync(
-      async () => {
-        if (startDate || endDate || period) {
-          const normalizedEndDate = endDate
-            ? endOfDay(convertToUTC(endDate))
-            : endOfDay(convertToUTC(new Date()));
-          const normalizedStartDate = startDate
-            ? startOfDay(convertToUTC(startDate))
-            : startOfDay(
-                getFirstDateOfPeriod(
-                  period ?? PeriodEnum.WEEKLY,
-                  normalizedEndDate
-                )
-              );
+    return this.err.wrap(async () => {
+      if (startDate || endDate || period) {
+        const normalizedEndDate = endDate
+          ? endOfDay(convertToUTC(endDate))
+          : endOfDay(convertToUTC(new Date()));
+        const normalizedStartDate = startDate
+          ? startOfDay(convertToUTC(startDate))
+          : startOfDay(
+              getFirstDateOfPeriod(
+                period ?? PeriodEnum.WEEKLY,
+                normalizedEndDate
+              )
+            );
 
-          const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-            userId: userId.toLowerCase(),
-            startDate: normalizedStartDate,
-            endDate: normalizedEndDate
-          });
+        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+          userId: userId.toLowerCase(),
+          startDate: normalizedStartDate,
+          endDate: normalizedEndDate
+        });
 
-          if (!eventLogs.length) {
-            return {
-              success: false,
-              error: 'User log summary not found in selected period',
-              data: null
-            };
-          }
-
-          return {
-            success: true,
-            data: buildSummaryResponseFromEvents(userId, eventLogs)
-          };
+        if (!eventLogs.length) {
+          return this.err.fail('errors.user_log.summary_period_not_found');
         }
 
-        const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne(
-          {
-            userId: userId.toLowerCase()
-          }
-        );
-
-        if (!userLogSummary) {
-          return {
-            success: false,
-            error: 'User log summary not found',
-            data: null
-          };
-        }
         return {
           success: true,
-          data: UserLogSummaryMapper.toResponse(userLogSummary)
+          data: buildSummaryResponseFromEvents(userId, eventLogs)
         };
-      },
-      'Failed to get user log summary',
-      true
-    );
+      }
+
+      const userLogSummary = await this.unitOfWork.UserLogSummaryRepo.findOne({
+        userId: userId.toLowerCase()
+      });
+
+      if (!userLogSummary) {
+        return this.err.fail('errors.user_log.summary_not_found');
+      }
+      return {
+        success: true,
+        data: UserLogSummaryMapper.toResponse(userLogSummary)
+      };
+    }, 'errors.user_log.get_summary');
   }
 
   async getAllUserLogSummary(
     allUserLogRequest?: AllUserLogRequest
   ): Promise<BaseResponse<UserLogSummaryResponse[] | null>> {
-    return funcHandlerAsync(
-      async () => {
-        if (allUserLogRequest) {
-          const { startDate, endDate } =
-            resolveAllUserLogRange(allUserLogRequest);
-          const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
-            startDate,
-            endDate
-          });
+    return this.err.wrap(async () => {
+      if (allUserLogRequest) {
+        const { startDate, endDate } =
+          resolveAllUserLogRange(allUserLogRequest);
+        const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
+          startDate,
+          endDate
+        });
 
-          const groupedByUserId = new Map<string, EventLog[]>();
-          for (const eventLog of eventLogs) {
-            const key = eventLog.userId || 'anonymous';
-            const current = groupedByUserId.get(key) || [];
-            current.push(eventLog);
-            groupedByUserId.set(key, current);
-          }
-
-          const summaryResponses = Array.from(groupedByUserId.entries())
-            .map(([userId, logs]) =>
-              buildSummaryResponseFromEvents(userId, logs)
-            )
-            .sort(
-              (a, b) =>
-                (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-            );
-
-          return {
-            success: true,
-            data: summaryResponses
-          };
+        const groupedByUserId = new Map<string, EventLog[]>();
+        for (const eventLog of eventLogs) {
+          const key = eventLog.userId || 'anonymous';
+          const current = groupedByUserId.get(key) || [];
+          current.push(eventLog);
+          groupedByUserId.set(key, current);
         }
 
-        const userLogSummaryEntities = await this.unitOfWork.UserLogSummaryRepo.find(
+        const summaryResponses = Array.from(groupedByUserId.entries())
+          .map(([userId, logs]) => buildSummaryResponseFromEvents(userId, logs))
+          .sort(
+            (a, b) =>
+              (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+          );
+
+        return {
+          success: true,
+          data: summaryResponses
+        };
+      }
+
+      const userLogSummaryEntities =
+        await this.unitOfWork.UserLogSummaryRepo.find(
           {},
           { orderBy: { updatedAt: 'DESC' } }
         );
 
-        if (!userLogSummaryEntities) {
-          return {
-            success: false,
-            error: 'User log summary not found',
-            data: null
-          };
-        }
+      if (!userLogSummaryEntities) {
+        return this.err.fail('errors.user_log.summary_not_found');
+      }
 
-        return {
-          success: true,
-          data: UserLogSummaryMapper.toResponseList(userLogSummaryEntities)
-        };
-      },
-      'Failed to get user log summary',
-      true
-    );
+      return {
+        success: true,
+        data: UserLogSummaryMapper.toResponseList(userLogSummaryEntities)
+      };
+    }, 'errors.user_log.get_summary');
   }
 
   async getAllUserLogSummaryReport(): Promise<BaseResponse<string | null>> {
-    return funcHandlerAsync(
-      async () => {
-        const summaries = await this.getAllUserLogSummary();
-        if (!summaries.success) {
-          return {
-            success: false,
-            error: 'User log summary not found',
-            data: null
-          };
-        }
+    return this.err.wrap(async () => {
+      const summaries = await this.getAllUserLogSummary();
+      if (!summaries.success) {
+        return this.err.fail('errors.user_log.summary_not_found');
+      }
 
-        const report = summaries.data
-          ?.map((summary) => summary.logSummary)
-          .join('\n');
-        return { success: true, data: report };
-      },
-      'Failed to get user log summary report',
-      true
-    );
+      const report = summaries.data
+        ?.map((summary) => summary.logSummary)
+        .join('\n');
+      return { success: true, data: report };
+    }, 'errors.user_log.summary_report');
   }
 
   /** Lay user summary theo tuan */
@@ -1027,7 +952,7 @@ export class UserLogService {
   }
 
   async getAllSummaryByPeriod(
-    period: PeriodEnum,
+    period: PeriodEnum
   ): Promise<BaseResponse<UserLogSummaryResponse[] | null>> {
     const normalizedEndDate = endOfDay(convertToUTC(new Date()));
     const normalizedStartDate = startOfDay(

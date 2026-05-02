@@ -9,7 +9,10 @@ import { Common } from './common/common.entities';
 @Index({ properties: ['userId', 'createdAt'] })
 @Index({ properties: ['eventType', 'createdAt'] })
 export class EventLog extends Common {
-  @ApiProperty({ description: 'ID người dùng (nullable cho anonymous/system)', nullable: true })
+  @ApiProperty({
+    description: 'ID người dùng (nullable cho anonymous/system)',
+    nullable: true
+  })
   @Property({ type: 'text', nullable: true })
   userId?: string;
 
@@ -17,15 +20,24 @@ export class EventLog extends Common {
   @Enum(() => EventLogEventType)
   eventType!: EventLogEventType;
 
-  @ApiProperty({ description: 'Loại thực thể liên quan', enum: EventLogEntityType })
+  @ApiProperty({
+    description: 'Loại thực thể liên quan',
+    enum: EventLogEntityType
+  })
   @Enum(() => EventLogEntityType)
   entityType!: EventLogEntityType;
 
-  @ApiProperty({ description: 'ID thực thể liên quan (nullable)', nullable: true })
+  @ApiProperty({
+    description: 'ID thực thể liên quan (nullable)',
+    nullable: true
+  })
   @Property({ type: 'uuid', nullable: true })
   entityId?: string;
 
-  @ApiProperty({ description: 'Nội dung text cho message/search', nullable: true })
+  @ApiProperty({
+    description: 'Nội dung text cho message/search',
+    nullable: true
+  })
   @Property({ type: 'text', nullable: true })
   contentText?: string;
 

@@ -9,7 +9,9 @@ import {
   ApiUnprocessableEntityResponse
 } from '@nestjs/swagger';
 
-const errorShape = (example: Record<string, unknown>): Record<string, unknown> => ({
+const errorShape = (
+  example: Record<string, unknown>
+): Record<string, unknown> => ({
   type: 'object',
   properties: {
     success: { type: 'boolean', example: false },
@@ -23,7 +25,9 @@ const errorShape = (example: Record<string, unknown>): Record<string, unknown> =
 const E400 = errorShape({
   success: false,
   error: 'Bad Request — Validation failed',
-  detail: { message: ['name must be a string', 'price must be a positive number'] },
+  detail: {
+    message: ['name must be a string', 'price must be a positive number']
+  },
   statusCode: 400
 });
 
@@ -71,56 +75,126 @@ const E500 = errorShape({
 
 export const ApiPublicErrorResponses = () =>
   applyDecorators(
-    ApiBadRequestResponse({ description: 'Bad Request — Thiếu hoặc sai tham số', schema: E400 }),
-    ApiNotFoundResponse({ description: 'Not Found — Không tìm thấy tài nguyên', schema: E404 }),
-    ApiInternalServerErrorResponse({ description: 'Internal Server Error — Lỗi hệ thống', schema: E500 })
+    ApiBadRequestResponse({
+      description: 'Bad Request — Thiếu hoặc sai tham số',
+      schema: E400
+    }),
+    ApiNotFoundResponse({
+      description: 'Not Found — Không tìm thấy tài nguyên',
+      schema: E404
+    }),
+    ApiInternalServerErrorResponse({
+      description: 'Internal Server Error — Lỗi hệ thống',
+      schema: E500
+    })
   );
 
 export const ApiSharedErrorResponses = () =>
   applyDecorators(
-    ApiBadRequestResponse({ description: 'Bad Request — Thiếu hoặc sai tham số', schema: E400 }),
-    ApiUnauthorizedResponse({ description: 'Unauthorized — Token JWT không hợp lệ hoặc không được cung cấp', schema: E401 }),
-    ApiForbiddenResponse({ description: 'Forbidden — Không có quyền truy cập', schema: E403 }),
-    ApiNotFoundResponse({ description: 'Not Found — Không tìm thấy tài nguyên', schema: E404 }),
-    ApiInternalServerErrorResponse({ description: 'Internal Server Error — Lỗi hệ thống', schema: E500 })
+    ApiBadRequestResponse({
+      description: 'Bad Request — Thiếu hoặc sai tham số',
+      schema: E400
+    }),
+    ApiUnauthorizedResponse({
+      description:
+        'Unauthorized — Token JWT không hợp lệ hoặc không được cung cấp',
+      schema: E401
+    }),
+    ApiForbiddenResponse({
+      description: 'Forbidden — Không có quyền truy cập',
+      schema: E403
+    }),
+    ApiNotFoundResponse({
+      description: 'Not Found — Không tìm thấy tài nguyên',
+      schema: E404
+    }),
+    ApiInternalServerErrorResponse({
+      description: 'Internal Server Error — Lỗi hệ thống',
+      schema: E500
+    })
   );
 
 export const ApiSharedAuthErrors = () =>
   applyDecorators(
-    ApiUnauthorizedResponse({ description: 'Unauthorized — Token JWT không hợp lệ hoặc không được cung cấp', schema: E401 }),
-    ApiForbiddenResponse({ description: 'Forbidden — Không có quyền truy cập', schema: E403 })
+    ApiUnauthorizedResponse({
+      description:
+        'Unauthorized — Token JWT không hợp lệ hoặc không được cung cấp',
+      schema: E401
+    }),
+    ApiForbiddenResponse({
+      description: 'Forbidden — Không có quyền truy cập',
+      schema: E403
+    })
   );
 
 export const ApiSharedValidationErrors = () =>
   applyDecorators(
-    ApiBadRequestResponse({ description: 'Bad Request — Thiếu hoặc sai tham số', schema: E400 }),
-    ApiUnprocessableEntityResponse({ description: 'Unprocessable Entity — Dữ liệu không hợp lệ', schema: E422 })
+    ApiBadRequestResponse({
+      description: 'Bad Request — Thiếu hoặc sai tham số',
+      schema: E400
+    }),
+    ApiUnprocessableEntityResponse({
+      description: 'Unprocessable Entity — Dữ liệu không hợp lệ',
+      schema: E422
+    })
   );
 
 export const ApiReadErrors = () =>
   applyDecorators(
-    ApiNotFoundResponse({ description: 'Not Found — Không tìm thấy tài nguyên', schema: E404 }),
+    ApiNotFoundResponse({
+      description: 'Not Found — Không tìm thấy tài nguyên',
+      schema: E404
+    }),
     ApiSharedAuthErrors()
   );
 
 export const ApiWriteErrors = () =>
   applyDecorators(
-    ApiBadRequestResponse({ description: 'Bad Request — Thiếu hoặc sai tham số', schema: E400 }),
-    ApiNotFoundResponse({ description: 'Not Found — Không tìm thấy tài nguyên', schema: E404 }),
-    ApiConflictResponse({ description: 'Conflict — Dữ liệu bị trùng lặp', schema: E409 }),
+    ApiBadRequestResponse({
+      description: 'Bad Request — Thiếu hoặc sai tham số',
+      schema: E400
+    }),
+    ApiNotFoundResponse({
+      description: 'Not Found — Không tìm thấy tài nguyên',
+      schema: E404
+    }),
+    ApiConflictResponse({
+      description: 'Conflict — Dữ liệu bị trùng lặp',
+      schema: E409
+    }),
     ApiSharedAuthErrors()
   );
 
 export const ApiAdminErrors = () =>
   applyDecorators(
-    ApiUnauthorizedResponse({ description: 'Unauthorized — Token JWT không hợp lệ hoặc không được cung cấp', schema: E401 }),
-    ApiForbiddenResponse({ description: 'Forbidden — Yêu cầu role: admin', schema: E403 }),
-    ApiNotFoundResponse({ description: 'Not Found — Không tìm thấy tài nguyên', schema: E404 }),
-    ApiInternalServerErrorResponse({ description: 'Internal Server Error — Lỗi hệ thống', schema: E500 })
+    ApiUnauthorizedResponse({
+      description:
+        'Unauthorized — Token JWT không hợp lệ hoặc không được cung cấp',
+      schema: E401
+    }),
+    ApiForbiddenResponse({
+      description: 'Forbidden — Yêu cầu role: admin',
+      schema: E403
+    }),
+    ApiNotFoundResponse({
+      description: 'Not Found — Không tìm thấy tài nguyên',
+      schema: E404
+    }),
+    ApiInternalServerErrorResponse({
+      description: 'Internal Server Error — Lỗi hệ thống',
+      schema: E500
+    })
   );
 
 export const ApiAiErrors = () =>
   applyDecorators(
-    ApiBadRequestResponse({ description: 'Bad Request — Thiếu hoặc sai tham số', schema: E400 }),
-    ApiInternalServerErrorResponse({ description: 'Internal Server Error — AI service không khả dụng hoặc lỗi xử lý', schema: E500 })
+    ApiBadRequestResponse({
+      description: 'Bad Request — Thiếu hoặc sai tham số',
+      schema: E400
+    }),
+    ApiInternalServerErrorResponse({
+      description:
+        'Internal Server Error — AI service không khả dụng hoặc lỗi xử lý',
+      schema: E500
+    })
   );

@@ -12,13 +12,22 @@ export class SurveyQuestionAnswer extends Common {
   @Property()
   userId!: string;
 
-  @ApiProperty({ description: 'Kết quả AI recommendation (JSON string)', required: false })
+  @ApiProperty({
+    description: 'Kết quả AI recommendation (JSON string)',
+    required: false
+  })
   @Property({ type: 'text', nullable: true })
   aiResult?: string;
 
   /** Danh sách chi tiết câu hỏi - câu trả lời */
-  @ApiProperty({ description: 'Danh sách chi tiết câu hỏi - câu trả lời', type: () => SurveyQuestionAnswerDetail, isArray: true })
-  @OneToMany(() => SurveyQuestionAnswerDetail, (detail) => detail.quesAns, { orphanRemoval: true })
+  @ApiProperty({
+    description: 'Danh sách chi tiết câu hỏi - câu trả lời',
+    type: () => SurveyQuestionAnswerDetail,
+    isArray: true
+  })
+  @OneToMany(() => SurveyQuestionAnswerDetail, (detail) => detail.quesAns, {
+    orphanRemoval: true
+  })
   details = new Collection<SurveyQuestionAnswerDetail>(this);
 
   constructor(init?: Partial<SurveyQuestionAnswer>) {

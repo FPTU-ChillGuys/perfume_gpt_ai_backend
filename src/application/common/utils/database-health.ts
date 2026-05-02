@@ -35,7 +35,10 @@ export class DatabaseHealthService {
   /**
    * Check PostgreSQL connection (MikroORM)
    */
-  async checkPostgresConnection(): Promise<{ connected: boolean; error?: string }> {
+  async checkPostgresConnection(): Promise<{
+    connected: boolean;
+    error?: string;
+  }> {
     try {
       // Check if ORM is initialized
       if (!this.orm.isConnected()) {
@@ -45,7 +48,7 @@ export class DatabaseHealthService {
       // Try a simple query
       const em = this.orm.em.fork();
       const result = await em.getConnection().execute('SELECT 1');
-      
+
       return { connected: !!result };
     } catch (error: any) {
       return { connected: false, error: error.message };
@@ -55,7 +58,10 @@ export class DatabaseHealthService {
   /**
    * Check SQL Server connection (Prisma)
    */
-  async checkSqlServerConnection(): Promise<{ connected: boolean; error?: string }> {
+  async checkSqlServerConnection(): Promise<{
+    connected: boolean;
+    error?: string;
+  }> {
     try {
       // Try a simple raw query
       const result = await this.prismaService.$queryRaw`SELECT 1`;
@@ -68,7 +74,10 @@ export class DatabaseHealthService {
   /**
    * Check Redis connection (via BullMQ or Redis client)
    */
-  async checkRedisConnection(): Promise<{ connected: boolean; error?: string }> {
+  async checkRedisConnection(): Promise<{
+    connected: boolean;
+    error?: string;
+  }> {
     try {
       // Try to import and use redis client directly
       const redis = require('redis');
@@ -100,17 +109,23 @@ export class DatabaseHealthService {
     return {
       postgres: {
         connected: postgresResult.connected,
-        message: postgresResult.connected ? 'Connected' : `Failed: ${postgresResult.error}`,
+        message: postgresResult.connected
+          ? 'Connected'
+          : `Failed: ${postgresResult.error}`,
         error: postgresResult.error
       },
       sqlServer: {
         connected: sqlServerResult.connected,
-        message: sqlServerResult.connected ? 'Connected' : `Failed: ${sqlServerResult.error}`,
+        message: sqlServerResult.connected
+          ? 'Connected'
+          : `Failed: ${sqlServerResult.error}`,
         error: sqlServerResult.error
       },
       redis: {
         connected: redisResult.connected,
-        message: redisResult.connected ? 'Connected' : `Failed: ${redisResult.error}`,
+        message: redisResult.connected
+          ? 'Connected'
+          : `Failed: ${redisResult.error}`,
         error: redisResult.error
       }
     };
@@ -129,13 +144,31 @@ export class DatabaseHealthService {
       return `${color}${symbol}${reset} ${name}: ${message}`;
     };
 
-    console.log('\n════════════════════════════════════════════════════════════');
+    console.log(
+      '\n════════════════════════════════════════════════════════════'
+    );
     console.log('  Database Connection Status');
     console.log('════════════════════════════════════════════════════════════');
-    console.log(statusLine('PostgreSQL (MikroORM)', status.postgres.connected, status.postgres.message));
-    console.log(statusLine('SQL Server (Prisma)', status.sqlServer.connected, status.sqlServer.message));
-    console.log(statusLine('Redis (BullMQ)', status.redis.connected, status.redis.message));
-    console.log('════════════════════════════════════════════════════════════\n');
+    console.log(
+      statusLine(
+        'PostgreSQL (MikroORM)',
+        status.postgres.connected,
+        status.postgres.message
+      )
+    );
+    console.log(
+      statusLine(
+        'SQL Server (Prisma)',
+        status.sqlServer.connected,
+        status.sqlServer.message
+      )
+    );
+    console.log(
+      statusLine('Redis (BullMQ)', status.redis.connected, status.redis.message)
+    );
+    console.log(
+      '════════════════════════════════════════════════════════════\n'
+    );
 
     // Log using logger too
     this.logger.log(`PostgreSQL: ${status.postgres.message}`);

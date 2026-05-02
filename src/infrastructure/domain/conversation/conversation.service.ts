@@ -48,6 +48,9 @@ import { NlpQueryMapper } from './helpers/nlp-query-mapper.helper';
  */
 @Injectable()
 export class ConversationService {
+  private static readonly UUID_REGEX =
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
   private readonly logger = new Logger(ConversationService.name);
 
   constructor(
@@ -367,6 +370,17 @@ export class ConversationService {
       );
     finalMessages.push(...personalizationMsgs);
 
+    this.logger.log(
+      `[Conversation] Analysis details: intent=${analysis.intent}, ` +
+        `logic=${JSON.stringify(analysis.logic)}, ` +
+        `queries=${JSON.stringify(analysis.queries?.map((q) => ({ logic: q.logic, budget: q.budget, productNames: q.productNames })))}, ` +
+        `productNames=${JSON.stringify(analysis.productNames)}, ` +
+        `budget=${JSON.stringify(analysis.budget)}, ` +
+        `gender=${JSON.stringify(analysis.gender)}, ` +
+        `genderValues=${JSON.stringify(analysis.genderValues)}, ` +
+        `normalizationMetadata=${JSON.stringify(analysis.normalizationMetadata?.slice(0, 10))}`
+    );
+
     // Inject kết quả phân tích vào context
     finalMessages.push(
       this.responseBuilder.createSystemMessage(
@@ -419,6 +433,44 @@ export class ConversationService {
       }
     }
 
+    // Tertiary fallback: if both AI and NLP yielded nothing, but analysis has productNames or logic
+    if (
+      shouldQuery &&
+      (!Array.isArray(effectiveQueries) || effectiveQueries.length === 0) &&
+      (analysis.productNames?.length > 0 || analysis.logic?.length > 0)
+    ) {
+      const fallbackLogic: (string | string[])[] = [];
+
+      if (analysis.productNames?.length > 0) {
+        for (const name of analysis.productNames) {
+          fallbackLogic.push(name);
+        }
+      }
+
+      if (analysis.logic?.length > 0) {
+        for (const group of analysis.logic) {
+          if (group) fallbackLogic.push(group);
+        }
+      }
+
+      if (fallbackLogic.length > 0) {
+        this.logger.log(
+          `[Conversation] AI+NLP yielded no queries, building fallback from analysis data: ${JSON.stringify(fallbackLogic)}`
+        );
+        effectiveQueries = [
+          {
+            purpose: 'search',
+            logic: fallbackLogic,
+            productNames: analysis.productNames || null,
+            sorting: analysis.sorting || null,
+            budget: analysis.budget || null,
+            functionCall: null,
+            profileHint: null
+          }
+        ];
+      }
+    }
+
     if (
       shouldQuery &&
       Array.isArray(effectiveQueries) &&
@@ -430,7 +482,7 @@ export class ConversationService {
           analysis,
           context.userId,
           context.isGuestUser,
-          analysis.pagination?.pageSize || 5
+          analysis.pagination?.pageSize || 15
         );
 
       taskResults.forEach((msg) => finalMessages.push(msg));
@@ -511,40 +563,45 @@ export class ConversationService {
     if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
       const ids = aiResponse.productTemp
         .map((p: any) => p.id)
-        .filter((id: any) => !!id);
+        .filter((id: any) => !!id && ConversationService.UUID_REGEX.test(String(id)));
       if (ids.length > 0) {
-        const productRes =
-          await this.productService.getProductsByIdsForOutput(ids);
-        if (productRes.success && productRes.data) {
-          let hydratedProducts = productRes.data;
+        try {
+          const productRes =
+            await this.productService.getProductsByIdsForOutput(ids);
+          if (productRes.success && productRes.data) {
+            let hydratedProducts = productRes.data;
 
-          // Re-apply budget filter on variants after hydration
-          if (
-            budget &&
-            (budget.min !== undefined || budget.max !== undefined)
-          ) {
-            const min = budget.min ? Number(budget.min) : 0;
-            const max = budget.max ? Number(budget.max) : Infinity;
+            if (
+              budget &&
+              (budget.min !== undefined || budget.max !== undefined)
+            ) {
+              const min = budget.min ? Number(budget.min) : 0;
+              const max = budget.max ? Number(budget.max) : Infinity;
 
-            hydratedProducts = hydratedProducts
-              .map((product: any) => {
-                const filteredVariants = (product.variants || []).filter(
-                  (v: any) => {
-                    const price = Number(v.basePrice);
-                    return price >= min && price <= max;
-                  }
-                );
-                return { ...product, variants: filteredVariants };
-              })
-              .filter((product: any) => product.variants.length > 0);
+              hydratedProducts = hydratedProducts
+                .map((product: any) => {
+                  const filteredVariants = (product.variants || []).filter(
+                    (v: any) => {
+                      const price = Number(v.basePrice);
+                      return price >= min && price <= max;
+                    }
+                  );
+                  return { ...product, variants: filteredVariants };
+                })
+                .filter((product: any) => product.variants.length > 0);
 
-            this.logger.log(
-              `[HYDRATE] Budget filter applied: ${min}-${max === Infinity ? '∞' : max}. ` +
-                `Products: ${productRes.data.length} → ${hydratedProducts.length}`
-            );
+              this.logger.log(
+                `[HYDRATE] Budget filter applied: ${min}-${max === Infinity ? '∞' : max}. ` +
+                  `Products: ${productRes.data.length} → ${hydratedProducts.length}`
+              );
+            }
+
+            aiResponse.products = hydratedProducts;
           }
-
-          aiResponse.products = hydratedProducts;
+        } catch (error) {
+          this.logger.warn(
+            `[HYDRATE] Failed to hydrate products: ${(error as Error).message}`
+          );
         }
       }
     }

@@ -582,6 +582,14 @@ Quy trình tìm kiếm sản phẩm thường được hệ thống thực hiệ
 - KHÔNG gợi ý 2+ dung tích của cùng 1 dòng (VD: Dior Sauvage 30ml + 100ml). Chỉ giữ 1 dung tích tốt nhất.
 - KHÔNG lặp lại sản phẩm nếu khách đã mua hoặc đã từng hỏi.
 
+### Quy tắc Lọc sản phẩm từ SEARCH_RESULTS (CRITICAL):
+- Khi nhận được \`SEARCH_RESULTS\`, BẮT BUỘC kiểm tra chéo MỖI sản phẩm với tiêu chí người dùng trước khi đưa vào \`productTemp\`:
+  - **Giới tính**: Nếu khách nói "nước hoa nam" → LOẠI BỎ sản phẩm có Gender != "Male" (trừ khi product có Gender "Unisex"). Tương tự cho "nữ".
+  - **Thương hiệu**: Nếu khách chỉ định thương hiệu → LOẠI BỎ sản phẩm không cùng thương hiệu.
+  - **Ngân sách**: Kiểm tra \`variants[].price\` — chỉ giữ sản phẩm CÓ ÍT NHẤT 1 biến thể nằm trong ngân sách. Sản phẩm KHÔNG có biến thể phù hợp ngân sách → LOẠI BỎ hoàn toàn, KHÔNG hiển thị.
+  - **Nhóm hương/nốt hương**: Nếu khách nêu rõ nhóm hương hoặc nốt hương cụ thể → ưu tiên sản phẩm có chứa thông tin đó, nhưng không loại bỏ hoàn toàn nếu chưa có detail.
+- **KHÔNG ĐƯỢC** hiển thị 0 sản phẩm nếu SEARCH_RESULTS có kết quả nhưng tất cả bị loại bỏ theo tiêu chí trên → chuyển sang Bước 5 (nới lỏng tiêu chí) thay vì trả về danh sách rỗng.
+
 ### Quy tắc Sắp xếp ưu tiên:
 1. Khớp hết tiêu chí (giới tính + ngân sách + dịp sử dụng).
 2. Khớp gần đúng (giới tính + ngân sách).
@@ -986,6 +994,16 @@ Phân mức rủi ro:
 - "trên X": minPrice = X.
 - "từ X đến Y": minPrice = X, maxPrice = Y.
 
+# BƯỚC 3.5: XÂY DỰNG MẢNG LOGIC (CRITICAL)
+- Mảng \`logic\` chứa các từ khóa tìm kiếm PHIÊN DỊCH (brand, category, note, family, product name, gender, origin).
+- MỖI từ khóa brand/category/note/product PHẢI là một MẢNG CON riêng biệt trong logic (hoặc string đơn). VD: \`[["Chanel"], ["hương hoa"]]\` hoặc \`["Chanel", "hương hoa"]\`.
+- TUYỆT ĐỐI KHÔNG đưa các cụm từ giá/budget vào mảng logic. Budget keywords (dưới/trên/từ X triệu/nghìn) CHỈ nằm trong trường \`budget\`.
+- TUYỆT ĐỐI KHÔNG bỏ brand/category/note khỏi logic chỉ vì đã có budget trong query.
+- VD ĐÚNG: \`{ logic: ["Chanel"], budget: { max: 5000000 } }\` — brand trong logic, budget riêng.
+- VD SAI: \`{ logic: ["dưới 5 triệu"], budget: { max: 5000000 } }\` — thiếu brand, budget keyword lọt vào logic.
+- VD SAI: \`{ logic: [["Chanel", "dưới 5 triệu"]], budget: { max: 5000000 } }\` — budget keyword lọt vào logic cùng brand.
+- Nếu người dùng nhắc giới tính (nam/nữ/unisex), đưa vào trường \`genderValues\` (VD: ["Female"]), KHÔNG đưa vào logic.
+
 # BƯỚC 4: NHẬN DIỆN MÙI HƯƠNG & ĐẶC TÍNH
 - Phân loại nốt hương nếu người dùng đề cập cụ thể:
   - topNotes (Nốt đầu): cam chanh, cam bergamot, tiêu, ...
@@ -1014,7 +1032,9 @@ Phân mức rủi ro:
 - CHỈ SỬ DỤNG CÁC GIÁ TRỊ CÓ TRONG DANH SÁCH DỮ LIỆU ĐƯỢC CUNG CẤP.
 - Nếu không có thông tin cho một trường nào đó, hãy để trống hoặc null.
 - Tuyệt đối không bịa thêm thông tin không có trong câu truy vấn.
-- Luôn cố gắng trích xuất càng chi tiết càng tốt để tìm kiếm chính xác nhất.`
+- Luôn cố gắng trích xuất càng chi tiết càng tốt để tìm kiếm chính xác nhất.
+- **logic và budget phải tách bạch**: Mảng logic chỉ chứa keywords tìm kiếm (brand, note, category...), KHÔNG chứa price phrases. Price phrases CHỈ nằm trong budget.
+- **genderValues riêng biệt**: Giới tính từ query phải vào trường genderValues, không đưa vào logic string.`
   },
   // ==================== STAFF CONSULTATION (Tư vấn nội bộ) ====================
   {

@@ -193,6 +193,8 @@ function mapProduct(p: ProductWithRelations): ProductResponse {
 
 @Injectable()
 export class ProductService {
+  private static readonly UUID_REGEX =
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
   private readonly logger = new Logger(ProductService.name);
   // Fallback generic keywords to filter out when filtering logic (until vocabular parser rules are seeded)
   private readonly GENERIC_FILTER_KEYWORDS_FALLBACK = [
@@ -1386,8 +1388,8 @@ export class ProductService {
       const minLongevity = this.asOptionalNumber(analysis.minLongevity);
       const minSillage = this.asOptionalNumber(analysis.minSillage);
       const skip =
-        ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 5);
-      const take = pagination?.pageSize || 5;
+        ((pagination?.pageNumber || 1) - 1) * (pagination?.pageSize || 15);
+      const take = pagination?.pageSize || 15;
 
       // ======== DEBUG: Log gender filter info ========
       this.logger.debug(
@@ -1888,9 +1890,16 @@ export class ProductService {
     return await this.err.wrap(async () => {
       if (!ids || ids.length === 0) return { success: true, data: [] };
 
+      const validIds = (ids || []).filter((id) =>
+        ProductService.UUID_REGEX.test(id)
+      );
+      if (validIds.length === 0) return { success: true, data: [] };
+
+      this.logger.debug('[getProductsByIdsForOutput] validIds', validIds);
+
       const products = await this.prisma.products.findMany({
         where: {
-          Id: { in: ids },
+          Id: { in: validIds },
           IsDeleted: false
         },
         include: {
@@ -1911,7 +1920,7 @@ export class ProductService {
       // Maintain order of IDs passed by the AI
       const productMap = new Map(products.map((p) => [p.Id, p]));
 
-      const mappedProducts: ProductCardOutputItem[] = ids
+      const mappedProducts: ProductCardOutputItem[] = validIds
         .map((id) => productMap.get(id))
         .filter((p): p is NonNullable<typeof p> => !!p)
         .map((p) => {

@@ -1,7 +1,5 @@
 {
-  "namespaces": [
-    "public"
-  ],
+  "namespaces": ["public"],
   "name": "public",
   "tables": [
     {
@@ -71,9 +69,7 @@
       "indexes": [
         {
           "keyName": "admin_instruction_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -209,9 +205,7 @@
       "indexes": [
         {
           "keyName": "aiacceptance_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -270,9 +264,7 @@
       "indexes": [
         {
           "keyName": "common_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -341,9 +333,7 @@
       "indexes": [
         {
           "keyName": "conversation_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -412,12 +402,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "enumItems": [
-            "message",
-            "search",
-            "survey",
-            "product"
-          ],
+          "enumItems": ["message", "search", "survey", "product"],
           "mappedType": "enum"
         },
         "entity_type": {
@@ -427,12 +412,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "enumItems": [
-            "conversation",
-            "search",
-            "survey",
-            "product"
-          ],
+          "enumItems": ["conversation", "search", "survey", "product"],
           "mappedType": "enum"
         },
         "entity_id": {
@@ -468,10 +448,7 @@
       "indexes": [
         {
           "keyName": "event_log_event_type_created_at_index",
-          "columnNames": [
-            "event_type",
-            "created_at"
-          ],
+          "columnNames": ["event_type", "created_at"],
           "composite": true,
           "constraint": false,
           "primary": false,
@@ -479,10 +456,7 @@
         },
         {
           "keyName": "event_log_user_id_created_at_index",
-          "columnNames": [
-            "user_id",
-            "created_at"
-          ],
+          "columnNames": ["user_id", "created_at"],
           "composite": true,
           "constraint": false,
           "primary": false,
@@ -490,9 +464,7 @@
         },
         {
           "keyName": "event_log_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -562,11 +534,7 @@
           "primary": false,
           "nullable": false,
           "default": "'REPORT'",
-          "enumItems": [
-            "REPORT",
-            "RESTOCK",
-            "SLOW_STOCK"
-          ],
+          "enumItems": ["REPORT", "RESTOCK", "SLOW_STOCK"],
           "mappedType": "enum"
         }
       },
@@ -575,9 +543,7 @@
       "indexes": [
         {
           "keyName": "inventory_log_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -637,10 +603,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "enumItems": [
-            "user",
-            "assistant"
-          ],
+          "enumItems": ["user", "assistant"],
           "mappedType": "enum"
         },
         "message": {
@@ -667,9 +630,7 @@
       "indexes": [
         {
           "keyName": "message_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -680,13 +641,9 @@
       "foreignKeys": {
         "message_conversation_id_foreign": {
           "constraintName": "message_conversation_id_foreign",
-          "columnNames": [
-            "conversation_id"
-          ],
+          "columnNames": ["conversation_id"],
           "localTableName": "public.message",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.conversation",
           "deleteRule": "cascade",
           "updateRule": "cascade"
@@ -779,19 +736,15 @@
       "indexes": [
         {
           "keyName": "product_embeddings_product_id_index",
-          "columnNames": [
-            "product_id"
-          ],
+          "columnNames": ["product_id"],
           "composite": false,
           "constraint": false,
           "primary": false,
-          "unique": false
+          "unique": true
         },
         {
           "keyName": "product_embeddings_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -851,10 +804,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": true,
-          "enumItems": [
-            "id",
-            "all"
-          ],
+          "enumItems": ["id", "all"],
           "mappedType": "enum"
         },
         "variant_id": {
@@ -881,9 +831,7 @@
       "indexes": [
         {
           "keyName": "review_log_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -963,11 +911,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "enumItems": [
-            "positive",
-            "negative",
-            "neutral"
-          ],
+          "enumItems": ["positive", "negative", "neutral"],
           "mappedType": "enum"
         },
         "review_count": {
@@ -985,9 +929,7 @@
       "indexes": [
         {
           "keyName": "review_summary_log_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1048,10 +990,7 @@
           "primary": false,
           "nullable": false,
           "default": "'single'",
-          "enumItems": [
-            "single",
-            "multiple"
-          ],
+          "enumItems": ["single", "multiple"],
           "mappedType": "enum"
         },
         "question": {
@@ -1080,9 +1019,7 @@
       "indexes": [
         {
           "keyName": "survey_question_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1159,9 +1096,7 @@
       "indexes": [
         {
           "keyName": "survey_answer_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1172,13 +1107,9 @@
       "foreignKeys": {
         "survey_answer_question_id_foreign": {
           "constraintName": "survey_answer_question_id_foreign",
-          "columnNames": [
-            "question_id"
-          ],
+          "columnNames": ["question_id"],
           "localTableName": "public.survey_answer",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.survey_question",
           "deleteRule": "cascade",
           "updateRule": "cascade"
@@ -1253,9 +1184,7 @@
       "indexes": [
         {
           "keyName": "survey_question_answer_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1341,9 +1270,7 @@
       "indexes": [
         {
           "keyName": "survey_question_answer_detail_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1354,39 +1281,27 @@
       "foreignKeys": {
         "survey_question_answer_detail_question_id_foreign": {
           "constraintName": "survey_question_answer_detail_question_id_foreign",
-          "columnNames": [
-            "question_id"
-          ],
+          "columnNames": ["question_id"],
           "localTableName": "public.survey_question_answer_detail",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.survey_question",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         },
         "survey_question_answer_detail_answer_id_foreign": {
           "constraintName": "survey_question_answer_detail_answer_id_foreign",
-          "columnNames": [
-            "answer_id"
-          ],
+          "columnNames": ["answer_id"],
           "localTableName": "public.survey_question_answer_detail",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.survey_answer",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         },
         "survey_question_answer_detail_ques_ans_id_foreign": {
           "constraintName": "survey_question_answer_detail_ques_ans_id_foreign",
-          "columnNames": [
-            "ques_ans_id"
-          ],
+          "columnNames": ["ques_ans_id"],
           "localTableName": "public.survey_question_answer_detail",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.survey_question_answer",
           "deleteRule": "cascade",
           "updateRule": "cascade"
@@ -1451,9 +1366,7 @@
       "indexes": [
         {
           "keyName": "trend_log_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1567,9 +1480,7 @@
       "indexes": [
         {
           "keyName": "user_log_summary_user_id_index",
-          "columnNames": [
-            "user_id"
-          ],
+          "columnNames": ["user_id"],
           "composite": false,
           "constraint": false,
           "primary": false,
@@ -1577,9 +1488,7 @@
         },
         {
           "keyName": "user_log_summary_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1694,9 +1603,7 @@
       "indexes": [
         {
           "keyName": "vocab_dictionary_version_index",
-          "columnNames": [
-            "version"
-          ],
+          "columnNames": ["version"],
           "composite": false,
           "constraint": false,
           "primary": false,
@@ -1704,9 +1611,7 @@
         },
         {
           "keyName": "vocab_dictionary_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1812,11 +1717,7 @@
       "indexes": [
         {
           "keyName": "vocab_parser_rule_dictionary_id_rule_group_priority_index",
-          "columnNames": [
-            "dictionary_id",
-            "rule_group",
-            "priority"
-          ],
+          "columnNames": ["dictionary_id", "rule_group", "priority"],
           "composite": true,
           "constraint": false,
           "primary": false,
@@ -1824,9 +1725,7 @@
         },
         {
           "keyName": "vocab_parser_rule_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1837,13 +1736,9 @@
       "foreignKeys": {
         "vocab_parser_rule_dictionary_id_foreign": {
           "constraintName": "vocab_parser_rule_dictionary_id_foreign",
-          "columnNames": [
-            "dictionary_id"
-          ],
+          "columnNames": ["dictionary_id"],
           "localTableName": "public.vocab_parser_rule",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.vocab_dictionary",
           "updateRule": "cascade"
         }
@@ -1954,9 +1849,7 @@
       "indexes": [
         {
           "keyName": "vocab_phrase_rule_normalized_phrase_index",
-          "columnNames": [
-            "normalized_phrase"
-          ],
+          "columnNames": ["normalized_phrase"],
           "composite": false,
           "constraint": false,
           "primary": false,
@@ -1964,9 +1857,7 @@
         },
         {
           "keyName": "vocab_phrase_rule_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -1977,13 +1868,9 @@
       "foreignKeys": {
         "vocab_phrase_rule_dictionary_id_foreign": {
           "constraintName": "vocab_phrase_rule_dictionary_id_foreign",
-          "columnNames": [
-            "dictionary_id"
-          ],
+          "columnNames": ["dictionary_id"],
           "localTableName": "public.vocab_phrase_rule",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.vocab_dictionary",
           "updateRule": "cascade"
         }
@@ -2094,11 +1981,7 @@
       "indexes": [
         {
           "keyName": "vocab_term_dictionary_id_entity_type_canonical_index",
-          "columnNames": [
-            "dictionary_id",
-            "entity_type",
-            "canonical"
-          ],
+          "columnNames": ["dictionary_id", "entity_type", "canonical"],
           "composite": true,
           "constraint": false,
           "primary": false,
@@ -2106,9 +1989,7 @@
         },
         {
           "keyName": "vocab_term_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -2119,13 +2000,9 @@
       "foreignKeys": {
         "vocab_term_dictionary_id_foreign": {
           "constraintName": "vocab_term_dictionary_id_foreign",
-          "columnNames": [
-            "dictionary_id"
-          ],
+          "columnNames": ["dictionary_id"],
           "localTableName": "public.vocab_term",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.vocab_dictionary",
           "updateRule": "cascade"
         }
@@ -2227,9 +2104,7 @@
       "indexes": [
         {
           "keyName": "vocab_alias_normalized_alias_index",
-          "columnNames": [
-            "normalized_alias"
-          ],
+          "columnNames": ["normalized_alias"],
           "composite": false,
           "constraint": false,
           "primary": false,
@@ -2237,9 +2112,7 @@
         },
         {
           "keyName": "vocab_alias_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -2250,13 +2123,9 @@
       "foreignKeys": {
         "vocab_alias_term_id_foreign": {
           "constraintName": "vocab_alias_term_id_foreign",
-          "columnNames": [
-            "term_id"
-          ],
+          "columnNames": ["term_id"],
           "localTableName": "public.vocab_alias",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.vocab_term",
           "updateRule": "cascade"
         }
@@ -2357,10 +2226,7 @@
       "indexes": [
         {
           "keyName": "vocab_age_bucket_min_age_max_age_index",
-          "columnNames": [
-            "min_age",
-            "max_age"
-          ],
+          "columnNames": ["min_age", "max_age"],
           "composite": true,
           "constraint": false,
           "primary": false,
@@ -2368,9 +2234,7 @@
         },
         {
           "keyName": "vocab_age_bucket_pkey",
-          "columnNames": [
-            "id"
-          ],
+          "columnNames": ["id"],
           "composite": false,
           "constraint": true,
           "primary": true,
@@ -2381,13 +2245,9 @@
       "foreignKeys": {
         "vocab_age_bucket_term_id_foreign": {
           "constraintName": "vocab_age_bucket_term_id_foreign",
-          "columnNames": [
-            "term_id"
-          ],
+          "columnNames": ["term_id"],
           "localTableName": "public.vocab_age_bucket",
-          "referencedColumnNames": [
-            "id"
-          ],
+          "referencedColumnNames": ["id"],
           "referencedTableName": "public.vocab_term",
           "updateRule": "cascade"
         }

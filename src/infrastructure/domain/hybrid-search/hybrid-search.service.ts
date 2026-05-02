@@ -129,11 +129,11 @@ export class HybridSearchService {
     hardFilterIds: string[] | null
   ): Promise<{ bm25Ids: string[]; vectorData: VectorSearchResult[] }> {
     const limit = HYBRID_SEARCH_CONFIG.RETRIEVAL_LIMIT;
-    const filterClause = hardFilterIds ? 'AND product_id = ANY(?::uuid[])' : '';
-    const params: unknown[] = [];
+    const filterClause = hardFilterIds
+      ? `AND product_id = ANY(ARRAY['${hardFilterIds.join("','")}']::text[])`
+      : '';
 
     const bm25Params: unknown[] = [];
-    if (hardFilterIds) bm25Params.push(hardFilterIds);
     bm25Params.push(searchText, limit);
 
     const bm25Result = await this.embeddingService.em
@@ -146,7 +146,6 @@ export class HybridSearchService {
     const bm25Ids = bm25Rows.map((r) => r.product_id as string);
 
     const vectorParams: unknown[] = [embeddingString];
-    if (hardFilterIds) vectorParams.push(hardFilterIds);
     vectorParams.push(embeddingString, limit);
 
     const vectorResult = await this.embeddingService.em

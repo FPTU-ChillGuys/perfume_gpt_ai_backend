@@ -4,7 +4,8 @@ import {
   ApiOperation,
   ApiQuery,
   ApiTags,
-  ApiExtraModels
+  ApiExtraModels,
+  getSchemaPath
 } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public, Role } from 'src/application/common/Metadata';
@@ -17,8 +18,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
 import {
-  ApiBaseResponse,
-  ExtendApiBaseResponse
+  ApiBaseResponse
 } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { ConversationOutputDto } from 'src/application/dtos/common/conversation-output.dto';
 import { ConversationInputHelper } from 'src/infrastructure/domain/conversation/helpers/conversation-input.helper';
@@ -30,7 +30,7 @@ import { ChatRequest } from 'src/application/dtos/request/conversation/chat.requ
 import { PagedConversationRequest } from 'src/application/dtos/request/conversation/paged-conversation.request';
 
 @ApiTags('Conversation')
-@ApiExtraModels(ConversationOutputDto)
+@ApiExtraModels(ConversationOutputDto, ConversationResponse)
 @Controller('conversation')
 export class ConversationController {
   constructor(
@@ -59,7 +59,14 @@ export class ConversationController {
     required: false,
     description: 'Guest userId (nếu chưa đăng nhập)'
   })
-  @ExtendApiBaseResponse(PagedResult, ConversationResponse)
+  @ApiBaseResponse(PagedResult, false, {
+    data: {
+      allOf: [
+        { $ref: getSchemaPath(PagedResult) },
+        { properties: { items: { type: 'array', items: { $ref: getSchemaPath(ConversationResponse) } } } }
+      ]
+    }
+  })
   async getMyConversationHistory(
     @Req() request: Request,
     @Query() pagedRequest: PagedConversationRequest
@@ -76,7 +83,14 @@ export class ConversationController {
   @Get('list/paged')
   @ApiAdminErrors()
   @ApiOperation({ summary: 'Lấy danh sách hội thoại có phân trang' })
-  @ExtendApiBaseResponse(PagedResult, ConversationResponse)
+  @ApiBaseResponse(PagedResult, false, {
+    data: {
+      allOf: [
+        { $ref: getSchemaPath(PagedResult) },
+        { properties: { items: { type: 'array', items: { $ref: getSchemaPath(ConversationResponse) } } } }
+      ]
+    }
+  })
   async getAllConversationsPaginated(
     @Query() request: PagedConversationRequest
   ): Promise<BaseResponse<PagedResult<ConversationResponse>>> {

@@ -140,15 +140,7 @@ export class ConversationService {
     messageRequests: ChatMessageRequest[]
   ): Promise<BaseResponse<MessageResponse[]>> {
     return this.err.wrap(async () => {
-      const messages = messageRequests.map((req) => {
-        const entity = new Message();
-        entity.sender = req.sender;
-        entity.message =
-          typeof req.message === 'string'
-            ? req.message
-            : JSON.stringify(req.message);
-        return entity;
-      });
+      const messages = messageRequests.map((req) => req.toEntity());
 
       const conversation =
         await this.unitOfWork.AIConversationRepo.addMessagesToConversation(
@@ -188,15 +180,7 @@ export class ConversationService {
       });
       if (conversation.messages && Array.isArray(conversation.messages)) {
         entity.messages.set(
-          conversation.messages.map((m) => {
-            const msg = new Message();
-            msg.sender = m.sender;
-            msg.message =
-              typeof m.message === 'string'
-                ? m.message
-                : JSON.stringify(m.message);
-            return msg;
-          })
+          conversation.messages.map((m) => m.toEntity())
         );
       }
       await this.unitOfWork.AIConversationRepo.addAndFlush(entity);

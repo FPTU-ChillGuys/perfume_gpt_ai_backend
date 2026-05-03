@@ -5,6 +5,11 @@ import { ChatRequest } from 'src/application/dtos/request/conversation/chat.requ
 import { Sender } from 'src/domain/enum/sender.enum';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { ConversationResponse } from 'src/application/dtos/response/conversation/conversation.response';
+import {
+  ConversationOutputDto,
+  ProductCardOutputItemDto,
+  ProductTempItemDto
+} from 'src/application/dtos/common/conversation-output.dto';
 
 /** Chuyển đổi danh sách tin nhắn request sang định dạng UIMessage cho AI SDK */
 export function convertToMessages(messages: ChatMessageRequest[]): UIMessage[] {
@@ -15,10 +20,7 @@ export function convertToMessages(messages: ChatMessageRequest[]): UIMessage[] {
     parts: [
       {
         type: 'text',
-        text:
-          typeof msgReq.message === 'string'
-            ? msgReq.message
-            : JSON.stringify(msgReq.message)
+        text: msgReq.message
       }
     ]
   }));
@@ -30,7 +32,7 @@ export const addMessageToMessages = (
   existingMessages: ChatMessageRequest[]
 ): ChatMessageRequest[] => {
   const newAssistantMessage = new ChatMessageRequest();
-  newAssistantMessage.sender = 'assistant' as any; // Cast for compatibility
+  newAssistantMessage.sender = Sender.ASSISTANT;
   newAssistantMessage.message = aiMessage;
 
   return [...existingMessages, newAssistantMessage];
@@ -49,12 +51,28 @@ export const overrideMessagesToConversation = (
   return request;
 };
 
-/** Xử lý convert ngược Object -> String cho Request từ Mobile */
+/**
+ * Xử lý Request từ Mobile: gộp structured fields vào message string để persist.
+ * Nếu message có products/suggestedQuestions/productTemp, stringify toàn bộ.
+ */
 export const processRequestForMobile = (request: ChatRequest): ChatRequest => {
   if (request.messages && Array.isArray(request.messages)) {
     request.messages = request.messages.map((msg) => {
-      if (typeof msg.message !== 'string') {
-        msg.message = JSON.stringify(msg.message);
+      const hasStructuredData =
+        (msg.products && msg.products.length > 0) ||
+        (msg.suggestedQuestions && msg.suggestedQuestions.length > 0) ||
+        (msg.productTemp && msg.productTemp.length > 0);
+
+      if (hasStructuredData) {
+        msg.message = JSON.stringify({
+          message: msg.message,
+          products: msg.products ?? null,
+          productTemp: msg.productTemp ?? null,
+          suggestedQuestions: msg.suggestedQuestions ?? null
+        });
+        msg.products = null;
+        msg.productTemp = null;
+        msg.suggestedQuestions = null;
       }
       return msg;
     });
@@ -62,7 +80,10 @@ export const processRequestForMobile = (request: ChatRequest): ChatRequest => {
   return request;
 };
 
-/** Xử lý parse message JSON cho Mobile Client (Response) */
+/**
+ * Parse JSON message từ DB thành flat fields cho Mobile Client.
+ * Assistant: bóc message text + products + suggestedQuestions ra flat fields.
+ */
 export const processResponseForMobile = (
   response: BaseResponse<ConversationResponse>,
   isMobile?: boolean
@@ -71,27 +92,118 @@ export const processResponseForMobile = (
     response.data.isMobile = true;
     response.data.messages = response.data.messages.map((msg) => {
       if (msg.sender === Sender.ASSISTANT && typeof msg.message === 'string') {
-        const trimmed = msg.message.trim();
-        // Kiểm tra dấu hiệu của JSON
-        if (
-          (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-          (trimmed.startsWith('"') && trimmed.includes('{'))
-        ) {
-          try {
-            let parsed = msg.message;
-            if (trimmed.startsWith('"')) {
-              parsed = JSON.parse(parsed);
-            }
-            // Parse lần 2 nếu kết quả vẫn là string (tránh double stringify)
-            msg.message =
-              typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
-          } catch (e) {
-            // Bỏ qua nếu parse lỗi
-          }
+        const parsed = tryParseAssistantJson(msg.message);
+        if (parsed) {
+          msg.message = parsed.message || '';
+          msg.products = parsed.products;
+          msg.productTemp = parsed.productTemp;
+          msg.suggestedQuestions = parsed.suggestedQuestions ?? null;
+        } else {
+          msg.products = null;
+          msg.productTemp = null;
+          msg.suggestedQuestions = null;
         }
+      } else {
+        msg.products = null;
+        msg.productTemp = null;
+        msg.suggestedQuestions = null;
       }
       return msg;
     });
   }
   return response;
 };
+
+/**
+ * Parse JSON string từ DB thành ConversationOutputDto.
+ * Hỗ trợ double-stringified JSON (wrapped in quotes).
+ * Trả về null nếu không phải JSON hợp lệ.
+ */
+function tryParseAssistantJson(raw: string): ConversationOutputDto | null {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('"')) {
+    return null;
+  }
+
+  try {
+    let parsed: unknown = trimmed;
+
+    // Handle double-stringified: "\"{...}\""
+    if (trimmed.startsWith('"')) {
+      const unquoted = JSON.parse(trimmed);
+      if (typeof unquoted === 'string') {
+        parsed = unquoted;
+      } else {
+        parsed = unquoted;
+      }
+    }
+
+    // Parse final layer
+    if (typeof parsed === 'string') {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        return null;
+      }
+    }
+
+    if (typeof parsed !== 'object' || parsed === null) {
+      return null;
+    }
+
+    const obj = parsed as Record<string, unknown>;
+
+    return {
+      message: typeof obj.message === 'string' ? obj.message : '',
+      products: mapProducts(obj.products),
+      productTemp: mapProductTemp(obj.productTemp),
+      suggestedQuestions: mapSuggestedQuestions(obj.suggestedQuestions) ?? undefined
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Map products array từ parsed JSON sang ProductCardOutputItemDto[] */
+function mapProducts(raw: unknown): ProductCardOutputItemDto[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.map((item: any) => ({
+    id: item.id ?? '',
+    name: item.name ?? '',
+    brandName: item.brandName ?? '',
+    primaryImage: item.primaryImage ?? null,
+    variants: Array.isArray(item.variants)
+      ? item.variants.map((v: any) => ({
+          id: v.id ?? '',
+          sku: v.sku ?? '',
+          volumeMl: v.volumeMl ?? 0,
+          basePrice: v.basePrice ?? 0
+        }))
+      : [],
+    reasoning: item.reasoning ?? null,
+    source: item.source ?? null
+  }));
+}
+
+/** Map productTemp array từ parsed JSON sang ProductTempItemDto[] */
+function mapProductTemp(raw: unknown): ProductTempItemDto[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.map((item: any) => ({
+    id: item.id ?? '',
+    name: item.name ?? null,
+    variants: Array.isArray(item.variants)
+      ? item.variants.map((v: any) => ({
+          id: v.id ?? '',
+          price: v.price ?? 0
+        }))
+      : null,
+    reasoning: item.reasoning ?? '',
+    source: item.source ?? ''
+  }));
+}
+
+/** Map suggestedQuestions từ parsed JSON */
+function mapSuggestedQuestions(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((q): q is string => typeof q === 'string');
+}

@@ -1,14 +1,19 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
   IsNotEmpty,
-  IsObject,
+  IsOptional,
   IsString,
-  ValidateIf
+  ValidateNested
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Sender } from 'src/domain/enum/sender.enum';
 import { Message } from 'src/domain/entities/message.entity';
-import { ConversationOutputDto } from '../../common/conversation-output.dto';
+import {
+  ConversationOutputDto,
+  ProductCardOutputItemDto,
+  ProductTempItemDto
+} from '../../common/conversation-output.dto';
 
 /** DTO yêu cầu gửi tin nhắn */
 export class ChatMessageRequest {
@@ -19,35 +24,70 @@ export class ChatMessageRequest {
     enum: Sender
   })
   @IsEnum(Sender)
-  sender: Sender;
+  sender: Sender = "user" as Sender;
 
-  /** Nội dung tin nhắn */
+  /** Nội dung tin nhắn dạng text */
   @ApiProperty({
-    description: 'Nội dung tin nhắn',
+    description: 'Nội dung tin nhắn dạng text',
     required: true,
-    oneOf: [
-      { type: 'string' },
-      { $ref: '#/components/schemas/ConversationOutputDto' }
-    ]
+    type: String
   })
-  @ValidateIf((o) => typeof o.message !== 'string')
-  @IsObject()
-  @ValidateIf((o) => typeof o.message === 'string')
   @IsString()
   @IsNotEmpty()
-  message: string | ConversationOutputDto;
+  message!: string;
+
+  /** Danh sách sản phẩm gợi ý (chỉ dùng khi sender=assistant) */
+  @ApiPropertyOptional({
+    description: 'Danh sách sản phẩm gợi ý',
+    type: [ProductCardOutputItemDto],
+    nullable: true
+  })
+  @IsOptional()
+  products?: ProductCardOutputItemDto[] | null;
+
+  /** Danh sách sản phẩm tạm (chỉ dùng khi sender=assistant) */
+  @ApiPropertyOptional({
+    description: 'Danh sách sản phẩm tạm',
+    type: [ProductTempItemDto],
+    nullable: true
+  })
+  @IsOptional()
+  productTemp?: ProductTempItemDto[] | null;
+
+  /** Gợi ý câu hỏi tiếp theo (chỉ dùng khi sender=assistant) */
+  @ApiPropertyOptional({
+    description: 'Gợi ý 3-4 câu hỏi tiếp theo',
+    type: [String],
+    nullable: true
+  })
+  @IsOptional()
+  suggestedQuestions?: string[] | null;
 
   /**
    * Chuyển đổi từ DTO sang Entity.
+   * Nếu có structured data (products/suggestedQuestions), lưu dạng JSON string.
    * @returns Entity Message mới
    */
   toEntity(): Message {
     const entity = new Message();
     entity.sender = this.sender;
-    entity.message =
-      typeof this.message === 'string'
-        ? this.message
-        : JSON.stringify(this.message);
+
+    const hasStructuredData =
+      (this.products && this.products.length > 0) ||
+      (this.suggestedQuestions && this.suggestedQuestions.length > 0) ||
+      (this.productTemp && this.productTemp.length > 0);
+
+    if (hasStructuredData) {
+      entity.message = JSON.stringify({
+        message: this.message,
+        products: this.products ?? null,
+        productTemp: this.productTemp ?? null,
+        suggestedQuestions: this.suggestedQuestions ?? null
+      });
+    } else {
+      entity.message = this.message;
+    }
+
     return entity;
   }
 }

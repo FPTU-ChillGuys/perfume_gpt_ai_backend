@@ -6,6 +6,7 @@ import { BaseResponse } from 'src/application/dtos/response/common/base-response
 import { SurveyAnswerRequest } from 'src/application/dtos/request/survey-answer.request';
 import { CreateQuestionFromAttributeRequest } from 'src/infrastructure/domain/survey/survey-query.types';
 import { SurveyQuestionRequest } from 'src/application/dtos/request/survey-question.request';
+import { QuestionType } from 'src/domain/entities/survey-question.entity';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { SurveyQuestionResponse } from 'src/application/dtos/response/survey-question.response';
 import {
@@ -15,9 +16,25 @@ import {
 import { SurveyQuesAnwsRequest } from 'src/application/dtos/request/survey-ques-ans.request';
 import { SurveyQuestionAnswerResponse } from 'src/application/dtos/response/survey-question-answer.response';
 import {
+  MobileSurveyQuestionItem,
+  MobileSurveyAnswerItem,
+  MobileSurveyResponseData,
+  MobileSurveyProduct,
+  MobileSurveyMessage
+} from 'src/application/dtos/response/survey/mobile-survey.response';
+import {
+  MobileSurveyRequest,
+  MobileSurveyAnswer
+} from 'src/application/dtos/request/survey/mobile-survey.request';
+import {
   InternalServerErrorWithDetailsException,
   BadRequestWithDetailsException
 } from 'src/application/common/exceptions/http-with-details.exception';
+import {
+  SurveyAnalysis,
+  PerQuestionAnalysis,
+  SurveyAIResponse
+} from 'src/application/dtos/request/survey/survey-analysis.types';
 import { Ok } from 'src/application/dtos/response/common/success-response';
 import { SurveyQuestionAnswer } from 'src/domain/entities/survey-question-answer.entity';
 import { v4 as uuidv4 } from 'uuid';
@@ -29,6 +46,11 @@ import {
   QueryFragmentBudget
 } from 'src/infrastructure/domain/survey/survey-query.types';
 import { SurveyJobName } from 'src/application/constant/processor';
+import {
+  SURVEY_DEFAULT_REASONING,
+  SURVEY_PRODUCT_INTRO,
+  v5ResponseSchema
+} from 'src/application/constant/survey.constant';
 import {
   mergeSurveyQueryResults,
   SurveyQueryResult
@@ -42,34 +64,6 @@ import {
   BudgetConstraint
 } from './helpers/survey-product.helper';
 import { SurveyPipelineHelper } from './helpers/survey-pipeline.helper';
-
-/** Analysis result từ AI hoặc query fragments — dùng cho V4/V5 survey pipeline */
-interface SurveyAnalysis {
-  logic?: (string | string[])[] | null;
-  genderValues?: string[];
-  originValues?: string[];
-  concentrationValues?: string[];
-  budget?: { min?: number | null; max?: number | null } | null;
-  pagination?: { pageNumber: number; pageSize: number } | null;
-  sorting?: { field: string; isDescending: boolean } | null;
-  [key: string]: unknown;
-}
-
-/** Per-question analysis entry cho V5 hybrid flow */
-interface PerQuestionAnalysis {
-  questionId: string;
-  question: string;
-  answer: string;
-  analysis: SurveyAnalysis | null;
-}
-
-/** AI recommendation response structure */
-interface SurveyAIResponse {
-  products?: Record<string, unknown>[];
-  productTemp?: Record<string, unknown>[];
-  aiAcceptanceId?: string;
-  [key: string]: unknown;
-}
 
 @Injectable()
 export class SurveyService {
@@ -164,7 +158,7 @@ export class SurveyService {
     // 5. Build survey question request with JSON answers
     const surveyQuestionReq: SurveyQuestionRequest = {
       question: body.question,
-      questionType: body.questionType as any,
+      questionType: body.questionType as QuestionType,
       answers: allValues.map(
         (val) =>
           new SurveyAnswerRequest({
@@ -269,6 +263,36 @@ export class SurveyService {
       );
 
       return { success: true, data: surveyQuestionsResponses };
+    }, 'errors.survey.get_questions');
+  }
+
+  async getMobileSurveyQuestions(): Promise<
+    BaseResponse<MobileSurveyQuestionItem[]>
+  > {
+    return this.err.wrap(async () => {
+      const allQuestions = await this.unitOfWork.AISurveyQuestionRepo.find(
+        {
+          isActive: true
+        },
+        { populate: ['answers'], orderBy: { order: 'ASC' } }
+      );
+
+      const data: MobileSurveyQuestionItem[] = allQuestions.map((q) => {
+        return {
+          id: q.id,
+          question: q.question ?? '',
+          questionType: q.questionType as string,
+          order: q.order,
+          isActive: q.isActive,
+          answers: (q.answers || []).map((ans) => ({
+            id: ans.id,
+            answer: ans.answer,
+            displayText: extractDisplayText(ans.answer)
+          }))
+        };
+      });
+
+      return { success: true, data };
     }, 'errors.survey.get_questions');
   }
 
@@ -1338,4 +1362,72 @@ export class SurveyService {
       sorting: { field: 'Newest', isDescending: true }
     };
   }
+
+  async processMobileSurvey(
+    userId: string,
+    surveyAnswers: { questionId: string; answerId: string }[]
+  ): Promise<BaseResponse<MobileSurveyResponseData>> {
+    return this.err.wrap(async () => {
+      const result = await this.processSurveyV5Hybrid(userId, surveyAnswers);
+
+      if (!result.success || !result.data) {
+        return { success: false, error: result.error };
+      }
+
+      const aiResponse = v5ResponseSchema.parse(JSON.parse(result.data));
+
+      const products: MobileSurveyProduct[] = (aiResponse.products || []).map(
+        (p) => {
+          const prices = (p.variants || [])
+            .map((v) => v.basePrice ?? 0)
+            .filter((price) => typeof price === 'number');
+          return {
+            id: p.id || '',
+            name: p.name || '',
+            brandName: p.brandName || '',
+            primaryImage: p.primaryImage || '',
+            reasoning: p.reasoning || SURVEY_DEFAULT_REASONING,
+            minPrice: prices.length > 0 ? Math.min(...prices) : 0,
+            maxPrice: prices.length > 0 ? Math.max(...prices) : 0
+          };
+        }
+      );
+
+      const messages: MobileSurveyMessage[] = [];
+      if (aiResponse.message) {
+        messages.push({ message: aiResponse.message, products: [] });
+      }
+      if (products.length > 0) {
+        messages.push({
+          message: SURVEY_PRODUCT_INTRO.replace(
+            '{count}',
+            String(products.length)
+          ),
+          products
+        });
+      }
+
+      return {
+        success: true,
+        data: {
+          messages,
+          products
+        }
+      };
+    }, 'errors.survey.process_mobile');
+  }
+}
+
+function extractDisplayText(rawAnswer: string): string {
+  try {
+    if (rawAnswer && rawAnswer.trim().startsWith('{')) {
+      const parsed = JSON.parse(rawAnswer);
+      if (parsed && typeof parsed.displayText === 'string') {
+        return parsed.displayText;
+      }
+    }
+  } catch {
+    // Not JSON
+  }
+  return rawAnswer;
 }

@@ -108,10 +108,7 @@ export class AliasNgramHelper {
       }
     }
 
-    const finalCount = Object.values(map).reduce(
-      (sum, a) => sum + a.length,
-      0
-    );
+    const finalCount = Object.values(map).reduce((sum, a) => sum + a.length, 0);
     const aliasAdded = finalCount - originalCount;
     this.logger.log(
       this.promptLoader.get('log.alias_enrich.ngram.type', {

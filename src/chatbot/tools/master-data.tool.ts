@@ -16,7 +16,15 @@ type NormalizationContext = {
   releaseYears: number[];
   concentrationNames: string[];
   variantTypes: string[];
-  sampleProducts: { id: string | number; name: string; brand: string; category: string; origin: string; gender: string; releaseYear: number }[];
+  sampleProducts: {
+    id: string | number;
+    name: string;
+    brand: string;
+    category: string;
+    origin: string;
+    gender: string;
+    releaseYear: number;
+  }[];
 };
 
 @Injectable()
@@ -24,15 +32,88 @@ export class MasterDataTool {
   private readonly logger = new Logger(MasterDataTool.name);
 
   private static readonly GENERIC_TERMS = new Set([
-    'and', 'the', 'a', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-    'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought',
-    'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
-    'into', 'through', 'during', 'before', 'after', 'above', 'below',
-    'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there',
-    'when', 'where', 'why', 'how', 'all', 'each', 'few', 'more', 'most',
-    'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so',
-    'than', 'too', 'very', 'just', 'also', 'now', 'yes', 'ok', 'okay'
+    'and',
+    'the',
+    'a',
+    'is',
+    'are',
+    'was',
+    'were',
+    'be',
+    'been',
+    'being',
+    'have',
+    'has',
+    'had',
+    'do',
+    'does',
+    'did',
+    'will',
+    'would',
+    'could',
+    'should',
+    'may',
+    'might',
+    'must',
+    'shall',
+    'can',
+    'need',
+    'dare',
+    'ought',
+    'used',
+    'to',
+    'of',
+    'in',
+    'for',
+    'on',
+    'with',
+    'at',
+    'by',
+    'from',
+    'as',
+    'into',
+    'through',
+    'during',
+    'before',
+    'after',
+    'above',
+    'below',
+    'between',
+    'under',
+    'again',
+    'further',
+    'then',
+    'once',
+    'here',
+    'there',
+    'when',
+    'where',
+    'why',
+    'how',
+    'all',
+    'each',
+    'few',
+    'more',
+    'most',
+    'other',
+    'some',
+    'such',
+    'no',
+    'nor',
+    'not',
+    'only',
+    'own',
+    'same',
+    'so',
+    'than',
+    'too',
+    'very',
+    'just',
+    'also',
+    'now',
+    'yes',
+    'ok',
+    'okay'
   ]);
 
   constructor(
@@ -231,7 +312,9 @@ export class MasterDataTool {
               for (const term of correctedTerms) {
                 // CRITICAL: Validate that normalized term actually exists in context
                 // Skip if term is too generic or doesn't match any real data
-                if (this.shouldSkipNormalizedTerm(term, mapping.original, context)) {
+                if (
+                  this.shouldSkipNormalizedTerm(term, mapping.original, context)
+                ) {
                   this.logger.log(
                     `[searchMasterData] SKIP normalized term (too generic/no match): ${mapping.original} -> ${term}`
                   );
@@ -290,9 +373,9 @@ export class MasterDataTool {
       ): Promise<any[]> => {
         const validItems: any[] = [];
         for (const item of items) {
-           const name = item.Name || item.Value || item.id || item.Id;
-           if (!name) continue;
-           try {
+          const name = item.Name || item.Value || item.id || item.Id;
+          if (!name) continue;
+          try {
             const count = await this.masterDataService.countProductsByField(
               name,
               type
@@ -424,19 +507,29 @@ export class MasterDataTool {
    * CRITICAL: Skip normalized terms that are too generic or don't match real data.
    * English terms are validated against the normalization context instead of a hardcoded whitelist.
    */
-  private shouldSkipNormalizedTerm(term: string, original: string, context?: NormalizationContext): boolean {
+  private shouldSkipNormalizedTerm(
+    term: string,
+    original: string,
+    context?: NormalizationContext
+  ): boolean {
     const englishOnlyPattern = /^[a-zA-Z\s]+$/;
     if (englishOnlyPattern.test(term)) {
       if (context) {
         const contextSet = this.buildContextSet(context);
         if (contextSet.has(term.toLowerCase())) {
-          this.logger.log(`[searchMasterData] KEEP: English term "${term}" found in context`);
+          this.logger.log(
+            `[searchMasterData] KEEP: English term "${term}" found in context`
+          );
           return false;
         }
-        this.logger.log(`[searchMasterData] SKIP: English term "${term}" not found in context`);
+        this.logger.log(
+          `[searchMasterData] SKIP: English term "${term}" not found in context`
+        );
         return true;
       }
-      this.logger.log(`[searchMasterData] KEEP: English term "${term}" (no context provided)`);
+      this.logger.log(
+        `[searchMasterData] KEEP: English term "${term}" (no context provided)`
+      );
       return false;
     }
 
@@ -451,7 +544,9 @@ export class MasterDataTool {
     }
 
     if (term.toLowerCase() === original.toLowerCase()) {
-      this.logger.log(`[searchMasterData] SKIP: No normalization occurred "${original}" -> "${term}"`);
+      this.logger.log(
+        `[searchMasterData] SKIP: No normalization occurred "${original}" -> "${term}"`
+      );
       return true;
     }
 
@@ -460,7 +555,8 @@ export class MasterDataTool {
 
   private buildContextSet(context: NormalizationContext): Set<string> {
     const set = new Set<string>();
-    const add = (values: string[]) => values.forEach((v) => set.add(v.toLowerCase()));
+    const add = (values: string[]) =>
+      values.forEach((v) => set.add(v.toLowerCase()));
     add(context.notes);
     add(context.families);
     add(context.genders);

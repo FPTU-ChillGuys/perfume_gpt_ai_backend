@@ -179,9 +179,7 @@ export class ConversationService {
         userId: conversation.userId
       });
       if (conversation.messages && Array.isArray(conversation.messages)) {
-        entity.messages.set(
-          conversation.messages.map((m) => m.toEntity())
-        );
+        entity.messages.set(conversation.messages.map((m) => m.toEntity()));
       }
       await this.unitOfWork.AIConversationRepo.addAndFlush(entity);
     } else {
@@ -547,7 +545,9 @@ export class ConversationService {
     if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
       const ids = aiResponse.productTemp
         .map((p: any) => p.id)
-        .filter((id: any) => !!id && ConversationService.UUID_REGEX.test(String(id)));
+        .filter(
+          (id: any) => !!id && ConversationService.UUID_REGEX.test(String(id))
+        );
       if (ids.length > 0) {
         try {
           const productRes =

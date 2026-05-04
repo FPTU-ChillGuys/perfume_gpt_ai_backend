@@ -11,13 +11,13 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export enum PhraseRuleType {
   CONSUME = 'consume',
   EXTRACT = 'extract',
-  REPLACE = 'replace',
+  REPLACE = 'replace'
 }
 
 export enum PhraseRuleScope {
   GLOBAL = 'global',
   PRODUCT = 'product',
-  BRAND = 'brand',
+  BRAND = 'brand'
 }
 
 export class AddPhraseRuleRequest {
@@ -31,7 +31,7 @@ export class AddPhraseRuleRequest {
   @ApiProperty({
     description: 'Rule type',
     example: 'consume',
-    enum: PhraseRuleType,
+    enum: PhraseRuleType
   })
   @IsEnum(PhraseRuleType)
   ruleType!: PhraseRuleType;
@@ -39,7 +39,7 @@ export class AddPhraseRuleRequest {
   @ApiPropertyOptional({
     description: 'Rule scope',
     example: 'global',
-    enum: PhraseRuleScope,
+    enum: PhraseRuleScope
   })
   @IsOptional()
   @IsEnum(PhraseRuleScope)
@@ -47,7 +47,7 @@ export class AddPhraseRuleRequest {
 
   @ApiPropertyOptional({
     description: 'Confidence score (0-1)',
-    example: 1.0,
+    example: 1.0
   })
   @IsOptional()
   @IsNumber()

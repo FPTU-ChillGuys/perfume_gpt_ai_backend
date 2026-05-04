@@ -17,9 +17,7 @@ import {
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
-import {
-  ApiBaseResponse
-} from 'src/infrastructure/domain/utils/api-response-decorator';
+import { ApiBaseResponse } from 'src/infrastructure/domain/utils/api-response-decorator';
 import { ConversationOutputDto } from 'src/application/dtos/common/conversation-output.dto';
 import { ConversationInputHelper } from 'src/infrastructure/domain/conversation/helpers/conversation-input.helper';
 
@@ -63,7 +61,14 @@ export class ConversationController {
     data: {
       allOf: [
         { $ref: getSchemaPath(PagedResult) },
-        { properties: { items: { type: 'array', items: { $ref: getSchemaPath(ConversationResponse) } } } }
+        {
+          properties: {
+            items: {
+              type: 'array',
+              items: { $ref: getSchemaPath(ConversationResponse) }
+            }
+          }
+        }
       ]
     }
   })
@@ -87,7 +92,14 @@ export class ConversationController {
     data: {
       allOf: [
         { $ref: getSchemaPath(PagedResult) },
-        { properties: { items: { type: 'array', items: { $ref: getSchemaPath(ConversationResponse) } } } }
+        {
+          properties: {
+            items: {
+              type: 'array',
+              items: { $ref: getSchemaPath(ConversationResponse) }
+            }
+          }
+        }
       ]
     }
   })

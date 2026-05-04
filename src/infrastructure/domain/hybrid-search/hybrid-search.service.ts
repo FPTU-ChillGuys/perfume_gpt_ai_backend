@@ -355,6 +355,7 @@ export class HybridSearchService {
       brandName: product.Brands.Name,
       categoryId: product.CategoryId,
       categoryName: product.Categories.Name,
+      gender: product.Gender ?? null,
       description: product.Description ?? undefined,
       primaryImage: product.Media[0]?.Url || null,
       variants: variants.map((v) => ({

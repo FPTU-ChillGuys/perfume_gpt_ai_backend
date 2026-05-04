@@ -17,6 +17,7 @@ export interface MinimalProductDto {
   scentNotes: string[];
   olfactoryFamilies: string[];
   variants: MinimalVariantDto[];
+  gender: string;
   source?: string;
 }
 
@@ -122,6 +123,7 @@ export class SurveyProductHelper {
       brand: product.brandName,
       image: product.primaryImage,
       category: product.categoryName,
+      gender: product.gender,
       description: product.description,
       attributes: (product.attributes || []).map(
         (a: any) => `${a.attribute}: ${a.value}`
@@ -251,22 +253,23 @@ export class SurveyProductHelper {
   }
 
   /**
-   * Filter variants theo budget + concentration.
-   * Dùng cho V5 hybrid flow.
+   * Filter variants theo budget + concentration + gender.
+   * Dùng cho V5 hybrid flow. Gender là hard constraint sau merge.
    */
   filterVariantsByBudgetAndConcentration(
     products: any[],
     budget?: BudgetConstraint,
-    concentrations?: Set<string>
+    concentrations?: Set<string>,
+    genderValues?: string[]
   ): any[] {
-    if (!budget && (!concentrations || concentrations.size === 0)) {
+    if (!budget && (!concentrations || concentrations.size === 0) && (!genderValues || genderValues.length === 0)) {
       return products;
     }
 
     const min = budget?.min ? Number(budget.min) : undefined;
     const max = budget?.max ? Number(budget.max) : undefined;
 
-    return products.filter((product: any) => {
+    let filtered = products.filter((product: any) => {
       const hasValidVariant = (product.variants || []).some((v: any) => {
         // Budget check
         const price = Number(v.basePrice || v.price);
@@ -293,6 +296,19 @@ export class SurveyProductHelper {
       });
       return hasValidVariant;
     });
+
+    // Gender hard filter — applied after budget/concentration
+    if (genderValues && genderValues.length > 0) {
+      const normalizedGenders = genderValues.map((g) => g.toLowerCase());
+      filtered = filtered.filter((product: any) => {
+        const productGender = (product.gender ?? '').toLowerCase();
+        if (!productGender) return true;
+        if (productGender === 'unisex') return true;
+        return normalizedGenders.some((g) => productGender === g);
+      });
+    }
+
+    return filtered;
   }
 
   // ==========================================

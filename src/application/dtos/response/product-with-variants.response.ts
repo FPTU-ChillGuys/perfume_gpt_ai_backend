@@ -202,6 +202,10 @@ export class ProductWithVariantsResponse {
   @ApiProperty({ description: 'Danh sách nhóm hương', type: [String] })
   olfactoryFamilies!: string[];
 
+  /** Giới tính sản phẩm */
+  @ApiPropertyOptional({ description: 'Giới tính (Male/Female/Unisex)', nullable: true })
+  gender!: string | null;
+
   /** Danh sách thuộc tính cấp sản phẩm */
   @ApiProperty({
     description: 'Danh sách thuộc tính sản phẩm',

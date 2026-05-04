@@ -36,6 +36,10 @@ export const surveyAnswerAnalysisSchema = z
       .describe(
         'CNF logic for this specific answer only. Keep focused on ONE intent. MUST use searchMasterData to normalize keywords.'
       ),
+    genderValues: z
+      .array(z.string())
+      .nullable()
+      .describe('Nếu người dùng nhắc giới tính (nam/nữ/unisex), đưa vào trường này (VD: ["Male", "Female", "Unisex"]). KHÔNG đưa vào logic.'),
     productNames: z
       .array(z.string())
       .nullable()

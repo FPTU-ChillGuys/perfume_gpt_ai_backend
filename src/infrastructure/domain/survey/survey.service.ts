@@ -847,10 +847,14 @@ export class SurveyService {
 
     // Step 6: Merge & Filter
     let mergedProducts = mergeSurveyQueryResults(queryResults, 50);
+    const genderValues = perQuestionAnalysis
+      .flatMap((a) => a.analysis?.genderValues ?? [])
+      .filter((v, i, arr) => arr.indexOf(v) === i);
     mergedProducts = this.productHelper.filterVariantsByBudgetAndConcentration(
       mergedProducts,
       budget,
-      concentrations
+      concentrations,
+      genderValues
     );
 
     // Step 7: AI Recommendation
@@ -1147,19 +1151,16 @@ export class SurveyService {
     perQuestionAnalysis: PerQuestionAnalysis[];
     quesAnsesForContext: Array<{ question: string; answer: string }>;
   }> {
-    const perQuestionAnalysis: PerQuestionAnalysis[] = [];
-    const quesAnsesForContext: Array<{ question: string; answer: string }> = [];
-
-    for (const surveyAnswer of surveyAnswers) {
+    const analysisPromises = surveyAnswers.map(async (surveyAnswer) => {
       const surveyQues = surveyQueses.find(
         (q) => q.id === surveyAnswer.questionId
       );
-      if (!surveyQues?.answers || !surveyQues.question) continue;
+      if (!surveyQues?.answers || !surveyQues.question) return null;
 
       const answer = surveyQues.answers.find(
         (ans) => ans.id === surveyAnswer.answerId
       );
-      if (!answer?.answer) continue;
+      if (!answer?.answer) return null;
 
       let analysis: SurveyAnalysis | null = null;
       let displayAnswer = answer.answer;
@@ -1178,21 +1179,31 @@ export class SurveyService {
         });
       }
 
-      if (analysis) {
-        perQuestionAnalysis.push({
-          questionId: surveyAnswer.questionId,
-          question: surveyQues.question,
-          answer: displayAnswer,
-          analysis
-        });
-        quesAnsesForContext.push({
-          question: surveyQues.question,
-          answer: displayAnswer
-        });
-      }
-    }
+      if (!analysis) return null;
 
-    return { perQuestionAnalysis, quesAnsesForContext };
+      if (!analysis.genderValues || analysis.genderValues.length === 0) {
+        const extracted = extractGenderFromText(surveyQues.question, answer.answer);
+        if (extracted.length > 0) {
+          analysis.genderValues = extracted;
+        }
+      }
+
+      return {
+        questionId: surveyAnswer.questionId,
+        question: surveyQues.question,
+        answer: displayAnswer,
+        analysis,
+        contextEntry: { question: surveyQues.question, answer: displayAnswer }
+      };
+    });
+
+    const results = await Promise.all(analysisPromises);
+    const perQuestionAnalysis = results.filter((r): r is NonNullable<typeof r> => r !== null);
+
+    return {
+      perQuestionAnalysis,
+      quesAnsesForContext: perQuestionAnalysis.map((r) => r.contextEntry)
+    };
   }
 
   /** Extract global budget & concentration constraints từ V5 analysis. */
@@ -1239,9 +1250,7 @@ export class SurveyService {
   private async executeV5Queries(
     perQuestionAnalysis: PerQuestionAnalysis[]
   ): Promise<SurveyQueryResult[]> {
-    const queryResults: SurveyQueryResult[] = [];
-
-    for (const item of perQuestionAnalysis) {
+    const queryPromises = perQuestionAnalysis.map(async (item) => {
       const analysisCopy = { ...item.analysis };
       delete analysisCopy.budget;
       delete analysisCopy.concentrationValues;
@@ -1252,18 +1261,14 @@ export class SurveyService {
           await this.productHelper.searchProductsWithConcentration(
             analysisCopy
           );
-        if (products.length > 0) {
-          queryResults.push({ questionId: item.questionId, products });
-        } else {
-          queryResults.push({ questionId: item.questionId, products: [] });
-        }
+        return { questionId: item.questionId, products };
       } catch (error) {
         this.err.log('errors.survey.per_question');
-        queryResults.push({ questionId: item.questionId, products: [] });
+        return { questionId: item.questionId, products: [] };
       }
-    }
+    });
 
-    return queryResults;
+    return Promise.all(queryPromises);
   }
 
   /** Build final product list cho V5: merge AI recommendation + filter budget/concentration. */
@@ -1303,6 +1308,7 @@ export class SurveyService {
           name: p.name,
           brandName: p.brand,
           primaryImage: p.image,
+          gender: p.gender,
           reasoning:
             (aiItem?.reasoning as string) ||
             'Sản phẩm đạt điểm tương xứng cao nhất với sở thích của bạn.',
@@ -1430,4 +1436,21 @@ function extractDisplayText(rawAnswer: string): string {
     // Not JSON
   }
   return rawAnswer;
+}
+
+const GENDER_KEYWORDS: Record<string, string[]> = {
+  'Male': ['nam', 'nam tính', 'đàn ông', 'for him', 'male', 'men'],
+  'Female': ['nữ', 'nữ tính', 'đàn bà', 'for her', 'female', 'women'],
+  'Unisex': ['unisex', 'uni', 'cả nam và nữ', 'cho cả hai']
+};
+
+function extractGenderFromText(question: string, answer: string): string[] {
+  const combined = `${question.toLowerCase()} ${answer.toLowerCase()}`;
+  const matched: string[] = [];
+  for (const [gender, keywords] of Object.entries(GENDER_KEYWORDS)) {
+    if (keywords.some((kw) => combined.includes(kw))) {
+      matched.push(gender);
+    }
+  }
+  return matched;
 }

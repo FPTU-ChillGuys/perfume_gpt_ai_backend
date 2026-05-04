@@ -90,6 +90,7 @@ function mapProductWithVariants(
     brandName: p.Brands.Name,
     categoryId: p.CategoryId,
     categoryName: p.Categories.Name,
+    gender: p.Gender ?? null,
     description: p.Description ?? '',
     primaryImage: p.Media[0]?.Url ?? null,
     createdAt: p.CreatedAt.toISOString(),

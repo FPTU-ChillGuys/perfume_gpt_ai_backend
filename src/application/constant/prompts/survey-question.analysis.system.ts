@@ -38,8 +38,9 @@ export const SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT =
   '- **Giải thích (Explanation)**: Mô tả ngắn gọn tại sao bạn chọn các tiêu chí này.\n' +
   '- **Không tự bịa đặt**: Chỉ suy luận dựa trên answer thực tế.\n' +
   '- **Nếu answer quá chung chung** (ví dụ: "Có", "Thích", "Không biết")): Trả về logic = null hoặc [] - đừng cố suy diễn.\n' +
-  '- **Mỗi answer là độc lập**: Không xem xét các answers khác, chỉ phân tích answer này.\n\n' +
-  '## CÔNG CỤ BẮT BUỘC: searchMasterData\n' +
+'- **Mỗi answer là độc lập**: Không xem xét các answers khác, chỉ phân tích answer này.\n' +
+'- **Giới tính (Gender)**: Nếu answer đề cập đến giới tính (nam/nữ/unisex), PHẢI đưa vào trường `genderValues` (VD: ["Male"]), KHÔNG đưa vào `logic`. Giá trị hợp lệ: "Male", "Female", "Unisex". `genderValues` là hard filter riêng biệt.\n\n' +
+'## CÔNG CỤ BẮT BUỘC: searchMasterData\n' +
   '- **Mô tả**: Tìm kiếm và chuẩn hóa Brands, Categories, Scent Notes, Olfactory Families, Attribute Values.\n' +
   '- **Cách dùng**: \n' +
   '  ```\n' +
@@ -60,10 +61,10 @@ export const SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT =
   '### Ví dụ 2: Answer "Dùng đi tiệc tối"\n' +
   '  - **Sai**: `logic = ["occasion = Tiệc tối", "event:Evening"]`\n' +
   '  - **Đúng**: `logic = ["Tiệc tối", "Formal", "Evening"]` (chỉ giá trị chuẩn)\n\n' +
-  '### Ví dụ 3: Answer "Nam tính"\n' +
-  '  - **Sai**: `logic = ["attribute:Phong cách=Nam tính"]`\n' +
-  '  - **Đúng**: `logic = ["Nam tính"]` (chỉ giá trị chuẩn, KHÔNG bao gồm field name)\n\n' +
-  '### Ví dụ 4: Answer "Hàng ngày / Thường ngày"\n' +
+'### Ví dụ 3: Answer "Nam tính"\n' +
+'  - **Sai**: `logic = ["Nam tính"]`, `genderValues = null`\n' +
+'  - **Đúng**: `logic = null` hoặc `logic = []`, `genderValues = ["Male"]`\n\n' +
+'### Ví dụ 4: Answer "Hàng ngày / Thường ngày"\n' +
   '  - **Sai (AND)**: `logic = ["Hàng ngày", "Thường ngày"]` (Sẽ tìm sản phẩm khớp cả 2 - thường gây ra 0 kết quả)\n' +
   '  - **Đúng (OR)**: `logic = [["Hàng ngày", "Thường ngày"]]` (Tách và gộp vào mảng con để tạo logic OR)\n\n' +
   '## ĐẦU VÀO (INPUT):\n' +

@@ -43,64 +43,66 @@ export class AISearchExecutorHelper {
       `[AISearchExecutorHelper] Executing ${queries.length} decomposed queries`
     );
 
-    for (const query of queries) {
-      switch (query.purpose) {
-        case 'function': {
-          if (!query.functionCall) break;
-          const funcName = query.functionCall.name;
+    await Promise.all(
+      queries.map(async (query) => {
+        switch (query.purpose) {
+          case 'function': {
+            if (!query.functionCall) break;
+            const funcName = query.functionCall.name;
 
-          if (
-            ['addToCart', 'getCart', 'clearCart', 'getOrdersByUserId'].includes(
-              funcName
-            )
-          ) {
-            const taskMsg = await this.handleTaskFunction(
-              funcName,
-              query.functionCall.arguments,
+            if (
+              ['addToCart', 'getCart', 'clearCart', 'getOrdersByUserId'].includes(
+                funcName
+              )
+            ) {
+              const taskMsg = await this.handleTaskFunction(
+                funcName,
+                query.functionCall.arguments,
+                userId,
+                isGuestUser
+              );
+              if (taskMsg) taskResults.push(taskMsg);
+            } else {
+              const items = await this.executeFunctionQuery(query);
+              for (const p of items) {
+                if (p.id && !seenProductIds.has(p.id)) {
+                  seenProductIds.add(p.id);
+                  functionProducts.push(p);
+                }
+              }
+            }
+            break;
+          }
+
+          case 'profile': {
+            if (isGuestUser) break;
+            const items = await this.executeProfileQuery(
               userId,
-              isGuestUser
+              query,
+              rootAnalysis
             );
-            if (taskMsg) taskResults.push(taskMsg);
-          } else {
-            const items = await this.executeFunctionQuery(query);
             for (const p of items) {
               if (p.id && !seenProductIds.has(p.id)) {
                 seenProductIds.add(p.id);
-                functionProducts.push(p);
+                allProducts.push(this.mapToMinimalProduct(p, 'PROFILE_QUERY'));
               }
             }
+            break;
           }
-          break;
-        }
 
-        case 'profile': {
-          if (isGuestUser) break;
-          const items = await this.executeProfileQuery(
-            userId,
-            query,
-            rootAnalysis
-          );
-          for (const p of items) {
-            if (p.id && !seenProductIds.has(p.id)) {
-              seenProductIds.add(p.id);
-              allProducts.push(this.mapToMinimalProduct(p, 'PROFILE_QUERY'));
+          case 'search': {
+            const items = await this.executeSearchQuery(query, rootAnalysis);
+            for (const p of items) {
+              if (p.id && !seenProductIds.has(p.id)) {
+                seenProductIds.add(p.id);
+                allProducts.push(this.mapToMinimalProduct(p, 'SEARCH_QUERY'));
+              }
             }
+            break;
           }
-          break;
         }
-
-        case 'search': {
-          const items = await this.executeSearchQuery(query, rootAnalysis);
-          for (const p of items) {
-            if (p.id && !seenProductIds.has(p.id)) {
-              seenProductIds.add(p.id);
-              allProducts.push(this.mapToMinimalProduct(p, 'SEARCH_QUERY'));
-            }
-          }
-          break;
-        }
-      }
-    }
+      })
+    );
 
     const functionMinimal = functionProducts.map((p) =>
       this.mapToMinimalProduct(p, 'FUNCTION_RESULTS')

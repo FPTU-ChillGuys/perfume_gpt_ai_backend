@@ -24,7 +24,7 @@ export class ChatMessageRequest {
     enum: Sender
   })
   @IsEnum(Sender)
-  sender: Sender = "user" as Sender;
+  sender: Sender = 'user' as Sender;
 
   /** Nội dung tin nhắn dạng text */
   @ApiProperty({

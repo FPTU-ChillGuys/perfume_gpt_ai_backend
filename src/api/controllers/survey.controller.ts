@@ -53,9 +53,20 @@ import {
   QueryFragmentAttribute,
   QueryFragmentBudget
 } from 'src/infrastructure/domain/survey/survey-query.types';
+import { MobileSurveyRequest } from 'src/application/dtos/request/survey/mobile-survey.request';
+import {
+  MobileSurveyResponseData,
+  MobileSurveyQuestionItem
+} from 'src/application/dtos/response/survey/mobile-survey.response';
 
 @ApiTags('Surveys')
-@ApiExtraModels(QueryFragmentMatch, QueryFragmentAttribute, QueryFragmentBudget)
+@ApiExtraModels(
+  QueryFragmentMatch,
+  QueryFragmentAttribute,
+  QueryFragmentBudget,
+  MobileSurveyQuestionItem,
+  MobileSurveyResponseData
+)
 @ApiAdminErrors()
 @Controller('surveys')
 export class SurveyController {
@@ -64,6 +75,41 @@ export class SurveyController {
     private surveyAttributeService: SurveyAttributeService,
     private inputHelper: SurveyInputHelper
   ) {}
+
+  // ═══════════════════════════════════════════════════════════════
+  // ═══  📱 MOBILE-SPECIFIC ENDPOINTS  ═══
+  // ═══════════════════════════════════════════════════════════════
+
+  @Public()
+  @Get('mobile/questions')
+  @ApiOperation({
+    summary: '[Mobile] Lấy danh sách câu hỏi survey (đã parse displayText)'
+  })
+  @ApiBaseResponse(MobileSurveyQuestionItem, true)
+  async getMobileSurveyQuestions(): Promise<
+    BaseResponse<MobileSurveyQuestionItem[]>
+  > {
+    return this.surveyService.getMobileSurveyQuestions();
+  }
+
+  @Public()
+  @Post('mobile/submit')
+  @ApiOperation({
+    summary: '[Mobile] Gửi câu trả lời survey, nhận kết quả cấu trúc'
+  })
+  @ApiBaseResponse(MobileSurveyResponseData)
+  async submitMobileSurvey(
+    @Body() body: MobileSurveyRequest
+  ): Promise<BaseResponse<MobileSurveyResponseData>> {
+    const transformedAnswers = body.answers.map((a) => ({
+      questionId: a.questionId,
+      answerId: a.answerId
+    }));
+    return this.surveyService.processMobileSurvey(
+      body.userId,
+      transformedAnswers
+    );
+  }
 
   /** Lấy tất cả câu hỏi survey */
   @Public()

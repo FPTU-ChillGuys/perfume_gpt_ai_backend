@@ -157,7 +157,8 @@ function tryParseAssistantJson(raw: string): ConversationOutputDto | null {
       message: typeof obj.message === 'string' ? obj.message : '',
       products: mapProducts(obj.products),
       productTemp: mapProductTemp(obj.productTemp),
-      suggestedQuestions: mapSuggestedQuestions(obj.suggestedQuestions) ?? undefined
+      suggestedQuestions:
+        mapSuggestedQuestions(obj.suggestedQuestions) ?? undefined
     };
   } catch {
     return null;

@@ -236,7 +236,7 @@ export class AIAnalysisHelper {
     result.logic =
       strippedLogic.length > 0
         ? strippedLogic
-        : (this.rebuildLogicFromMetadata(analysis) || []);
+        : this.rebuildLogicFromMetadata(analysis) || [];
 
     return result;
   }

@@ -25,7 +25,10 @@ import { VocabularySnapshotService } from 'src/infrastructure/domain/common/voca
 import { VocabBm25SearchService } from 'src/infrastructure/domain/common/vocab-bm25.service';
 import { EmbeddingService } from 'src/infrastructure/domain/hybrid-search/embedding.service';
 import { ProductEmbedding } from 'src/infrastructure/domain/hybrid-search/entities/product-embedding.entity';
-import { AddPhraseRuleRequest, PhraseRuleScope } from 'src/application/dtos/request/dictionary/add-phrase-rule.request';
+import {
+  AddPhraseRuleRequest,
+  PhraseRuleScope
+} from 'src/application/dtos/request/dictionary/add-phrase-rule.request';
 import * as fs from 'fs';
 import * as path from 'path';
 

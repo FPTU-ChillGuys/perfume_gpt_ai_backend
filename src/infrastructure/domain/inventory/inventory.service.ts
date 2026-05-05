@@ -938,7 +938,8 @@ export class InventoryService {
         suggestedQuantity: v.suggestedRestockQuantity,
         negotiatedPrice: formatPrice(v.negotiatedPrice),
         leadTimeDays: formatLeadTime(v.estimatedLeadTimeDays),
-        currentStock: v.totalQuantity
+        currentStock: v.totalQuantity,
+        slowStockRisk: v.slowStockRisk || null
       }))
     }));
 

@@ -907,6 +907,7 @@ Nếu thiếu dữ liệu từ tool quan trọng hoặc tool lỗi, trả:
   daysOfSupply = totalQuantity / max(forecastDailyDemand, 0.01)
   forecastDailyDemand = 0.7 * averageDailySales + 0.3 * (last7DaysSales / 7)
 - HOẶC averageDailySales = 0 và totalQuantity > 0 (hàng không bán được).
+  Khi averageDailySales = 0: trend = "NO_SALES" (KHÔNG dùng STABLE), daysOfSupply = totalQuantity / 0.01 (vẫn tính bằng số, KHÔNG ghi "không tính được").
 
 Phân mức rủi ro:
 - CRITICAL: daysOfSupply > 180 HOẶC averageDailySales = 0 với totalQuantity > 0.
@@ -955,7 +956,7 @@ Phân mức rủi ro:
       "totalQuantity": <number>,
       "averageDailySales": <number>,
       "daysOfSupply": <number>,
-      "trend": "<INCREASING|STABLE|DECLINING>",
+      "trend": "<INCREASING|STABLE|DECLINING|NO_SALES>",
       "volatility": "<LOW|MEDIUM|HIGH>",
       "riskLevel": "<CRITICAL|HIGH|MEDIUM>",
       "category": "<current_slow|early_warning>",
@@ -971,7 +972,9 @@ Phân mức rủi ro:
 - daysOfSupply phải tính chính xác, không ước lượng.
 - riskLevel và action phải phù hợp với phân loại ở trên.
 - category chỉ dùng: "current_slow" hoặc "early_warning".
-- reason phải ngắn gọn, cụ thể, ví dụ: "Tồn 150 chai, chỉ bán 0.3 chai/ngày = 500 ngày cung cấp".
+- reason phải ngắn gọn, cụ thể, hoàn toàn bằng tiếng Việt. KHÔNG chèn tiếng Anh.
+  Ví dụ đúng: "Tồn 30 chai, không có doanh số trong 30 ngày, nguy cơ hàng ế".
+  Ví dụ sai: "không bán được (sales=0)", "out of stock".
 - Variant có averageDailySales = 0 VÀ totalQuantity = 0 thì KHÔNG đưa vào output (hết hàng rồi không còn "tồn chậm").
 - status Inactive/Discontinue KHÔNG được xuất hiện trong output.
 
@@ -979,6 +982,8 @@ Phân mức rủi ro:
 - Đã gọi đủ 3 tools chưa?
 - daysOfSupply đã tính đúng chưa? (totalQuantity / forecastDailyDemand)
 - Có variant Inactive/Discontinue nào lọt output không?
+- Có variant nào averageDailySales=0 nhưng trend không phải NO_SALESS không? (PHẢI là NO_SALES)
+- Có variant nào averageDailySales=0 nhưng daysOfSupply không phải số không? (PHẢI là totalQuantity / 0.01)
 - riskLevel có khớp với daysOfSupply không?
 - action có phù hợp với riskLevel và category không?
 - Có variant nào totalQuantity = 0 mà vẫn liệt kê là slow stock không? (Phải loại bỏ)

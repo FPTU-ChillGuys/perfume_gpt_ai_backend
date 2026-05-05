@@ -59,6 +59,41 @@
         color: #64748b;
         font-size: 13px;
       }
+      .risk-critical {
+        display: inline-block;
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+        border-radius: 999px;
+        font-size: 11px;
+        padding: 2px 8px;
+        font-weight: 600;
+      }
+      .risk-high {
+        display: inline-block;
+        background: #ffedd5;
+        color: #9a3412;
+        border: 1px solid #fed7aa;
+        border-radius: 999px;
+        font-size: 11px;
+        padding: 2px 8px;
+        font-weight: 600;
+      }
+      .risk-medium {
+        display: inline-block;
+        background: #fef9c3;
+        color: #854d0e;
+        border: 1px solid #fef08a;
+        border-radius: 999px;
+        font-size: 11px;
+        padding: 2px 8px;
+        font-weight: 600;
+      }
+      .risk-none {
+        display: inline-block;
+        color: #94a3b8;
+        font-size: 11px;
+      }
       .footer {
         padding: 16px 24px 24px;
       }
@@ -93,12 +128,13 @@
               <th>Negotiated Price</th>
               <th>Lead Time</th>
               <th>Current Stock</th>
+              <th>Slow Stock</th>
             </tr>
           </thead>
           <tbody>
             <% supplierGroups.forEach((group) => { %>
               <tr>
-                <th colspan="6" style="text-align: left; background: #e0e7ff; font-weight: 600;">
+                <th colspan="7" style="text-align: left; background: #e0e7ff; font-weight: 600;">
                   Supplier: <%= group.supplierName %>
                 </th>
               </tr>
@@ -110,6 +146,17 @@
               <td><%= item.negotiatedPrice %></td>
               <td><%= item.leadTimeDays %></td>
               <td><%= item.currentStock %></td>
+              <td>
+                <% if (item.slowStockRisk === 'CRITICAL') { %>
+                  <span class="risk-critical">CRITICAL</span>
+                <% } else if (item.slowStockRisk === 'HIGH') { %>
+                  <span class="risk-high">HIGH</span>
+                <% } else if (item.slowStockRisk === 'MEDIUM') { %>
+                  <span class="risk-medium">MEDIUM</span>
+                <% } else { %>
+                  <span class="risk-none">—</span>
+                <% } %>
+              </td>
             </tr>
               <% }); %>
             <% }); %>

@@ -34,12 +34,12 @@ export const productTempItemSchema = z.object({
   reasoning: z
     .string()
     .describe(
-      'Giải thích chi tiết tại sao AI quyết định gợi ý sản phẩm này (dựa trên sở thích, profile người dùng). BẮT BUỘC có.'
+      'Giải thích chi tiết tại sao AI quyết định gợi ý sản phẩm này (dựa trên sở thích, profile người dùng).'
     ),
   source: z
     .string()
     .describe(
-      'Nguồn cung cấp sản phẩm này (RECOMMENDATION_RESULTS, SEARCH_RESULTS, hay AI_KNOWLEDGE). BẮT BUỘC có.'
+      'Nguồn cung cấp sản phẩm này (RECOMMENDATION_RESULTS, SEARCH_RESULTS, hay AI_KNOWLEDGE).'
     )
 });
 

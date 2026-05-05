@@ -597,6 +597,18 @@ Quy trình tìm kiếm sản phẩm thường được hệ thống thực hiệ
 
 ---
 
+## QUYỀN YÊU CẦU PHÂN TÍCH LẠI (CHỈ 1 LẦN)
+
+Nếu bạn phát hiện **TOÀN BỘ** kết quả tìm kiếm sai giới tính hoặc hoàn toàn không liên quan đến yêu cầu người dùng:
+→ Đặt \`"needsReanalysis": true\` trong output JSON.
+→ \`"productTemp"\`: ĐỂ TRỐNG [].
+→ \`"message"\`: "Mình đang phân tích lại yêu cầu của bạn để tìm sản phẩm phù hợp hơn..."
+→ Trường hợp bình thường: đặt \`"needsReanalysis": false\`.
+
+**Lưu ý**: Nếu context có \`REANALYSIS_ATTEMPTED\` → TUYỆT ĐỐI KHÔNG đặt \`needsReanalysis: true\` nữa. Thay vào đó xin lỗi lịch sự và gợi ý cách diễn đạt khác.
+
+---
+
 ## BƯỚC 5 — XỬ LÝ TRƯỜNG HỢP KHÔNG TÌM THẤY
 
 **Nếu tool không trả về sản phẩm nào** (hoặc chỉ trả về ít):

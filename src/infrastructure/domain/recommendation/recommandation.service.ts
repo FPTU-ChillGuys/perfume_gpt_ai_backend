@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Output, UIMessage } from 'ai';
+import { UIMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
 import {
   INSTRUCTION_TYPE_RECOMMENDATION,
@@ -29,9 +29,17 @@ import { ProductService } from 'src/infrastructure/domain/product/product.servic
 import { ProductWithVariantsResponse } from 'src/application/dtos/response/product-with-variants.response';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { PagedAndSortedRequest } from 'src/application/dtos/request/paged-and-sorted.request';
 import { ProfileTool } from 'src/chatbot/tools/profile.tool';
+import {
+  RecommendationProductResponse,
+  RecommendationProfileResponse,
+  RecommendationResultResponse,
+  DailyRecommendationBatchSummaryResponse
+} from 'src/application/dtos/response/recommendation/recommendation-product.response';
+import {
+  RecommendationPrismaRepository
+} from 'src/infrastructure/domain/recommendation/recommendation-prisma.repository';
 
 export type DailyRecommendationTrigger = 'cron' | 'manual';
 type DailyRecommendationUserResult =
@@ -52,6 +60,27 @@ export interface DailyRecommendationBatchSummary {
   failedCount: number;
 }
 
+interface MinimalVariant {
+  id: string;
+  volume: number;
+  price: number;
+}
+
+interface MinimalProduct {
+  id: string;
+  name: string;
+  brand: string | null;
+  image: string | null;
+  variants: MinimalVariant[];
+  source: string;
+}
+
+interface AIOutputParsed {
+  message?: string;
+  productTemp?: Array<Record<string, unknown>>;
+  products?: Array<Record<string, unknown>>;
+}
+
 @Injectable()
 export class RecommendationService {
   private readonly logger = new Logger(RecommendationService.name);
@@ -66,7 +95,7 @@ export class RecommendationService {
     private readonly configService: ConfigService,
     private readonly orderService: OrderService,
     private readonly productService: ProductService,
-    private readonly prisma: PrismaService,
+    private readonly recommendationRepo: RecommendationPrismaRepository,
     private readonly aiAcceptanceService: AIAcceptanceService,
     private readonly profileTool: ProfileTool
   ) {}
@@ -75,6 +104,14 @@ export class RecommendationService {
     return Array.from(
       new Set(items.map((item) => item.trim()).filter(Boolean))
     ).slice(0, 16);
+  }
+
+  private escapeHtml(text: string): string {
+    const map: Record<string, string> = {
+      '&': '&amp;', '<': '&lt;', '>': '&gt;',
+      '"': '&quot;', "'": '&#x27;'
+    };
+    return text.replace(/[&<>"']/g, (ch) => map[ch] || ch);
   }
 
   private splitTerms(input?: string | null): string[] {
@@ -121,8 +158,7 @@ export class RecommendationService {
   ): Promise<string> {
     const response = await this.aiHelper.textGenerateFromPrompt(
       prompt,
-      systemPrompt,
-      Output.object(searchOutput)
+      systemPrompt
     );
     if (!response.success) {
       throw new InternalServerErrorWithDetailsException(
@@ -137,51 +173,45 @@ export class RecommendationService {
     return response.data ?? '';
   }
 
-  /**
-   * Builds a personalized recommendation message + email products using the ConversationV10 pattern:
-   * 1. Fetch products from getRecommendationsSimple (Order → Best Seller fallback)
-   * 2. Encode them as TOON and inject as RECOMMENDATION_CONTEXT
-   * 3. Call the main AI to generate {message, productTemp}
-   * 4. Hydrate productTemp into EmailProduct[]
-   */
-  private async generateRecommendationTextWithProducts(
+  // --- Phase 4a: Split generateRecommendationTextWithProducts ---
+
+  private async fetchSimpleRecs(
     userId: string,
-    systemPrompt: string,
-    combinedPrompt: string,
     options: {
       limit?: number;
       contextType?: 'recommendation' | 'repurchase';
       orderId?: string;
-      personalizationPayload?: any;
-    } = {}
-  ): Promise<{ message: string; emailProducts: EmailProduct[] }> {
+      personalizationPayload?: Record<string, unknown>;
+    }
+  ): Promise<{
+    simpleRecs: RecommendationProductResponse[];
+    minimalProducts: MinimalProduct[];
+  }> {
     const limit = options.limit || 3;
     const contextType = options.contextType || 'recommendation';
 
-    // Step 1: Fetch products from Simple Recommendation (always has results)
-    let simpleResult: BaseResponse<any> | null = null;
+    let simpleResult: BaseResponse<RecommendationResultResponse> | null = null;
     if (contextType === 'repurchase' && options.orderId) {
       simpleResult = await this.getRepurchaseRecommendationsSimple(
         userId,
-        options.orderId as string,
+        options.orderId,
         limit
       );
     } else {
       simpleResult = await this.getRecommendationsSimple(userId, limit);
     }
 
-    const simpleRecs: any[] =
-      simpleResult && simpleResult.success
+    const simpleRecs: RecommendationProductResponse[] =
+      simpleResult?.success
         ? (simpleResult.data?.recommendations ?? [])
         : [];
 
-    // Map to the minimal format the AI understands (same as conversationV10)
-    const minimalProducts = simpleRecs.map((rec: any) => ({
+    const minimalProducts: MinimalProduct[] = simpleRecs.map((rec) => ({
       id: rec.productId,
       name: rec.productName,
       brand: rec.brand,
       image: rec.primaryImage,
-      variants: (rec.variants || []).map((v: any) => ({
+      variants: (rec.variants || []).map((v) => ({
         id: v.id,
         volume: v.volumeMl,
         price: v.basePrice
@@ -189,19 +219,18 @@ export class RecommendationService {
       source: rec.source ?? 'RECOMMENDATION'
     }));
 
-    const tag =
-      contextType === 'repurchase' ? '[REPURCHASE]' : '[RECOMMENDATION]';
+    return { simpleRecs, minimalProducts };
+  }
 
-    this.logger.log(
-      `${tag}[TOON_INJECT] userId=${userId} injecting ${minimalProducts.length} products into AI context`
-    );
-
-    // Step 2: Build messages array with PERSONALIZATION contexts and RECOMMENDATION_CONTEXT
+  private buildContextMessages(
+    minimalProducts: MinimalProduct[],
+    combinedPrompt: string,
+    personalizationPayload?: Record<string, unknown>
+  ): UIMessage[] {
     const messages: UIMessage[] = [];
 
-    // Inject Persona Context if available (Point 2: Pattern Conversation V10)
-    if (options.personalizationPayload) {
-      const p = options.personalizationPayload;
+    if (personalizationPayload) {
+      const p = personalizationPayload;
       const sourcePriority = Array.isArray(p.sourcePriority)
         ? p.sourcePriority.join(' > ')
         : 'INPUT > ORDER > PROFILE';
@@ -227,20 +256,20 @@ export class RecommendationService {
         ]
       });
 
-      const orderToon = p?.toonContext?.orderDataToon?.encoded;
-      const profileToon = p?.toonContext?.profileDataToon?.encoded;
-      if (orderToon)
+      const orderToon = (p?.toonContext as Record<string, unknown>)?.orderDataToon as { encoded?: string } | undefined;
+      const profileToon = (p?.toonContext as Record<string, unknown>)?.profileDataToon as { encoded?: string } | undefined;
+      if (orderToon?.encoded)
         messages.push({
           id: uuid(),
           role: 'system',
-          parts: [{ type: 'text', text: `ORDER_CONTEXT_TOON: ${orderToon}` }]
+          parts: [{ type: 'text', text: `ORDER_CONTEXT_TOON: ${orderToon.encoded}` }]
         });
-      if (profileToon)
+      if (profileToon?.encoded)
         messages.push({
           id: uuid(),
           role: 'system',
           parts: [
-            { type: 'text', text: `PROFILE_CONTEXT_TOON: ${profileToon}` }
+            { type: 'text', text: `PROFILE_CONTEXT_TOON: ${profileToon.encoded}` }
           ]
         });
     }
@@ -248,49 +277,51 @@ export class RecommendationService {
     const encodedContext = encodeToolOutput(minimalProducts);
     const encoded = encodedContext.encoded;
 
-    this.logger.log(
-      `${tag}[TOON_ENCODED] size=${encoded.length}/${encodedContext.originalSize} ratio=${encodedContext.compressionRatio}%`
-    );
-
     messages.push({
       id: uuid(),
-      role: 'system' as const,
+      role: 'system',
       parts: [{ type: 'text', text: `RECOMMENDATION_CONTEXT: ${encoded}` }]
     });
 
     messages.push({
       id: uuid(),
-      role: 'user' as const,
+      role: 'user',
       parts: [{ type: 'text', text: combinedPrompt }]
     });
 
-    // Step 3: Call AI main with textGenerateFromMessages
+    return messages;
+  }
+
+  private async callAIAndHydrate(
+    userId: string,
+    messages: UIMessage[],
+    systemPrompt: string,
+    simpleRecs: RecommendationProductResponse[],
+    limit: number,
+    tag: string
+  ): Promise<{ message: string; emailProducts: EmailProduct[] }> {
     const aiResponse = await this.aiHelper.textGenerateFromMessages(
       messages,
-      systemPrompt,
-      Output.object(searchOutput)
+      systemPrompt
     );
 
-    const rawMessage = aiResponse.success ? (aiResponse.data ?? '') : '';
-    this.logger.log(
-      `${tag}[AI_RAW] length=${rawMessage.length} preview=${String(rawMessage).slice(0, 120)}`
-    );
-
-    let parsedAI: { message?: string; productTemp?: any[]; products?: any[] } =
-      {};
-    try {
-      parsedAI =
-        typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
-    } catch {
-      parsedAI = { message: rawMessage };
+    if (!aiResponse.success || !aiResponse.data) {
+      this.logger.warn(`${tag}[AI_FAILED] userId=${userId}`);
+      return { message: '', emailProducts: [] };
     }
 
+    let parsedAI: AIOutputParsed = {};
+    try {
+      const rawText = aiResponse.data;
+      parsedAI =
+        typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
+    } catch {
+      parsedAI = { message: aiResponse.data };
+    }
     const aiMessage = parsedAI.message ?? '';
 
-    // Step 4: Hydrate productTemp exactly like conversationV10, but fallback to "products"
-    // because the instruction prompts often tell the AI to use the "products" array.
     let emailProducts: EmailProduct[] = [];
-    let productTemp =
+    const productTemp =
       Array.isArray(parsedAI.productTemp) && parsedAI.productTemp.length > 0
         ? parsedAI.productTemp
         : Array.isArray(parsedAI.products)
@@ -298,23 +329,23 @@ export class RecommendationService {
           : [];
 
     this.logger.log(
-      `${tag}[PRODUCT_TEMP] productTempCount=${productTemp.length} ids=[${productTemp.map((p: any) => p.id).join(',')}]`
+      `${tag}[PRODUCT_TEMP] productTempCount=${productTemp.length} ids=[${productTemp.map((p) => String(p.id)).join(',')}]`
     );
 
     if (productTemp.length > 0) {
       const ids = productTemp
-        .map((item: any) => item.id)
-        .filter((id: any) => !!id);
+        .map((item) => String(item.id))
+        .filter((id) => !!id);
       if (ids.length > 0) {
         const productResponse =
           await this.productService.getProductsByIdsForOutput(ids);
         if (productResponse.success && Array.isArray(productResponse.data)) {
           const recommendationsMap = new Map<string, Set<string>>();
-          productTemp.forEach((item: any) => {
+          productTemp.forEach((item) => {
             if (item.id && Array.isArray(item.variants)) {
               recommendationsMap.set(
-                item.id,
-                new Set(item.variants.map((v: any) => v.id))
+                String(item.id),
+                new Set(item.variants.map((v: Record<string, unknown>) => String(v.id)))
               );
             }
           });
@@ -334,12 +365,12 @@ export class RecommendationService {
       }
     }
 
-    // If AI didn't produce productTemp or hydration failed, fall back to the Simple products directly
+    // Fallback to Simple products directly
     if (emailProducts.length === 0 && simpleRecs.length > 0) {
       this.logger.warn(
         `[RecommendationService][V10_PATTERN] userId=${userId} productTemp hydration failed, falling back to Simple products directly`
       );
-      const ids = simpleRecs.map((r: any) => r.productId).filter(Boolean);
+      const ids = simpleRecs.map((r) => r.productId).filter(Boolean);
       const productResponse =
         await this.productService.getProductsByIdsForOutput(ids);
       if (productResponse.success && Array.isArray(productResponse.data)) {
@@ -361,12 +392,55 @@ export class RecommendationService {
     return { message: aiMessage, emailProducts };
   }
 
-  /**
-   * Maps a ProductCardOutputItem to a EmailProduct for use in email templates.
-   */
+  private async generateRecommendationTextWithProducts(
+    userId: string,
+    systemPrompt: string,
+    combinedPrompt: string,
+    options: {
+      limit?: number;
+      contextType?: 'recommendation' | 'repurchase';
+      orderId?: string;
+      personalizationPayload?: Record<string, unknown>;
+    } = {}
+  ): Promise<{ message: string; emailProducts: EmailProduct[] }> {
+    const limit = options.limit || 3;
+    const contextType = options.contextType || 'recommendation';
+    const tag =
+      contextType === 'repurchase' ? '[REPURCHASE]' : '[RECOMMENDATION]';
+
+    const { simpleRecs, minimalProducts } = await this.fetchSimpleRecs(
+      userId,
+      options
+    );
+
+    this.logger.log(
+      `${tag}[TOON_INJECT] userId=${userId} injecting ${minimalProducts.length} products into AI context`
+    );
+
+    const messages = this.buildContextMessages(
+      minimalProducts,
+      combinedPrompt,
+      options.personalizationPayload
+    );
+
+    const encodedContext = encodeToolOutput(minimalProducts);
+    this.logger.log(
+      `${tag}[TOON_ENCODED] size=${encodedContext.encoded.length}/${encodedContext.originalSize} ratio=${encodedContext.compressionRatio}%`
+    );
+
+    return this.callAIAndHydrate(
+      userId,
+      messages,
+      systemPrompt,
+      simpleRecs,
+      limit,
+      tag
+    );
+  }
+
   private mapProductCardOutputToEmailProduct(
     product: import('src/chatbot/output/product.output').ProductCardOutputItem,
-    variants: any[]
+    variants: Array<Record<string, unknown>>
   ): EmailProduct {
     return {
       id: product.id,
@@ -375,14 +449,14 @@ export class RecommendationService {
       brandName: product.brandName ?? 'Unknown',
       categoryName: 'Perfume',
       primaryImage: product.primaryImage ?? undefined,
-      variants: variants.slice(0, 3).map((v: any) => ({
-        id: v.id,
-        sku: v.sku ?? 'N/A',
+      variants: variants.slice(0, 3).map((v) => ({
+        id: String(v.id),
+        sku: String(v.sku ?? 'N/A'),
         volumeMl: Number(v.volumeMl),
-        type: 'Standard',
+        type: String(v.type ?? 'Standard'),
         basePrice: Number(v.basePrice),
-        status: 'Active',
-        concentrationName: 'N/A'
+        status: String(v.status ?? 'Active'),
+        concentrationName: String(v.concentrationName ?? 'N/A')
       }))
     };
   }
@@ -454,7 +528,6 @@ export class RecommendationService {
     if (productCount <= 1) {
       return 'Dựa trên hồ sơ và hành vi gần đây, PerfumeGPT đã chọn cho bạn 1 gợi ý phù hợp nhất hôm nay.';
     }
-
     return `Dựa trên hồ sơ và hành vi gần đây, PerfumeGPT đã chọn ${productCount} gợi ý phù hợp nhất cho bạn hôm nay.`;
   }
 
@@ -526,14 +599,23 @@ export class RecommendationService {
     };
   }
 
+  // --- Phase 2c: Remove hard-coded prompts ---
   private async buildDailyEmailProductsFromV3(
     userId: string
   ): Promise<EmailProduct[]> {
     try {
-      const systemPrompt =
-        '📧 Bạn là chuyên gia tư vấn nước hoa cá nhân hóa của PerfumeGPT. Dựa trên RECOMMENDATION_CONTEXT, viết lời chào cá nhân đến khách hàng và gợi ý các sản phẩm trong context.';
-      const combinedPrompt =
-        'Hãy viết lời tư vấn chân thành cho khách hàng dựa trên các sản phẩm trong RECOMMENDATION_CONTEXT.';
+      const promptResult = await buildCombinedPromptV5(
+        INSTRUCTION_TYPE_RECOMMENDATION,
+        this.adminInstructionService,
+        userId
+      );
+      const systemPrompt = promptResult.success
+        ? (promptResult.data?.adminInstruction ?? '')
+        : '';
+      const combinedPrompt = promptResult.success
+        ? (promptResult.data?.combinedPrompt ??
+            'Hãy viết lời tư vấn chân thành cho khách hàng dựa trên các sản phẩm trong RECOMMENDATION_CONTEXT.')
+        : 'Hãy viết lời tư vấn chân thành cho khách hàng dựa trên các sản phẩm trong RECOMMENDATION_CONTEXT.';
 
       const { message, emailProducts } =
         await this.generateRecommendationTextWithProducts(
@@ -545,6 +627,16 @@ export class RecommendationService {
             contextType: 'recommendation'
           }
         );
+
+      if (!message && emailProducts.length === 0) {
+        this.logger.warn(
+          `${this.dailyRecommendationTag}[V3_EMPTY] userId=${userId} reason=NO_PRODUCTS_AFTER_AI`
+        );
+        throw new InternalServerErrorWithDetailsException(
+          'AI failed to generate daily recommendation',
+          { userId, service: 'RecommendationService', endpoint: 'buildDailyEmailProductsFromV3' }
+        );
+      }
 
       if (emailProducts.length === 0) {
         this.logger.warn(
@@ -565,7 +657,7 @@ export class RecommendationService {
       this.logger.warn(
         `${this.dailyRecommendationTag}[V3_FAIL] userId=${userId} error=${errorMessage}`
       );
-      return [];
+      throw error;
     }
   }
 
@@ -619,6 +711,7 @@ export class RecommendationService {
     return 'sent';
   }
 
+  // --- Phase 4b: Parallel batch processing ---
   async sendRecommendationToAllUsers(
     triggeredBy: DailyRecommendationTrigger = 'manual'
   ): Promise<DailyRecommendationBatchSummary> {
@@ -653,10 +746,17 @@ export class RecommendationService {
     let skippedInvalidRecipient = 0;
     let failedCount = 0;
 
-    for (const recipient of recipients) {
-      try {
-        const result =
-          await this.sendDailyRecommendationForRecipient(recipient);
+    const CONCURRENCY = 5;
+    const chunks: ActiveDailyRecommendationRecipient[][] = [];
+    for (let i = 0; i < recipients.length; i += CONCURRENCY) {
+      chunks.push(recipients.slice(i, i + CONCURRENCY));
+    }
+
+    for (const chunk of chunks) {
+      const results = await Promise.all(
+        chunk.map((r) => this.sendDailyRecommendationForRecipient(r))
+      );
+      for (const result of results) {
         if (result === 'sent') {
           sentCount += 1;
         } else if (result === 'skipped-no-recommendation') {
@@ -666,12 +766,6 @@ export class RecommendationService {
         } else {
           failedCount += 1;
         }
-      } catch (error) {
-        failedCount += 1;
-        this.logger.error(
-          `${this.dailyRecommendationTag}[USER_FAILED] userId=${recipient.id}`,
-          error
-        );
       }
     }
 
@@ -695,16 +789,22 @@ export class RecommendationService {
     return summary;
   }
 
-  async sendRecommendation(userId: string): Promise<boolean> {
+  // --- Phase 5a: Return BaseResponse instead of boolean ---
+  async sendRecommendation(
+    userId: string
+  ): Promise<BaseResponse<RecommendationResultResponse>> {
     try {
       const userInfo = await this.userService.getUserEmailInfo(userId);
       if (!userInfo.success || !userInfo.payload) {
         this.logger.error(`Failed to get user info for user ${userId}`);
-        return false;
+        return {
+          success: false,
+          error: 'Failed to get user info',
+          data: undefined
+        };
       }
       const { email, userName } = userInfo.payload;
 
-      // Build prompt for AI recommendation using the V10 pattern
       const promptResult = await buildCombinedPromptV5(
         INSTRUCTION_TYPE_RECOMMENDATION,
         this.adminInstructionService,
@@ -753,17 +853,32 @@ export class RecommendationService {
       this.logger.log(
         `Sent recommendation email to ${email} for user ${userId}`
       );
-      return true;
+
+      const result: RecommendationResultResponse = {
+        userId,
+        recommendations: productsWithAcceptance.map((p) => this.mapEmailProductToResponse(p)),
+        totalProducts: productsWithAcceptance.length,
+        profile: { source: 'recommendation', userType: 'returning_user', topBrands: [], budgetRange: [0, 0] }
+      };
+
+      return Ok(result);
     } catch (error) {
       this.logger.error(
         `Failed to send recommendation for user ${userId}:`,
         error
       );
-      return false;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        data: undefined
+      };
     }
   }
 
-  async sendRepurchase(userId: string, orderId: string): Promise<boolean> {
+  async sendRepurchase(
+    userId: string,
+    orderId: string
+  ): Promise<BaseResponse<RecommendationResultResponse>> {
     try {
       this.logger.log(
         `[REPURCHASE][START] userId=${userId} orderId=${orderId}`
@@ -774,11 +889,14 @@ export class RecommendationService {
         this.logger.error(
           `[REPURCHASE][ERROR] Failed to get user info for user ${userId}`
         );
-        return false;
+        return {
+          success: false,
+          error: 'Failed to get user info',
+          data: undefined
+        };
       }
       const { email, userName } = userInfo.payload;
 
-      // Fetch order details for email table + AI context
       const orderRes = await this.orderService.getOrderById(orderId);
       const order = orderRes.success ? orderRes.payload : null;
       const orderItems = order?.orderDetails ?? [];
@@ -787,7 +905,6 @@ export class RecommendationService {
         `[REPURCHASE][ORDER_FETCHED] orderId=${orderId} itemCount=${orderItems.length}`
       );
 
-      // Build rich combinedPrompt with ordered items context
       const promptResult = await buildCombinedPromptV5(
         INSTRUCTION_TYPE_REPURCHASE,
         this.adminInstructionService,
@@ -797,7 +914,6 @@ export class RecommendationService {
         ? (promptResult.data?.adminInstruction ?? '')
         : '';
 
-      // Build an order summary table for AI to understand what was purchased
       const orderTableRows = orderItems
         .map(
           (item) =>
@@ -812,7 +928,7 @@ Khách hàng ${userName || userId} vừa chọn mua các sản phẩm từ đơn
 | --- | --- | --- |
 ${orderTableRows}
 
-Hãy bắt đầu tin nhắn bằng lời cảm ơn chân thành vì họ đã mua những sản phẩm trên. 
+Hãy bắt đầu tin nhắn bằng lời cảm ơn chân thành vì họ đã mua những sản phẩm trên.
 Sau đó, dựa trên RECOMMENDATION_CONTEXT, hãy tư vấn cho họ:
 1. Nhắc lại việc mua lại (repurchase) chính các sản phẩm trên nếu họ thấy thích và muốn dự phòng/tặng thêm.
 2. Gợi ý thêm các sản phẩm mới phù hợp với hương thơm và sở thích họ vừa thể hiện qua đơn hàng này.
@@ -864,23 +980,51 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
           userName: userName || 'Khách hàng',
           heading: 'Dựa trên đơn hàng của bạn, chúng tôi có một số gợi ý mới',
           message,
-          orderItems, // order detail table for email template
+          orderItems,
           products: productsWithAcceptance,
-          frontendUrl,
-          savingsPercent: '15'
+          frontendUrl
         }
       );
       this.logger.log(
         `[REPURCHASE][EMAIL_SENT] email=${email} userId=${userId} orderId=${orderId} productCount=${productsWithAcceptance.length}`
       );
-      return true;
+
+      const result: RecommendationResultResponse = {
+        userId,
+        recommendations: productsWithAcceptance.map((p) => this.mapEmailProductToResponse(p)),
+        totalProducts: productsWithAcceptance.length,
+        profile: { source: 'repurchase', userType: 'returning_user', topBrands: [], budgetRange: [0, 0] }
+      };
+
+      return Ok(result);
     } catch (error) {
       this.logger.error(
         `[REPURCHASE][FAILED] userId=${userId} orderId=${orderId}`,
         error
       );
-      return false;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        data: undefined
+      };
     }
+  }
+
+  private mapEmailProductToResponse(p: EmailProduct): RecommendationProductResponse {
+    return {
+      productId: p.id,
+      productName: p.name,
+      brand: p.brandName,
+      primaryImage: p.primaryImage ?? null,
+      variants: (p.variants || []).map((v) => ({
+        id: v.id,
+        sku: v.sku,
+        volumeMl: v.volumeMl,
+        basePrice: v.basePrice
+      })),
+      source: 'email',
+      aiAcceptanceId: p.aiAcceptanceId
+    };
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: 'Asia/Ho_Chi_Minh' })
@@ -895,21 +1039,14 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     }
   }
 
-  // @Cron(CronExpression.EVERY_DAY_AT_9AM, { timeZone: 'Asia/Ho_Chi_Minh' }) // Chạy vào 9h sáng mỗi ngày
   async sendRepurchaseToAllUsers(): Promise<void> {
     this.logger.log(
       'Bắt đầu chạy cron job: Gửi daily repurchase cho tất cả người dùng (SKIPPED vì cần orderId)'
     );
-    // Ghi chú: Kịch bản mới bắt buộc có orderId, CronJob này cần được thiết kế lại
-    // theo logic lấy các đơn hàng Delivered sau 1 khoảng thời gian thay vì lặp qua toàn bộ User.
   }
 
   // --- MULTI-QUERY Helpers ---
 
-  /**
-   * Builds preference context via ProfileTool (same as ConversationV10).
-   * Priority: order history → profile keywords → new_user fallback (best-sellers)
-   */
   private async buildPreferencesFromProfileTool(userId: string): Promise<{
     source: string;
     userType: string;
@@ -922,7 +1059,7 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     avgPrice: number;
     purchasedProductIds: Set<string>;
     hasPreferences: boolean;
-    contextSummaries: Record<string, any>;
+    contextSummaries: Record<string, unknown>;
   }> {
     const payload =
       await this.profileTool.getProfileRecommendationContextPayload(userId);
@@ -934,8 +1071,6 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     const profileKeywords: string[] = payload?.profileKeywords ?? [];
     const contextSummaries = payload?.contextSummaries ?? {};
 
-    // Extract brand names from topOrderProducts (first word if brand is unknown).
-    // e.g. "Dior Sauvage EDT 100ml" → "Dior"
     const topBrands = Array.from(
       new Set(
         topOrderProducts.map((name) => name.split(' ')[0]).filter(Boolean)
@@ -946,11 +1081,7 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     const budgetMax = budgetHint?.max ?? 5_000_000;
     const avgPrice = Math.round((budgetMin + budgetMax) / 2);
 
-    // Collect purchased product IDs to exclude from sub-queries
     const purchasedProductIds = new Set<string>();
-    const orderContext = payload?.toonContext?.orderDataToon;
-    // Note: PurchasedProductIds are not encoded in toon; we keep this set empty here.
-    // Brand/product sub-queries already exclude via label matching.
 
     const hasPreferences =
       source !== 'none' &&
@@ -958,7 +1089,7 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
     this.logger.log(
       `[V3_MULTI_QUERY][PROFILE_CONTEXT] source=${source} userType=${userType} ` +
-        `orderCount=${contextSummaries.order?.orderCount ?? 0} ` +
+        `orderCount=${(contextSummaries.order as Record<string, unknown>)?.orderCount ?? 0} ` +
         `topOrderProducts=[${topOrderProducts.slice(0, 3).join(', ')}] ` +
         `budgetHint=${JSON.stringify(budgetHint)}`
     );
@@ -1023,7 +1154,6 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       return empty;
     }
 
-    // ── Budget from unit prices ────────────────────────────────────────────────
     let minPrice = Infinity;
     let maxPrice = 0;
     const variantIds = order.orderDetails
@@ -1037,13 +1167,11 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
     if (minPrice === Infinity) minPrice = 0;
 
-    // Point 3: min - 30% and max + 30%
     const budgetHint = {
       min: Math.max(0, Math.floor(minPrice * 0.7)),
       max: Math.floor(maxPrice * 1.3)
     };
 
-    // ── Full attribute aggregation (mirroring ProfileTool.extractOrderAttributes) ──
     const variantQuantities = new Map<string, number>();
     for (const item of order.orderDetails) {
       if (!item.variantId) continue;
@@ -1070,33 +1198,22 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       if (k) map.set(k, (map.get(k) || 0) + weight);
     };
 
-    const variants = await this.prisma.productVariants.findMany({
-      where: { Id: { in: variantIds } },
-      include: {
-        Products: {
-          include: {
-            Brands: true,
-            ProductNoteMaps: { include: { ScentNotes: true } },
-            ProductFamilyMaps: { include: { OlfactoryFamilies: true } }
-          }
-        }
-      }
-    });
+    const variants = await this.recommendationRepo.findProductAttributesByVariantIds(variantIds) as Array<Record<string, unknown>>;
 
     const purchasedProductIds = new Set<string>();
 
     for (const v of variants) {
-      const qty = variantQuantities.get(v.Id) || 1;
-      const p = v.Products;
+      const qty = variantQuantities.get(v['Id'] as string) || 1;
+      const p = v['Products'] as Record<string, unknown>;
       if (!p) continue;
-      purchasedProductIds.add(p.Id);
+      purchasedProductIds.add(p['Id'] as string);
 
-      addCount(counters.brands, p.Brands?.Name, qty);
-      addCount(counters.genders, p.Gender, qty);
-      for (const nm of p.ProductNoteMaps || [])
-        addCount(counters.scentNotes, nm.ScentNotes?.Name, qty);
-      for (const fm of p.ProductFamilyMaps || [])
-        addCount(counters.olfactoryFamilies, fm.OlfactoryFamilies?.Name, qty);
+      addCount(counters.brands, (p['Brands'] as Record<string, unknown>)?.['Name'] as string, qty);
+      addCount(counters.genders, p['Gender'] as string, qty);
+      for (const nm of (p['ProductNoteMaps'] as Array<Record<string, unknown>>) || [])
+        addCount(counters.scentNotes, (nm['ScentNotes'] as Record<string, unknown>)?.['Name'] as string, qty);
+      for (const fm of (p['ProductFamilyMaps'] as Array<Record<string, unknown>>) || [])
+        addCount(counters.olfactoryFamilies, (fm['OlfactoryFamilies'] as Record<string, unknown>)?.['Name'] as string, qty);
     }
 
     const getTop = (map: Map<string, number>, limit: number) =>
@@ -1110,7 +1227,6 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     const scentKeywords = getTop(counters.scentNotes, 6);
     const olfactoryKeywords = getTop(counters.olfactoryFamilies, 4);
 
-    // Rich keyword set for ORDER_QUERY sub-query: scent > olfactory > brand
     const topOrderProducts = [
       ...scentKeywords.slice(0, 3),
       ...olfactoryKeywords.slice(0, 2),
@@ -1141,11 +1257,31 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     };
   }
 
+  // --- Phase 4c: Merge duplicate formatting logic ---
+  private formatProductResults(
+    mergedProducts: Array<Record<string, unknown>>,
+    hasPreferences: boolean
+  ): RecommendationProductResponse[] {
+    return mergedProducts.map((p) => {
+      if (p._isBestSeller) {
+        return RecommendationProductResponse.fromBestSellerProduct(p, hasPreferences
+          ? (p._matchScore as number) >= 2
+            ? 'matched_preference'
+            : 'best_seller'
+          : 'best_seller')!;
+      }
+      return RecommendationProductResponse.fromPrismaProduct(
+        p,
+        (p._matchScore as number) >= 2 ? 'matched_intersection' : 'order_preference'
+      )!;
+    });
+  }
+
   async getRepurchaseRecommendationsSimple(
     userIdRaw: string,
     orderId: string,
     size: number = 10
-  ): Promise<BaseResponse<any>> {
+  ): Promise<BaseResponse<RecommendationResultResponse>> {
     try {
       const userId = userIdRaw.toLowerCase();
       this.logger.log(
@@ -1154,45 +1290,56 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
       const prefs = await this.buildPreferencesFromOrder(userId, orderId);
 
-      // If no valid order items, return generic or empty
       if (!prefs.hasPreferences) {
-        return { success: true, data: { recommendations: [] } };
+        return Ok({
+          userId,
+          recommendations: [],
+          totalProducts: 0,
+          profile: {
+            source: 'order_and_profile',
+            userType: 'returning_user',
+            topBrands: [],
+            budgetRange: [0, 0]
+          }
+        });
       }
 
-      const promises: Promise<{ label: string; products: any[] }>[] = [];
+      const promises: Promise<{ label: string; products: Array<Record<string, unknown>> }>[] = [];
       const subQueryLimit = size * 2;
 
-      // New: Specific sub-query for the items in the current order (True Repurchase candidate)
       if (prefs.purchasedProductIds.size > 0) {
         promises.push(
-          this.prisma.products
-            .findMany({
-              where: { Id: { in: Array.from(prefs.purchasedProductIds) } },
-              include: this.productInclude
-            })
-            .then((products) => ({ label: 'CURRENT_ORDER', products }))
+          this.recommendationRepo
+            .findProductsByIds(Array.from(prefs.purchasedProductIds))
+            .then((products) => ({
+              label: 'CURRENT_ORDER',
+              products: products as Array<Record<string, unknown>>
+            }))
         );
       }
 
-      // Brand sub-queries (with budget filter)
       for (const brand of prefs.topBrands) {
         promises.push(
-          this.runBrandSubQuery(brand, subQueryLimit, prefs.budgetHint).then(
-            (products) => ({ label: `BRAND:${brand}`, products })
-          )
+          this.recommendationRepo
+            .findProductsByBrand(brand, subQueryLimit, prefs.budgetHint)
+            .then((products) => ({
+              label: `BRAND:${brand}`,
+              products: products as Array<Record<string, unknown>>
+            }))
         );
       }
 
-      // Scent note sub-queries - using real DB scent notes
       for (const scent of prefs.scentKeywords.slice(0, 3)) {
         promises.push(
-          this.runScentSubQuery(scent, subQueryLimit, prefs.budgetHint).then(
-            (products) => ({ label: `SCENT:${scent}`, products })
-          )
+          this.recommendationRepo
+            .findProductsByScent(scent, subQueryLimit, prefs.budgetHint)
+            .then((products) => ({
+              label: `SCENT:${scent}`,
+              products: products as Array<Record<string, unknown>>
+            }))
         );
       }
 
-      // Top product/keyword sub-query (scentNotes + olfactory + brand keywords)
       if (prefs.topOrderProducts.length > 0) {
         promises.push(
           this.runTopProductsSubQuery(
@@ -1203,14 +1350,12 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
         );
       }
 
-      // Best seller fallback with budget filter (Point 1 & 2: No more exclude purchasedProductIds)
       promises.push(
         this.runBestSellerSubQuery(size * 2).then((products) => {
           const budgetFiltered = prefs.budgetHint
             ? products.filter((p) => {
-                const minV = Math.min(
-                  ...(p.variants || []).map((v: any) => v.basePrice)
-                );
+                const rawVariants = (p.variants as Array<Record<string, unknown>>) || [];
+                const minV = Math.min(...rawVariants.map((v) => Number(v.basePrice)));
                 return (
                   minV >= prefs.budgetHint!.min && minV <= prefs.budgetHint!.max
                 );
@@ -1225,189 +1370,92 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
       const subResults = await Promise.all(promises);
       const mergedProducts = this.mergeByIntersectionScore(subResults, size);
-
-      const results = mergedProducts.map((p) => {
-        if (p._isBestSeller) {
-          return {
-            productId: p.id,
-            productName: p.name,
-            brand: p.brandName,
-            primaryImage: p.primaryImage,
-            variants: (p.variants || []).slice(0, 3).map((v: any) => ({
-              id: v.id,
-              sku: v.sku,
-              volumeMl: v.volumeMl,
-              basePrice: v.basePrice
-            })),
-            source: prefs.hasPreferences
-              ? p._matchScore >= 2
-                ? 'matched_preference'
-                : 'best_seller'
-              : 'best_seller'
-          };
-        }
-
-        return {
-          productId: p.Id,
-          productName: p.Name,
-          brand: p.Brands?.Name ?? null,
-          primaryImage: p.Media?.[0]?.Url ?? null,
-          variants: (p.ProductVariants || []).map((v: any) => ({
-            id: v.Id,
-            sku: v.Sku,
-            volumeMl: v.VolumeMl,
-            basePrice: Number(v.BasePrice)
-          })),
-          source:
-            p._matchScore && p._matchScore >= 2
-              ? 'matched_intersection'
-              : 'order_preference'
-        };
-      });
+      const results = this.formatProductResults(mergedProducts, true);
 
       this.logger.log(
         `[V3_MULTI_QUERY][REPURCHASE_DONE] userId=${userId} returning=${results.length} products`
       );
 
-      return {
-        success: true,
-        data: {
-          userId,
-          recommendations: results,
-          totalProducts: results.length,
-          profile: {
-            source: 'order_and_profile',
-            userType: 'returning_user',
-            topBrands: prefs.topBrands,
-            genders: prefs.genders,
-            scentKeywords: prefs.scentKeywords,
-            olfactoryKeywords: prefs.olfactoryKeywords,
-            topOrderProducts: prefs.topOrderProducts,
-            budgetRange: prefs.budgetHint
-              ? [prefs.budgetHint.min, prefs.budgetHint.max]
-              : [0, 0],
-            purchasedProductIds: Array.from(prefs.purchasedProductIds)
-          }
+      return Ok({
+        userId,
+        recommendations: results,
+        totalProducts: results.length,
+        profile: {
+          source: 'order_and_profile',
+          userType: 'returning_user',
+          topBrands: prefs.topBrands,
+          genders: prefs.genders,
+          scentKeywords: prefs.scentKeywords,
+          olfactoryKeywords: prefs.olfactoryKeywords,
+          topOrderProducts: prefs.topOrderProducts,
+          budgetRange: prefs.budgetHint
+            ? [prefs.budgetHint.min, prefs.budgetHint.max]
+            : [0, 0],
+          purchasedProductIds: Array.from(prefs.purchasedProductIds)
         }
-      };
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(
         `[V3_MULTI_QUERY][REPURCHASE_ERROR] userId=${userIdRaw} error=${errorMessage}`
       );
-      return { success: false, data: null };
+      return { success: false, error: errorMessage, data: undefined };
     }
   }
-
-  private readonly productInclude = {
-    Brands: true,
-    Media: { where: { IsPrimary: true } },
-    ProductVariants: {
-      where: { IsDeleted: false, Status: 'Active' },
-      take: 3,
-      orderBy: { BasePrice: 'asc' as const }
-    }
-  };
 
   private async runBrandSubQuery(
     brand: string,
     limit: number,
     budgetHint: { min: number; max: number } | null = null
-  ): Promise<any[]> {
-    const products = await this.prisma.products.findMany({
-      where: {
-        IsDeleted: false,
-        Brands: { Name: brand },
-        ...(budgetHint
-          ? {
-              ProductVariants: {
-                some: {
-                  BasePrice: {
-                    gte: budgetHint.min,
-                    lte: budgetHint.max
-                  }
-                }
-              }
-            }
-          : {})
-      },
-      include: this.productInclude,
-      take: limit
-    });
+  ): Promise<Array<Record<string, unknown>>> {
+    const products = await this.recommendationRepo.findProductsByBrand(
+      brand,
+      limit,
+      budgetHint
+    );
     const topNames = products
       .slice(0, 5)
-      .map((p) => p.Name)
+      .map((p) => (p as Record<string, unknown>).Name as string)
       .join(', ');
     this.logger.log(
       `[V3_MULTI_QUERY][BRAND] brand="${brand}" found=${products.length}. Top: [${topNames}]`
     );
-    return products;
+    return products as Array<Record<string, unknown>>;
   }
 
   private async runScentSubQuery(
     scent: string,
     limit: number,
     budgetHint: { min: number; max: number } | null = null
-  ): Promise<any[]> {
-    const products = await this.prisma.products.findMany({
-      where: {
-        IsDeleted: false,
-        OR: [
-          {
-            ProductNoteMaps: {
-              some: {
-                ScentNotes: { Name: { contains: scent } }
-              }
-            }
-          },
-          {
-            Brands: { OR: [{ Name: { contains: scent } }] }
-          }
-        ],
-        ...(budgetHint
-          ? {
-              ProductVariants: {
-                some: {
-                  BasePrice: {
-                    gte: budgetHint.min,
-                    lte: budgetHint.max
-                  }
-                }
-              }
-            }
-          : {})
-      },
-      include: this.productInclude,
-      take: limit
-    });
+  ): Promise<Array<Record<string, unknown>>> {
+    const products = await this.recommendationRepo.findProductsByScent(
+      scent,
+      limit,
+      budgetHint
+    );
     const topNames = products
       .slice(0, 5)
-      .map((p) => p.Name)
+      .map((p) => (p as Record<string, unknown>).Name as string)
       .join(', ');
     this.logger.log(
       `[V3_MULTI_QUERY][SCENT] scent="${scent}" found=${products.length}. Top: [${topNames}]`
     );
-    return products;
+    return products as Array<Record<string, unknown>>;
   }
 
-  /**
-   * Profile-based product sub-query — mirrors ConversationV10's executeProfileQuery.
-   * Keywords = profileKeywords (scent/style from profile) + topOrderProducts.slice(0,3)
-   * Budget filter applied to narrow results to user's price range.
-   */
   private async runTopProductsSubQuery(
     keywords: string[],
     budgetHint: { min: number; max: number } | null,
     limit: number
-  ): Promise<any[]> {
+  ): Promise<Array<Record<string, unknown>>> {
     if (keywords.length === 0) return [];
 
-    const miniAnalysis: any = {
-      logic: [keywords], // OR between all combined keywords — same as V10
+    const miniAnalysis: Record<string, unknown> = {
+      logic: [keywords],
       productNames: null,
       sorting: null,
-      budget: budgetHint, // KEY: apply budget filter like V10
+      budget: budgetHint,
       pagination: { pageNumber: 1, pageSize: limit }
     };
 
@@ -1417,19 +1465,21 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       const items = res.data.items;
       const topNames = items
         .slice(0, 5)
-        .map((p: any) => p.name)
+        .map((p) => String((p as unknown as Record<string, unknown>).name))
         .join(', ');
       this.logger.log(
         `[V3_MULTI_QUERY][PROFILE_QUERY] keywords=[${keywords.slice(0, 3).join(', ')}...] ` +
           `budget=${JSON.stringify(budgetHint)} found=${items.length}. Top: [${topNames}]`
       );
-      return items;
+      return items as unknown as Array<Record<string, unknown>>;
     }
     this.logger.log(`[V3_MULTI_QUERY][PROFILE_QUERY] found=0`);
     return [];
   }
 
-  private async runBestSellerSubQuery(limit: number): Promise<any[]> {
+  private async runBestSellerSubQuery(
+    limit: number
+  ): Promise<Array<Record<string, unknown>>> {
     const res = await this.productService.getBestSellingProducts({
       PageNumber: 1,
       PageSize: limit,
@@ -1438,13 +1488,13 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     } as PagedAndSortedRequest);
 
     if (res.success && res.data) {
-      const items = res.data.items.map((item: any) => ({
+      const items = res.data.items.map((item) => ({
         _isBestSeller: true,
-        ...item.product
+        ...(item.product as unknown as Record<string, unknown>)
       }));
       const topNames = items
         .slice(0, 5)
-        .map((p) => p.name)
+        .map((p) => String((p as Record<string, unknown>).name))
         .join(', ');
       this.logger.log(
         `[V3_MULTI_QUERY][BESTSELLER] found=${items.length}. Top: [${topNames}]`
@@ -1456,17 +1506,17 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
   }
 
   private mergeByIntersectionScore(
-    subResults: Array<{ label: string; products: any[] }>,
+    subResults: Array<{ label: string; products: Array<Record<string, unknown>> }>,
     size: number
-  ): any[] {
+  ): Array<Record<string, unknown>> {
     const scoreMap = new Map<
       string,
-      { product: any; score: number; sources: Set<string> }
+      { product: Record<string, unknown>; score: number; sources: Set<string> }
     >();
 
     for (const sub of subResults) {
       for (const p of sub.products) {
-        const pId = p.Id || p.id; // Prisma uses Id, bestseller uses id
+        const pId = String(p.Id || p.id);
         if (!pId) continue;
 
         if (!scoreMap.has(pId)) {
@@ -1479,29 +1529,26 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     }
 
     const allScored = Array.from(scoreMap.values());
-    allScored.sort((a, b) => b.score - a.score); // Highest score first
+    allScored.sort((a, b) => b.score - a.score);
 
-    // Prefer intersection (score >= 2)
     const intersections = allScored.filter((x) => x.score >= 2);
     const unions = allScored.filter((x) => x.score < 2);
 
-    const finalResults: any[] = [];
+    const finalResults: Array<Record<string, unknown>> = [];
 
-    // Fill from intersections
     for (const item of intersections) {
       if (finalResults.length < size) {
         finalResults.push({ ...item.product, _matchScore: item.score });
       }
     }
 
-    // Fill from unions if still needed
     for (const item of unions) {
       if (finalResults.length < size) {
         finalResults.push({ ...item.product, _matchScore: item.score });
       }
     }
 
-    const finalNames = finalResults.map((p) => p.Name || p.name).join(', ');
+    const finalNames = finalResults.map((p) => String(p.Name || p.name)).join(', ');
     this.logger.log(
       `[V3_MULTI_QUERY][MERGE] Total unique=${allScored.length}, Intersections(>=2)=${intersections.length}, Unions=${unions.length}. Result: [${finalNames}]`
     );
@@ -1509,26 +1556,19 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
     return finalResults;
   }
 
-  /**
-   * Recommendation Pipeline V3 (Multi-Query Decomposition)
-   * 1. Extract preference profile
-   * 2. Run independent sub-queries for brands, scents, and best-sellers
-   * 3. Merge products using an intersection score mechanism
-   */
+  // --- Phase 5c: Move acceptance logic from controller into service ---
   async getRecommendationsSimple(
     userIdRaw: string,
     size: number = 10
-  ): Promise<BaseResponse<any>> {
+  ): Promise<BaseResponse<RecommendationResultResponse>> {
     try {
       const userId = userIdRaw.toLowerCase();
       this.logger.log(`[V3_MULTI_QUERY][START] userId=${userId} size=${size}`);
 
-      // 1. Build profile/preferences via ProfileTool (same as ConversationV10)
       const prefs = await this.buildPreferencesFromProfileTool(userId);
 
-      // 2. Run sub-queries concurrently
-      const promises: Promise<{ label: string; products: any[] }>[] = [];
-      const subQueryLimit = size * 2; // Fetch more per sub-query to allow overlap
+      const promises: Promise<{ label: string; products: Array<Record<string, unknown>> }>[] = [];
+      const subQueryLimit = size * 2;
 
       for (const brand of prefs.topBrands) {
         promises.push(
@@ -1538,7 +1578,6 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
         );
       }
 
-      // 2.b Profile-based sub-query — combines profileKeywords + topOrderProducts like V10's executeProfileQuery
       if (prefs.hasPreferences) {
         const profileQueryKeywords = [
           ...prefs.profileKeywords,
@@ -1556,7 +1595,6 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
         }
       }
 
-      // 2.c Profile keyword scent sub-queries (for users with profile but no orders)
       if (prefs.source === 'profile' && prefs.profileKeywords.length > 0) {
         for (const scent of prefs.profileKeywords.slice(0, 5)) {
           promises.push(
@@ -1569,9 +1607,8 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
 
       promises.push(
         this.runBestSellerSubQuery(size * 2).then((products) => {
-          // Exclude purchased products explicitly here since bestseller query doesn't accept exclude
           const filtered = products.filter((p) => {
-            const pId = p.Id || p.id;
+            const pId = String(p.Id || p.id);
             return !prefs.purchasedProductIds.has(pId);
           });
           return { label: 'BESTSELLER', products: filtered };
@@ -1579,80 +1616,76 @@ ${promptResult.success ? (promptResult.data?.combinedPrompt ?? '') : ''}`.trim()
       );
 
       const subResults = await Promise.all(promises);
-
-      // 3. Merge by intersection score
       const mergedProducts = this.mergeByIntersectionScore(subResults, size);
-
-      // 4. Format output
-      const results = mergedProducts.map((p) => {
-        // Best seller or already matched items format check
-        if (p._isBestSeller) {
-          return {
-            productId: p.id,
-            productName: p.name,
-            brand: p.brandName,
-            primaryImage: p.primaryImage,
-            variants: (p.variants || []).slice(0, 3).map((v: any) => ({
-              id: v.id,
-              sku: v.sku,
-              volumeMl: v.volumeMl,
-              basePrice: v.basePrice
-            })),
-            source: prefs.hasPreferences
-              ? p._matchScore >= 2
-                ? 'matched_preference'
-                : 'best_seller'
-              : 'best_seller'
-          };
-        }
-
-        // Prisma product shape
-        return {
-          productId: p.Id,
-          productName: p.Name,
-          brand: p.Brands?.Name ?? null,
-          primaryImage: p.Media?.[0]?.Url ?? null,
-          variants: (p.ProductVariants || []).map((v: any) => ({
-            id: v.Id,
-            sku: v.Sku,
-            volumeMl: v.VolumeMl,
-            basePrice: Number(v.BasePrice)
-          })),
-          source:
-            p._matchScore && p._matchScore >= 2
-              ? 'matched_intersection'
-              : 'order_preference'
-        };
-      });
+      const results = this.formatProductResults(mergedProducts, prefs.hasPreferences);
 
       this.logger.log(
         `[V3_MULTI_QUERY][DONE] userId=${userId} returning=${results.length} products`
       );
 
-      return {
-        success: true,
-        data: {
-          userId,
-          recommendations: results,
-          totalProducts: results.length,
-          profile: {
-            source: prefs.source,
-            userType: prefs.userType,
-            topBrands: prefs.topBrands,
-            topOrderProducts: prefs.topOrderProducts,
-            profileKeywords: prefs.profileKeywords,
-            avgPrice: prefs.avgPrice,
-            budgetRange: [prefs.budgetMin, prefs.budgetMax]
-          }
+      const response: RecommendationResultResponse = {
+        userId,
+        recommendations: results,
+        totalProducts: results.length,
+        profile: {
+          source: prefs.source,
+          userType: prefs.userType,
+          topBrands: prefs.topBrands,
+          topOrderProducts: prefs.topOrderProducts,
+          profileKeywords: prefs.profileKeywords,
+          avgPrice: prefs.avgPrice,
+          budgetRange: [prefs.budgetMin, prefs.budgetMax]
         }
       };
+
+      // Attach AI acceptance inside service
+      if (response.recommendations.length > 0) {
+        const attachResult =
+          await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+            contextType: 'recommendation',
+            sourceRefId: `recommendation-v3-simple-${userId}-${Date.now()}`,
+            products: response.recommendations as unknown as EmailProduct[],
+            metadata: {
+              sizeRequested: size,
+              productCount: response.recommendations.length
+            }
+          });
+
+        const attached = attachResult.products as unknown as Array<Record<string, unknown>>;
+        response.recommendations = attached.map((p) => this.mapGenericToRecommendationProductResponse(p));
+        if (attachResult.aiAcceptanceId) {
+          response.aiAcceptanceId = attachResult.aiAcceptanceId;
+        }
+      }
+
+      return Ok(response);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(
         `[V3_MULTI_QUERY][ERROR] userId=${userIdRaw} error=${errorMessage}`
       );
-      return { success: false, data: null };
+      return { success: false, error: errorMessage, data: undefined };
     }
+  }
+
+  private mapGenericToRecommendationProductResponse(
+    p: Record<string, unknown>
+  ): RecommendationProductResponse {
+    const variants = ((p.variants as Array<Record<string, unknown>>) || []).map((v) => ({
+      id: String(v.id ?? v.Id ?? ''),
+      sku: String(v.sku ?? v.Sku ?? 'N/A'),
+      volumeMl: Number(v.volumeMl ?? v.VolumeMl ?? 0),
+      basePrice: Number(v.basePrice ?? v.BasePrice ?? 0)
+    }));
+    return {
+      productId: String(p.productId ?? p.id ?? ''),
+      productName: String(p.productName ?? p.name ?? ''),
+      brand: (p.brand as string) ?? (p.brandName as string) ?? null,
+      primaryImage: (p.primaryImage as string) ?? null,
+      variants,
+      source: String(p.source ?? 'unknown'),
+      aiAcceptanceId: (p.aiAcceptanceId as string) ?? undefined
+    };
   }
 }

@@ -1,8 +1,7 @@
-import { Controller, Get, Logger, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
   ApiTags
 } from '@nestjs/swagger';
 import { Public, Role } from 'src/application/common/Metadata';
@@ -17,8 +16,15 @@ import {
   DailyRecommendationBatchSummary,
   RecommendationService
 } from 'src/infrastructure/domain/recommendation/recommandation.service';
-import { RecommendationResponse } from 'src/infrastructure/domain/recommendation/recommendation-profile.type';
-import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
+import {
+  RecommendationTestRequest,
+  RepurchaseTestRequest,
+  RecommendationV3SimpleRequest
+} from 'src/application/dtos/request/recommendation/recommendation.request';
+import {
+  RecommendationResultResponse,
+  DailyRecommendationBatchSummaryResponse
+} from 'src/application/dtos/response/recommendation/recommendation-product.response';
 
 @ApiTags('Recommendation')
 @Controller('recommendation')
@@ -26,58 +32,31 @@ export class RecommendationController {
   logger = new Logger(RecommendationController.name);
 
   constructor(
-    private readonly recommendationService: RecommendationService,
-    private readonly aiAcceptanceService: AIAcceptanceService
+    private readonly recommendationService: RecommendationService
   ) {}
 
-  /**
-   * Test recommendation API
-   * Sinh ra recommendation cho một user
-   */
   @Public()
   @Post('test-recommendation')
   @ApiPublicErrorResponses()
-  @ApiOperation({ summary: 'Test sinh recommendation cho user và gửi email' })
-  @ApiQuery({
-    name: 'userId',
-    description: 'ID của user để test recommendation'
-  })
-  @ApiBaseResponse(String)
+  @ApiOperation({ summary: 'Test sinh recommendation cho user va gui email' })
+  @ApiBaseResponse(RecommendationResultResponse)
   async testRecommendation(
-    @Query('userId') userId: string
-  ): Promise<BaseResponse<string>> {
-    await this.recommendationService.sendRecommendation(userId);
-    return Ok('Recommendation generated and email sent successfully');
+    @Body() body: RecommendationTestRequest
+  ): Promise<BaseResponse<RecommendationResultResponse>> {
+    return this.recommendationService.sendRecommendation(body.userId);
   }
 
-  /**
-   * Test repurchase recommendation API
-   * Sinh ra repurchase recommendation cho một user và gửi email
-   */
   @Public()
   @Post('test-repurchase')
   @ApiPublicErrorResponses()
   @ApiOperation({
-    summary: 'Test sinh repurchase recommendation cho user và gửi email'
+    summary: 'Test sinh repurchase recommendation cho user va gui email'
   })
-  @ApiQuery({
-    name: 'userId',
-    description: 'ID của user để test repurchase recommendation'
-  })
-  @ApiQuery({
-    name: 'orderId',
-    required: true,
-    description: 'ID của đơn hàng để phân tích khuyến nghị'
-  })
-  @ApiBaseResponse(String)
+  @ApiBaseResponse(RecommendationResultResponse)
   async testRepurchase(
-    @Query('userId') userId: string,
-    @Query('orderId') orderId: string
-  ): Promise<BaseResponse<string>> {
-    await this.recommendationService.sendRepurchase(userId, orderId);
-    return Ok(
-      'Repurchase recommendation generated and email sent successfully'
-    );
+    @Body() body: RepurchaseTestRequest
+  ): Promise<BaseResponse<RecommendationResultResponse>> {
+    return this.recommendationService.sendRepurchase(body.userId, body.orderId);
   }
 
   @Post('daily/send')
@@ -87,7 +66,7 @@ export class RecommendationController {
   @ApiOperation({
     summary: 'Manual trigger gửi daily recommendation cho user active (sync)'
   })
-  @ApiBaseResponse(Object)
+  @ApiBaseResponse(DailyRecommendationBatchSummaryResponse)
   async sendDailyRecommendationManual(): Promise<
     BaseResponse<DailyRecommendationBatchSummary>
   > {
@@ -96,12 +75,6 @@ export class RecommendationController {
     return Ok(summary);
   }
 
-  /**
-   * Get simple robust practical recommendations (V3)
-   * Dựa trên:
-   * - Lịch sử mua hàng TẤT CẢ các trạng thái
-   * - Mở rộng với Best Sellers (Luôn có kết quả trả về)
-   */
   @Public()
   @Get('v3/simple')
   @ApiPublicErrorResponses()
@@ -109,45 +82,13 @@ export class RecommendationController {
     summary:
       'Recommend đơn giản và ổn định dựa trên Order và Best Sellers (không fallback mảng rỗng)'
   })
-  @ApiQuery({
-    name: 'userId',
-    required: true,
-    description: 'ID của user cần recommend'
-  })
-  @ApiQuery({
-    name: 'size',
-    required: false,
-    type: Number,
-    description: 'Số sản phẩm recommend (default: 10)'
-  })
-  @ApiBaseResponse(Object)
+  @ApiBaseResponse(RecommendationResultResponse)
   async getRecommendationsV3Simple(
-    @Query('userId') userId: string,
-    @Query('size') size?: number
-  ): Promise<BaseResponse<any>> {
-    const result = await this.recommendationService.getRecommendationsSimple(
-      userId,
-      size || 10
+    @Query() query: RecommendationV3SimpleRequest
+  ): Promise<BaseResponse<RecommendationResultResponse>> {
+    return this.recommendationService.getRecommendationsSimple(
+      query.userId,
+      query.size || 10
     );
-
-    if (result.success && result.data?.recommendations?.length) {
-      const attachResult =
-        await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
-          contextType: 'recommendation',
-          sourceRefId: `recommendation-v3-simple-${userId}-${Date.now()}`,
-          products: result.data.recommendations,
-          metadata: {
-            sizeRequested: size || 10,
-            productCount: result.data.recommendations.length
-          }
-        });
-
-      result.data.recommendations = attachResult.products as any;
-      if (attachResult.aiAcceptanceId) {
-        (result.data as any).aiAcceptanceId = attachResult.aiAcceptanceId;
-      }
-    }
-
-    return result;
   }
 }

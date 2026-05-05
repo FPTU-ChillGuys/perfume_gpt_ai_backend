@@ -54,7 +54,6 @@ export class ConversationResponseBuilder {
     userId: string
   ): BaseResponse<ConversationResponse> {
     const response = new ConversationResponse();
-    response.id = responseConversation.id || conversationId;
     response.userId = responseConversation.userId || userId;
     response.updatedAt = new Date();
     response.messages = (responseConversation.messages || []).map((m) => {

@@ -4,13 +4,17 @@ import { MessageResponse } from './message.response';
 
 /** DTO phản hồi cuộc hội thoại */
 export class ConversationResponse {
-  /** ID cuộc hội thoại */
-  @ApiProperty({ description: 'ID cuộc hội thoại' })
-  id!: string;
-
   /** ID người dùng sở hữu */
   @ApiProperty({ description: 'ID người dùng', format: 'uuid', required: true })
   userId!: string;
+
+  /** Tên người dùng (resolved from DB) */
+  @ApiProperty({
+    description: 'Tên người dùng (resolved từ DB)',
+    required: false,
+    default: 'Khách'
+  })
+  userName?: string;
 
   /** Danh sách tin nhắn */
   @ApiProperty({
@@ -40,7 +44,6 @@ export class ConversationResponse {
     if (!entity) return null;
 
     const response = new ConversationResponse();
-    response.id = entity.id;
     response.userId = entity.userId;
     response.updatedAt = entity.updatedAt;
 

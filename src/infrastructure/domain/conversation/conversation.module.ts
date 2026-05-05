@@ -12,6 +12,7 @@ import { SurveyModule } from 'src/infrastructure/domain/survey/survey.module';
 import { OrderModule } from 'src/infrastructure/domain/order/order.module';
 import { ProfileModule } from 'src/infrastructure/domain/profile/profile.module';
 import { CartModule } from 'src/infrastructure/domain/cart/cart.module';
+import { UserModule } from 'src/infrastructure/domain/user/user.module';
 import { AIAnalysisHelper } from './helpers/ai-analysis.helper';
 import { AIPersonalizationHelper } from './helpers/ai-personalization.helper';
 import { AISearchExecutorHelper } from './helpers/ai-search-executor.helper';
@@ -31,6 +32,7 @@ import { NlpQueryMapper } from './helpers/nlp-query-mapper.helper';
     AIAcceptanceModule,
     AdminInstructionModule,
     DictionaryModule,
+    UserModule,
     forwardRef(() => RecommendationModule)
   ],
   providers: [

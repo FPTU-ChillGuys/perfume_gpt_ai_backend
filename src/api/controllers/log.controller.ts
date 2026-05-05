@@ -35,6 +35,7 @@ import { InternalServerErrorWithDetailsException } from 'src/application/common/
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { EventLogQueryRequest } from 'src/application/dtos/request/event-log.request';
 import { EventLog } from 'src/domain/entities/event-log.entity';
+import { EventLogResponse } from 'src/application/dtos/response/event-log/event-log.response';
 import { EventLogPagedQueryRequest } from 'src/application/dtos/request/event-log.request';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 import {
@@ -106,8 +107,8 @@ export class LogController {
   @CacheTTL(0)
   @Get('all')
   @ApiOperation({ summary: 'Lấy tất cả log hoạt động người dùng' })
-  @ApiBaseResponse(EventLog, true)
-  async getAllUserLogs(): Promise<BaseResponse<EventLog[]>> {
+  @ApiBaseResponse(EventLogResponse, true)
+  async getAllUserLogs(): Promise<BaseResponse<EventLogResponse[]>> {
     return this.userLogService.getAllEventLogs();
   }
 
@@ -115,10 +116,10 @@ export class LogController {
   @CacheTTL(0)
   @Get('events')
   @ApiOperation({ summary: 'Lấy event log dạng mới' })
-  @ApiBaseResponse(EventLog, true)
+  @ApiBaseResponse(EventLogResponse, true)
   async getEventLogs(
     @Query() request: EventLogQueryRequest
-  ): Promise<BaseResponse<EventLog[]>> {
+  ): Promise<BaseResponse<EventLogResponse[]>> {
     return this.userLogService.getEventLogs(request);
   }
 
@@ -126,10 +127,10 @@ export class LogController {
   @CacheTTL(0)
   @Get('events/paged')
   @ApiOperation({ summary: 'Lấy event log dạng mới có phân trang' })
-  @ExtendApiBaseResponse(PagedResult, EventLog)
+  @ExtendApiBaseResponse(PagedResult, EventLogResponse)
   async getPagedEventLogs(
     @Query() request: EventLogPagedQueryRequest
-  ): Promise<BaseResponse<PagedResult<EventLog>>> {
+  ): Promise<BaseResponse<PagedResult<EventLogResponse>>> {
     return this.userLogService.getEventLogsPaged(request);
   }
 
@@ -171,10 +172,10 @@ export class LogController {
   @ApiOperation({
     summary: 'Lấy tất cả log hoạt động người dùng theo khoảng thời gian'
   })
-  @ApiBaseResponse(EventLog, true)
+  @ApiBaseResponse(EventLogResponse, true)
   async getUserLogsWithPeriod(
     @Query() allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<EventLog[]>> {
+  ): Promise<BaseResponse<EventLogResponse[]>> {
     return this.userLogService.getEventLogsWithPeriod(allUserLogRequest);
   }
 

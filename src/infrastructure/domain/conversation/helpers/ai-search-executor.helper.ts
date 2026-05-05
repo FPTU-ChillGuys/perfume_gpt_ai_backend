@@ -174,9 +174,35 @@ export class AISearchExecutorHelper {
           this.logger.log(
             `[TASK][addToCart] Result for ${i.variantId || i.id}: Success=${addRes.success}${!addRes.success ? `, Error=${addRes.error}` : ''}`
           );
-          return { variantId: i.variantId || i.id, success: addRes.success };
+          return {
+            variantId: i.variantId || i.id,
+            success: addRes.success,
+            error: addRes.success ? undefined : addRes.error
+          };
         })
       );
+
+      // Generate user-friendly system message for auth failures
+      if (res.length > 0 && res.every((r: any) => !r.success)) {
+        const errorText = res[0].error || '';
+        const isAuth = errorText.includes('đăng nhập');
+        const isAdmin = errorText.includes('admin') || errorText.includes('staff');
+
+        if (isAuth) {
+          return this.createSystemMessage(
+            'FUNCTION_ACTION_FAILED: addToCart không thể thực hiện vì người dùng chưa đăng nhập. ' +
+            'Hãy lịch sự thông báo cho người dùng bằng tiếng Việt rằng họ cần đăng nhập để thêm sản phẩm vào giỏ hàng. ' +
+            'KHÔNG nhắc đến bất kỳ mã ID hay lỗi kỹ thuật nào.'
+          );
+        }
+        if (isAdmin) {
+          return this.createSystemMessage(
+            'FUNCTION_ACTION_FAILED: addToCart không thể thực hiện vì tài khoản admin/staff không được phép thêm giỏ hàng. ' +
+            'Hãy lịch sự thông báo cho người dùng bằng tiếng Việt. ' +
+            'KHÔNG nhắc đến bất kỳ mã ID hay lỗi kỹ thuật nào.'
+          );
+        }
+      }
     } else if (funcName === 'getCart') {
       const cartRes = await this.cartService.getCart(userId);
       res = cartRes.success ? cartRes.data : cartRes.error;

@@ -1,7 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from 'generated/prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { EmailService, EmailTemplate } from 'src/infrastructure/domain/common/mail.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
 import { InventoryStockRequest } from 'src/application/dtos/request/inventory-stock.request';
 import { BaseResponseAPI } from 'src/application/dtos/response/common/base-response-api';
@@ -57,7 +61,10 @@ export class InventoryService {
     @Inject(AI_RESTOCK_HELPER) private readonly aiRestockHelper: AIHelper,
     private readonly adminInstructionService: AdminInstructionService,
     private readonly sourcingCatalogService: SourcingCatalogService,
-    private readonly err: I18nErrorHandler
+    private readonly err: I18nErrorHandler,
+    private readonly emailService: EmailService,
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService
   ) {}
 
   private async ensureCriticalLowStockIncluded(
@@ -848,5 +855,120 @@ export class InventoryService {
     );
 
     return Ok(normalizedResult);
+  }
+
+  @Cron('0 0 9 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  async runDailyRestockPrediction(): Promise<void> {
+    this.logger.log('[DailyRestockPrediction] Cron job started');
+    try {
+      await this.sendDailyRestockPredictionReport();
+      this.logger.log('[DailyRestockPrediction] Cron job finished');
+    } catch (error) {
+      this.logger.error('[DailyRestockPrediction] Cron job failed', error);
+    }
+  }
+
+  private async sendDailyRestockPredictionReport(): Promise<void> {
+    const generatedAtDate = new Date();
+    const reportDate = generatedAtDate.toISOString().slice(0, 10);
+    const generatedAt = generatedAtDate.toLocaleString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh'
+    });
+
+    const result = await this.analyzeRestockNeeds();
+    if (!result.success || !result.data?.variants || result.data.variants.length === 0) {
+      this.logger.log(`[DailyRestockPrediction] Skip sending - no variants suggested on ${reportDate}`);
+      return;
+    }
+
+    const variants = result.data.variants;
+
+    const staffUsers = await this.prisma.aspNetUsers.findMany({
+      where: {
+        IsActive: true,
+        IsDeleted: false,
+        Email: { not: null },
+        AspNetUserRoles: {
+          some: {
+            AspNetRoles: {
+              OR: [
+                { NormalizedName: 'STAFF' },
+                { NormalizedName: 'ADMIN' },
+                { Name: { contains: 'staff' } },
+                { Name: { contains: 'Staff' } },
+                { Name: { contains: 'admin' } },
+                { Name: { contains: 'Admin' } }
+              ]
+            }
+          }
+        }
+      },
+      select: { Email: true }
+    });
+
+    const recipients = [...new Set(
+      staffUsers.map(u => u.Email?.trim().toLowerCase()).filter((e): e is string => e !== undefined && e.length > 0)
+    )];
+
+    if (recipients.length === 0) {
+      this.logger.warn('[DailyRestockPrediction] No staff/admin recipients found. Report email skipped.');
+      return;
+    }
+
+    const formatPrice = (price: number | undefined): string =>
+      price != null ? price.toLocaleString('vi-VN') + '₫' : '—';
+
+    const formatLeadTime = (days: number | undefined): string =>
+      days != null && days > 0 ? `${days} ngày` : '—';
+
+    const supplierGroups = new Map<string, typeof variants>();
+    const noSupplierKey = 'Không xác định';
+
+    for (const v of variants) {
+      const key = v.supplierName?.trim() || noSupplierKey;
+      if (!supplierGroups.has(key)) supplierGroups.set(key, []);
+      supplierGroups.get(key)!.push(v);
+    }
+
+    const supplierGroupsArray = Array.from(supplierGroups.entries()).map(([supplierName, items]) => ({
+      supplierName,
+      items: items.map(v => ({
+        product: v.productName,
+        sku: v.sku,
+        suggestedQuantity: v.suggestedRestockQuantity,
+        negotiatedPrice: formatPrice(v.negotiatedPrice),
+        leadTimeDays: formatLeadTime(v.estimatedLeadTimeDays),
+        currentStock: v.totalQuantity,
+        slowStockRisk: v.slowStockRisk || null
+      }))
+    }));
+
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || '#';
+    const subject = `[AI Restock Prediction] ${variants.length} sản phẩm cần nhập - ${reportDate}`;
+
+    const sendResults = await Promise.allSettled(
+      recipients.map(recipient =>
+        this.emailService.sendTemplateEmail(
+          recipient,
+          subject,
+          EmailTemplate.RESTOCK_AI_PREDICTION as string,
+          {
+            userName: 'Staff Team',
+            generatedAt,
+            totalSuggestions: variants.length,
+            supplierGroups: supplierGroupsArray,
+            frontendUrl
+          }
+        )
+      )
+    );
+
+    const successCount = sendResults.filter(r => r.status === 'fulfilled').length;
+    const failCount = sendResults.length - successCount;
+    if (failCount > 0) {
+      this.logger.warn(`[DailyRestockPrediction] Partial send: ${successCount}/${recipients.length} recipients`);
+    } else {
+      this.logger.log(`[DailyRestockPrediction] Sent to ${successCount} staff/admin recipient(s), ${variants.length} variants suggested`);
+    }
   }
 }

@@ -8,6 +8,7 @@ import { RestockModule } from 'src/infrastructure/domain/restock/restock.module'
 import { SlowStockModule } from 'src/infrastructure/domain/slow-stock/slow-stock.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { SourcingModule } from 'src/infrastructure/domain/sourcing/sourcing.module';
+import { EmailModule } from 'src/infrastructure/domain/common/email.module';
 import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositories/inventory-prisma.repository';
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { InventoryPrismaRepository } from 'src/infrastructure/domain/repositorie
     RestockModule,
     SlowStockModule,
     PrismaModule,
-    SourcingModule
+    SourcingModule,
+    EmailModule
   ],
   providers: [InventoryService, InventoryTool, InventoryPrismaRepository],
   exports: [InventoryService, InventoryTool]

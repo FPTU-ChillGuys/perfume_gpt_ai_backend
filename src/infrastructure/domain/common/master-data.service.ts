@@ -1,21 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaMasterDataRepository } from 'src/infrastructure/domain/repositories/prisma-master-data.repository';
 import { JaroWinklerDistance } from 'natural';
 
 @Injectable()
 export class MasterDataService {
+  private readonly logger = new Logger(MasterDataService.name);
+
   constructor(private readonly masterDataRepo: PrismaMasterDataRepository) {}
 
   async getNormalizationContextData() {
-    const [notes, families, attributes, products, variants] = await Promise.all(
-      [
-        this.masterDataRepo.getScentNotesForContext(300),
-        this.masterDataRepo.getOlfactoryFamiliesForContext(200),
-        this.masterDataRepo.getAllAttributesWithValues(),
-        this.masterDataRepo.getProductsForContext(300),
-        this.masterDataRepo.getProductVariantsForContext(600)
-      ]
-    );
+    const t0 = Date.now();
+
+    const notes = await this.masterDataRepo.getScentNotesForContext(150);
+    this.logger.log(`NormContext: notes ${notes.length} (${Date.now() - t0}ms)`);
+
+    const t1 = Date.now();
+    const families = await this.masterDataRepo.getOlfactoryFamiliesForContext(100);
+    this.logger.log(`NormContext: families ${families.length} (${Date.now() - t1}ms)`);
+
+    const t2 = Date.now();
+    const attributes = await this.masterDataRepo.getAllAttributesWithValues();
+    this.logger.log(`NormContext: attributes ${attributes.length} (${Date.now() - t2}ms)`);
+
+    const t3 = Date.now();
+    const products = await this.masterDataRepo.getProductsForContext(100);
+    this.logger.log(`NormContext: products ${products.length} (${Date.now() - t3}ms)`);
+
+    const t4 = Date.now();
+    const variants = await this.masterDataRepo.getProductVariantsForContext(200);
+    this.logger.log(`NormContext: variants ${variants.length} (${Date.now() - t4}ms)`);
+    this.logger.log(`NormContext: total ${Date.now() - t0}ms`);
 
     const origins = Array.from(
       new Set(

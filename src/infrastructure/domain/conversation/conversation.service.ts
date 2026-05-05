@@ -206,7 +206,7 @@ export class ConversationService {
   async chat(
     request: ChatRequest
   ): Promise<BaseResponse<ConversationResponse>> {
-    const context = this.buildChatContext(request);
+    const context = await this.buildChatContext(request);
     this.logger.log(
       `[CHAT] Analyzing message: "${context.messageText.substring(0, 50)}..."`
     );
@@ -228,6 +228,9 @@ export class ConversationService {
     // Phase 5: Gọi AI chính
     const aiResponse = await this.executeAIGeneration(finalMessages, context);
 
+    // Sanitize variant IDs leak from AI message
+    this.sanitizeVariantIdsFromMessage(aiResponse);
+
     // Phase 6: Hydrate products
     await this.hydrateProductsInResponse(aiResponse, analysis.budget);
 
@@ -239,7 +242,7 @@ export class ConversationService {
   // ==========================================
 
   async chatV11(request: ChatRequest): Promise<BaseResponse<ChatV11Response>> {
-    const context = this.buildChatContext(request);
+    const context = await this.buildChatContext(request);
     this.logger.log(
       `[CHAT-V11] Analyzing message: "${context.messageText.substring(0, 50)}..."`
     );
@@ -254,9 +257,13 @@ export class ConversationService {
       }
     );
 
-    const finalMessages = await this.buildContextMessages(context, analysis);
+    const finalMessages = await this.
+    buildContextMessages(context, analysis);
 
     const aiResponse = await this.executeAIGeneration(finalMessages, context);
+
+    // Sanitize variant IDs leak from AI message
+    this.sanitizeVariantIdsFromMessage(aiResponse);
 
     await this.hydrateProductsInResponse(aiResponse, analysis.budget);
 
@@ -306,10 +313,14 @@ export class ConversationService {
   // ==========================================
 
   /** Xây dựng ChatContext từ request */
-  private buildChatContext(request: ChatRequest) {
+  private async buildChatContext(request: ChatRequest) {
     const userId = request.userId ?? uuid();
     const conversationId = request.id;
-    const isGuestUser = !request.userId;
+    let isGuestUser = !request.userId;
+    if (request.userId) {
+      const userExists = await this.userService.isUserExistedByUserId(request.userId);
+      isGuestUser = !userExists.payload;
+    }
     const isStaff = request.isStaff === true;
 
     const convertedMessages: UIMessage[] = convertToMessages(
@@ -377,6 +388,15 @@ export class ConversationService {
         `NORMALIZED_QUERY_ANALYSIS: ${JSON.stringify(analysis)}`
       )
     );
+
+    // Inject guest user notice so AI knows not to attempt cart operations
+    if (context.isGuestUser) {
+      finalMessages.push(
+        this.responseBuilder.createSystemMessage(
+          'GUEST_USER_NOTICE: Người dùng chưa đăng nhập. KHÔNG gọi tool addToCart. Nếu người dùng yêu cầu thêm vào giỏ hàng, lịch sự nhắc họ đăng nhập.'
+        )
+      );
+    }
 
     // Phase 3: Thực thi truy vấn dữ liệu (Multi-Query Execution)
     const shouldQuery = [
@@ -596,6 +616,28 @@ export class ConversationService {
           );
         }
       }
+    }
+  }
+
+  /** Strip variant UUIDs leaked into AI response message text */
+  private sanitizeVariantIdsFromMessage(aiResponse: any): void {
+    if (!aiResponse?.message || typeof aiResponse.message !== 'string') return;
+
+    const UUID_PATTERN =
+      /\b(variantId|variant_id|biến thể)\s*[:：]?\s*[0-9a-f]{8}[-]?[0-9a-f]{4}[-]?[0-9a-f]{4}[-]?[0-9a-f]{4}[-]?[0-9a-f]{12}\b/gi;
+
+    let sanitized = aiResponse.message.replace(UUID_PATTERN, '');
+
+    // Also catch bare UUIDs that might appear standalone in error messages
+    const BARE_UUID = /\b[0-9a-f]{8}[-]?[0-9a-f]{4}[-]?[0-9a-f]{4}[-]?[0-9a-f]{4}[-]?[0-9a-f]{12}\b/gi;
+    sanitized = sanitized.replace(BARE_UUID, '');
+
+    // Clean up double spaces / empty parentheses left from removal
+    sanitized = sanitized.replace(/\s{2,}/g, ' ').replace(/\(\s*\)/g, '').trim();
+
+    if (sanitized !== aiResponse.message) {
+      this.logger.log('[SANITIZE] Removed variant UUIDs from AI message');
+      aiResponse.message = sanitized;
     }
   }
 

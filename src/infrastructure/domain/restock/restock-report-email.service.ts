@@ -44,8 +44,11 @@ export class RestockReportEmailService {
             AspNetRoles: {
               OR: [
                 { NormalizedName: 'STAFF' },
+                { NormalizedName: 'ADMIN' },
                 { Name: { contains: 'staff' } },
-                { Name: { contains: 'Staff' } }
+                { Name: { contains: 'Staff' } },
+                { Name: { contains: 'admin' } },
+                { Name: { contains: 'Admin' } }
               ]
             }
           }
@@ -180,7 +183,7 @@ export class RestockReportEmailService {
     };
   }
 
-  // @Cron('0 0 8 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  @Cron('0 0 8 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async runDailyCriticalRestockReport(): Promise<void> {
     this.logger.log('[DailyCriticalRestockReport] Cron job started');
     try {

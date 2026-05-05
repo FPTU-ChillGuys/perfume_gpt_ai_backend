@@ -12,7 +12,7 @@ export const slowStockVariantSchema = z.object({
   totalQuantity: z.number(),
   averageDailySales: z.number(),
   daysOfSupply: z.number(),
-  trend: z.enum(['INCREASING', 'STABLE', 'DECLINING']),
+  trend: z.enum(['INCREASING', 'STABLE', 'DECLINING', 'NO_SALES']),
   volatility: z.enum(['LOW', 'MEDIUM', 'HIGH']),
   riskLevel: z.enum(['CRITICAL', 'HIGH', 'MEDIUM']),
   category: z.enum(['current_slow', 'early_warning']),

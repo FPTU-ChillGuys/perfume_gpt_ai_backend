@@ -8,6 +8,7 @@ import {
   AIAcceptanceContextType,
   AI_ACCEPTANCE_DEFAULT_VISIBLE_HOURS
 } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.constants';
+import { AIAcceptanceResponse } from 'src/application/dtos/response/ai-acceptance/ai-acceptance.response';
 
 export interface CreatePendingAIAcceptanceInput {
   contextType: AIAcceptanceContextType;
@@ -36,6 +37,8 @@ export interface AIAcceptanceMetrics {
   pending: number;
   noClick: number;
   acceptanceRate: number;
+  rejectionRate: number;
+  pendingRate: number;
 }
 
 @Injectable()
@@ -151,7 +154,7 @@ export class AIAcceptanceService {
   }
 
   async getAllAIAcceptanceStatus(): Promise<
-    BaseResponse<AIAcceptance[] | null>
+    BaseResponse<AIAcceptanceResponse[] | null>
   > {
     return this.err.wrap(async () => {
       const aiAcceptance = await this.unitOfWork.AIAcceptanceRepo.findAll({
@@ -160,7 +163,10 @@ export class AIAcceptanceService {
       if (!aiAcceptance) {
         return this.err.fail('errors.ai.acceptance_not_found');
       }
-      return { success: true, data: aiAcceptance };
+      const response = aiAcceptance
+        .map(AIAcceptanceResponse.fromEntity)
+        .filter((r): r is AIAcceptanceResponse => r !== null);
+      return { success: true, data: response };
     }, 'errors.common.internal');
   }
 
@@ -188,11 +194,24 @@ export class AIAcceptanceService {
         accepted,
         pending,
         noClick,
-        acceptanceRate: totalForRate > 0 ? (accepted / totalForRate) * 100 : 0
+        acceptanceRate: totalForRate > 0 ? (accepted / totalForRate) * 100 : 0,
+        rejectionRate: totalForRate > 0 ? (noClick / totalForRate) * 100 : 0,
+        pendingRate: records.length > 0 ? (pending / records.length) * 100 : 0
       };
 
       return { success: true, data: metrics };
     }, 'errors.common.internal');
+  }
+
+  async getAIAcceptanceRates(
+    contextType?: AIAcceptanceContextType
+  ): Promise<BaseResponse<{ acceptanceRate: number; rejectionRate: number; pendingRate: number }>> {
+    const metricsResult = await this.getAIAcceptanceMetrics(contextType);
+    if (!metricsResult.success || !metricsResult.data) {
+      return { success: false, error: metricsResult.error || 'Failed to get rates' };
+    }
+    const { acceptanceRate, rejectionRate, pendingRate } = metricsResult.data;
+    return { success: true, data: { acceptanceRate, rejectionRate, pendingRate } };
   }
 
   async createAndAttachAIAcceptanceToProducts<T extends Record<string, any>>(

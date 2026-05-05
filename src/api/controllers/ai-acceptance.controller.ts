@@ -13,6 +13,7 @@ import { ApiPublicErrorResponses } from 'src/application/decorators/swagger-erro
 import { CreateResponseAIAcceptanceRequest } from 'src/application/dtos/request/ai-acceptance.request';
 import { BaseResponse } from 'src/application/dtos/response/common/base-response';
 import { AIAcceptance } from 'src/domain/entities/ai-acceptance.entities';
+import { AIAcceptanceResponse } from 'src/application/dtos/response/ai-acceptance/ai-acceptance.response';
 import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import {
   AIAcceptanceContextType,
@@ -74,9 +75,9 @@ export class AIAcceptanceController {
   @ApiOperation({
     summary: 'Lấy trạng thái chấp nhận AI của tất cả gợi ý'
   })
-  @ApiBaseResponse(AIAcceptance)
+  @ApiBaseResponse(AIAcceptanceResponse)
   async getAllAIAcceptanceStatus(): Promise<
-    BaseResponse<AIAcceptance[] | null>
+    BaseResponse<AIAcceptanceResponse[] | null>
   > {
     this.logger.log(`[GET] /ai-acceptance/status/all`);
     return this.aiAcceptanceService.getAllAIAcceptanceStatus();
@@ -148,5 +149,24 @@ export class AIAcceptanceController {
       `[GET] /ai-acceptance/metrics - contextType=${contextType}`
     );
     return this.aiAcceptanceService.getAIAcceptanceMetrics(contextType);
+  }
+
+  @Get('rates')
+  @ApiOperation({
+    summary: 'Lấy 3 tỉ lệ acceptance (chấp nhận / từ chối / chưa xác định)'
+  })
+  @ApiQuery({
+    name: 'contextType',
+    required: false,
+    enum: AI_ACCEPTANCE_CONTEXTS
+  })
+  @ApiBaseResponse(Object)
+  async getAIAcceptanceRates(
+    @Query('contextType') contextType?: AIAcceptanceContextType
+  ): Promise<BaseResponse<{ acceptanceRate: number; rejectionRate: number; pendingRate: number }>> {
+    this.logger.log(
+      `[GET] /ai-acceptance/rates - contextType=${contextType}`
+    );
+    return this.aiAcceptanceService.getAIAcceptanceRates(contextType);
   }
 }

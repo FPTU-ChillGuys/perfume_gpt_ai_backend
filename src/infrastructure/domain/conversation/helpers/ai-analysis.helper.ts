@@ -162,6 +162,55 @@ export class AIAnalysisHelper {
     return logicGroups.length > 0 ? logicGroups : null;
   }
 
+  /** Trích xuất gender từ analysis khi AI không điền genderValues */
+  private extractGenderFromAnalysis(analysis: AnalysisObject): string[] {
+    const GENDER_KEYWORDS: Record<string, string[]> = {
+      Male: ['nam', 'nam tính', 'đàn ông', 'for him', 'male', 'men'],
+      Female: ['nữ', 'nữ tính', 'đàn bà', 'for her', 'female', 'women'],
+      Unisex: ['unisex', 'uni', 'cả nam và nữ', 'cho cả hai']
+    };
+
+    const found: string[] = [];
+
+    // 1. Quét normalizationMetadata type: 'gender'
+    if (Array.isArray(analysis.normalizationMetadata)) {
+      for (const entry of analysis.normalizationMetadata) {
+        if ((entry.type || '').toLowerCase() === 'gender') {
+          const value = entry.corrected || entry.original || '';
+          const lower = value.toLowerCase();
+          for (const [gender, keywords] of Object.entries(GENDER_KEYWORDS)) {
+            if (keywords.some((kw) => lower.includes(kw))) {
+              found.push(gender);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Quét logic array
+    const scanArray = (arr: (string | string[])[] | null) => {
+      if (!arr) return;
+      for (const item of arr) {
+        const values = Array.isArray(item) ? item : [item];
+        for (const v of values) {
+          const lower = v.toLowerCase();
+          for (const [gender, keywords] of Object.entries(GENDER_KEYWORDS)) {
+            if (keywords.some((kw) => lower.includes(kw))) {
+              found.push(gender);
+            }
+          }
+        }
+      }
+    };
+
+    scanArray(analysis.logic);
+    for (const query of analysis.queries || []) {
+      scanArray(query.logic);
+    }
+
+    return [...new Set(found)];
+  }
+
   /** Chuẩn hóa kết quả phân tích */
   private normalizeAnalysisForQuery(analysis: AnalysisObject): AnalysisObject {
     let queries = Array.isArray(analysis.queries) ? analysis.queries : [];
@@ -237,6 +286,15 @@ export class AIAnalysisHelper {
       strippedLogic.length > 0
         ? strippedLogic
         : this.rebuildLogicFromMetadata(analysis) || [];
+
+    // Extract gender from analysis data for downstream filtering
+    const extractedGender = this.extractGenderFromAnalysis(result);
+    if (extractedGender.length > 0) {
+      (result as any).genderValues = extractedGender;
+      this.logger.log(
+        `[AIAnalysisHelper] Extracted gender from analysis: ${JSON.stringify(extractedGender)}`
+      );
+    }
 
     return result;
   }

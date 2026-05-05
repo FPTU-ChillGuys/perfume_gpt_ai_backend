@@ -206,7 +206,7 @@ export class ConversationService {
   async chat(
     request: ChatRequest
   ): Promise<BaseResponse<ConversationResponse>> {
-    const context = this.buildChatContext(request);
+    const context = await this.buildChatContext(request);
     this.logger.log(
       `[CHAT] Analyzing message: "${context.messageText.substring(0, 50)}..."`
     );
@@ -242,7 +242,7 @@ export class ConversationService {
   // ==========================================
 
   async chatV11(request: ChatRequest): Promise<BaseResponse<ChatV11Response>> {
-    const context = this.buildChatContext(request);
+    const context = await this.buildChatContext(request);
     this.logger.log(
       `[CHAT-V11] Analyzing message: "${context.messageText.substring(0, 50)}..."`
     );
@@ -313,10 +313,14 @@ export class ConversationService {
   // ==========================================
 
   /** Xây dựng ChatContext từ request */
-  private buildChatContext(request: ChatRequest) {
+  private async buildChatContext(request: ChatRequest) {
     const userId = request.userId ?? uuid();
     const conversationId = request.id;
-    const isGuestUser = !request.userId;
+    let isGuestUser = !request.userId;
+    if (request.userId) {
+      const userExists = await this.userService.isUserExistedByUserId(request.userId);
+      isGuestUser = !userExists.payload;
+    }
     const isStaff = request.isStaff === true;
 
     const convertedMessages: UIMessage[] = convertToMessages(
@@ -384,6 +388,15 @@ export class ConversationService {
         `NORMALIZED_QUERY_ANALYSIS: ${JSON.stringify(analysis)}`
       )
     );
+
+    // Inject guest user notice so AI knows not to attempt cart operations
+    if (context.isGuestUser) {
+      finalMessages.push(
+        this.responseBuilder.createSystemMessage(
+          'GUEST_USER_NOTICE: Người dùng chưa đăng nhập. KHÔNG gọi tool addToCart. Nếu người dùng yêu cầu thêm vào giỏ hàng, lịch sự nhắc họ đăng nhập.'
+        )
+      );
+    }
 
     // Phase 3: Thực thi truy vấn dữ liệu (Multi-Query Execution)
     const shouldQuery = [

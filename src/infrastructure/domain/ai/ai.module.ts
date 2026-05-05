@@ -143,7 +143,11 @@ const aiRecommendationProvider: Provider = {
       undefined,
       undefined,
       undefined,
-      undefined,
+      {
+        enablePromptOptimization: true,
+        optimizationPrompt:
+          'Use case: recommendation/repurchase email generation. Preserve all product mentions and personalization context. Keep Vietnamese language intact.'
+      },
       undefined,
       err,
       promptLoader
@@ -226,12 +230,16 @@ const aiInventoryReportProvider: Provider = {
   ) =>
     new AIHelper(
       SYSTEM_PROMPT,
-      () => tools.getToolsForInventoryReport,
+      undefined,
       10,
       undefined,
       undefined,
       undefined,
-      undefined,
+      {
+        enablePromptOptimization: true,
+        optimizationPrompt:
+          'Use case: recommendation/repurchase email generation. Preserve all product mentions and personalization context. Keep Vietnamese language intact. Do not change product IDs, variant IDs, or TOON-encoded data.'
+      },
       undefined,
       err,
       promptLoader

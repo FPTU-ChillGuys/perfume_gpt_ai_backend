@@ -265,7 +265,7 @@ export class MasterDataTool {
 
         const context = await this.getNormalizationContext();
         const prompt = this.promptLoader.get('system.internal_norm_full', {
-          CONTEXT: JSON.stringify(context, null, 2),
+          CONTEXT: JSON.stringify(context),
           KEYWORDS: missingKeywords.join(', ')
         });
 

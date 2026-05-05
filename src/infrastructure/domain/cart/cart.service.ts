@@ -109,6 +109,39 @@ export class CartService {
     request: AddToCartRequest
   ): Promise<BaseResponse<string>> {
     return this.err.wrap(async () => {
+      // Check if user is admin/staff — backoffice accounts cannot add to cart
+      const userWithRoles = await this.prisma.aspNetUsers.findUnique({
+        where: { Id: userId },
+        select: {
+          AspNetUserRoles: {
+            select: {
+              AspNetRoles: { select: { Name: true } }
+            }
+          }
+        }
+      });
+
+      if (!userWithRoles) {
+        // Guest user — userId không tồn tại trong hệ thống
+        this.err.throw(
+          'errors.cart.user_not_found',
+          BadRequestWithDetailsException
+        );
+      }
+
+      const isBackOffice = userWithRoles.AspNetUserRoles.some(
+        (ur) =>
+          ur.AspNetRoles?.Name &&
+          ['admin', 'staff'].includes(ur.AspNetRoles.Name.toLowerCase())
+      );
+
+      if (isBackOffice) {
+        this.err.throw(
+          'errors.cart.admin_not_allowed',
+          BadRequestWithDetailsException
+        );
+      }
+
       const variant = await this.prisma.productVariants.findFirst({
         where: { Id: request.variantId, IsDeleted: false },
         include: { Stocks: true }

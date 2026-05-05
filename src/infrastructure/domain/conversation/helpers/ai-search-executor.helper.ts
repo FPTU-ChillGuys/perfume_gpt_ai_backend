@@ -174,7 +174,11 @@ export class AISearchExecutorHelper {
           this.logger.log(
             `[TASK][addToCart] Result for ${i.variantId || i.id}: Success=${addRes.success}${!addRes.success ? `, Error=${addRes.error}` : ''}`
           );
-          return { variantId: i.variantId || i.id, success: addRes.success };
+          return {
+            variantId: i.variantId || i.id,
+            success: addRes.success,
+            error: addRes.success ? undefined : addRes.error
+          };
         })
       );
     } else if (funcName === 'getCart') {

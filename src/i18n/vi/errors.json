@@ -207,6 +207,8 @@
   },
   "cart": {
     "not_found": "Cart item not found",
+    "user_not_found": "Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng",
+    "admin_not_allowed": "Tài khoản admin/staff không thể thêm giỏ hàng hoặc thanh toán online",
     "get": "Failed to retrieve cart",
     "create": "Failed to create cart",
     "add_item": "Failed to add item to cart",

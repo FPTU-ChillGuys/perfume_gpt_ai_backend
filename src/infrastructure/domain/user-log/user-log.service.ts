@@ -57,6 +57,8 @@ import {
   normalizeFeatureSnapshot,
   resolveAllUserLogRange
 } from 'src/infrastructure/domain/utils/user-log-summary.util';
+import { EventLogResponse } from 'src/application/dtos/response/event-log/event-log.response';
+import { UserService } from 'src/infrastructure/domain/user/user.service';
 
 @Injectable()
 export class UserLogService {
@@ -66,7 +68,8 @@ export class UserLogService {
     protected unitOfWork: UnitOfWork,
     private readonly err: I18nErrorHandler,
     @InjectQueue(QueueName.USER_LOG_SUMMARY_QUEUE)
-    private readonly userLogSummaryQueue: Queue
+    private readonly userLogSummaryQueue: Queue,
+    private readonly userService: UserService
   ) {}
 
   async enqueueRollingSummaryUpdate(userId: string): Promise<void> {
@@ -96,17 +99,18 @@ export class UserLogService {
     );
   }
 
-  async getAllEventLogs(): Promise<BaseResponse<EventLog[]>> {
+  async getAllEventLogs(): Promise<BaseResponse<EventLogResponse[]>> {
     return await this.err.wrap(async () => {
       const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({});
-      return { success: true, data: eventLogs };
+      const responses = await this.mapToResponseWithUserNames(eventLogs);
+      return { success: true, data: responses };
     }, 'errors.user_log.get_all');
   }
 
   /** Lay event log moi */
   async getEventLogs(
     request: EventLogQueryRequest
-  ): Promise<BaseResponse<EventLog[]>> {
+  ): Promise<BaseResponse<EventLogResponse[]>> {
     return await this.err.wrap(async () => {
       const eventLogs = await this.unitOfWork.EventLogRepo.getEventLogs({
         userId: request.userId,
@@ -119,13 +123,14 @@ export class UserLogService {
           : undefined
       });
 
-      return { success: true, data: eventLogs };
+      const responses = await this.mapToResponseWithUserNames(eventLogs);
+      return { success: true, data: responses };
     }, 'errors.user_log.get_by_user');
   }
 
   async getEventLogsPaged(
     request: EventLogPagedQueryRequest
-  ): Promise<BaseResponse<PagedResult<EventLog>>> {
+  ): Promise<BaseResponse<PagedResult<EventLogResponse>>> {
     return await this.err.wrap(async () => {
       const pageNumber = Math.max(Number(request.PageNumber) || 1, 1);
       const pageSize = Math.max(Number(request.PageSize) || 10, 1);
@@ -146,7 +151,18 @@ export class UserLogService {
         request.IsDescending
       );
 
-      return { success: true, data: paged };
+      const responses = await this.mapToResponseWithUserNames(paged.items);
+      
+      return {
+        success: true,
+        data: new PagedResult<EventLogResponse>({
+          items: responses,
+          pageNumber: paged.pageNumber,
+          pageSize: paged.pageSize,
+          totalCount: paged.totalCount,
+          totalPages: paged.totalPages
+        })
+      };
     }, 'errors.user_log.get_paged');
   }
 
@@ -367,7 +383,7 @@ export class UserLogService {
 
   async getEventLogsWithPeriod(
     allUserLogRequest: AllUserLogRequest
-  ): Promise<BaseResponse<EventLog[]>> {
+  ): Promise<BaseResponse<EventLogResponse[]>> {
     return await this.err.wrap(async () => {
       if (!allUserLogRequest.startDate) {
         allUserLogRequest.startDate = getFirstDateOfPeriod(
@@ -381,7 +397,8 @@ export class UserLogService {
         endDate: convertToUTC(endOfDay(allUserLogRequest.endDate!))
       });
 
-      return { success: true, data: eventLogs };
+      const responses = await this.mapToResponseWithUserNames(eventLogs);
+      return { success: true, data: responses };
     }, 'errors.user_log.get_with_period');
   }
 
@@ -962,6 +979,23 @@ export class UserLogService {
       period,
       startDate: normalizedStartDate,
       endDate: normalizedEndDate
+    });
+  }
+
+  private async mapToResponseWithUserNames(
+    eventLogs: EventLog[]
+  ): Promise<EventLogResponse[]> {
+    if (eventLogs.length === 0) return [];
+
+    const userIds = eventLogs
+      .map((log) => log.userId)
+      .filter((id): id is string => !!id);
+    const userNameMap = await this.userService.resolveUserNames(userIds);
+
+    return eventLogs.map((log) => {
+      const response = EventLogResponse.fromEntity(log)!;
+      response.userName = userNameMap.get(log.userId!) || 'Khách';
+      return response;
     });
   }
 }

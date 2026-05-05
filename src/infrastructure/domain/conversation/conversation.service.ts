@@ -22,6 +22,7 @@ import { AI_CONVERSATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
+import { UserService } from 'src/infrastructure/domain/user/user.service';
 import { PagedResult } from 'src/application/dtos/response/common/paged-result';
 
 // DTOs
@@ -59,6 +60,7 @@ export class ConversationService {
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userLogService: UserLogService,
     private readonly productService: ProductService,
+    private readonly userService: UserService,
 
     // Helpers
     private readonly analysisHelper: AIAnalysisHelper,
@@ -87,10 +89,10 @@ export class ConversationService {
         return this.err.fail('errors.conversation.not_found');
       }
 
-      return {
-        success: true,
-        data: ConversationResponse.fromEntity(conversation)!
-      };
+      const response = ConversationResponse.fromEntity(conversation)!;
+      await this.resolveUserNameForConversation(response);
+
+      return { success: true, data: response };
     }, 'errors.conversation.get_by_id');
   }
 
@@ -105,6 +107,8 @@ export class ConversationService {
       const data = conversations.map(
         (c) => ConversationResponse.fromEntity(c)!
       );
+      await this.resolveUserNameForConversations(data);
+
       return { success: true, data };
     }, 'errors.conversation.get_all');
   }
@@ -122,13 +126,17 @@ export class ConversationService {
         { populate: ['messages'] }
       );
 
+      const items = pagedResult.items
+        .map((c) => ConversationResponse.fromEntity(c)!)
+        .reverse();
+
+      await this.resolveUserNameForConversations(items);
+
       return {
         success: true,
         data: new PagedResult<ConversationResponse>({
           ...pagedResult,
-          items: pagedResult.items
-            .map((c) => ConversationResponse.fromEntity(c)!)
-            .reverse() // Đảo ngược thứ tự để hiển thị mới nhất trước
+          items
         })
       };
     }, 'errors.conversation.get_paginated');
@@ -588,6 +596,34 @@ export class ConversationService {
           );
         }
       }
+    }
+  }
+
+  private async resolveUserNameForConversation(
+    response: ConversationResponse
+  ): Promise<void> {
+    if (!response.userId) {
+      response.userName = 'Khách';
+      return;
+    }
+
+    const userNameMap = await this.userService.resolveUserNames([
+      response.userId
+    ]);
+    response.userName = userNameMap.get(response.userId) || 'Khách';
+  }
+
+  private async resolveUserNameForConversations(
+    responses: ConversationResponse[]
+  ): Promise<void> {
+    if (responses.length === 0) return;
+
+    const userNameMap = await this.userService.resolveUserNames(
+      responses.map((r) => r.userId).filter((id): id is string => !!id)
+    );
+
+    for (const resp of responses) {
+      resp.userName = userNameMap.get(resp.userId) || 'Khách';
     }
   }
 }

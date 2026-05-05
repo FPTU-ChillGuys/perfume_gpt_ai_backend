@@ -8,6 +8,8 @@ export interface UserEmailInfo {
   userName?: string;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface ActiveDailyRecommendationRecipient {
   id: string;
   email: string;
@@ -163,5 +165,27 @@ export class UserService {
     }
 
     return 'Khách hàng';
+  }
+
+  /**
+   * Resolve multiple userIds to display names in batch.
+   * Returns a Map where key=userId, value=displayName.
+   * Users not found in DB are NOT added to the map (caller defaults to "Khách").
+   */
+  async resolveUserNames(userIds: string[]): Promise<Map<string, string>> {
+    const userNameMap = new Map<string, string>();
+    const uniqueIds = [...new Set(userIds.filter((id) => !!id && UUID_REGEX.test(id)))];
+    if (uniqueIds.length === 0) return userNameMap;
+
+    const users = await this.prisma.aspNetUsers.findMany({
+      where: { Id: { in: uniqueIds } },
+      select: { Id: true, FullName: true, UserName: true }
+    });
+
+    for (const user of users) {
+      userNameMap.set(user.Id, this.formatDisplayName(user.FullName, user.UserName));
+    }
+
+    return userNameMap;
   }
 }

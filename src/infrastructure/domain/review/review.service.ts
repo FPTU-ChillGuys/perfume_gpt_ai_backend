@@ -99,7 +99,7 @@ function mapToReviewResponse(review: ReviewWithRelations): ReviewResponse {
     userId: review.UserId,
     userFullName: review.AspNetUsers_Reviews_UserIdToAspNetUsers.FullName,
     userProfilePictureUrl:
-      review.AspNetUsers_Reviews_UserIdToAspNetUsers.Media?.Url ?? null,
+      review.AspNetUsers_Reviews_UserIdToAspNetUsers.Media?.[0]?.Url ?? null,
     orderDetailId: review.OrderDetailId,
     variantId: review.OrderDetails.VariantId,
     variantName: buildVariantName(review),
@@ -130,7 +130,7 @@ function mapToReviewListItemResponse(
     userId: review.UserId,
     userFullName: review.AspNetUsers_Reviews_UserIdToAspNetUsers.FullName,
     userProfilePictureUrl:
-      review.AspNetUsers_Reviews_UserIdToAspNetUsers.Media?.Url ?? null,
+      review.AspNetUsers_Reviews_UserIdToAspNetUsers.Media?.[0]?.Url ?? null,
     variantId: review.OrderDetails.VariantId,
     variantName: buildVariantName(review),
     rating: review.Rating,

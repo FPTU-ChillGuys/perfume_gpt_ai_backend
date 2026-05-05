@@ -21,6 +21,7 @@ import {
   ministral_14b_2512,
   ministral_8b_2512,
   mistral_small_2603,
+  mistralai_voxtral_small_24b_2507,
   nemotron3Nano30bA3bNitro,
   qwen3_30b,
   qwen3_5_flash,
@@ -49,4 +50,4 @@ export const aiModelForOptimizePrompt = gpt5_4nano;
 
 export const aiModelForSearch = gpt5_4nano;
 
-export const aiModelForConversationAnalysis = gemma3n27b;
+export const aiModelForConversationAnalysis = mistralai_voxtral_small_24b_2507;

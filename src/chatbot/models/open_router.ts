@@ -98,3 +98,5 @@ export const qwen3_5_flash: LanguageModel = openrouter(
 export const seed1_6: LanguageModel = openrouter(
   'bytedance-seed/seed-1.6-flash'
 );
+
+export const mistralai_voxtral_small_24b_2507 : LanguageModel = openrouter('mistralai/voxtral-small-24b-2507');

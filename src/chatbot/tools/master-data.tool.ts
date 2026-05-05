@@ -273,7 +273,7 @@ export class MasterDataTool {
           await objectGenerationFromMessagesToResultWithErrorHandler<{
             mappings: {
               original: string;
-              corrected: string | string[] | null;
+              corrected: string[];
             }[];
           }>(
             aiModelForConversationAnalysis,
@@ -289,9 +289,7 @@ export class MasterDataTool {
               mappings: z.array(
                 z.object({
                   original: z.string(),
-                  corrected: z
-                    .union([z.string(), z.array(z.string())])
-                    .nullable()
+                  corrected: z.array(z.string())
                 })
               )
             }),
@@ -301,10 +299,8 @@ export class MasterDataTool {
         if (normalizationResult && (normalizationResult as any).mappings) {
           const reSearchTasks: Promise<void>[] = [];
           for (const mapping of (normalizationResult as any).mappings) {
-            if (mapping.corrected) {
-              const correctedTerms = Array.isArray(mapping.corrected)
-                ? mapping.corrected
-                : [mapping.corrected];
+            if (mapping.corrected && mapping.corrected.length > 0) {
+              const correctedTerms = mapping.corrected;
               const originalInfo = searchInfos.find(
                 (i) => i.keyword === mapping.original
               );

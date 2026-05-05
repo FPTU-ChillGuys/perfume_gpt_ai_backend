@@ -28,6 +28,11 @@ export const conversationOutput = {
       .array(z.string())
       .describe(
         'Gợi ý 3-4 câu hỏi tiếp theo cho người dùng dựa trên ngữ cảnh hội thoại'
+      ),
+    needsReanalysis: z
+      .boolean()
+      .describe(
+        'BẮT BUỘC luôn có. Đặt true nếu SEARCH_RESULTS hoàn toàn không liên quan đến yêu cầu người dùng (sai giới tính, sai thương hiệu, v.v.). Hệ thống sẽ phân tích lại 1 lần duy nhất. Đặt false trong mọi trường hợp khác.'
       )
   })
 };

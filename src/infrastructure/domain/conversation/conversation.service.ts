@@ -217,11 +217,11 @@ export class ConversationService {
     // Phase 2-4: Xây dựng context messages
     const finalMessages = await this.buildContextMessages(context, analysis);
 
-    // Phase 5: Gọi AI chính
-    const aiResponse = await this.executeAIGeneration(finalMessages, context);
+    // Phase 5: Gọi AI chính (có quyền phân tích lại 1 lần)
+    const aiResponse = await this.executeWithReanalysis(finalMessages, context, analysis);
 
     // Phase 6: Hydrate products
-    await this.hydrateProductsInResponse(aiResponse, analysis.budget);
+    await this.hydrateProductsInResponse(aiResponse, analysis.budget, (analysis as any).gender);
 
     return this.buildResponseOnly(aiResponse, context, request);
   }
@@ -248,9 +248,9 @@ export class ConversationService {
 
     const finalMessages = await this.buildContextMessages(context, analysis);
 
-    const aiResponse = await this.executeAIGeneration(finalMessages, context);
+    const aiResponse = await this.executeWithReanalysis(finalMessages, context, analysis);
 
-    await this.hydrateProductsInResponse(aiResponse, analysis.budget);
+    await this.hydrateProductsInResponse(aiResponse, analysis.budget, (analysis as any).gender);
 
     const userMessageText = context.messageText;
     const userMsg = new Message();
@@ -263,8 +263,17 @@ export class ConversationService {
         userMsg
       );
 
-    const aiMessageText =
+    let aiMessageText =
       typeof aiResponse === 'string' ? aiResponse : JSON.stringify(aiResponse);
+
+    if (aiResponse?.message && typeof aiResponse.message === 'string') {
+      aiMessageText = aiResponse.message
+        .replace(/\(?\s*biến thể\s*[0-9a-fA-F\-]{8,}\s*\)?/gi, '')
+        .replace(/\/\s*biến thể\s*[0-9a-fA-F\-]{8,}/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    }
+
     const aiMsg = new Message();
     aiMsg.sender = Sender.ASSISTANT;
     aiMsg.message = aiMessageText;
@@ -480,6 +489,32 @@ export class ConversationService {
     return finalMessages;
   }
 
+  /** Phase 5 với quyền phân tích lại: nếu AI phát hiện kết quả sai lệch → retry 1 lần */
+  private async executeWithReanalysis(
+    finalMessages: UIMessage[],
+    context: { userId: string; conversationId: string },
+    analysis: any
+  ): Promise<any> {
+    let aiResponse = await this.executeAIGeneration(finalMessages, context);
+
+    if (aiResponse?.needsReanalysis) {
+      this.logger.log(
+        `[CHAT] AI requested reanalysis for conversation=${context.conversationId} — retrying once`
+      );
+
+      const retryMessages = [...finalMessages];
+      retryMessages.push(
+        this.responseBuilder.createSystemMessage(
+          'REANALYSIS_ATTEMPTED'
+        )
+      );
+
+      aiResponse = await this.executeAIGeneration(retryMessages, context);
+    }
+
+    return aiResponse;
+  }
+
   /** Phase 5: Gọi AI chính và parse response */
   private async executeAIGeneration(
     finalMessages: UIMessage[],
@@ -523,6 +558,14 @@ export class ConversationService {
     context: { userId: string; conversationId: string },
     request: ChatRequest
   ): BaseResponse<ConversationResponse> {
+    if (aiResponse?.message && typeof aiResponse.message === 'string') {
+      aiResponse.message = aiResponse.message
+        .replace(/\(?\s*biến thể\s*[0-9a-fA-F\-]{8,}\s*\)?/gi, '')
+        .replace(/\/\s*biến thể\s*[0-9a-fA-F\-]{8,}/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    }
+
     const responseConversation = this.responseBuilder.buildConversationForSave(
       context.conversationId,
       context.userId,
@@ -540,7 +583,8 @@ export class ConversationService {
   /** Hỗ trợ lấy thông tin sản phẩm đầy đủ cho AI response */
   private async hydrateProductsInResponse(
     aiResponse: any,
-    budget?: any
+    budget?: any,
+    genderValues?: string[]
   ): Promise<void> {
     if (aiResponse.productTemp && Array.isArray(aiResponse.productTemp)) {
       const ids = aiResponse.productTemp
@@ -577,6 +621,24 @@ export class ConversationService {
               this.logger.log(
                 `[HYDRATE] Budget filter applied: ${min}-${max === Infinity ? '∞' : max}. ` +
                   `Products: ${productRes.data.length} → ${hydratedProducts.length}`
+              );
+            }
+
+            if (genderValues && Array.isArray(genderValues) && genderValues.length > 0) {
+              const expandedGenders = [...genderValues];
+              if (!expandedGenders.includes('Unisex')) {
+                expandedGenders.push('Unisex');
+              }
+              const lower = expandedGenders.map((g) => g.toLowerCase());
+
+              const before = hydratedProducts.length;
+              hydratedProducts = hydratedProducts.filter((product: any) => {
+                const g = (product.gender || '').toLowerCase();
+                return lower.includes(g);
+              });
+
+              this.logger.log(
+                `[HYDRATE] Gender filter applied: ${JSON.stringify(genderValues)} → ${before} → ${hydratedProducts.length} products`
               );
             }
 

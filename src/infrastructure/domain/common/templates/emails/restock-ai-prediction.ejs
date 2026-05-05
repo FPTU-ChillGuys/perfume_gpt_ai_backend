@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Restock Prediction Report</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f6f8fb;
+        color: #1f2937;
+      }
+      .wrapper {
+        max-width: 720px;
+        margin: 24px auto;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .header {
+        background: #1e40af;
+        color: #ffffff;
+        padding: 20px 24px;
+      }
+      .content {
+        padding: 20px 24px;
+      }
+      .badge {
+        display: inline-block;
+        background: #dbeafe;
+        color: #1e3a8a;
+        border: 1px solid #bfdbfe;
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 4px 10px;
+        margin-bottom: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+      }
+      th,
+      td {
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 10px 6px;
+        font-size: 14px;
+        vertical-align: top;
+      }
+      th {
+        color: #334155;
+        background: #f8fafc;
+      }
+      .muted {
+        color: #64748b;
+        font-size: 13px;
+      }
+      .footer {
+        padding: 16px 24px 24px;
+      }
+      .btn {
+        display: inline-block;
+        text-decoration: none;
+        background: #1d4ed8;
+        color: #ffffff;
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="header">
+        <h2 style="margin: 0">AI Restock Prediction Report</h2>
+      </div>
+
+      <div class="content">
+        <div class="badge">Generated at: <%= generatedAt %></div>
+        <p>Hello <%= userName %>,</p>
+        <p>AI đề xuất nhập <strong><%= totalSuggestions %></strong> sản phẩm</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>SKU</th>
+              <th>Suggested Qty</th>
+              <th>Negotiated Price</th>
+              <th>Lead Time</th>
+              <th>Current Stock</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% supplierGroups.forEach((group) => { %>
+              <tr>
+                <th colspan="6" style="text-align: left; background: #e0e7ff; font-weight: 600;">
+                  Supplier: <%= group.supplierName %>
+                </th>
+              </tr>
+              <% group.items.forEach((item) => { %>
+            <tr>
+              <td><%= item.product %></td>
+              <td><%= item.sku %></td>
+              <td><strong><%= item.suggestedQuantity %></strong></td>
+              <td><%= item.negotiatedPrice %></td>
+              <td><%= item.leadTimeDays %></td>
+              <td><%= item.currentStock %></td>
+            </tr>
+              <% }); %>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="footer">
+        <a class="btn" href="<%= frontendUrl %>">Open Inventory Dashboard</a>
+        <p class="muted" style="margin-top: 14px">This is an automated email. Please do not reply.</p>
+      </div>
+    </div>
+  </body>
+</html>

@@ -43,7 +43,8 @@ export interface EmailTemplateData {
 export enum EmailTemplate {
   RECOMMENDATION = 'recommendation',
   REPURCHASE = 'repurchase',
-  RESTOCK_CRITICAL_REPORT = 'restock-critical-report'
+  RESTOCK_CRITICAL_REPORT = 'restock-critical-report',
+  RESTOCK_AI_PREDICTION = 'restock-ai-prediction'
 }
 
 @Injectable()

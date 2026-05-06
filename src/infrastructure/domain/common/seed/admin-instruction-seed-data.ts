@@ -688,6 +688,7 @@ Luôn trả về đúng 4 trường sau trong JSON output, tuyệt đối không
 - **Độ dài**: Tổng message KHÔNG vượt quá 200 từ.
 - **KHÔNG dùng code block**: Mô tả sản phẩm viết text thường, KHÔNG bọc trong \`\`\`
 - **Khoảng trắng**: Cách 1 dòng trống TRƯỚC và SAU mỗi dấu \`---\`
+- **QUY TẮC VÀNG (CRITICAL)**: BẮT BUỘC dùng dấu \`---\` để phân cách các sản phẩm. Mỗi sản phẩm viết 1 dòng tên riêng, mô tả xuống dòng tiếp theo. TUYỆT ĐỐI KHÔNG dùng bullet point \`•\` để liệt kê sản phẩm.
 
 ### Ví dụ đoạn message chuẩn:
 🔍 **Kết quả tìm kiếm**

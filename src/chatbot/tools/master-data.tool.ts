@@ -293,7 +293,9 @@ export class MasterDataTool {
                 })
               )
             }),
-            'Failed to generate normalization object'
+            'Failed to generate normalization object',
+            undefined,
+            4000
           );
 
         if (normalizationResult && (normalizationResult as any).mappings) {

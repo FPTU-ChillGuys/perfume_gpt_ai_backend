@@ -1,4 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
+import { QueueName } from 'src/application/constant/processor';
 import { ConversationService } from 'src/infrastructure/domain/conversation/conversation.service';
 import { AIModule } from 'src/infrastructure/domain/ai/ai.module';
 import { UserLogModule } from 'src/infrastructure/domain/user-log/user-log.module';
@@ -33,7 +35,8 @@ import { NlpQueryMapper } from './helpers/nlp-query-mapper.helper';
     AdminInstructionModule,
     DictionaryModule,
     UserModule,
-    forwardRef(() => RecommendationModule)
+    forwardRef(() => RecommendationModule),
+    BullModule.registerQueue({ name: QueueName.CONVERSATION_IMPROVER_QUEUE })
   ],
   providers: [
     ConversationService,

@@ -8,7 +8,8 @@ export enum QueueName {
   AI_ACCEPTANCE_QUEUE = 'ai_acceptance_queue',
   ADMIN_INSTRUCTION_QUEUE = 'admin_instruction_queue',
   SURVEY_QUEUE = 'survey_queue',
-  USER_LOG_SUMMARY_QUEUE = 'user_log_summary_queue'
+  USER_LOG_SUMMARY_QUEUE = 'user_log_summary_queue',
+  CONVERSATION_IMPROVER_QUEUE = 'conversation_improver_queue'
 }
 
 export enum ConversationJobName {
@@ -25,4 +26,8 @@ export enum UserLogSummaryJobName {
 
 export enum ReviewJobName {
   PROCESS_REVIEW_SUMMARY = 'process_review_summary'
+}
+
+export enum ConversationImproverJobName {
+  IMPROVE_CONVERSATION = 'improve_conversation'
 }

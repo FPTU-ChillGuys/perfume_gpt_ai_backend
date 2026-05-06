@@ -36,7 +36,7 @@ export const embeddingModel: EmbeddingModel = openai.embedding(
   'text-embedding-3-small'
 );
 
-export const aiModel = gpt5_4nano;
+export const aiModel = geminiFlash3_1;
 
 export const aiModelForSurvey = gpt5_4nano;
 

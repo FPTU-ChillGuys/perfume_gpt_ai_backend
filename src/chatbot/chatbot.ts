@@ -145,6 +145,47 @@ export async function objectGenerationFromMessagesToResultWithErrorHandler<T>(
   return null;
 }
 
+export async function objectGenerationFromPromptToResultWithErrorHandler<T>(
+  model: LanguageModel,
+  prompt: string,
+  systemPrompt?: string,
+  output?: any,
+  errorMessage?: string,
+  temperature?: number,
+  maxTokens?: number
+): Promise<T | null> {
+  let retries = 2;
+  while (retries >= 0) {
+    try {
+      if (!prompt) {
+        console.error(
+          `[chatbot] objectGenerationFromPrompt: prompt is empty or undefined`
+        );
+        return null;
+      }
+      const result = await generateObject({
+        model: model,
+        prompt: prompt,
+        system: systemPrompt ? systemPrompt : undefined,
+        schema: output,
+        temperature: temperature,
+        maxOutputTokens: maxTokens
+      });
+      return result.object as T;
+    } catch (error) {
+      console.error(
+        `Error in ObjectGenerationFromPrompt (Remaining retries: ${retries}):`,
+        error
+      );
+      if (retries === 0) {
+        return null;
+      }
+      retries--;
+    }
+  }
+  return null;
+}
+
 export function streamTextGenerationFromPromptToResultWithErrorHandler(
   model: LanguageModel,
   prompt: string,

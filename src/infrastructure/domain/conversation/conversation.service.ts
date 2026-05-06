@@ -1,4 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Output, UIMessage } from 'ai';
 import { v4 as uuid } from 'uuid';
 
@@ -14,6 +17,10 @@ import {
   conversationSystemPrompt,
   INSTRUCTION_TYPE_CONVERSATION
 } from 'src/application/constant/prompts';
+import {
+  QueueName,
+  ConversationImproverJobName
+} from 'src/application/constant/processor';
 import { convertToMessages } from 'src/infrastructure/domain/utils/message-helper';
 import { buildCombinedPromptV5 } from 'src/infrastructure/domain/utils/prompt-builder';
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
@@ -54,6 +61,10 @@ export class ConversationService {
 
   private readonly logger = new Logger(ConversationService.name);
 
+  /** Toggle: read from ENABLE_IMPROVER env var, defaults to false for safety */
+  private readonly ENABLE_IMPROVER: boolean;
+  private readonly DELAY_BEFORE_IMPROVER_RUN: number;
+
   constructor(
     private readonly unitOfWork: UnitOfWork,
     @Inject(AI_CONVERSATION_HELPER) private readonly aiHelper: AIHelper,
@@ -61,6 +72,7 @@ export class ConversationService {
     private readonly userLogService: UserLogService,
     private readonly productService: ProductService,
     private readonly userService: UserService,
+    private readonly configService: ConfigService,
 
     // Helpers
     private readonly analysisHelper: AIAnalysisHelper,
@@ -68,8 +80,13 @@ export class ConversationService {
     private readonly searchExecutorHelper: AISearchExecutorHelper,
     private readonly responseBuilder: ConversationResponseBuilder,
     private readonly nlpQueryMapper: NlpQueryMapper,
-    private readonly err: I18nErrorHandler
-  ) {}
+    private readonly err: I18nErrorHandler,
+    @InjectQueue(QueueName.CONVERSATION_IMPROVER_QUEUE)
+    private readonly improverQueue: Queue
+  ) {
+    this.ENABLE_IMPROVER = this.configService.get<boolean>('ENABLE_IMPROVER', false);
+    this.DELAY_BEFORE_IMPROVER_RUN = this.configService.get<number>('IMPROVER_DELAY_MS', 60 * 1000);
+  }
 
   // ==========================================
   // 1. DATA ACCESS METHODS (CRUD)
@@ -247,6 +264,8 @@ export class ConversationService {
       `[CHAT-V11] Analyzing message: "${context.messageText.substring(0, 50)}..."`
     );
 
+    await this.cancelPendingImproverJob(context.conversationId);
+
     const analysis = await this.analysisHelper.analyze(
       context.messageText,
       context.previousContext,
@@ -304,6 +323,8 @@ export class ConversationService {
     response.aiMessage.sender = savedAiMsg.sender;
     response.aiMessage.message = savedAiMsg.message;
     response.aiMessage.createdAt = savedAiMsg.createdAt;
+
+    await this.scheduleImproverJob(context.conversationId);
 
     return { success: true, data: response };
   }
@@ -667,5 +688,46 @@ export class ConversationService {
     for (const resp of responses) {
       resp.userName = userNameMap.get(resp.userId) || 'Khách';
     }
+  }
+
+  // ==========================================
+  // 4. SELF-IMPROVING AI — Job Scheduling
+  // ==========================================
+
+  private async cancelPendingImproverJob(conversationId: string): Promise<void> {
+    if (!this.ENABLE_IMPROVER) return;
+
+    const jobId = this.improverJobId(conversationId);
+    const existing = await this.improverQueue.getJob(jobId).catch(() => null);
+    if (existing && (await existing.isDelayed())) {
+      await existing.remove().catch(() => {});
+      this.logger.log(
+        `[IMPROVER] Cancelled pending job: jobId=${jobId} conversationId=${conversationId}`
+      );
+    }
+  }
+
+  private async scheduleImproverJob(conversationId: string): Promise<void> {
+    if (!this.ENABLE_IMPROVER) return;
+
+    const delayMs = this.DELAY_BEFORE_IMPROVER_RUN;
+    const expectedRunAt = new Date(Date.now() + delayMs).toISOString();
+    this.logger.log(
+      `[IMPROVER] Scheduling job: jobId=${this.improverJobId(conversationId)} conversationId=${conversationId} expectedRunAt=${expectedRunAt} delayMs=${delayMs}`
+    );
+    await this.improverQueue.add(
+      ConversationImproverJobName.IMPROVE_CONVERSATION,
+      { conversationId },
+      {
+        jobId: this.improverJobId(conversationId),
+        delay: delayMs,
+        removeOnComplete: true,
+        removeOnFail: 10
+      }
+    );
+  }
+
+  private improverJobId(conversationId: string): string {
+    return `improv-${conversationId}`;
   }
 }

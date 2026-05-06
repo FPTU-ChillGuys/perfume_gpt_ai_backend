@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Output, UIMessage } from 'ai';
@@ -60,10 +61,9 @@ export class ConversationService {
 
   private readonly logger = new Logger(ConversationService.name);
 
-  /** Toggle: set false to disable AI self-improvement pipeline (for testing) */
-  ENABLE_IMPROVER = true;
-
-  DELAY_BEFORE_IMPROVER_RUN = 60 * 1000; // 1 phút
+  /** Toggle: read from ENABLE_IMPROVER env var, defaults to false for safety */
+  private readonly ENABLE_IMPROVER: boolean;
+  private readonly DELAY_BEFORE_IMPROVER_RUN: number;
 
   constructor(
     private readonly unitOfWork: UnitOfWork,
@@ -72,6 +72,7 @@ export class ConversationService {
     private readonly userLogService: UserLogService,
     private readonly productService: ProductService,
     private readonly userService: UserService,
+    private readonly configService: ConfigService,
 
     // Helpers
     private readonly analysisHelper: AIAnalysisHelper,
@@ -82,7 +83,10 @@ export class ConversationService {
     private readonly err: I18nErrorHandler,
     @InjectQueue(QueueName.CONVERSATION_IMPROVER_QUEUE)
     private readonly improverQueue: Queue
-  ) {}
+  ) {
+    this.ENABLE_IMPROVER = this.configService.get<boolean>('ENABLE_IMPROVER', false);
+    this.DELAY_BEFORE_IMPROVER_RUN = this.configService.get<number>('IMPROVER_DELAY_MS', 60 * 1000);
+  }
 
   // ==========================================
   // 1. DATA ACCESS METHODS (CRUD)

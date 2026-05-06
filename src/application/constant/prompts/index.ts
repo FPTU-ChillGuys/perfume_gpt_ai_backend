@@ -58,3 +58,6 @@ export type { InstructionDomainType } from './admin-instruction-types';
 
 // Survey answer analysis prompt
 export { SURVEY_ANSWER_ANALYSIS_SYSTEM_PROMPT } from './survey-question.analysis.system';
+
+// Improver prompt (technical infrastructure — AI self-improvement pipeline)
+export { IMPROVER_SYSTEM_PROMPT, buildImproverPrompt } from './improver.prompt';

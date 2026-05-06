@@ -4,6 +4,7 @@ import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-han
 import { PromptLoaderService } from 'src/infrastructure/domain/utils/prompt-loader.service';
 import {
   objectGenerationFromMessagesToResultWithErrorHandler,
+  objectGenerationFromPromptToResultWithErrorHandler,
   streamTextGenerationFromMessagesToResultWithErrorHandler,
   streamTextGenerationFromPromptToResultWithErrorHandler,
   textGenerationFromMessagesToResultWithErrorHandler,
@@ -381,6 +382,71 @@ export class AIHelper {
       }, 'errors.ai_helper.object_from_messages')) ?? {
         success: false,
         error: 'Failed to generate object from messages'
+      }
+    );
+  }
+
+  async objectGenerateFromPrompt<T>(
+    prompt: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AI SDK Schema<T> type interop: Zod schema must pass through as-is
+    output: any,
+    additionalSystemPrompt?: string,
+    errorMessage?: string
+  ): Promise<BaseResponse<T>> {
+    return (
+      (await this.err?.wrap(async () => {
+        const requestId = this.createRequestId('object-prompt');
+        const model = this.resolveModel();
+        const modelName = this.resolveModelName(model);
+        const startedAt = this.logStart(
+          requestId,
+          'objectGenerateFromPrompt',
+          modelName,
+          `promptLength=${prompt.length} hasOutputSchema=${!!output}`
+        );
+
+        const systemContext = `${this.systemPrompt ?? ''}\n${additionalSystemPrompt ?? ''}`;
+        try {
+          const object =
+            await objectGenerationFromPromptToResultWithErrorHandler<T>(
+              model,
+              prompt,
+              systemContext,
+              output,
+              errorMessage,
+              this.temperature,
+              this.maxTokens
+            );
+
+          this.logDone(
+            requestId,
+            'objectGenerateFromPrompt',
+            modelName,
+            startedAt,
+            `success=${!!object}`
+          );
+
+          if (!object) {
+            return {
+              success: false,
+              error: errorMessage || 'Failed to generate object from prompt'
+            };
+          }
+
+          return { success: true, data: object };
+        } catch (error) {
+          this.logError(
+            requestId,
+            'objectGenerateFromPrompt',
+            modelName,
+            startedAt,
+            error
+          );
+          throw error;
+        }
+      }, 'errors.ai_helper.object_from_prompt')) ?? {
+        success: false,
+        error: 'Failed to generate object from prompt'
       }
     );
   }

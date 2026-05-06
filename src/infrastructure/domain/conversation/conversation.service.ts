@@ -87,7 +87,9 @@ export class ConversationService {
     private readonly improverQueue: Queue
   ) {
     this.ENABLE_IMPROVER = this.configService.get<boolean>('ENABLE_IMPROVER', false);
-    this.DELAY_BEFORE_IMPROVER_RUN = this.configService.get<number>('IMPROVER_DELAY_MS', 60 * 1000);
+    this.DELAY_BEFORE_IMPROVER_RUN = Number(
+      this.configService.get('IMPROVER_DELAY_MS', 60 * 1000)
+    );
   }
 
   // ==========================================

@@ -21,4 +21,7 @@ export class ChatV11Response {
 
   @ApiProperty({ description: 'Tin nhắn AI phản hồi', type: ChatV11AiMessage })
   aiMessage: ChatV11AiMessage = new ChatV11AiMessage();
+
+  @ApiProperty({ description: 'ID của AI Acceptance record để tracking tương tác sản phẩm', required: false })
+  aiAcceptanceId?: string;
 }

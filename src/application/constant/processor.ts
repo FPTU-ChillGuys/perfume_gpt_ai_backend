@@ -31,3 +31,7 @@ export enum ReviewJobName {
 export enum ConversationImproverJobName {
   IMPROVE_CONVERSATION = 'improve_conversation'
 }
+
+export enum ProductSyncJobName {
+  REBUILD_EMBEDDING_AND_BM25 = 'rebuild_embedding_and_bm25'
+}

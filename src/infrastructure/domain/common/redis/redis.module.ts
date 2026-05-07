@@ -8,7 +8,8 @@ import { QueueName } from 'src/application/constant/processor';
 @Module({
   imports: [
     RecommendationModule,
-    BullModule.registerQueue({ name: QueueName.REVIEW_QUEUE })
+    BullModule.registerQueue({ name: QueueName.REVIEW_QUEUE }),
+    BullModule.registerQueue({ name: QueueName.INVENTORY_QUEUE })
   ],
   providers: [RedisSubscriberService, RedisRequestResponseService],
   exports: [RedisRequestResponseService]

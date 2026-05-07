@@ -135,7 +135,7 @@ export class ProductTool {
         this.logger.log(`[getNewestProducts] called`);
 
         const response =
-          await this.productService.getNewestProductsWithVariants({
+          await this.productService.getAllProductsWithVariants({
             PageNumber: input.pageNumber,
             PageSize: input.pageSize,
             SortOrder: 'desc',

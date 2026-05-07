@@ -26,6 +26,7 @@ import { buildCombinedPromptV5 } from 'src/infrastructure/domain/utils/prompt-bu
 import { encodeToolOutput } from 'src/chatbot/utils/toon-encoder.util';
 import { AIHelper } from 'src/infrastructure/domain/helpers/ai.helper';
 import { AI_CONVERSATION_HELPER } from 'src/infrastructure/domain/ai/ai.module';
+import { AIAcceptanceService } from 'src/infrastructure/domain/ai-acceptance/ai-acceptance.service';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { UserLogService } from 'src/infrastructure/domain/user-log/user-log.service';
 import { ProductService } from 'src/infrastructure/domain/product/product.service';
@@ -68,6 +69,7 @@ export class ConversationService {
   constructor(
     private readonly unitOfWork: UnitOfWork,
     @Inject(AI_CONVERSATION_HELPER) private readonly aiHelper: AIHelper,
+    private readonly aiAcceptanceService: AIAcceptanceService,
     private readonly adminInstructionService: AdminInstructionService,
     private readonly userLogService: UserLogService,
     private readonly productService: ProductService,
@@ -85,7 +87,9 @@ export class ConversationService {
     private readonly improverQueue: Queue
   ) {
     this.ENABLE_IMPROVER = this.configService.get<boolean>('ENABLE_IMPROVER', false);
-    this.DELAY_BEFORE_IMPROVER_RUN = this.configService.get<number>('IMPROVER_DELAY_MS', 60 * 1000);
+    this.DELAY_BEFORE_IMPROVER_RUN = Number(
+      this.configService.get('IMPROVER_DELAY_MS', 60 * 1000)
+    );
   }
 
   // ==========================================
@@ -138,14 +142,13 @@ export class ConversationService {
       const filter = request.userId ? { userId: request.userId } : {};
 
       const pagedResult = await this.unitOfWork.AIConversationRepo.getPaged(
-        request,
+        { ...request, SortOrder: 'desc' },
         filter,
         { populate: ['messages'] }
       );
 
       const items = pagedResult.items
-        .map((c) => ConversationResponse.fromEntity(c)!)
-        .reverse();
+        .map((c) => ConversationResponse.fromEntity(c)!);
 
       await this.resolveUserNameForConversations(items);
 
@@ -286,6 +289,21 @@ export class ConversationService {
 
     await this.hydrateProductsInResponse(aiResponse, analysis.budget);
 
+    let aiAcceptanceId: string | null = null;
+    if (Array.isArray(aiResponse.products) && aiResponse.products.length > 0) {
+      const attachResult =
+        await this.aiAcceptanceService.createAndAttachAIAcceptanceToProducts({
+          contextType: 'chatbot',
+          sourceRefId: context.conversationId,
+          products: aiResponse.products,
+          metadata: { productCount: aiResponse.products.length }
+        });
+      if (attachResult.aiAcceptanceId) {
+        aiResponse.products = attachResult.products;
+        aiAcceptanceId = attachResult.aiAcceptanceId;
+      }
+    }
+
     const userMessageText = context.messageText;
     const userMsg = new Message();
     userMsg.sender = Sender.USER;
@@ -323,6 +341,9 @@ export class ConversationService {
     response.aiMessage.sender = savedAiMsg.sender;
     response.aiMessage.message = savedAiMsg.message;
     response.aiMessage.createdAt = savedAiMsg.createdAt;
+    if (aiAcceptanceId) {
+      response.aiAcceptanceId = aiAcceptanceId;
+    }
 
     await this.scheduleImproverJob(context.conversationId);
 

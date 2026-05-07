@@ -52,6 +52,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     }
 
     message.conversation = conversation;
+    conversation.updatedAt = new Date();
     this.getEntityManager().persist(message);
     await this.flush();
 

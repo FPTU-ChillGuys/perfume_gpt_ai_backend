@@ -132,7 +132,7 @@ export class RecommendationService {
 
   private async buildNoPurchaseFallbackResponse(): Promise<string> {
     const newestProductsResponse =
-      await this.productService.getNewestProductsWithVariants({
+      await this.productService.getAllProductsWithVariants({
         PageNumber: 1,
         PageSize: 5,
         SortOrder: 'desc',

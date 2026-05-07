@@ -184,6 +184,17 @@ Mô tả: ${product.Description || 'Không có mô tả'}.
     }
   }
 
+  async deleteEmbedding(productId: string): Promise<boolean> {
+    try {
+      await this.prisma.$executeRaw`DELETE FROM product_embeddings WHERE product_id = ${productId}::uuid`;
+      this.logger.log(`Deleted embedding for product: ${productId}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error deleting embedding for ${productId}`, error);
+      return false;
+    }
+  }
+
   private async fetchProductForEmbedding(
     productId: string
   ): Promise<ProductData | null> {

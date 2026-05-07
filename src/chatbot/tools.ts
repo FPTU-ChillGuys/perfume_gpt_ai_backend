@@ -48,6 +48,7 @@ export class Tools implements OnModuleInit {
       queryProducts: this.productTool.queryProducts,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getLeastSellingProducts: this.productTool.getLeastSellingProducts,
       getInventoryStock: this.inventoryTool.getInventoryStock
     };
   }
@@ -95,6 +96,7 @@ export class Tools implements OnModuleInit {
       getAllProducts: this.productTool.getAllProducts,
       getNewestProducts: this.productTool.getNewestProducts,
       getBestSellingProducts: this.productTool.getBestSellingProducts,
+      getLeastSellingProducts: this.productTool.getLeastSellingProducts,
       getOrderDetailsWithOrdersByUserId:
         this.orderTool.getOrderDetailsWithOrdersByUserId,
       getOwnProfile: this.profileTool.getOwnProfile,

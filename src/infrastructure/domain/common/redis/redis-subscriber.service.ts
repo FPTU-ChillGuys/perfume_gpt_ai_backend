@@ -8,11 +8,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
-import { QueueName, ReviewJobName } from 'src/application/constant/processor';
+import { QueueName, ReviewJobName, ProductSyncJobName } from 'src/application/constant/processor';
 import { RecommendationService } from '../../recommendation/recommandation.service';
 
 const ORDER_CREATED_CHANNEL = 'order_created';
 const REVIEW_CREATED_CHANNEL = 'review_created';
+const PRODUCT_UPDATED_CHANNEL = 'product:updated';
 
 @Injectable()
 export class RedisSubscriberService
@@ -24,7 +25,8 @@ export class RedisSubscriberService
   constructor(
     private readonly configService: ConfigService,
     private readonly recommendationService: RecommendationService,
-    @InjectQueue(QueueName.REVIEW_QUEUE) private readonly reviewQueue: Queue
+    @InjectQueue(QueueName.REVIEW_QUEUE) private readonly reviewQueue: Queue,
+    @InjectQueue(QueueName.INVENTORY_QUEUE) private readonly inventoryQueue: Queue
   ) {}
 
   // ─── Lifecycle Hooks ───────────────────────────────────────────────────────
@@ -44,10 +46,11 @@ export class RedisSubscriberService
       await this.subscriber.connect();
       await this.subscriber.subscribe(
         ORDER_CREATED_CHANNEL,
-        REVIEW_CREATED_CHANNEL
+        REVIEW_CREATED_CHANNEL,
+        PRODUCT_UPDATED_CHANNEL
       );
       this.logger.log(
-        `[RedisSubscriber] Subscribed to channels: ${ORDER_CREATED_CHANNEL}, ${REVIEW_CREATED_CHANNEL}`
+        `[RedisSubscriber] Subscribed to channels: ${ORDER_CREATED_CHANNEL}, ${REVIEW_CREATED_CHANNEL}, ${PRODUCT_UPDATED_CHANNEL}`
       );
 
       this.subscriber.on('message', (channel: string, message: string) => {
@@ -55,6 +58,8 @@ export class RedisSubscriberService
           this.handleOrderCreated(message);
         } else if (channel === REVIEW_CREATED_CHANNEL) {
           this.handleReviewCreated(message);
+        } else if (channel === PRODUCT_UPDATED_CHANNEL) {
+          this.handleProductUpdated(message);
         }
       });
     } catch (err) {
@@ -70,7 +75,8 @@ export class RedisSubscriberService
       if (this.subscriber) {
         await this.subscriber.unsubscribe(
           ORDER_CREATED_CHANNEL,
-          REVIEW_CREATED_CHANNEL
+          REVIEW_CREATED_CHANNEL,
+          PRODUCT_UPDATED_CHANNEL
         );
         await this.subscriber.quit();
         this.logger.log('[RedisSubscriber] Disconnected from Redis.');
@@ -173,6 +179,55 @@ export class RedisSubscriberService
     } catch (err) {
       this.logger.error(
         `[RedisSubscriber][REVIEW_CREATED] Failed to process message: ${message}`,
+        err
+      );
+    }
+  }
+
+  /**
+   * Handles an incoming `product:updated` message from Redis Pub/Sub.
+   * Triggered by .NET backend when a product is created, updated, or deleted.
+   * Queues a BullMQ job to rebuild embeddings and refresh BM25 index.
+   */
+  private handleProductUpdated(message: string): void {
+    try {
+      const payload = JSON.parse(message) as {
+        productId?: string;
+        action?: string;
+      };
+      const { productId, action } = payload;
+
+      if (!productId || !action) {
+        this.logger.warn(
+          `[RedisSubscriber][PRODUCT_UPDATED] Invalid payload: ${message}`
+        );
+        return;
+      }
+
+      this.logger.log(
+        `[RedisSubscriber][PRODUCT_UPDATED] productId=${productId} action=${action}`
+      );
+
+      // Add to BullMQ inventory queue for background processing
+      this.inventoryQueue
+        .add(
+          ProductSyncJobName.REBUILD_EMBEDDING_AND_BM25,
+          { productId, action },
+          {
+            removeOnComplete: true,
+            removeOnFail: false,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 }
+          }
+        )
+        .catch((err) => {
+          this.logger.error(
+            `[RedisSubscriber][PRODUCT_UPDATED] Failed to add job to inventory_queue: ${err?.message}`
+          );
+        });
+    } catch (err) {
+      this.logger.error(
+        `[RedisSubscriber][PRODUCT_UPDATED] Failed to parse message: ${message}`,
         err
       );
     }

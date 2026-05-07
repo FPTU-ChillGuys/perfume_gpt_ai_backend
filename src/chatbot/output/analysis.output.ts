@@ -15,6 +15,17 @@ const budgetSchema = z
   })
   .nullable();
 
+const queryOptionsSchema = z
+  .object({
+    pageSize: z.number().min(1).max(100).nullable(),
+    gender: z.array(z.string()).nullable(),
+    sortOrder: z.enum(['asc', 'desc']).nullable()
+  })
+  .nullable()
+  .describe(
+    'Optional query parameters for product search functions (getBestSellingProducts, getNewestProducts, getLeastSellingProducts). Controls page size, gender filter, and sort direction.'
+  );
+
 const functionCallSchema = z
   .object({
     name: z.enum([
@@ -29,6 +40,7 @@ const functionCallSchema = z
       'clearCart'
     ]),
     purpose: z.enum(['main', 'support', 'task']),
+    queryOptions: queryOptionsSchema,
     arguments: z
       .object({
         items: z

@@ -289,31 +289,11 @@ export class InventoryService {
   }
 
   async getInventoryOverallStats() {
-    const now = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(now.getDate() + 30);
-
-    const [
-      totalSku,
-      lowStockSku,
-      outOfStockSku,
-      expiredBatches,
-      nearExpiryBatches
-    ] = await Promise.all([
-      this.inventoryPrismaRepo.countVariants(),
-      this.inventoryPrismaRepo.countLowStocks(),
-      this.inventoryPrismaRepo.countOutOfStocks(),
-      this.inventoryPrismaRepo.countExpiredBatches(now),
-      this.inventoryPrismaRepo.countNearExpiryBatches(now, thirtyDaysFromNow)
-    ]);
+    const stats = await this.inventoryPrismaRepo.getInventoryOverallStats();
 
     return {
-      totalSku,
-      lowStockSku: lowStockSku + outOfStockSku,
-      outOfStockSku,
-      expiredBatches,
-      nearExpiryBatches,
-      criticalAlerts: outOfStockSku
+      ...stats,
+      criticalAlerts: stats.outOfStockSku
     };
   }
 
@@ -325,13 +305,16 @@ export class InventoryService {
 
     const [problematicStocks, standardStocks] = await Promise.all([
       this.inventoryPrismaRepo.findProblematicStocks(thirtyDaysFromNow),
-      this.inventoryPrismaRepo.findAllStocksSorted(1000)
+      this.inventoryPrismaRepo.findAllStocksSorted(200)
     ]);
 
-    const { mergedStocks, existingVariantIds } = this.mergeStocks(
-      problematicStocks,
-      standardStocks
-    );
+    const { mergedStocks } = this.mergeStocks(problematicStocks, standardStocks);
+
+    if (mergedStocks.length > 200) {
+      mergedStocks.splice(200);
+    }
+
+    const existingVariantIds = new Set(mergedStocks.map((s) => s.VariantId));
     const batches = await this.inventoryPrismaRepo.findBatchesByVariantIds(
       Array.from(existingVariantIds)
     );
@@ -370,15 +353,15 @@ export class InventoryService {
 
   private buildReportMarkdown(
     stats: Awaited<ReturnType<InventoryService['getInventoryOverallStats']>>,
-    mergedStocks: Awaited<
-      ReturnType<InventoryPrismaRepository['findProblematicStocks']>
-    >,
-    batches: Awaited<
-      ReturnType<InventoryPrismaRepository['findBatchesByVariantIds']>
-    >,
+    mergedStocks: Awaited<ReturnType<InventoryPrismaRepository['findProblematicStocks']>>,
+    batches: Awaited<ReturnType<InventoryPrismaRepository['findBatchesByVariantIds']>>,
     now: Date,
     thirtyDaysFromNow: Date
   ): string {
+    if (mergedStocks.length > 200) {
+      mergedStocks.splice(200);
+    }
+
     const batchesByVariantId = new Map<string, typeof batches>();
     batches.forEach((b) => {
       const existing = batchesByVariantId.get(b.VariantId) || [];

@@ -187,7 +187,7 @@ export class AIAcceptanceService {
       const noClick = records.filter(
         (record) => !record.isAccepted && this.isVisibleRecord(record, now)
       ).length;
-      const totalForRate = accepted + noClick;
+      const totalForRate = records.length;
 
       const metrics: AIAcceptanceMetrics = {
         total: records.length,
@@ -196,7 +196,7 @@ export class AIAcceptanceService {
         noClick,
         acceptanceRate: totalForRate > 0 ? (accepted / totalForRate) * 100 : 0,
         rejectionRate: totalForRate > 0 ? (noClick / totalForRate) * 100 : 0,
-        pendingRate: records.length > 0 ? (pending / records.length) * 100 : 0
+        pendingRate: totalForRate > 0 ? (pending / totalForRate) * 100 : 0
       };
 
       return { success: true, data: metrics };
@@ -306,18 +306,19 @@ export class AIAcceptanceService {
     const where: any = {};
     if (contextType) where.contextType = contextType;
 
-    const now = new Date();
     const records = await this.unitOfWork.AIAcceptanceRepo.find(where);
-    const visibleRecords = records.filter(
-      (record) => record.isAccepted || this.isVisibleRecord(record, now)
-    );
-
-    const totalCount = visibleRecords.length;
+    const totalCount = records.length;
     if (totalCount === 0) return { success: true, data: 0 };
 
-    const matchingCount = visibleRecords.filter(
-      (record) => record.isAccepted === isAccepted
-    ).length;
+    let matchingCount: number;
+    if (isAccepted) {
+      matchingCount = records.filter((record) => record.isAccepted).length;
+    } else {
+      const now = new Date();
+      matchingCount = records.filter(
+        (record) => !record.isAccepted && this.isVisibleRecord(record, now)
+      ).length;
+    }
     const acceptanceRate = (matchingCount / totalCount) * 100;
     return { success: true, data: acceptanceRate };
   }

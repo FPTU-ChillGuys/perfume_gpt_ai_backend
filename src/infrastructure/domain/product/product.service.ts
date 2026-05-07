@@ -1076,52 +1076,32 @@ export class ProductService {
     }, 'errors.product.fetch_variants');
   }
 
-  /** Lấy chi tiết một sản phẩm kèm toàn bộ variants */
+  /** Lấy danh sách sản phẩm có phân trang và sắp xếp động */
   async getAllProductsWithVariants(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
-    return await this.err.wrap(async () => {
-      const skip = (request.PageNumber - 1) * request.PageSize;
-      const take = request.PageSize;
-
-      const [products, totalCount] = await Promise.all([
-        this.prisma.products.findMany({
-          where: { IsDeleted: false },
-          include: productWithVariantsInclude,
-          skip,
-          take,
-          orderBy: {
-            CreatedAt: request.SortOrder === 'asc' ? 'asc' : 'desc'
-          }
-        }),
-        this.prisma.products.count({
-          where: { IsDeleted: false }
-        })
-      ]);
-
-      if (!products) {
-        throw new NotFoundException(`Không tìm thấy sản phẩm`);
-      }
-
-      return {
-        success: true,
-        data: new PagedResult<ProductWithVariantsResponse>({
-          items: products.map(mapProductWithVariants),
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        })
-      };
-    }, 'errors.product.fetch_all_with_variants');
+    const direction = request.SortOrder === 'asc' ? 'asc' : 'desc';
+    return this.getSortedProducts('CreatedAt', direction, request.PageNumber, request.PageSize);
   }
 
+  /** @deprecated Use getAllProductsWithVariants({ SortOrder: 'desc' }) instead */
   async getNewestProductsWithVariants(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
+    return this.getSortedProducts('CreatedAt', 'desc', request.PageNumber, request.PageSize);
+  }
+
+  /** Private: truy vấn sản phẩm với sắp xếp động (hỗ trợ CreatedAt, Name) */
+  private async getSortedProducts(
+    field: 'CreatedAt' | 'Name',
+    direction: 'asc' | 'desc',
+    pageNumber: number,
+    pageSize: number
+  ): Promise<BaseResponse<PagedResult<ProductWithVariantsResponse>>> {
     return await this.err.wrap(async () => {
-      const skip = (request.PageNumber - 1) * request.PageSize;
-      const take = request.PageSize;
+      const skip = (pageNumber - 1) * pageSize;
+      const take = pageSize;
+      const orderBy = { [field]: direction } as Prisma.ProductsOrderByWithRelationInput;
 
       const [products, totalCount] = await Promise.all([
         this.prisma.products.findMany({
@@ -1129,7 +1109,7 @@ export class ProductService {
           include: productWithVariantsInclude,
           skip,
           take,
-          orderBy: { CreatedAt: 'desc' }
+          orderBy
         }),
         this.prisma.products.count({ where: { IsDeleted: false } })
       ]);
@@ -1138,145 +1118,83 @@ export class ProductService {
         success: true,
         data: new PagedResult<ProductWithVariantsResponse>({
           items: products.map(mapProductWithVariants),
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
+          pageNumber,
+          pageSize,
           totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
+          totalPages: Math.ceil(totalCount / pageSize)
         })
       };
-    }, 'errors.product.fetch_newest');
+    }, 'errors.product.fetch_sorted_products');
   }
 
   async getBestSellingProducts(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
-    return await this.err.wrap(async () => {
-      const skip = (request.PageNumber - 1) * request.PageSize;
-      const take = request.PageSize;
-
-      const groupedByVariant = await this.prisma.orderDetails.groupBy({
-        by: ['VariantId'],
-        _sum: { Quantity: true }
-      });
-
-      if (groupedByVariant.length === 0) {
-        return {
-          success: true,
-          data: new PagedResult<BestSellingProductResponse>({
-            items: [],
-            pageNumber: request.PageNumber,
-            pageSize: request.PageSize,
-            totalCount: 0,
-            totalPages: 0
-          })
-        };
-      }
-
-      const variantIds = groupedByVariant.map((item) => item.VariantId);
-      const variants = await this.prisma.productVariants.findMany({
-        where: {
-          Id: { in: variantIds },
-          IsDeleted: false,
-          Products: { IsDeleted: false }
-        },
-        select: {
-          Id: true,
-          ProductId: true
-        }
-      });
-
-      const variantToProductMap = new Map(
-        variants.map((item) => [item.Id, item.ProductId])
-      );
-
-      const productSoldMap = new Map<string, number>();
-      for (const row of groupedByVariant) {
-        const productId = variantToProductMap.get(row.VariantId);
-        if (!productId) {
-          continue;
-        }
-
-        const soldQty = row._sum.Quantity ?? 0;
-        const current = productSoldMap.get(productId) ?? 0;
-        productSoldMap.set(productId, current + soldQty);
-      }
-
-      const sortedProductSales = Array.from(productSoldMap.entries()).sort(
-        (a, b) => b[1] - a[1]
-      );
-
-      const totalCount = sortedProductSales.length;
-      const pagedProductSales = sortedProductSales.slice(skip, skip + take);
-      const pagedProductIds = pagedProductSales.map(([productId]) => productId);
-
-      if (pagedProductIds.length === 0) {
-        return {
-          success: true,
-          data: new PagedResult<BestSellingProductResponse>({
-            items: [],
-            pageNumber: request.PageNumber,
-            pageSize: request.PageSize,
-            totalCount,
-            totalPages: Math.ceil(totalCount / request.PageSize)
-          })
-        };
-      }
-
-      const products = await this.prisma.products.findMany({
-        where: { Id: { in: pagedProductIds }, IsDeleted: false },
-        include: productWithVariantsInclude
-      });
-
-      const productMap = new Map(products.map((item) => [item.Id, item]));
-      const items: BestSellingProductResponse[] = pagedProductIds
-        .map((productId) => {
-          const product = productMap.get(productId);
-          const totalSoldQuantity = productSoldMap.get(productId) || 0;
-          if (!product) {
-            return null;
-          }
-
-          return {
-            product: mapProductWithVariants(product),
-            totalSoldQuantity
-          };
-        })
-        .filter((item): item is BestSellingProductResponse => item !== null);
-
-      return {
-        success: true,
-        data: new PagedResult<BestSellingProductResponse>({
-          items,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
-          totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
-        })
-      };
-    }, 'errors.product.fetch_best_selling');
+    return this.getSalesRankedProducts('desc', false, request.PageNumber, request.PageSize);
   }
 
+  /** @deprecated Use getSalesRankedProducts('asc', true, ...) instead */
   async getLeastSellingProducts(
     @Query() request: PagedAndSortedRequest
   ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
+    return this.getSalesRankedProducts('asc', true, request.PageNumber, request.PageSize);
+  }
+
+  /** Private: truy vấn sản phẩm theo doanh số bán hàng (hỗ trợ both best & least selling) */
+  private async getSalesRankedProducts(
+    direction: 'asc' | 'desc',
+    includeZeroSales: boolean,
+    pageNumber: number,
+    pageSize: number,
+    gender?: string[]
+  ): Promise<BaseResponse<PagedResult<BestSellingProductResponse>>> {
     return await this.err.wrap(async () => {
-      const skip = (request.PageNumber - 1) * request.PageSize;
-      const take = request.PageSize;
+      const skip = (pageNumber - 1) * pageSize;
+      const take = pageSize;
+
+      // Nếu có gender filter, lấy danh sách ProductId phù hợp trước
+      const genderProductFilter: Prisma.ProductsWhereInput = {
+        IsDeleted: false,
+        ...(gender && gender.length > 0
+          ? { Gender: { in: gender } }
+          : {})
+      };
+      let allowedProductIds: Set<string> | null = null;
+      if (gender && gender.length > 0) {
+        const genderProducts = await this.prisma.products.findMany({
+          where: genderProductFilter,
+          select: { Id: true }
+        });
+        allowedProductIds = new Set(genderProducts.map((p) => p.Id));
+        // Nếu không có sản phẩm nào khớp gender, trả về rỗng ngay
+        if (allowedProductIds.size === 0) {
+          return {
+            success: true,
+            data: new PagedResult<BestSellingProductResponse>({
+              items: [],
+              pageNumber,
+              pageSize,
+              totalCount: 0,
+              totalPages: 0
+            })
+          };
+        }
+      }
 
       const groupedByVariant = await this.prisma.orderDetails.groupBy({
         by: ['VariantId'],
         _sum: { Quantity: true }
       });
 
-      // For least selling, we also want to consider products that have NEVER been sold (Quantity = 0)
-      const allProducts = await this.prisma.products.findMany({
-        where: { IsDeleted: false },
-        select: { Id: true }
-      });
+      const productSoldMap = new Map<string, number>();
 
-      const productSoldMap = new Map<string, number>(
-        allProducts.map((p) => [p.Id, 0])
-      );
+      if (includeZeroSales) {
+        const allProducts = await this.prisma.products.findMany({
+          where: genderProductFilter,
+          select: { Id: true }
+        });
+        allProducts.forEach((p) => productSoldMap.set(p.Id, 0));
+      }
 
       if (groupedByVariant.length > 0) {
         const variantIds = groupedByVariant.map((item) => item.VariantId);
@@ -1296,14 +1214,29 @@ export class ProductService {
         for (const row of groupedByVariant) {
           const productId = variantToProductMap.get(row.VariantId);
           if (!productId) continue;
+          // Nếu có gender filter, bỏ qua sản phẩm không khớp
+          if (allowedProductIds && !allowedProductIds.has(productId)) continue;
           const soldQty = row._sum.Quantity ?? 0;
           const current = productSoldMap.get(productId) ?? 0;
           productSoldMap.set(productId, current + soldQty);
         }
       }
 
+      if (productSoldMap.size === 0) {
+        return {
+          success: true,
+          data: new PagedResult<BestSellingProductResponse>({
+            items: [],
+            pageNumber,
+            pageSize,
+            totalCount: 0,
+            totalPages: 0
+          })
+        };
+      }
+
       const sortedProductSales = Array.from(productSoldMap.entries()).sort(
-        (a, b) => a[1] - b[1] // Ascending order for least selling
+        (a, b) => direction === 'desc' ? b[1] - a[1] : a[1] - b[1]
       );
 
       const totalCount = sortedProductSales.length;
@@ -1315,10 +1248,10 @@ export class ProductService {
           success: true,
           data: new PagedResult<BestSellingProductResponse>({
             items: [],
-            pageNumber: request.PageNumber,
-            pageSize: request.PageSize,
+            pageNumber,
+            pageSize,
             totalCount,
-            totalPages: 1
+            totalPages: Math.ceil(totalCount / pageSize)
           })
         };
       }
@@ -1345,13 +1278,13 @@ export class ProductService {
         success: true,
         data: new PagedResult<BestSellingProductResponse>({
           items,
-          pageNumber: request.PageNumber,
-          pageSize: request.PageSize,
+          pageNumber,
+          pageSize,
           totalCount,
-          totalPages: Math.ceil(totalCount / request.PageSize)
+          totalPages: Math.ceil(totalCount / pageSize)
         })
       };
-    }, 'errors.product.fetch_least_selling');
+    }, 'errors.product.fetch_sales_ranked');
   }
 
   async getProductsByStructuredQuery(

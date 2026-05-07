@@ -142,14 +142,13 @@ export class ConversationService {
       const filter = request.userId ? { userId: request.userId } : {};
 
       const pagedResult = await this.unitOfWork.AIConversationRepo.getPaged(
-        request,
+        { ...request, SortOrder: 'desc' },
         filter,
         { populate: ['messages'] }
       );
 
       const items = pagedResult.items
-        .map((c) => ConversationResponse.fromEntity(c)!)
-        .reverse();
+        .map((c) => ConversationResponse.fromEntity(c)!);
 
       await this.resolveUserNameForConversations(items);
 

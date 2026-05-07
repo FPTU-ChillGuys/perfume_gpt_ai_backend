@@ -227,26 +227,61 @@ export class AISearchExecutorHelper {
   private async executeFunctionQuery(query: QueryItemObject): Promise<any[]> {
     if (!query.functionCall) return [];
     const funcName = query.functionCall.name;
+    const opts: { pageSize?: number | null; gender?: string[] | null; sortOrder?: 'asc' | 'desc' | null } =
+      query.functionCall?.queryOptions ?? {};
+    const pageSize = opts?.pageSize ?? 50;
+    const sortOrder = opts?.sortOrder ?? 'desc';
+    const genderFilter = opts?.gender ?? null;
     let targetItems: any[] = [];
+
+    this.logger.log(
+      `[executeFunctionQuery] funcName=${funcName} pageSize=${pageSize} sortOrder=${sortOrder} gender=${JSON.stringify(genderFilter)}`
+    );
 
     if (funcName === 'getBestSellingProducts') {
       const res = await this.productService.getBestSellingProducts({
         PageNumber: 1,
-        PageSize: 50,
-        SortOrder: 'desc',
-        IsDescending: true
+        PageSize: pageSize,
+        SortOrder: sortOrder,
+        IsDescending: sortOrder === 'desc'
       });
       if (res.success && res.data)
         targetItems = res.data.items.map((i: any) => i.product);
     } else if (funcName === 'getNewestProducts') {
-      const res = await this.productService.getNewestProductsWithVariants({
+      const res = await this.productService.getAllProductsWithVariants({
         PageNumber: 1,
-        PageSize: 50,
+        PageSize: pageSize,
         SortOrder: 'desc',
         IsDescending: true
       });
       if (res.success && res.data) targetItems = res.data.items;
+    } else if (funcName === 'getLeastSellingProducts') {
+      const res = await this.productService.getLeastSellingProducts({
+        PageNumber: 1,
+        PageSize: pageSize,
+        SortOrder: 'asc',
+        IsDescending: false
+      });
+      if (res.success && res.data)
+        targetItems = res.data.items.map((i: any) => i.product);
     }
+
+    // Apply gender post-filter if specified in queryOptions
+    if (genderFilter && genderFilter.length > 0 && targetItems.length > 0) {
+      const beforeCount = targetItems.length;
+      const lowerGenders = genderFilter.map((g: string) => g.toLowerCase());
+      targetItems = targetItems.filter((item: any) => {
+        const itemGender = (item.gender || '').toLowerCase();
+        return lowerGenders.some((g) => itemGender.includes(g));
+      });
+      this.logger.log(
+        `[executeFunctionQuery] genderFilter=${JSON.stringify(genderFilter)} before=${beforeCount} after=${targetItems.length}`
+      );
+    }
+
+    this.logger.log(
+      `[executeFunctionQuery] result funcName=${funcName} items=${targetItems.length}`
+    );
 
     return targetItems;
   }

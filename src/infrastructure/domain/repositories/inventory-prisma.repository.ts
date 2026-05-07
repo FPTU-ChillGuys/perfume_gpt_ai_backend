@@ -178,4 +178,32 @@ export class InventoryPrismaRepository {
       include: stockVariantInclude
     });
   }
+
+  async getInventoryOverallStats(): Promise<{
+    totalSku: number;
+    lowStockSku: number;
+    outOfStockSku: number;
+    expiredBatches: number;
+    nearExpiryBatches: number;
+  }> {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+    const [totalSku, lowStockSku, outOfStockSku, expiredBatches, nearExpiryBatches] = await Promise.all([
+      this.countVariants(),
+      this.countLowStocks(),
+      this.countOutOfStocks(),
+      this.countExpiredBatches(now),
+      this.countNearExpiryBatches(now, thirtyDaysFromNow)
+    ]);
+
+    return {
+      totalSku,
+      lowStockSku: lowStockSku + outOfStockSku,
+      outOfStockSku,
+      expiredBatches,
+      nearExpiryBatches
+    };
+  }
 }

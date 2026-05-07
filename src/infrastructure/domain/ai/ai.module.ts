@@ -236,9 +236,7 @@ const aiInventoryReportProvider: Provider = {
       undefined,
       undefined,
       {
-        enablePromptOptimization: true,
-        optimizationPrompt:
-          'Use case: recommendation/repurchase email generation. Preserve all product mentions and personalization context. Keep Vietnamese language intact. Do not change product IDs, variant IDs, or TOON-encoded data.'
+        enablePromptOptimization: false
       },
       undefined,
       err,

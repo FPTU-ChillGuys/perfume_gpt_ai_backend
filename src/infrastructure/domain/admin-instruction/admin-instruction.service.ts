@@ -7,9 +7,16 @@ import { CreateAdminInstructionRequest } from 'src/application/dtos/request/admi
 import { UpdateAdminInstructionRequest } from 'src/application/dtos/request/admin-instruction/update-admin-instruction.request';
 import { I18nErrorHandler } from 'src/infrastructure/domain/utils/i18n-error-handler';
 
+interface CacheEntry {
+  value: string;
+  expiry: number;
+}
+
 @Injectable()
 export class AdminInstructionService {
   private readonly logger = new Logger(AdminInstructionService.name);
+  private readonly cache = new Map<string, CacheEntry>();
+  private readonly cacheTTL = 30 * 60 * 1000;
   constructor(
     private readonly unitOfWork: UnitOfWork,
     private readonly err: I18nErrorHandler
@@ -130,12 +137,23 @@ export class AdminInstructionService {
   }
 
   async getSystemPromptForDomain(domain: string): Promise<string> {
+    const cacheKey = `admin-instruction:${domain}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() < cached.expiry) {
+      return cached.value;
+    }
+
     try {
       const combined =
         await this.unitOfWork.AdminInstructionRepo.getCombinedInstructionsByType(
           domain
         );
-      return combined || '';
+      const value = combined || '';
+      this.cache.set(cacheKey, {
+        value,
+        expiry: Date.now() + this.cacheTTL
+      });
+      return value;
     } catch (error) {
       this.logger.error(
         `Failed to get system prompt for domain "${domain}"`,

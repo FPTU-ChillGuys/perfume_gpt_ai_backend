@@ -22,6 +22,7 @@ import {
 } from 'src/infrastructure/domain/ai/ai.module';
 import { AdminInstructionService } from 'src/infrastructure/domain/admin-instruction/admin-instruction.service';
 import { ReviewService } from 'src/infrastructure/domain/review/review.service';
+import { cleanMarkdown } from 'src/infrastructure/domain/utils/markdown-cleaner.util';
 
 @Injectable()
 export class ReviewAIService {
@@ -56,7 +57,7 @@ export class ReviewAIService {
     if (!aiResponse.success) {
       return this.err.fail('errors.review.summary');
     }
-    return Ok(aiResponse.data);
+    return Ok(cleanMarkdown(aiResponse.data!));
   }
 
   /** Tóm tắt đánh giá theo variant ID bằng AI */
@@ -82,7 +83,7 @@ export class ReviewAIService {
     if (!aiResponse.success) {
       return this.err.fail('errors.review.summary');
     }
-    return Ok(aiResponse.data);
+    return Ok(cleanMarkdown(aiResponse.data!));
   }
 
   /** Tóm tắt đánh giá có cấu trúc theo variant ID (với metadata) */
@@ -119,7 +120,7 @@ export class ReviewAIService {
     }
     const processingTimeMs = Date.now() - startTime;
     const result = new AIReviewSummaryStructuredResponse({
-      summary: aiResponse.data,
+      summary: cleanMarkdown(aiResponse.data!),
       variantId,
       reviewCount: reviews.length,
       generatedAt: new Date(),

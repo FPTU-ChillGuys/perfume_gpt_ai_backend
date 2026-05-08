@@ -18,7 +18,7 @@ interface ImproverJobData {
 }
 
 /** Minimum confidence (%) per instruction type for the improver to auto-apply an upgrade */
-const CONFIDENCE_THRESHOLD = 90;
+const CONFIDENCE_THRESHOLD = 95;
 
 /** Minimum messages in a conversation before the improver will analyze it */
 const MIN_MESSAGES_FOR_ANALYSIS = 4;

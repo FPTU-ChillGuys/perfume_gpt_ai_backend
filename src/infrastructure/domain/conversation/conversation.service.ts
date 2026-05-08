@@ -675,7 +675,7 @@ export class ConversationService {
     sanitized = sanitized.replace(BARE_UUID, '');
 
     // Clean up double spaces / empty parentheses left from removal
-    sanitized = sanitized.replace(/\s{2,}/g, ' ').replace(/\(\s*\)/g, '').trim();
+    sanitized = sanitized.replace(/ {2,}/g, ' ').replace(/\(\s*\)/g, '').trim();
 
     if (sanitized !== aiResponse.message) {
       this.logger.log('[SANITIZE] Removed variant UUIDs from AI message');

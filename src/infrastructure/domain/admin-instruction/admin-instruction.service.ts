@@ -113,6 +113,8 @@ export class AdminInstructionService {
 
       await this.unitOfWork.AdminInstructionRepo.flush();
 
+      this.clearCache(instruction.instructionType);
+
       return {
         success: true,
         data: AdminInstructionResponse.fromEntity(instruction)!
@@ -132,8 +134,14 @@ export class AdminInstructionService {
       this.unitOfWork.AdminInstructionRepo.remove(instruction);
       await this.unitOfWork.AdminInstructionRepo.flush();
 
+      this.clearCache(instruction.instructionType);
+
       return { success: true, data: true };
     }, 'errors.admin_instruction.delete');
+  }
+
+  private clearCache(type: string): void {
+    this.cache.delete(`admin-instruction:${type}`);
   }
 
   async getSystemPromptForDomain(domain: string): Promise<string> {

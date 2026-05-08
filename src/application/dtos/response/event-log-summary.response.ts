@@ -25,15 +25,15 @@ export class EventLogSummaryResponse {
   @ApiProperty({ description: 'Tổng số event' })
   totalCount!: number;
 
-  @ApiProperty({ description: 'Số event message' })
+  @ApiProperty({ description: 'Số sự kiện tin nhắn' })
   messageCount!: number;
 
-  @ApiProperty({ description: 'Số event search' })
+  @ApiProperty({ description: 'Số sự kiện tìm kiếm' })
   searchCount!: number;
 
-  @ApiProperty({ description: 'Số event survey' })
+  @ApiProperty({ description: 'Số sự kiện khảo sát' })
   surveyCount!: number;
 
-  @ApiProperty({ description: 'Số event product' })
+  @ApiProperty({ description: 'Số sự kiện sản phẩm' })
   productCount!: number;
 }

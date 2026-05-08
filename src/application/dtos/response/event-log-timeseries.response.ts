@@ -7,16 +7,16 @@ export class EventLogTimeSeriesPointResponse {
   @ApiProperty({ description: 'Tổng số event trong bucket' })
   totalCount!: number;
 
-  @ApiProperty({ description: 'Số event message trong bucket' })
+  @ApiProperty({ description: 'Số sự kiện tin nhắn trong bucket' })
   messageCount!: number;
 
-  @ApiProperty({ description: 'Số event search trong bucket' })
+  @ApiProperty({ description: 'Số sự kiện tìm kiếm trong bucket' })
   searchCount!: number;
 
-  @ApiProperty({ description: 'Số event survey trong bucket' })
+  @ApiProperty({ description: 'Số sự kiện khảo sát trong bucket' })
   surveyCount!: number;
 
-  @ApiProperty({ description: 'Số event product trong bucket' })
+  @ApiProperty({ description: 'Số sự kiện sản phẩm trong bucket' })
   productCount!: number;
 }
 

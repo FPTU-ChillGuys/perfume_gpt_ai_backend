@@ -3,6 +3,20 @@ import { EventLog } from 'src/domain/entities/event-log.entity';
 import { EventLogEventType } from 'src/domain/enum/event-log-event-type.enum';
 import { EventLogEntityType } from 'src/domain/enum/event-log-entity-type.enum';
 
+const EVENT_TYPE_VI_LABELS: Record<EventLogEventType, string> = {
+  [EventLogEventType.MESSAGE]: 'Tin nhắn',
+  [EventLogEventType.SEARCH]: 'Tìm kiếm',
+  [EventLogEventType.SURVEY]: 'Khảo sát',
+  [EventLogEventType.PRODUCT]: 'Sản phẩm',
+};
+
+const ENTITY_TYPE_VI_LABELS: Record<EventLogEntityType, string> = {
+  [EventLogEntityType.CONVERSATION]: 'Cuộc trò chuyện',
+  [EventLogEntityType.SEARCH]: 'Tìm kiếm',
+  [EventLogEntityType.SURVEY]: 'Khảo sát',
+  [EventLogEntityType.PRODUCT]: 'Sản phẩm',
+};
+
 /** DTO phản hồi event log */
 export class EventLogResponse {
   /** ID người dùng (nullable cho anonymous/system) */
@@ -24,10 +38,20 @@ export class EventLogResponse {
   eventType!: EventLogEventType;
 
   @ApiProperty({
+    description: 'Loại sự kiện hiển thị tiếng Việt',
+  })
+  eventTypeLabel!: string;
+
+  @ApiProperty({
     description: 'Loại thực thể liên quan',
     enum: EventLogEntityType
   })
   entityType!: EventLogEntityType;
+
+  @ApiProperty({
+    description: 'Loại thực thể hiển thị tiếng Việt',
+  })
+  entityTypeLabel!: string;
 
   @ApiProperty({
     description: 'ID thực thể liên quan (nullable)',
@@ -66,7 +90,9 @@ export class EventLogResponse {
     const response = new EventLogResponse();
     response.userId = entity.userId;
     response.eventType = entity.eventType;
+    response.eventTypeLabel = EVENT_TYPE_VI_LABELS[entity.eventType] ?? entity.eventType;
     response.entityType = entity.entityType;
+    response.entityTypeLabel = ENTITY_TYPE_VI_LABELS[entity.entityType] ?? entity.entityType;
     response.entityId = entity.entityId;
     response.contentText = entity.contentText;
     response.metadata = entity.metadata;

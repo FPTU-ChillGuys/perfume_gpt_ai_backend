@@ -15,6 +15,9 @@ COPY . .
 
 RUN npx prisma generate
 
+# Sync prompts
+RUN pnpm run sync:prompts
+
 # Build app
 RUN pnpm run build
 

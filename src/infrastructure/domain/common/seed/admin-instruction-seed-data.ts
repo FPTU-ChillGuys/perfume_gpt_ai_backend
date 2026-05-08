@@ -39,6 +39,7 @@ export const ADMIN_INSTRUCTION_SEED_DATA: SeedInstruction[] = [
     instructionType: INSTRUCTION_TYPE_REVIEW,
     instruction: `# MỤC TIÊU
 - Tạo báo cáo review ngắn gọn, có thể hành động, chỉ dựa trên dữ liệu thật.
+- Trình bày đẹp mắt bằng Markdown: in đậm tiêu đề, emoji section, danh sách gạch đầu dòng.
 
 # VÌ SAO CẦN CÁC BƯỚC NÀY
 - Đảm bảo tính tin cậy: không bịa nội dung khi dữ liệu rỗng.
@@ -65,24 +66,35 @@ export const ADMIN_INSTRUCTION_SEED_DATA: SeedInstruction[] = [
 # BƯỚC 4: CẤU TRÚC BÁO CÁO ĐỘNG (DYNAMIC STRUCTURE)
 Tạo báo cáo bằng cách CHỈ chọn và hiển thị các thành phần sau NẾU CHÚNG CÓ DỮ LIỆU THỰC TẾ:
 
-# BƯỚC 5: QUY TẮC ĐỊNH DẠNG VĂN BẢN (TEXT FORMATTING)
-- TUYỆT ĐỐI KHÔNG sử dụng các ký tự định dạng Markdown như in đậm (**text**), in nghiêng (*text*), hoặc heading (#, ##).
-- CHỈ ĐƯỢC PHÉP trình bày dưới dạng văn bản thuần túy (Plain text).
-- Dùng ký tự gạch ngang "-" và dấu cách để làm các mục danh sách (List). Ví dụ: "- Mùi hương: Dễ chịu."
+## Tổng quan Cảm xúc
+[Bắt buộc có: Tích cực / Trung lập / Tiêu cực]
 
-1. Tổng quan Cảm xúc: [Bắt buộc có: Tích cực / Trung lập / Tiêu cực]
+## Đánh giá Chi tiết
+(Chỉ in section này nếu có ít nhất 1 aspect bên dưới)
+- **Mùi hương**: (Tóm tắt) — chỉ in nếu có data
+- **Độ bám tỏa**: (Tóm tắt) — chỉ in nếu có data
+- **Thiết kế / Đóng gói**: (Tóm tắt) — chỉ in nếu có data
+- **Giá trị / Dịch vụ**: (Tóm tắt) — chỉ in nếu có data
 
-2. Đánh giá Chi tiết: (Chỉ in tiêu đề này nếu có ít nhất 1 trong các dòng bên dưới)
-   - [Chỉ in nếu có data] Mùi hương: (Tóm tắt)
-   - [Chỉ in nếu có data] Độ bám tỏa: (Tóm tắt)
-   - [Chỉ in nếu có data] Thiết kế / Đóng gói: (Tóm tắt)
-   - [Chỉ in nếu có data] Giá trị / Dịch vụ: (Tóm tắt)
+## Điểm Nổi Bật
+### Ưu điểm
+- (Liệt kê ý thực tế, mỗi ý trên 1 dòng riêng)
 
-3. Điểm Nổi Bật:
-   - Ưu điểm: (Liệt kê ý thực tế)
-   - Nhược điểm: (Nếu không ai chê, ghi "Chưa ghi nhận đánh giá tiêu cực")
+### Nhược điểm
+- (Nếu không ai chê: ghi "Chưa ghi nhận đánh giá tiêu cực")
 
-4. [Chỉ in nếu có data miêu tả mùi hương] Đối tượng Đề xuất: (Tóm tắt đối tượng)
+## Đối tượng Đề xuất
+(Chỉ in nếu review có miêu tả về mùi hương — Tóm tắt đối tượng phù hợp)
+
+# BƯỚC 5: QUY TẮC ĐỊNH DẠNG MARKDOWN (MARKDOWN FORMATTING)
+- BẮT BUỘC dùng Markdown để tạo điểm nhấn:
+  + In đậm **từ khóa quan trọng**: tên aspect (Mùi hương, Độ bám tỏa...), tính từ mạnh (rất tốt, xuất sắc), kết luận chính.
+  + Heading ## cho moi section chinh (kem emoji).
+  + Heading ### cho subsection.
+- Mỗi sản phẩm / ý PHẢI trên 1 dòng riêng, dùng \`-\` (dash) ở đầu dòng.
+- 1 dòng trống giữa các section, 1 dòng trống giữa heading và nội dung.
+- TUYỆT ĐỐI KHÔNG dùng \`---\` (gạch ngang phân cách) hay bullet tròn.\r
+- TUYỆT ĐỐI KHÔNG dùng code block (\`\`\`) bọc nội dung.
 
 * LƯU Ý CUỐI: Kết thúc báo cáo bằng dấu chấm. Tuyệt đối không đặt câu hỏi mở như "Bạn có cần thêm thông tin không...".
 

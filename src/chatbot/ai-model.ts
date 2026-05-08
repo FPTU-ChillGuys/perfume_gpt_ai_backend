@@ -38,16 +38,16 @@ export const embeddingModel: EmbeddingModel = openai.embedding(
 
 export const aiModel = geminiFlash3_1;
 
-export const aiModelForSurvey = gpt5_4nano;
+export const aiModelForSurvey = geminiFlash3_1;
 
 export const aiModelForTrend = gpt5_4nano;
 
-export const aiModelForRestock = gpt5_4nano;
+export const aiModelForRestock = geminiFlash3_1;
 
-export const aiModelForReview = gpt5_4nano;
+export const aiModelForReview = geminiFlash3_1;
 
 export const aiModelForOptimizePrompt = gpt5_4nano;
 
 export const aiModelForSearch = gpt5_4nano;
 
-export const aiModelForConversationAnalysis = mistralai_voxtral_small_24b_2507;
+export const aiModelForConversationAnalysis = geminiFlash3_1;
